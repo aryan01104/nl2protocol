@@ -1,0 +1,4 @@
+row,dilution_factor,num_points,diluent_volume_ul,transfer_volume_ul,stock_well
+A,2,8,100,100,A2
+B,3,6,200,100,A2
+C,10,4,180,20,A2

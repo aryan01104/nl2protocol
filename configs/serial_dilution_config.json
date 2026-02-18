@@ -1,0 +1,30 @@
+{
+  "labware": {
+    "reservoir": {
+      "load_name": "nest_12_reservoir_15ml",
+      "slot": "1",
+      "label": "Reservoir",
+      "contents": {
+        "A1": "Diluent (PBS buffer)",
+        "A2": "Stock solution (100µM)"
+      }
+    },
+    "dilution_plate": {
+      "load_name": "corning_96_wellplate_360ul_flat",
+      "slot": "2",
+      "label": "Dilution Plate",
+      "contents": {}
+    },
+    "tips": {
+      "load_name": "opentrons_96_tiprack_300ul",
+      "slot": "3",
+      "label": "Tips"
+    }
+  },
+  "pipettes": {
+    "left": {
+      "model": "p300_single_gen2",
+      "tipracks": ["Tips"]
+    }
+  }
+}
