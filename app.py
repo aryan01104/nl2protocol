@@ -163,21 +163,36 @@ def generate_opentrons_script(protocol: ProtocolSchema) -> str:
     return "\n".join(lines)
 
 
-def verify_protocol(script_code: str):
+def verify_protocol(script_code: str) -> tuple[bool, str]:
     """Runs the script through the Opentrons simulator and returns (success, logs/errors)."""
     protocol_file = io.StringIO(script_code)
     try:
         runlog, _ = simulate.simulate(protocol_file)
-        return True, "Simulation completed successfully."
+        # Format the run log into readable output
+        log_lines = ["Simulation completed successfully.", "", "Run Log:"]
+        for entry in runlog:
+            if isinstance(entry, dict):
+                msg = entry.get('payload', {}).get('text', str(entry))
+                log_lines.append(f"  {msg}")
+            else:
+                log_lines.append(f"  {entry}")
+        return True, "\n".join(log_lines)
     except Exception as e:
-        return False, str(e)
+        return False, f"Simulation failed: {str(e)}"
 
 
 class ProtocolAgent:
-    def __init__(self):
-        self.parser = ProtocolParser()
+    def __init__(self, config_path: str = "lab_config.json"):
+        self.config_path = config_path
+        self.parser = ProtocolParser(config_path=config_path)
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 3):
+    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 3) -> tuple[str, str] | None:
+        """Run the protocol generation pipeline.
+
+        Returns:
+            On success: Tuple of (script, simulation_log)
+            On failure: None
+        """
         print(f"Scientist Intent: {prompt}")
 
         attempt = 0
@@ -204,14 +219,14 @@ class ProtocolAgent:
                 continue
 
             # 3. Verification: Simulation
-            success, result = verify_protocol(script)
+            success, simulation_log = verify_protocol(script)
 
             if success:
                 print("Success! 'Scientist Intent' verified as robotic action.")
-                return script
+                return (script, simulation_log)
             else:
-                print(f"Safety Violation Detected: {result}")
-                error_log = result
+                print(f"Safety Violation Detected: {simulation_log}")
+                error_log = simulation_log
                 print("Self-Correction Loop: Feeding error back to Reasoning engine...")
 
         print(f"Failed after {max_retries} attempts.")
@@ -219,13 +234,11 @@ class ProtocolAgent:
 
 
 if __name__ == "__main__":
-    agent = ProtocolAgent()
-    final_script = agent.run_pipeline(
-        prompt="Transfer samples from source to dest according to the experimental data",
-        csv_path="experiment_data.csv"
-    )
+    import sys
+    from cli import main
 
-    if final_script:
-        with open("generated_protocol.py", "w") as f:
-            f.write(final_script)
-        print("\nFinal verified script saved to generated_protocol.py")
+    # If no arguments provided, show help
+    if len(sys.argv) == 1:
+        sys.argv.append('--help')
+
+    sys.exit(main())

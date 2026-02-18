@@ -10,48 +10,50 @@ from models import ProtocolSchema, Labware, Pipette, Transfer, Mix, Distribute
 # =============================================================================
 
 # Mock config (simulates lab_config.json)
+# Note: label is auto-set to dict key by normalize_config() at load time
 MOCK_CONFIG = {
     "labware": {
         "reservoir": {
             "load_name": "nest_12_reservoir_15ml",
             "slot": "1",
-            "label": "Reservoir"
+            "label": "reservoir"  # normalized: label = dict key
         },
         "plate": {
             "load_name": "corning_96_wellplate_360ul_flat",
             "slot": "2",
-            "label": "Plate"
+            "label": "plate"  # normalized: label = dict key
         },
         "tips": {
             "load_name": "opentrons_96_tiprack_300ul",
             "slot": "3",
-            "label": "Tips"
+            "label": "tips"  # normalized: label = dict key
         }
     },
     "pipettes": {
         "left": {
             "model": "p300_single_gen2",
-            "tipracks": ["Tips"]
+            "tipracks": ["tips"]  # references dict key
         }
     }
 }
 
 # Valid protocol data (what LLM might output)
+# Uses dict keys for all labware references
 VALID_PROTOCOL = {
     "protocol_name": "Test Serial Dilution",
     "author": "Test",
     "labware": [
-        {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "Reservoir"},
-        {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "Plate"},
-        {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "Tips"}
+        {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "reservoir"},
+        {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "plate"},
+        {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "tips"}
     ],
     "pipettes": [
-        {"mount": "left", "model": "p300_single_gen2", "tipracks": ["Tips"]}
+        {"mount": "left", "model": "p300_single_gen2", "tipracks": ["tips"]}
     ],
     "commands": [
-        {"command_type": "transfer", "pipette": "left", "source_labware": "Reservoir",
-         "source_well": "A1", "dest_labware": "Plate", "dest_well": "A1", "volume": 100},
-        {"command_type": "mix", "pipette": "left", "labware": "Plate",
+        {"command_type": "transfer", "pipette": "left", "source_labware": "reservoir",
+         "source_well": "A1", "dest_labware": "plate", "dest_well": "A1", "volume": 100},
+        {"command_type": "mix", "pipette": "left", "labware": "plate",
          "well": "A1", "volume": 50, "repetitions": 3}
     ]
 }
@@ -105,8 +107,8 @@ def test_invalid_pipette_reference():
     print("\n=== Test: Invalid Pipette Reference ===")
     bad_protocol = VALID_PROTOCOL.copy()
     bad_protocol["commands"] = [
-        {"command_type": "transfer", "pipette": "right", "source_labware": "Reservoir",
-         "source_well": "A1", "dest_labware": "Plate", "dest_well": "A1", "volume": 100}
+        {"command_type": "transfer", "pipette": "right", "source_labware": "reservoir",
+         "source_well": "A1", "dest_labware": "plate", "dest_well": "A1", "volume": 100}
     ]
 
     try:
@@ -127,8 +129,8 @@ def test_volume_out_of_range():
     print("\n=== Test: Volume Out of Range ===")
     bad_protocol = VALID_PROTOCOL.copy()
     bad_protocol["commands"] = [
-        {"command_type": "transfer", "pipette": "left", "source_labware": "Reservoir",
-         "source_well": "A1", "dest_labware": "Plate", "dest_well": "A1", "volume": 500}
+        {"command_type": "transfer", "pipette": "left", "source_labware": "reservoir",
+         "source_well": "A1", "dest_labware": "plate", "dest_well": "A1", "volume": 500}
     ]
 
     try:
@@ -149,13 +151,13 @@ def test_config_mismatch_labware():
     print("\n=== Test: Labware Not in Config ===")
     bad_protocol = VALID_PROTOCOL.copy()
     bad_protocol["labware"] = [
-        {"slot": "1", "load_name": "fake_labware_that_doesnt_exist", "label": "Fake"},
-        {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "Plate"},
-        {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "Tips"}
+        {"slot": "1", "load_name": "fake_labware_that_doesnt_exist", "label": "fake"},
+        {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "plate"},
+        {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "tips"}
     ]
     bad_protocol["commands"] = [
-        {"command_type": "transfer", "pipette": "left", "source_labware": "Fake",
-         "source_well": "A1", "dest_labware": "Plate", "dest_well": "A1", "volume": 100}
+        {"command_type": "transfer", "pipette": "left", "source_labware": "fake",
+         "source_well": "A1", "dest_labware": "plate", "dest_well": "A1", "volume": 100}
     ]
 
     try:
@@ -176,7 +178,7 @@ def test_config_mismatch_pipette():
     print("\n=== Test: Pipette Model Mismatch ===")
     bad_protocol = VALID_PROTOCOL.copy()
     bad_protocol["pipettes"] = [
-        {"mount": "left", "model": "p1000_single_gen2", "tipracks": ["Tips"]}
+        {"mount": "left", "model": "p1000_single_gen2", "tipracks": ["tips"]}
     ]
 
     try:
@@ -197,8 +199,8 @@ def test_mix_after_tuple():
     print("\n=== Test: mix_after Tuple Handling ===")
     protocol_with_mix = VALID_PROTOCOL.copy()
     protocol_with_mix["commands"] = [
-        {"command_type": "transfer", "pipette": "left", "source_labware": "Reservoir",
-         "source_well": "A1", "dest_labware": "Plate", "dest_well": "A1", "volume": 100,
+        {"command_type": "transfer", "pipette": "left", "source_labware": "reservoir",
+         "source_well": "A1", "dest_labware": "plate", "dest_well": "A1", "volume": 100,
          "mix_after": [3, 50]}  # JSON array, should become tuple
     ]
 

@@ -48,9 +48,32 @@ def get_well_info(load_name: str) -> Dict[str, Any]:
     }
 
 
+def normalize_config(config: Dict) -> Dict:
+    """
+    Normalize config so that label = dict_key for all labware.
+    This ensures consistent referencing throughout the system.
+    """
+    normalized = json.loads(json.dumps(config))  # Deep copy
+
+    if "labware" in normalized:
+        for key, labware in normalized["labware"].items():
+            # Set label to dict key (overwrite any existing label)
+            labware["label"] = key
+
+    if "pipettes" in normalized:
+        for mount, pipette in normalized["pipettes"].items():
+            # Ensure tipracks reference dict keys
+            # (this is informational - the config author should use dict keys)
+            pass
+
+    return normalized
+
+
 def enrich_config_with_wells(config: Dict) -> Dict:
     """Add well information to each labware in the config."""
-    enriched = config.copy()
+    # First normalize the config
+    enriched = normalize_config(config)
+
     if "labware" in enriched:
         for name, labware in enriched["labware"].items():
             if "load_name" in labware:
@@ -80,9 +103,9 @@ FEW_SHOT_EXAMPLES = """
 USER GOAL: "Perform a 2x serial dilution across row A (wells A1-A8). Stock solution is in the reservoir at A1. Pre-fill destination wells with 100uL diluent first."
 
 LAB CONFIG:
-- reservoir in slot 1 (label: "Reservoir") - contains diluent in A1, stock in A2
-- plate in slot 2 (label: "Dilution Plate") - 96-well, destination
-- tiprack in slot 3 (label: "Tips")
+- reservoir (dict key: "reservoir") in slot 1 - contains diluent in A1, stock in A2
+- dilution_plate (dict key: "dilution_plate") in slot 2 - 96-well, destination
+- tips (dict key: "tips") in slot 3
 - left pipette: p300_single_gen2
 
 OUTPUT:
@@ -90,23 +113,23 @@ OUTPUT:
   "protocol_name": "Serial Dilution 2x Row A",
   "author": "Biolab AI",
   "labware": [
-    {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "Reservoir"},
-    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "Dilution Plate"},
-    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "Tips"}
+    {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "reservoir"},
+    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "dilution_plate"},
+    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "tips"}
   ],
   "pipettes": [
-    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["Tips"]}
+    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["tips"]}
   ],
   "commands": [
-    {"command_type": "distribute", "pipette": "left", "source_labware": "Reservoir", "source_well": "A1", "dest_labware": "Dilution Plate", "dest_wells": ["A2", "A3", "A4", "A5", "A6", "A7", "A8"], "volume": 100, "new_tip": "once"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Reservoir", "source_well": "A2", "dest_labware": "Dilution Plate", "dest_well": "A1", "volume": 200, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A1", "dest_labware": "Dilution Plate", "dest_well": "A2", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A2", "dest_labware": "Dilution Plate", "dest_well": "A3", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A3", "dest_labware": "Dilution Plate", "dest_well": "A4", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A4", "dest_labware": "Dilution Plate", "dest_well": "A5", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A5", "dest_labware": "Dilution Plate", "dest_well": "A6", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A6", "dest_labware": "Dilution Plate", "dest_well": "A7", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Dilution Plate", "source_well": "A7", "dest_labware": "Dilution Plate", "dest_well": "A8", "volume": 100, "new_tip": "always", "mix_after": [3, 100]}
+    {"command_type": "distribute", "pipette": "left", "source_labware": "reservoir", "source_well": "A1", "dest_labware": "dilution_plate", "dest_wells": ["A2", "A3", "A4", "A5", "A6", "A7", "A8"], "volume": 100, "new_tip": "once"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "reservoir", "source_well": "A2", "dest_labware": "dilution_plate", "dest_well": "A1", "volume": 200, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A1", "dest_labware": "dilution_plate", "dest_well": "A2", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A2", "dest_labware": "dilution_plate", "dest_well": "A3", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A3", "dest_labware": "dilution_plate", "dest_well": "A4", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A4", "dest_labware": "dilution_plate", "dest_well": "A5", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A5", "dest_labware": "dilution_plate", "dest_well": "A6", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A6", "dest_labware": "dilution_plate", "dest_well": "A7", "volume": 100, "new_tip": "always", "mix_after": [3, 100]},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "dilution_plate", "source_well": "A7", "dest_labware": "dilution_plate", "dest_well": "A8", "volume": 100, "new_tip": "always", "mix_after": [3, 100]}
   ]
 }
 
@@ -115,9 +138,9 @@ OUTPUT:
 USER GOAL: "Copy 50uL from each well in column 1 of the source plate to the same wells in the destination plate (A1-H1)."
 
 LAB CONFIG:
-- source plate in slot 1 (label: "Source Plate") - 96-well with samples
-- dest plate in slot 2 (label: "Dest Plate") - 96-well, empty
-- tiprack in slot 3 (label: "Tips")
+- source_plate (dict key: "source_plate") in slot 1 - 96-well with samples
+- dest_plate (dict key: "dest_plate") in slot 2 - 96-well, empty
+- tips (dict key: "tips") in slot 3
 - left pipette: p300_single_gen2
 
 OUTPUT:
@@ -125,22 +148,22 @@ OUTPUT:
   "protocol_name": "Plate Replication Column 1",
   "author": "Biolab AI",
   "labware": [
-    {"slot": "1", "load_name": "corning_96_wellplate_360ul_flat", "label": "Source Plate"},
-    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "Dest Plate"},
-    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "Tips"}
+    {"slot": "1", "load_name": "corning_96_wellplate_360ul_flat", "label": "source_plate"},
+    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "dest_plate"},
+    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "tips"}
   ],
   "pipettes": [
-    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["Tips"]}
+    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["tips"]}
   ],
   "commands": [
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "A1", "dest_labware": "Dest Plate", "dest_well": "A1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "B1", "dest_labware": "Dest Plate", "dest_well": "B1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "C1", "dest_labware": "Dest Plate", "dest_well": "C1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "D1", "dest_labware": "Dest Plate", "dest_well": "D1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "E1", "dest_labware": "Dest Plate", "dest_well": "E1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "F1", "dest_labware": "Dest Plate", "dest_well": "F1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "G1", "dest_labware": "Dest Plate", "dest_well": "G1", "volume": 50, "new_tip": "always"},
-    {"command_type": "transfer", "pipette": "left", "source_labware": "Source Plate", "source_well": "H1", "dest_labware": "Dest Plate", "dest_well": "H1", "volume": 50, "new_tip": "always"}
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "A1", "dest_labware": "dest_plate", "dest_well": "A1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "B1", "dest_labware": "dest_plate", "dest_well": "B1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "C1", "dest_labware": "dest_plate", "dest_well": "C1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "D1", "dest_labware": "dest_plate", "dest_well": "D1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "E1", "dest_labware": "dest_plate", "dest_well": "E1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "F1", "dest_labware": "dest_plate", "dest_well": "F1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "G1", "dest_labware": "dest_plate", "dest_well": "G1", "volume": 50, "new_tip": "always"},
+    {"command_type": "transfer", "pipette": "left", "source_labware": "source_plate", "source_well": "H1", "dest_labware": "dest_plate", "dest_well": "H1", "volume": 50, "new_tip": "always"}
   ]
 }
 
@@ -149,9 +172,9 @@ OUTPUT:
 USER GOAL: "Add 100uL of buffer from reservoir A1 to all wells in row A of the plate (A1-A12)."
 
 LAB CONFIG:
-- reservoir in slot 1 (label: "Reagent Reservoir") - buffer in A1
-- plate in slot 2 (label: "Assay Plate") - 96-well destination
-- tiprack in slot 3 (label: "Tips")
+- reagent_reservoir (dict key: "reagent_reservoir") in slot 1 - buffer in A1
+- assay_plate (dict key: "assay_plate") in slot 2 - 96-well destination
+- tips (dict key: "tips") in slot 3
 - left pipette: p300_single_gen2
 
 OUTPUT:
@@ -159,15 +182,15 @@ OUTPUT:
   "protocol_name": "Buffer Distribution Row A",
   "author": "Biolab AI",
   "labware": [
-    {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "Reagent Reservoir"},
-    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "Assay Plate"},
-    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "Tips"}
+    {"slot": "1", "load_name": "nest_12_reservoir_15ml", "label": "reagent_reservoir"},
+    {"slot": "2", "load_name": "corning_96_wellplate_360ul_flat", "label": "assay_plate"},
+    {"slot": "3", "load_name": "opentrons_96_tiprack_300ul", "label": "tips"}
   ],
   "pipettes": [
-    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["Tips"]}
+    {"mount": "left", "model": "p300_single_gen2", "tipracks": ["tips"]}
   ],
   "commands": [
-    {"command_type": "distribute", "pipette": "left", "source_labware": "Reagent Reservoir", "source_well": "A1", "dest_labware": "Assay Plate", "dest_wells": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12"], "volume": 100, "new_tip": "once"}
+    {"command_type": "distribute", "pipette": "left", "source_labware": "reagent_reservoir", "source_well": "A1", "dest_labware": "assay_plate", "dest_wells": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12"], "volume": 100, "new_tip": "once"}
   ]
 }
 
@@ -191,7 +214,9 @@ class ProtocolParser:
     def _load_config(self) -> Dict:
         try:
             with open(self.config_path, 'r') as f:
-                return json.load(f)
+                raw_config = json.load(f)
+                # Normalize config so label = dict_key for all labware
+                return normalize_config(raw_config)
         except FileNotFoundError:
             print(f"Warning: Config file {self.config_path} not found.")
             return {}
@@ -272,19 +297,20 @@ LAB CONFIG (Physical Setup with Valid Wells):
 {json.dumps(enriched_config, indent=2)}
 
 IMPORTANT - HOW TO READ THE CONFIG:
+- The dictionary key (e.g., "reservoir", "source_plate", "tips") is the canonical identifier for each labware.
+- 'label': Always equals the dictionary key. Use this value in all labware references and tipracks.
 - 'well_info': Shows valid wells for each labware. Use ONLY wells from the valid range.
 - 'contents': Shows what liquid/sample is in each well (e.g., "A1": "PBS buffer", "A2": "Stock solution").
-- 'label': The labware name to use in commands.
 
 RESOLVING REFERENCES IN THE GOAL:
 The user's goal may refer to labware or liquids by:
-1. Labware label (e.g., "Reservoir", "Source Plate")
-2. Contents name (e.g., "stock solution", "PBS", "diluent")
-3. Common lab names (e.g., "buffer", "samples", "tips")
+1. Dictionary key (e.g., "reservoir", "source_plate") - use this exact key in your output
+2. Contents name (e.g., "stock solution", "PBS", "diluent") - find which labware contains it
+3. Common lab names (e.g., "buffer", "samples", "tips") - map to the appropriate dict key
 
-Look at the config to identify which labware and well contains the referenced item.
-Example: If goal says "Transfer stock solution" and config shows Reservoir A2 contains "Stock solution (100µM)",
-         then source_labware="Reservoir" and source_well="A2".
+Look at the config to identify which labware (by dict key) and well contains the referenced item.
+Example: If goal says "Transfer stock solution" and config shows reservoir["contents"]["A2"] = "Stock solution",
+         then source_labware="reservoir" and source_well="A2".
 
 CSV DATA (Experiment Parameters):
 {csv_content if csv_content else "None"}

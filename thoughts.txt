@@ -1,9 +1,0 @@
-
-- in models.py, shouldnt source labware be of labware type?
-- the experimental data seems really tedious to make, we must eventually make these too right?
-
-
-configs
-- why do the differnt labware which refer
-
-we need csv data when we have math that we need to else, not

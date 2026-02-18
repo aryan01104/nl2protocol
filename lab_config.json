@@ -2,18 +2,15 @@
     "labware": {
         "source_plate": {
             "load_name": "corning_96_wellplate_360ul_flat",
-            "slot": "1",
-            "label": "Source Plate"
+            "slot": "1"
         },
         "dest_plate": {
             "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
-            "slot": "2",
-            "label": "Destination Plate"
+            "slot": "2"
         },
         "tips": {
             "load_name": "opentrons_96_tiprack_300ul",
-            "slot": "3",
-            "label": "300ul Tips"
+            "slot": "3"
         }
     },
     "pipettes": {
