@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Command-line interface for the BioLab Protocol Generator.
+Command-line interface for nl2protocol.
 
 Usage:
-    python cli.py -i "Your protocol description" [options]
+    nl2protocol -i "Your protocol description" [options]
 
 Options:
     -c, --config    Lab configuration JSON file (default: lab_config.json)
@@ -21,8 +21,8 @@ from pathlib import Path
 def create_parser() -> argparse.ArgumentParser:
     """Create and configure the argument parser."""
     parser = argparse.ArgumentParser(
-        prog='biolab',
-        description='Generate and verify Opentrons OT-2 protocols from natural language descriptions.',
+        prog='nl2protocol',
+        description='Convert natural language to Opentrons OT-2 protocols.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
@@ -38,8 +38,8 @@ Compatibility:
 
     parser.add_argument(
         '-i', '--intent',
-        required=True,
-        help='Natural language description of the protocol (required)'
+        default=None,
+        help='Natural language description of the protocol'
     )
 
     parser.add_argument(
@@ -71,6 +71,18 @@ Compatibility:
         '--robot',
         action='store_true',
         help='After successful simulation, prompt to upload protocol to robot'
+    )
+
+    parser.add_argument(
+        '--validate-only',
+        action='store_true',
+        help='Only validate config file, do not generate protocol'
+    )
+
+    parser.add_argument(
+        '-v', '--version',
+        action='store_true',
+        help='Show version and exit'
     )
 
     return parser
@@ -115,7 +127,7 @@ def handle_robot_upload(protocol_path: str) -> bool:
     Returns:
         True if successful or skipped, False if error occurred.
     """
-    from robot import (
+    from .robot import (
         RobotClient,
         load_robot_config,
         save_robot_config,
@@ -202,6 +214,29 @@ def main(argv: list = None) -> int:
     parser = create_parser()
     args = parser.parse_args(argv)
 
+    # Handle --version
+    if args.version:
+        from . import __version__
+        print(f"nl2protocol {__version__}")
+        return 0
+
+    # Handle --validate-only
+    if args.validate_only:
+        from .validation import validate_config_file
+        result = validate_config_file(args.config)
+        if result.valid:
+            print(f"Config '{args.config}' is valid.")
+            return 0
+        else:
+            print(result, file=sys.stderr)
+            return 1
+
+    # For protocol generation, --intent is required
+    if not args.intent:
+        print("Error: -i/--intent is required for protocol generation", file=sys.stderr)
+        parser.print_usage(sys.stderr)
+        return 1
+
     try:
         validate_args(args)
     except (FileNotFoundError, ValueError) as e:
@@ -209,7 +244,7 @@ def main(argv: list = None) -> int:
         return 1
 
     # Import here to allow --help to work without dependencies
-    from app import ProtocolAgent
+    from .app import ProtocolAgent
 
     agent = ProtocolAgent(config_path=args.config)
 

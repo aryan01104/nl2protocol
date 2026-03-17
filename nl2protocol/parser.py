@@ -2,7 +2,7 @@ import json
 import os
 from typing import Optional, Dict, Any
 import google.generativeai as genai
-from models import ProtocolSchema
+from .models import ProtocolSchema
 from dotenv import load_dotenv
 
 
@@ -212,14 +212,17 @@ class ProtocolParser:
         self._setup_gemini()
 
     def _load_config(self) -> Dict:
-        try:
-            with open(self.config_path, 'r') as f:
-                raw_config = json.load(f)
-                # Normalize config so label = dict_key for all labware
-                return normalize_config(raw_config)
-        except FileNotFoundError:
-            print(f"Warning: Config file {self.config_path} not found.")
-            return {}
+        from .validation import validate_config_file
+
+        # First validate the config file
+        result = validate_config_file(self.config_path)
+        if not result.valid:
+            raise ValueError(f"Invalid config file:\n{result}")
+
+        # Load and normalize
+        with open(self.config_path, 'r') as f:
+            raw_config = json.load(f)
+        return normalize_config(raw_config)
 
     def _setup_gemini(self):
         api_key = os.getenv("GEMINI_API_KEY")

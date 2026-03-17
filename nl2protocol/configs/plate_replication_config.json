@@ -1,0 +1,26 @@
+{
+  "labware": {
+    "source_plate": {
+      "load_name": "corning_96_wellplate_360ul_flat",
+      "slot": "1",
+      "contents": {
+        "note": "Contains samples in wells specified by CSV"
+      }
+    },
+    "dest_plate": {
+      "load_name": "corning_96_wellplate_360ul_flat",
+      "slot": "2",
+      "contents": {}
+    },
+    "tips": {
+      "load_name": "opentrons_96_tiprack_300ul",
+      "slot": "3"
+    }
+  },
+  "pipettes": {
+    "left": {
+      "model": "p300_single_gen2",
+      "tipracks": ["tips"]
+    }
+  }
+}

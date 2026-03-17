@@ -1,0 +1,47 @@
+{
+  "labware": {
+    "reagent_reservoir": {
+      "load_name": "nest_12_reservoir_15ml",
+      "slot": "1",
+      "contents": {
+        "A1": "Bradford Reagent",
+        "A2": "BSA Standard (2 mg/mL)",
+        "A3": "Diluent (PBS)"
+      }
+    },
+    "sample_plate": {
+      "load_name": "corning_96_wellplate_360ul_flat",
+      "slot": "2",
+      "contents": {
+        "A1": "Sample 1",
+        "A2": "Sample 2",
+        "A3": "Sample 3",
+        "A4": "Sample 4",
+        "A5": "Sample 5",
+        "A6": "Sample 6"
+      }
+    },
+    "assay_plate": {
+      "load_name": "corning_96_wellplate_360ul_flat",
+      "slot": "3"
+    },
+    "tiprack_300": {
+      "load_name": "opentrons_96_tiprack_300ul",
+      "slot": "4"
+    },
+    "tiprack_20": {
+      "load_name": "opentrons_96_tiprack_20ul",
+      "slot": "5"
+    }
+  },
+  "pipettes": {
+    "left": {
+      "model": "p300_single_gen2",
+      "tipracks": ["tiprack_300"]
+    },
+    "right": {
+      "model": "p20_single_gen2",
+      "tipracks": ["tiprack_20"]
+    }
+  }
+}

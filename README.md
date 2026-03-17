@@ -65,7 +65,7 @@ echo "GEMINI_API_KEY=your_api_key_here" > .env
 
 ## Quick Start
 
-1. **Define your lab configuration** in `lab_config.json`:
+1. **Define your lab configuration** (e.g., `my_lab_config.json`):
 
 ```json
 {
@@ -98,17 +98,24 @@ echo "GEMINI_API_KEY=your_api_key_here" > .env
 2. **Run the agent** with your intent:
 
 ```python
-from app import ProtocolAgent
+from nl2protocol import ProtocolAgent
 
 agent = ProtocolAgent()
-script = agent.run_pipeline(
+result = agent.run_pipeline(
     prompt="Transfer 50uL from wells A1-A8 of the source plate to the same wells in the dest plate",
     csv_path="experiment_data.csv"  # optional
 )
 
-if script:
+if result:
+    script, simulation_log = result
     with open("my_protocol.py", "w") as f:
         f.write(script)
+```
+
+Or use the CLI:
+
+```bash
+nl2protocol -i "Transfer 50uL from A1 to B1" -c my_lab_config.json -o my_protocol.py
 ```
 
 3. **Run on your robot** or test in the Opentrons simulator.
@@ -157,25 +164,33 @@ BioLab enforces correctness at multiple levels:
 
 ```
 biolab/
-├── models.py          # Pydantic schemas for protocol validation
-├── parser.py          # LLM reasoning engine (Gemini integration)
-├── app.py             # Protocol generation and verification
-├── lab_config.json    # Your lab hardware configuration
-├── test_models.py     # Validation test suite
-├── configs/           # Example lab configurations
-│   ├── serial_dilution_config.json
-│   ├── plate_replication_config.json
-│   └── reagent_distribution_config.json
-└── data/              # Example CSV experiment data
-    ├── serial_dilution.csv
-    ├── plate_replication.csv
-    └── reagent_distribution.csv
+├── nl2protocol/       # Main package
+│   ├── __init__.py
+│   ├── models.py      # Pydantic schemas for protocol validation
+│   ├── parser.py      # LLM reasoning engine (Gemini integration)
+│   ├── app.py         # Protocol generation and verification
+│   ├── cli.py         # Command-line interface
+│   ├── robot.py       # Robot HTTP client
+│   └── validation.py  # Config file validation
+├── tests/             # Test suite
+│   └── test_models.py
+└── examples/          # Example configurations and data
+    ├── configs/       # Example lab configurations
+    │   ├── serial_dilution_config.json
+    │   ├── plate_replication_config.json
+    │   ├── reagent_distribution_config.json
+    │   └── bradford_assay_config.json
+    ├── data/          # Example CSV experiment data
+    │   ├── serial_dilution.csv
+    │   ├── plate_replication.csv
+    │   └── reagent_distribution.csv
+    └── robot_config.example.json
 ```
 
 ## Testing
 
 ```bash
-python test_models.py
+python tests/test_models.py
 ```
 
 Tests cover:

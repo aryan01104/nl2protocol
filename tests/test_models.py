@@ -1,9 +1,9 @@
 """
 Test Layer 1: Models + Validation (no external dependencies)
-Run with: python test_models.py
+Run with: python -m pytest tests/ or python tests/test_models.py
 """
 
-from models import ProtocolSchema, Labware, Pipette, Transfer, Mix, Distribute
+from nl2protocol.models import ProtocolSchema, Labware, Pipette, Transfer, Mix, Distribute
 
 # =============================================================================
 # TEST DATA

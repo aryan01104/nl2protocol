@@ -1,6 +1,6 @@
 import io
-from models import ProtocolSchema
-from parser import ProtocolParser
+from .models import ProtocolSchema
+from .parser import ProtocolParser
 from opentrons import simulate
 
 
@@ -235,7 +235,7 @@ class ProtocolAgent:
 
 if __name__ == "__main__":
     import sys
-    from cli import main
+    from nl2protocol.cli import main
 
     # If no arguments provided, show help
     if len(sys.argv) == 1:
