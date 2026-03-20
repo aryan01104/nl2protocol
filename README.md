@@ -1,6 +1,6 @@
 # BioLab
 
-An AI-powered system that translates natural language instructions into executable Opentrons robot protocols.
+An LLM-based system that translates natural language instructions into executable Opentrons robot protocols, with an emphasis on verification of generated scripts.
 
 BioLab bridges the gap between scientific intent and robotic action. Describe your lab procedure in plain English, and BioLab generates validated, simulator-tested Python code ready to run on Opentrons liquid handling robots.
 
