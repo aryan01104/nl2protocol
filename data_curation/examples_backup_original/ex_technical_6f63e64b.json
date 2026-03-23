@@ -1,0 +1,116 @@
+{
+  "id": "ex_technical_6f63e64b",
+  "intent": "Execute a two-phase cherrypicking and normalization protocol using CSV-defined transfer maps. First, dispense diluent volumes from source wells to destination wells at specified aspiration and dispensing heights according to the diluent CSV parameters. Second, perform sample transfers of DNA from source to destination wells with precise volumetric control, including optional 3x mixing at target volumes not exceeding pipette capacity. Utilize dynamic tip management with configurable tip changing schemes and multi-pipette coordination.",
+  "config": {
+    "labware": {
+      "labware_slot_slot": {
+        "load_name": "lower",
+        "slot": "slot"
+      },
+      "labware_slot_slot_slot": {
+        "load_name": "lower",
+        "slot": "slot"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "76c562.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Cherrypicking and Normalization",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "slot",
+        "load_name": "lower",
+        "label": null
+      },
+      {
+        "slot": "slot",
+        "load_name": "lower",
+        "label": null
+      }
+    ],
+    "pipettes": [],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring diluent to wells based on Dilutant CSV..."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring DNA to wells based on Sample CSV..."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": "mix_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol is complete."
+      }
+    ]
+  }
+}

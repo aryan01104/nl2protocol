@@ -1,0 +1,142 @@
+{
+  "id": "ex_casual_993597fe",
+  "intent": "Set up a PCR run by first putting mastermix into strips, then transferring samples and mastermix from several source plates into a 384-well plate, mixing everything up, and creating the files needed to track samples and run the PCR machine",
+  "config": {
+    "labware": {
+      "384 well plate": {
+        "load_name": "microamp_384_wellplate_40ul",
+        "slot": "2"
+      },
+      "mastermix strips": {
+        "load_name": "custom_96_wellplate_200ul",
+        "slot": "5"
+      },
+      "tuberack": {
+        "load_name": "custom_24_tuberack_2000ul",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "reformat.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR Setup",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "microamp_384_wellplate_40ul",
+        "label": "384 well plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "custom_96_wellplate_200ul",
+        "label": "mastermix strips"
+      },
+      {
+        "slot": "8",
+        "load_name": "custom_24_tuberack_2000ul",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace tipracks before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_mm_per_well"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_mm_per_well"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "protocol_info:vol_mm"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "protocol_info:vol_mm"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "protocol_info:vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "protocol_info:vol_sample"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

@@ -1,0 +1,167 @@
+{
+  "id": "ex_technical_e33eb6bb",
+  "source_file": "tagment.ot2.apiv2.py",
+  "intent_precise": "4. Illumina COVIDSeq - Tagment PCR Amplicons: Using TAG1 plate (pcr_plate, slot 2), reagent_plate (plate, slot reagent plate), COV1 plate (pcr_plate, slot 1), COV2 plate (pcr_plate, slot 5). With temperature module, magnetic module. (1) Set temperature to 4\u00b0C. (2) Disengage magnets to release beads. (3) Pause: \n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n (4) Transfer from source to destination. (5) Transfer from source to destination.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (4\u00b0C).",
+  "intent": "For the Illumina COVIDSeq tagmentation of PCR amplicons, you'll need to set up the TAG1 plate in slot 2, the reagent plate in the reagent slot, and the COV1 and COV2 plates in slots 1 and 5 respectively, using both the temperature and magnetic modules. Start by setting the temperature module to 4\u00b0C, then disengage the magnets to release the beads. At this point, pause the protocol and replace the 200\u03bcL filter tip racks before continuing with the transfer steps between the source and destination plates.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "4. Illumina COVIDSeq - Tagment PCR Amplicons",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "TAG1 plate"
+      },
+      {
+        "slot": "reagent plate",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "COV1 plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "COV2 plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_amplicon"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_mm"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_mm"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\nSeal and shake at 1600 rpm for 1 minute. Place on the preprogrammed thermal cycler and run the COVIDSeq TAG program.\n\n\n\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "TAG1 plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "reagent plate"
+      },
+      "COV1 plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "1"
+      },
+      "COV2 plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  }
+}

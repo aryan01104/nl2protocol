@@ -1,0 +1,173 @@
+"""
+errors.py
+
+Custom exceptions with user-friendly error messages for nl2protocol.
+"""
+
+
+class NL2ProtocolError(Exception):
+    """Base exception for nl2protocol errors."""
+    pass
+
+
+class ConfigurationError(NL2ProtocolError):
+    """Error related to configuration files or settings."""
+    pass
+
+
+class APIKeyError(ConfigurationError):
+    """Missing or invalid API key."""
+
+    def __init__(self, key_name: str = "ANTHROPIC_API_KEY"):
+        self.key_name = key_name
+        message = f"""
+API key not found: {key_name}
+
+To fix this:
+1. Get an API key from https://console.anthropic.com/
+2. Set the environment variable:
+   export {key_name}="your-api-key-here"
+
+   Or create a .env file in your project root:
+   {key_name}=your-api-key-here
+"""
+        super().__init__(message)
+
+
+class ConfigFileError(ConfigurationError):
+    """Error loading or parsing config file."""
+
+    def __init__(self, config_path: str, reason: str = ""):
+        self.config_path = config_path
+        message = f"""
+Configuration error: {config_path}
+{reason}
+
+Expected format (lab_config.json):
+{{
+    "labware": {{
+        "tiprack": {{"load_name": "opentrons_96_tiprack_300ul", "slot": "1"}},
+        "plate": {{"load_name": "corning_96_wellplate_360ul_flat", "slot": "2"}}
+    }},
+    "pipettes": {{
+        "left": {{"model": "p300_single_gen2", "tipracks": ["tiprack"]}}
+    }}
+}}
+
+See lab_config.example.json for a complete example.
+"""
+        super().__init__(message)
+
+
+class ValidationError(NL2ProtocolError):
+    """Error validating user input or generated content."""
+    pass
+
+
+class InputValidationError(ValidationError):
+    """User input is not a valid protocol instruction."""
+
+    def __init__(self, classification: str, reason: str, suggestion: str = None):
+        self.classification = classification
+        self.reason = reason
+        self.suggestion = suggestion
+
+        message = f"""
+Invalid input: {reason}
+
+Your input was classified as: {classification}
+"""
+        if suggestion:
+            message += f"\nSuggestion: {suggestion}"
+
+        message += """
+
+Examples of valid protocol instructions:
+- "Transfer 100uL from well A1 to B1"
+- "Perform a serial dilution across row A"
+- "Distribute 50uL of reagent to all wells in column 1"
+"""
+        super().__init__(message)
+
+
+class EquipmentError(NL2ProtocolError):
+    """Error related to lab equipment configuration."""
+    pass
+
+
+class LabwareNotFoundError(EquipmentError):
+    """Referenced labware not found in config."""
+
+    def __init__(self, labware_name: str, available: list = None):
+        self.labware_name = labware_name
+        message = f"Labware '{labware_name}' not found in configuration."
+        if available:
+            message += f"\n\nAvailable labware: {', '.join(available)}"
+        message += "\n\nCheck your lab_config.json or use --generate-config to auto-detect equipment."
+        super().__init__(message)
+
+
+class PipetteNotFoundError(EquipmentError):
+    """Referenced pipette not found in config."""
+
+    def __init__(self, mount: str, available: list = None):
+        self.mount = mount
+        message = f"No pipette configured for mount '{mount}'."
+        if available:
+            message += f"\n\nAvailable mounts: {', '.join(available)}"
+        super().__init__(message)
+
+
+class ModuleNotFoundError(EquipmentError):
+    """Referenced module not found in config."""
+
+    def __init__(self, module_name: str, available: list = None):
+        self.module_name = module_name
+        message = f"Module '{module_name}' not found in configuration."
+        if available:
+            message += f"\n\nAvailable modules: {', '.join(available)}"
+        super().__init__(message)
+
+
+class GenerationError(NL2ProtocolError):
+    """Error during protocol generation."""
+    pass
+
+
+class SimulationError(GenerationError):
+    """Protocol simulation failed."""
+
+    def __init__(self, error_message: str):
+        message = f"""
+Protocol simulation failed: {error_message}
+
+This usually means the generated protocol has an error.
+The system will attempt to self-correct and retry.
+"""
+        super().__init__(message)
+
+
+class RobotConnectionError(NL2ProtocolError):
+    """Error connecting to OT-2 robot."""
+
+    def __init__(self, robot_ip: str, reason: str = ""):
+        self.robot_ip = robot_ip
+        message = f"""
+Could not connect to robot at {robot_ip}
+{reason}
+
+Troubleshooting:
+1. Ensure the robot is powered on and connected to the network
+2. Verify the IP address is correct
+3. Check that your computer is on the same network as the robot
+4. Try pinging the robot: ping {robot_ip}
+"""
+        super().__init__(message)
+
+
+def format_error_for_cli(error: Exception) -> str:
+    """Format an error message for CLI display."""
+    if isinstance(error, NL2ProtocolError):
+        return f"Error: {str(error)}"
+    else:
+        return f"Unexpected error: {type(error).__name__}: {str(error)}"

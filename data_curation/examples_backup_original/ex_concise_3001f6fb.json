@@ -1,0 +1,103 @@
+{
+  "id": "ex_concise_3001f6fb",
+  "intent": "Transfer 24-well samples to 96-well quadrant, then backfill source wells with buffer",
+  "config": {
+    "labware": {
+      "source plate": {
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "slot": "1"
+      },
+      "reservoir": {
+        "load_name": "agilent_1_reservoir_290ml",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "mount_p1000": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "plate_fill.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Drug Release Time Point Testing",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "label": "source plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "agilent_1_reservoir_290ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p1000",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p1000",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mount_p1000"
+      }
+    ]
+  }
+}

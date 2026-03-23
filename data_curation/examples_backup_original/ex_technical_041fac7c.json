@@ -1,0 +1,127 @@
+{
+  "id": "ex_technical_041fac7c",
+  "intent": "Set up a CerTest VIASURE SARS-CoV-2 RT-PCR reaction plate by dispensing 15\u00b5L rehydration buffer into all wells of row A in a 96-well PCR plate with 2x mixing at 10\u00b5L volume. Transfer 5\u00b5L from each sample in columns 1-11 of the deep well sample plate to corresponding PCR plate wells with 1x mixing at 5\u00b5L. Add 5\u00b5L from sample column 12 to PCR well A12 without mixing. Add 5\u00b5L negative control to well G12 and 5\u00b5L positive control to well H12.",
+  "config": {
+    "labware": {
+      "pcr_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "5"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "6"
+      },
+      "controls": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "33b12a.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "CerTest VIASURE SARS-CoV-2 Real Time PCR Detection kit",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "controls"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          1,
+          5
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

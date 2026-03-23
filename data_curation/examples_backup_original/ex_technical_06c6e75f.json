@@ -1,0 +1,227 @@
+{
+  "id": "ex_technical_06c6e75f",
+  "intent": "Execute post-tagmentation cleanup for Illumina COVIDSeq protocol: Add 10\u00b5L ST2 reagent to each sample well with mixing, perform two sequential washes with 100\u00b5L TWB buffer using magnetic bead separation at 8.5mm engagement height with 3-minute settling periods, including resuspension steps with 70\u00b5L mixing volume and 15 repetitions per well",
+  "config": {
+    "labware": {
+      "tag1_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "TAG1 plate"
+      },
+      "reagent_plate": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "reagent plate"
+      },
+      "reagent reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "cleanup.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "5. Illumina COVIDSeq - Post Tagmentation Clean Up",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "TAG1 plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "tag1_plate"
+      },
+      {
+        "slot": "reagent plate",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol",
+        "labware": "liquid_trash",
+        "well": "A1"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mixreps",
+        "volume": "vol_mix"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_incubation"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_settling"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_st2"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "mixreps",
+        "volume": 20
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

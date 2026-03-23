@@ -1,18 +1,16 @@
-# BioLab
+# nl2protocol
 
-An LLM-based system that translates natural language instructions into executable Opentrons robot protocols, with an emphasis on verification of generated scripts.
+Convert natural language instructions into executable [Opentrons](https://opentrons.com/) OT-2 robot protocols using Claude LLM.
 
-BioLab bridges the gap between scientific intent and robotic action. Describe your lab procedure in plain English, and BioLab generates validated, simulator-tested Python code ready to run on Opentrons liquid handling robots.
+Describe your lab procedure in plain English, and nl2protocol generates validated, simulator-tested Python code ready to run on Opentrons OT-2 robots.
 
 ## How It Works
-
-BioLab uses a three-layer architecture with a self-correction loop:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  LAYER 1: REASONING                                         │
-│  Natural language + CSV data → ProtocolSchema               │
-│  (Google Gemini 2.0 Flash)                                  │
+│  Natural language + Config → ProtocolSchema                 │
+│  (Claude Sonnet with RAG examples)                          │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -22,7 +20,7 @@ BioLab uses a three-layer architecture with a self-correction loop:
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │  LAYER 3: VERIFICATION                                      │
-│  Opentrons Simulator validates safety before execution      │
+│  Opentrons Simulator + LLM Intent Verification              │
 └─────────────────────────────────────────────────────────────┘
                               ↓
                     ┌────────────────┐
@@ -34,199 +32,222 @@ BioLab uses a three-layer architecture with a self-correction loop:
                            (up to 3 attempts)
 ```
 
-If verification fails, the error is fed back to the reasoning layer for automatic correction.
-
 ## Features
 
 - **Natural Language Input**: Describe experiments in plain English
+- **Auto-Config Generation**: Use `--generate-config` to infer equipment from your instruction
 - **CSV Data Integration**: Import experimental parameters from spreadsheets
-- **Strict Validation**: Pydantic schemas enforce protocol correctness
-- **Config-Aware**: Validates against your actual lab hardware setup
+- **Hardware Module Support**: Temperature, magnetic, heater-shaker, and thermocycler modules
 - **Simulator-Tested**: Every protocol passes Opentrons simulation before output
 - **Self-Correcting**: Automatically fixes errors through LLM feedback loop
+- **Robot Upload**: Push protocols directly to your OT-2 robot
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/biolab.git
-cd biolab
+git clone https://github.com/yourusername/nl2protocol.git
+cd nl2protocol
 
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install package
+pip install -e .
 
 # Set up API key
-echo "GEMINI_API_KEY=your_api_key_here" > .env
+export ANTHROPIC_API_KEY="your_api_key_here"
+# Or create a .env file:
+echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
 ```
+
+Get your API key from https://console.anthropic.com/
 
 ## Quick Start
 
-1. **Define your lab configuration** (e.g., `my_lab_config.json`):
+### Option 1: Auto-generate config (easiest)
 
-```json
-{
-  "labware": {
-    "source_plate": {
-      "load_name": "corning_96_wellplate_360ul_flat",
-      "slot": "1",
-      "label": "Source Plate"
-    },
-    "dest_plate": {
-      "load_name": "nest_96_wellplate_200ul_flat",
-      "slot": "2",
-      "label": "Dest Plate"
-    },
-    "tips": {
-      "load_name": "opentrons_96_tiprack_300ul",
-      "slot": "3",
-      "label": "Tips"
-    }
-  },
-  "pipettes": {
-    "left": {
-      "model": "p300_single_gen2",
-      "tipracks": ["Tips"]
-    }
-  }
-}
+```bash
+nl2protocol -i "Transfer 100uL from source plate A1 to dest plate B1" --generate-config
 ```
 
-2. **Run the agent** with your intent:
+The system will infer what equipment you need and ask you to confirm.
+
+### Option 2: Use existing config
+
+1. Copy the example config:
+```bash
+cp lab_config.example.json lab_config.json
+# Edit to match your actual equipment
+```
+
+2. Run:
+```bash
+nl2protocol -i "Transfer 100uL from plate A1 to B1" -c lab_config.json
+```
+
+### Option 3: Python API
 
 ```python
 from nl2protocol import ProtocolAgent
 
-agent = ProtocolAgent()
+agent = ProtocolAgent(config_path="lab_config.json")
 result = agent.run_pipeline(
-    prompt="Transfer 50uL from wells A1-A8 of the source plate to the same wells in the dest plate",
-    csv_path="experiment_data.csv"  # optional
+    prompt="Transfer 50uL from wells A1-A8 of the source plate to dest plate"
 )
 
 if result:
-    script, simulation_log = result
+    print(result.script)
     with open("my_protocol.py", "w") as f:
-        f.write(script)
+        f.write(result.script)
 ```
 
-Or use the CLI:
+## CLI Usage
 
 ```bash
-nl2protocol -i "Transfer 50uL from A1 to B1" -c my_lab_config.json -o my_protocol.py
+# Basic usage
+nl2protocol -i "Your protocol instruction" -c lab_config.json
+
+# Auto-generate config
+nl2protocol -i "Serial dilution across row A" --generate-config
+
+# Read instruction from file
+nl2protocol -i protocol.txt -c lab_config.json
+
+# With CSV data
+nl2protocol -i "Distribute samples per data file" -c lab.json -d samples.csv
+
+# Upload to robot after generation
+nl2protocol -i "Mix wells A1-A6" -c lab.json --robot
+
+# Validate config file only
+nl2protocol --validate-only -c lab_config.json
+
+# Show help
+nl2protocol --help
 ```
 
-3. **Run on your robot** or test in the Opentrons simulator.
+## Configuration
+
+### Lab Config (lab_config.json)
+
+```json
+{
+    "labware": {
+        "tiprack": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "source_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "2"
+        },
+        "dest_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "3"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack"]
+        }
+    }
+}
+```
+
+See `lab_config.example.json` for a complete example with modules.
+
+### Robot Config (robot_config.json)
+
+```json
+{
+    "robot_ip": "192.168.1.100",
+    "robot_name": "My OT-2"
+}
+```
 
 ## Supported Commands
 
-### Atomic Commands
+### Liquid Handling
 | Command | Description |
 |---------|-------------|
 | `aspirate` | Draw liquid into pipette tip |
 | `dispense` | Push liquid out of pipette tip |
 | `mix` | Aspirate/dispense cycles to mix |
+| `transfer` | Move liquid from source to destination |
+| `distribute` | One source to multiple destinations |
+| `consolidate` | Multiple sources to one destination |
 | `blow_out` | Expel remaining liquid/air |
 | `touch_tip` | Touch tip to well sides |
 | `air_gap` | Add air gap to prevent dripping |
 | `pick_up_tip` | Pick up a pipette tip |
 | `drop_tip` | Drop current tip |
-| `return_tip` | Return tip to original location |
 
-### Complex Commands
+### Flow Control
 | Command | Description |
 |---------|-------------|
-| `transfer` | Move liquid from source to destination |
-| `distribute` | One source to multiple destinations |
-| `consolidate` | Multiple sources to one destination |
+| `pause` | Pause for user intervention |
+| `delay` | Wait for specified time |
+| `comment` | Add comment to run log |
 
-## Validation Layers
+### Hardware Modules
+| Module | Commands |
+|--------|----------|
+| Temperature | `set_temperature`, `wait_for_temperature`, `deactivate` |
+| Magnetic | `engage_magnets`, `disengage_magnets` |
+| Heater-Shaker | `set_shake_speed`, `open_latch`, `close_latch` |
+| Thermocycler | `set_block_temperature`, `set_lid_temperature`, `open_lid`, `close_lid`, `run_profile` |
 
-BioLab enforces correctness at multiple levels:
-
-1. **Config Validation** (Field Validators)
-   - Labware must exist in lab config (load_name, slot, label)
-   - Pipette models must match config exactly
-   - Tipracks must match config
-
-2. **Reference Validation** (Model Validator)
-   - Commands must reference defined labware
-   - Commands must reference defined pipettes
-   - Volumes must be within pipette capacity (e.g., p300: 20-300µL)
-
-3. **Simulation Validation** (Opentrons Simulator)
-   - Full protocol execution in virtual environment
-   - Catches runtime errors before physical execution
-
-## Project Structure
-
-```
-biolab/
-├── nl2protocol/       # Main package
-│   ├── __init__.py
-│   ├── models.py      # Pydantic schemas for protocol validation
-│   ├── parser.py      # LLM reasoning engine (Gemini integration)
-│   ├── app.py         # Protocol generation and verification
-│   ├── cli.py         # Command-line interface
-│   ├── robot.py       # Robot HTTP client
-│   └── validation.py  # Config file validation
-├── tests/             # Test suite
-│   └── test_models.py
-└── examples/          # Example configurations and data
-    ├── configs/       # Example lab configurations
-    │   ├── serial_dilution_config.json
-    │   ├── plate_replication_config.json
-    │   ├── reagent_distribution_config.json
-    │   └── bradford_assay_config.json
-    ├── data/          # Example CSV experiment data
-    │   ├── serial_dilution.csv
-    │   ├── plate_replication.csv
-    │   └── reagent_distribution.csv
-    └── robot_config.example.json
-```
-
-## Testing
-
-```bash
-python tests/test_models.py
-```
-
-Tests cover:
-- Valid protocol creation
-- Invalid labware/pipette references
-- Volume range validation
-- Config mismatch detection
-- Tuple handling for mix parameters
-
-## Example Use Cases
+## Example Instructions
 
 **Serial Dilution**
 ```
-"Perform a 2x serial dilution across row A. Stock is in reservoir A2,
-diluent in A1. Pre-fill destination wells with 100uL diluent."
+Perform a 2x serial dilution across row A. Start with 200uL stock in A1.
 ```
 
 **Plate Replication**
 ```
-"Copy 50uL from each well in column 1 of the source plate to the
-same wells in the destination plate."
+Copy 50uL from each well in column 1 of source plate to dest plate.
 ```
 
-**Reagent Distribution**
+**Temperature-Controlled Transfer**
 ```
-"Add 100uL of buffer from reservoir A1 to all wells in row A of
-the assay plate."
+Set temperature module to 4C, wait for temperature, then transfer samples.
+```
+
+**PCR Setup**
+```
+Distribute 10uL master mix from tube rack to PCR plate wells A1-H12.
+```
+
+## Project Structure
+
+```
+nl2protocol/
+├── nl2protocol/           # Main package
+│   ├── app.py             # Protocol generation pipeline
+│   ├── parser.py          # LLM reasoning (Claude)
+│   ├── models.py          # Pydantic schemas
+│   ├── cli.py             # Command-line interface
+│   ├── robot.py           # OT-2 HTTP client
+│   ├── config_generator.py # Auto-config from NL
+│   ├── input_validator.py # Input classification
+│   ├── example_store.py   # RAG with ChromaDB
+│   └── errors.py          # Custom exceptions
+├── examples/              # RAG training examples
+├── data_curation/         # Tools to generate examples
+├── lab_config.example.json
+├── robot_config.example.json
+└── pyproject.toml
 ```
 
 ## Requirements
 
 - Python 3.10+
-- Pydantic v2
-- Google Generative AI SDK
+- Anthropic API key (Claude)
 - Opentrons API
-- python-dotenv
 
 ## License
 

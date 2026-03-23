@@ -1,0 +1,111 @@
+{
+  "id": "ex_technical_052a98b2",
+  "source_file": "3d02be.ot2.apiv2.py",
+  "intent_precise": "Plate Aliquoting with CSV: Using source_plate (plate, slot 1), dest_plate1 (plate, slot 4), dest_plate2 (plate, slot 7), dest_plate3 (plate, slot 10).",
+  "intent_concise": "Execute 9-step liquid handling protocol.",
+  "intent": "Take the source plate from slot 1 and aliquot its contents across three destination plates - place dest_plate1 in slot 4, dest_plate2 in slot 7, and dest_plate3 in slot 10. This plate aliquoting protocol will use the CSV file to determine the specific transfer volumes and well mappings. Make sure all plates are properly positioned in their designated slots before starting the automated transfers.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Plate Aliquoting with CSV",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "source_plate",
+        "label": "source_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "dest_plate1",
+        "label": "dest_plate1"
+      },
+      {
+        "slot": "7",
+        "load_name": "dest_plate2",
+        "label": "dest_plate2"
+      },
+      {
+        "slot": "10",
+        "load_name": "dest_plate3",
+        "label": "dest_plate3"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount",
+        "volume": "int"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "source_plate": {
+        "load_name": "source_plate",
+        "slot": "1"
+      },
+      "dest_plate1": {
+        "load_name": "dest_plate1",
+        "slot": "4"
+      },
+      "dest_plate2": {
+        "load_name": "dest_plate2",
+        "slot": "7"
+      },
+      "dest_plate3": {
+        "load_name": "dest_plate3",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

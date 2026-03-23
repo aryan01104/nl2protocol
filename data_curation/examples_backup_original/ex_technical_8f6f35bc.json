@@ -1,0 +1,37 @@
+{
+  "id": "ex_technical_8f6f35bc",
+  "intent": "Redistribute pipette tips from a full 96-well tip rack to two empty tip racks, placing tips only in rows A, C, E, and G (columns 1-12) to create 24-well spacing compatible with multichannel pipette operations on 24-well plates. Execute tip transfer using pick_up_tip() and drop_tip() functions across specified target wells.",
+  "config": {
+    "pipettes": {
+      "pipette_mount": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "i7g1ym.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Utility: Rearrange pipette tips for 24-well spacing",
+    "author": "Tim Fallon <tfallon@ucsd.edu>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      }
+    ]
+  }
+}

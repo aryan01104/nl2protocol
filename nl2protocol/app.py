@@ -1,11 +1,169 @@
 import io
+import sys
+import json
+import os
+import logging
+import warnings
+from contextlib import redirect_stderr
+from dataclasses import dataclass
+from typing import Optional
+
+from anthropic import Anthropic
+from dotenv import load_dotenv
+
 from .models import ProtocolSchema
 from .parser import ProtocolParser
+
+# Suppress opentrons simulator warnings
+logging.getLogger("opentrons").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", module="opentrons")
+
 from opentrons import simulate
 
 
-def generate_opentrons_script(protocol: ProtocolSchema) -> str:
-    """Generates a valid Opentrons Python script from the Pydantic schema."""
+@dataclass
+class VerificationResult:
+    """Result from LLM verification of generated protocol."""
+    matches: bool
+    confidence: float
+    issues: list
+    summary: str
+
+    def __str__(self) -> str:
+        status = "MATCH" if self.matches else "MISMATCH"
+        result = f"[{status}] Confidence: {self.confidence:.0%}"
+        if self.issues:
+            result += f"\nIssues: {', '.join(self.issues)}"
+        result += f"\nSummary: {self.summary}"
+        return result
+
+
+VERIFICATION_PROMPT = """You are verifying if a generated Opentrons protocol matches the user's intent.
+
+ORIGINAL INTENT:
+{intent}
+
+GENERATED PROTOCOL SCHEMA:
+- Protocol Name: {protocol_name}
+- Labware: {labware}
+- Pipettes: {pipettes}
+- Modules: {modules}
+- Number of Commands: {num_commands}
+- Command Summary: {command_summary}
+
+Questions:
+1. Does this protocol achieve what the user asked for?
+2. Are there any obvious mismatches between intent and actions?
+3. Summarize what this protocol actually does in one sentence.
+
+Respond with JSON only:
+{{"matches": true/false, "confidence": 0.0-1.0, "issues": ["issue1", ...], "summary": "..."}}
+"""
+
+
+def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResult:
+    """
+    Ask Claude to verify the generated protocol matches the original intent.
+
+    Args:
+        intent: Original natural language instruction
+        schema: Generated protocol schema
+
+    Returns:
+        VerificationResult with match status, confidence, issues, and summary
+    """
+    load_dotenv()
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        # Skip verification if no API key
+        return VerificationResult(
+            matches=True,
+            confidence=1.0,
+            issues=[],
+            summary="Verification skipped (no API key)"
+        )
+
+    client = Anthropic(api_key=api_key)
+
+    # Build command summary
+    cmd_counts = {}
+    for cmd in schema.commands:
+        cmd_type = cmd.command_type
+        cmd_counts[cmd_type] = cmd_counts.get(cmd_type, 0) + 1
+    command_summary = ", ".join([f"{count}x {cmd_type}" for cmd_type, count in cmd_counts.items()])
+
+    # Build labware summary
+    labware_summary = ", ".join([f"{lw.load_name} in slot {lw.slot}" for lw in schema.labware])
+
+    # Build pipette summary
+    pipette_summary = ", ".join([f"{p.model} on {p.mount}" for p in schema.pipettes])
+
+    # Build module summary
+    module_summary = "None"
+    if schema.modules:
+        module_summary = ", ".join([f"{m.module_type} in slot {m.slot}" for m in schema.modules])
+
+    prompt = VERIFICATION_PROMPT.format(
+        intent=intent,
+        protocol_name=schema.protocol_name,
+        labware=labware_summary,
+        pipettes=pipette_summary,
+        modules=module_summary,
+        num_commands=len(schema.commands),
+        command_summary=command_summary
+    )
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=512,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        result_text = response.content[0].text.strip()
+
+        # Parse JSON response
+        if "```json" in result_text:
+            result_text = result_text.split("```json")[1].split("```")[0]
+        elif "```" in result_text:
+            result_text = result_text.split("```")[1].split("```")[0]
+
+        result = json.loads(result_text.strip())
+
+        return VerificationResult(
+            matches=result.get("matches", True),
+            confidence=result.get("confidence", 1.0),
+            issues=result.get("issues", []),
+            summary=result.get("summary", "")
+        )
+
+    except Exception as e:
+        # On error, assume match to avoid blocking valid protocols
+        print(f"Verification error: {e}")
+        return VerificationResult(
+            matches=True,
+            confidence=0.5,
+            issues=["Verification failed due to error"],
+            summary="Could not verify protocol"
+        )
+
+
+@dataclass
+class PipelineResult:
+    """Result from a successful protocol generation pipeline run."""
+    script: str
+    simulation_log: str
+    protocol_schema: ProtocolSchema
+    runlog: list
+    config: dict
+
+
+def generate_python_script(protocol: ProtocolSchema) -> str:
+    """Generates a valid Opentrons Python script from the Pydantic schema.
+    the pydantic schema is generated by the llm, given the natural language.
+    this converts nl to script
+    """
+
     lines = [
         "from opentrons import protocol_api",
         "",
@@ -14,16 +172,46 @@ def generate_opentrons_script(protocol: ProtocolSchema) -> str:
         "def run(protocol: protocol_api.ProtocolContext):",
     ]
 
-    # Load Labware
+    # Protocol has objects and actions: labware, pipettes, modules, and commands
+    # Order matters: Modules first, then labware (some may load onto modules), then pipettes
+
+    # Load Modules first (labware may need to load onto them)
+    module_map = {}
+    if protocol.modules:
+        for mod in protocol.modules:
+            var_name = f"mod_{mod.slot.replace('-', '_')}"
+            module_type_map = {
+                "temperature": "temperature module gen2",
+                "magnetic": "magnetic module gen2",
+                "heater_shaker": "heaterShakerModuleV1",
+                "thermocycler": "thermocyclerModuleV2",
+            }
+            api_name = module_type_map.get(mod.module_type, mod.module_type)
+            lines.append(f"    {var_name} = protocol.load_module('{api_name}', '{mod.slot}')")
+            module_map[mod.slot] = var_name
+            if mod.label:
+                module_map[mod.label] = var_name
+        lines.append("")
+
+    # Load Labware (either directly on deck or onto modules)
     labware_map = {}
     for lw in protocol.labware:
         var_name = f"lw_{lw.slot}"
         label_arg = f", label='{lw.label}'" if lw.label else ""
-        lines.append(f"    {var_name} = protocol.load_labware('{lw.load_name}', '{lw.slot}'{label_arg})")
+
+        if lw.on_module:
+            # Load labware onto a module
+            mod_var = module_map.get(lw.on_module)
+            if not mod_var:
+                raise ValueError(f"Module '{lw.on_module}' not found for labware '{lw.label or lw.slot}'")
+            lines.append(f"    {var_name} = {mod_var}.load_labware('{lw.load_name}'{label_arg})")
+        else:
+            # Load labware directly on deck slot
+            lines.append(f"    {var_name} = protocol.load_labware('{lw.load_name}', '{lw.slot}'{label_arg})")
+
         labware_map[lw.slot] = var_name
         if lw.label:
             labware_map[lw.label] = var_name
-
     lines.append("")
 
     # Load Pipettes
@@ -31,7 +219,6 @@ def generate_opentrons_script(protocol: ProtocolSchema) -> str:
         tiprack_vars = [labware_map.get(tr) for tr in pip.tipracks if labware_map.get(tr)]
         tiprack_str = f", tip_racks=[{', '.join(tiprack_vars)}]" if tiprack_vars else ""
         lines.append(f"    pip_{pip.mount} = protocol.load_instrument('{pip.model}', '{pip.mount}'{tiprack_str})")
-
     lines.append("")
 
     # Execute Commands
@@ -95,6 +282,23 @@ def generate_opentrons_script(protocol: ProtocolSchema) -> str:
         elif cmd.command_type == "return_tip":
             lines.append(f"    {pip}.return_tip()")
 
+        # Flow control commands
+        elif cmd.command_type == "pause":
+            # Escape single quotes in message
+            msg = cmd.message.replace("'", "\\'")
+            lines.append(f"    protocol.pause('{msg}')")
+
+        elif cmd.command_type == "delay":
+            if cmd.minutes:
+                lines.append(f"    protocol.delay(minutes={cmd.minutes})")
+            elif cmd.seconds:
+                lines.append(f"    protocol.delay(seconds={cmd.seconds})")
+
+        elif cmd.command_type == "comment":
+            # Escape single quotes in message
+            msg = cmd.message.replace("'", "\\'")
+            lines.append(f"    protocol.comment('{msg}')")
+
         elif cmd.command_type == "transfer":
             src_lw = labware_map.get(cmd.source_labware)
             dst_lw = labware_map.get(cmd.dest_labware)
@@ -157,17 +361,118 @@ def generate_opentrons_script(protocol: ProtocolSchema) -> str:
             all_args = ", ".join(args + kwargs)
             lines.append(f"    {pip}.consolidate({all_args})")
 
+        # Module commands
+        elif cmd.command_type == "set_temperature":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.set_temperature({cmd.celsius})")
+
+        elif cmd.command_type == "wait_for_temperature":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.await_temperature({cmd.celsius if hasattr(cmd, 'celsius') else ''})")
+
+        elif cmd.command_type == "deactivate":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.deactivate()")
+
+        elif cmd.command_type == "engage_magnets":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            if cmd.height:
+                lines.append(f"    {mod}.engage(height_from_base={cmd.height})")
+            else:
+                lines.append(f"    {mod}.engage()")
+
+        elif cmd.command_type == "disengage_magnets":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.disengage()")
+
+        elif cmd.command_type == "set_shake_speed":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            if cmd.rpm == 0:
+                lines.append(f"    {mod}.stop_shaking()")
+            else:
+                lines.append(f"    {mod}.set_and_wait_for_shake_speed({cmd.rpm})")
+
+        elif cmd.command_type == "open_latch":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.open_labware_latch()")
+
+        elif cmd.command_type == "close_latch":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.close_labware_latch()")
+
+        elif cmd.command_type == "open_lid":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.open_lid()")
+
+        elif cmd.command_type == "close_lid":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.close_lid()")
+
+        elif cmd.command_type == "set_block_temperature":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            args = [str(cmd.celsius)]
+            if cmd.hold_time_seconds:
+                args.append(f"hold_time_seconds={cmd.hold_time_seconds}")
+            if cmd.hold_time_minutes:
+                args.append(f"hold_time_minutes={cmd.hold_time_minutes}")
+            lines.append(f"    {mod}.set_block_temperature({', '.join(args)})")
+
+        elif cmd.command_type == "set_lid_temperature":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            lines.append(f"    {mod}.set_lid_temperature({cmd.celsius})")
+
+        elif cmd.command_type == "run_profile":
+            mod = module_map.get(cmd.module)
+            if not mod:
+                raise ValueError(f"Module '{cmd.module}' not found")
+            steps_str = str(cmd.steps)
+            lines.append(f"    {mod}.execute_profile(steps={steps_str}, repetitions={cmd.repetitions})")
+
         else:
             raise ValueError(f"Unknown command type: {cmd.command_type}")
 
     return "\n".join(lines)
 
 
-def verify_protocol(script_code: str) -> tuple[bool, str]:
-    """Runs the script through the Opentrons simulator and returns (success, logs/errors)."""
+def simulate_script(script_code: str) -> tuple[bool, str, list]:
+    """Runs the script through the Opentrons simulator.
+
+    Returns:
+        Tuple of (success, formatted_log, raw_runlog)
+        - success: True if simulation passed
+        - formatted_log: Human-readable simulation log or error message
+        - raw_runlog: List of command dicts from simulator (empty on failure)
+    """
     protocol_file = io.StringIO(script_code)
     try:
-        runlog, _ = simulate.simulate(protocol_file)
+        # Suppress simulator stderr output (deck calibration warnings, etc.)
+        stderr_capture = io.StringIO()
+        with redirect_stderr(stderr_capture):
+            runlog, _ = simulate.simulate(protocol_file)
         # Format the run log into readable output
         log_lines = ["Simulation completed successfully.", "", "Run Log:"]
         for entry in runlog:
@@ -176,9 +481,9 @@ def verify_protocol(script_code: str) -> tuple[bool, str]:
                 log_lines.append(f"  {msg}")
             else:
                 log_lines.append(f"  {entry}")
-        return True, "\n".join(log_lines)
+        return True, "\n".join(log_lines), runlog
     except Exception as e:
-        return False, f"Simulation failed: {str(e)}"
+        return False, f"Simulation failed: {str(e)}", []
 
 
 class ProtocolAgent:
@@ -186,50 +491,149 @@ class ProtocolAgent:
         self.config_path = config_path
         self.parser = ProtocolParser(config_path=config_path)
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 3) -> tuple[str, str] | None:
+    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
+        Args:
+            prompt: Natural language protocol instruction
+            csv_path: Optional path to CSV with experiment parameters
+            max_retries: Maximum LLM retry attempts
+            skip_validation: Skip input validation (for testing)
+
         Returns:
-            On success: Tuple of (script, simulation_log)
+            On success: PipelineResult with script, logs, schema, runlog, and config
             On failure: None
         """
-        print(f"Scientist Intent: {prompt}")
+
+        # Step 0: Validate input is a protocol instruction
+        print("\n[Stage 0/4] Validating input instruction...")
+        if not skip_validation:
+            from .input_validator import InputValidator
+            validator = InputValidator()
+            validation = validator.classify(prompt)
+
+            if not validation.is_valid_protocol:
+                print(f"  Input validation result: {validation}")
+                if validation.classification == "QUESTION":
+                    print("  This appears to be a question. Please rephrase as a protocol instruction.")
+                elif validation.classification == "AMBIGUOUS":
+                    print("  This instruction is too vague. Please provide more details.")
+                elif validation.classification == "INVALID":
+                    print("  This doesn't appear to be a lab protocol instruction.")
+                return None
+            print("  Input validated as protocol instruction.")
+        else:
+            print("  Skipping input validation.")
 
         attempt = 0
         error_log = None
+        failed_json = None
+
+        # Reset retry state for this run
+        self.parser.reset_retry_state()
 
         while attempt < max_retries:
             attempt += 1
-            print(f"\n--- Reasoning & Verification: Attempt {attempt} ---")
+            print(f"\n{'='*50}")
+            print(f"Attempt {attempt}/{max_retries}")
+            print('='*50)
 
             # 1. Reasoning: Parser translates Intent -> Pydantic Schema
-            protocol_schema = self.parser.parse_intent(prompt, csv_path, error_log)
+            print("\n[Stage 1/4] Generating protocol schema from instruction...")
+            if failed_json:
+                print("  Mode: Spot-fix (correcting previous output)")
+            else:
+                print("  Mode: Fresh generation")
+
+            protocol_schema = self.parser.parse_intent(prompt, csv_path, error_log, failed_json)
 
             if protocol_schema is None:
-                print("Failed to parse intent into protocol schema.")
-                error_log = "LLM failed to produce valid JSON matching the schema."
+                # Capture failed output for next attempt's spot-fix
+                failed_json = self.parser.last_failed_output
+                error_log = "Output did not match expected schema structure."
+                self.parser.add_error(error_log, failed_json)
+                if attempt < max_retries:
+                    print(f"  -> Will feed error back for correction in next attempt")
                 continue
 
+            print("  Schema generated and validated successfully.")
+
             # 2. Generation: Schema -> Python
+            print("\n[Stage 2/4] Converting schema to Python script...")
             try:
-                script = generate_opentrons_script(protocol_schema)
+                script = generate_python_script(protocol_schema)
+                print("  Python script generated successfully.")
             except ValueError as e:
-                print(f"Script generation error: {e}")
-                error_log = str(e)
+                error_log = f"Script generation issue: {e}"
+                print(f"  Script generation issue: {e}")
+                self.parser.add_error(error_log)
+                if attempt < max_retries:
+                    print(f"  -> Will feed error back for correction in next attempt")
                 continue
 
             # 3. Verification: Simulation
-            success, simulation_log = verify_protocol(script)
+            print("\n[Stage 3/4] Running Opentrons simulation...")
+            success, simulation_log, runlog = simulate_script(script)
 
-            if success:
-                print("Success! 'Scientist Intent' verified as robotic action.")
-                return (script, simulation_log)
-            else:
-                print(f"Safety Violation Detected: {simulation_log}")
+            if not success:
                 error_log = simulation_log
-                print("Self-Correction Loop: Feeding error back to Reasoning engine...")
+                # Extract key error info for display
+                if "errorType=" in simulation_log:
+                    import re
+                    error_match = re.search(r"errorType='([^']+)'", simulation_log)
+                    error_info_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
+                    error_type = error_match.group(1) if error_match else "Unknown"
+                    error_detail = error_info_match.group(1) if error_info_match else simulation_log[:300]
+                    print(f"  Simulation issue: {error_type}")
+                    print(f"    Detail: {error_detail[:200]}...")
+                else:
+                    print(f"  Simulation issue detected: {simulation_log[:300]}...")
+                self.parser.add_error(error_log)
+                if attempt < max_retries:
+                    print(f"  -> Will feed simulation feedback back for correction in next attempt")
+                continue
 
-        print(f"Failed after {max_retries} attempts.")
+            print("  Simulation passed.")
+
+            # 4. Verification: Intent Match (LLM check)
+            print("\n[Stage 4/4] Verifying protocol matches original intent...")
+            verification = verify_intent_match(prompt, protocol_schema)
+
+            # Check if verification passes
+            if verification.matches and verification.confidence >= 0.7:
+                print(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
+                print("\n" + "="*50)
+                print("SUCCESS: Protocol generated and verified.")
+                print("="*50)
+                return PipelineResult(
+                    script=script,
+                    simulation_log=simulation_log,
+                    protocol_schema=protocol_schema,
+                    runlog=runlog,
+                    config=self.parser.config
+                )
+            else:
+                # Build feedback for retry
+                feedback_parts = ["Intent verification failed."]
+                if not verification.matches:
+                    feedback_parts.append("The generated protocol does NOT match the original intent.")
+                if verification.confidence < 0.7:
+                    feedback_parts.append(f"Low confidence ({verification.confidence:.0%}) in protocol correctness.")
+                if verification.issues:
+                    feedback_parts.append(f"Issues found: {'; '.join(verification.issues)}")
+                feedback_parts.append(f"What the protocol actually does: {verification.summary}")
+                feedback_parts.append("Please regenerate the protocol to better match the original intent.")
+
+                error_log = " ".join(feedback_parts)
+                print(f"  Intent mismatch detected (confidence: {verification.confidence:.0%})")
+                if verification.issues:
+                    print(f"  Issues: {'; '.join(verification.issues)}")
+                if attempt < max_retries:
+                    print(f"  -> Will feed verification feedback back for correction in next attempt")
+
+        print(f"\n{'='*50}")
+        print(f"Reached max attempts ({max_retries}). Could not generate valid protocol.")
+        print("="*50)
         return None
 
 

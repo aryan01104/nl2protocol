@@ -1,0 +1,45 @@
+{
+  "id": "ex_concise_03354946",
+  "intent": "Execute CSV-defined thermocycler protocol with custom temperature profiles and cycling parameters",
+  "style": "concise",
+  "source_file": "thermocycler_csv.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Thermocycler Example Protocol",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "1",
+        "label": "tc_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "close_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": "lid_temp"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc_mod",
+        "steps": "set",
+        "repetitions": "profile:cycles"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": "final_temp"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      }
+    ]
+  }
+}

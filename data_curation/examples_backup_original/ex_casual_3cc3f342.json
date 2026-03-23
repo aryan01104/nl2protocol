@@ -1,0 +1,123 @@
+{
+  "id": "ex_casual_3cc3f342",
+  "intent": "Set up a kinase assay by adding four different reagents one at a time to your sample wells. After each addition, you'll need to spin down the plate and wait - first for an hour, then 40 minutes, then 30 minutes. The robot will pause between each step so you can do the centrifugation and timing.",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "greiner_384_wellplate_130ul",
+        "slot": "1"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_20ul",
+        "slot": "2"
+      },
+      "tuberack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "58d57d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Promega ADP-Glo Kinase Assay",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "greiner_384_wellplate_130ul",
+        "label": "plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_tiprack_20ul",
+        "label": "tiprack"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "liquid_A_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge Plate to Mix Liquid A"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "liquid_B_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge Plate and Incubate for 60 minutes"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "liquid_C_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate for 40 minutes"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "liquid_D_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate for 30 minutes"
+      }
+    ]
+  }
+}

@@ -1,0 +1,582 @@
+{
+  "id": "ex_concise_452f3caa",
+  "intent": "NEBNext RNA isolation: magnetic bead binding, thermocycler steps, buffer washes, RNA elution to final plate",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "thermofisher_96_wellplate_200ul",
+        "slot": "3"
+      },
+      "temp_plate": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "4"
+      },
+      "dwp": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "4"
+      },
+      "final_plate": {
+        "load_name": "thermofisher_96_wellplate_200ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_deck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_deck": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "00f7b1_part2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "NEBNext Ultra II Directional RNA Library Prep Kit for Illumina Part 2: RNA Isolation",
+    "author": "John C. Lynch <john.lynch@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "thermofisher_96_wellplate_200ul",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "temp_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "dwp"
+      },
+      {
+        "slot": "2",
+        "load_name": "thermofisher_96_wellplate_200ul",
+        "label": "final_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_deck"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_deck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~PLEASE REPLACE TIPRACKS~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~PLEASE EMPTY TRASH~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MIXING\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 19
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~ADDING BEADS~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 65
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 80
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n              MOVE PLATE IN SLOT 1 TO OFF-DECK THERMOCYCLER\n              REFER TO 1.2.12 FOR SPECIFIC HEATING/COOLING CYCLE\n              RETURN PLATE TO SLOT 1 WHEN FINISHED. ENSURE SAMPLE PLATE IS\n              FLAT AND SECURE WHEN RETURNING TO MAGNETIC MODULE!\n              "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~MIXING~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 6,
+        "volume": 80
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~ENGAGING MAGNET~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~REMOVING SUPERNATANT~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~WASHING BEADS TWICE WITH BUFFER~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 170
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 170
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~REMOVING SUPERNATANT~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~ADDING TRIS BUFFER~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 15,
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\nMOVE PLATE IN SLOT 1 TO OFF-DECK THERMOCYCLER\n              REFER TO 1.2.24 FOR SPECIFIC HEATING/COOLING CYCLE\n              RETURN PLATE TO SLOT 1 WHEN FINISHED. ENSURE SAMPLE PLATE IS\n              FLAT AND SECURE WHEN RETURNING TO MAGNETIC MODULE!"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~ADDING BINDING BUFFER~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~INCUBATING 5 MINUTES~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~ENGAGING MAGNETIC MODULE~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_delay_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_delay_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~REMOVING SUPERNATANT~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~WASHING BEADS WITH BUFFER~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 180
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 180
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~REMOVING SUPERNATANT~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~ADDING MASTER MIX ELUTION~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 11.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 11.5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\nMOVE PLATE IN SLOT 1 TO OFF-DECK THERMOCYCLER\n              REFER TO 1.2.37 FOR SPECIFIC HEATING/COOLING CYCLE\n              SPIN PLATE DOWN BEFORE RETURNING TO DECK\n              RETURN PLATE TO SLOT 1 WHEN FINISHED. ENSURE SAMPLE PLATE IS\n              FLAT AND SECURE WHEN RETURNING TO MAGNETIC MODULE!"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~SEPARATING RNA SOLUTION~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~MOVING RNA TO NEW PLATE~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~PROTOCOL  COMPLETE~~~~~~~~~~~~~~~\n"
+      }
+    ]
+  }
+}

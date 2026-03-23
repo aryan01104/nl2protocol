@@ -1,0 +1,128 @@
+{
+  "id": "ex_concise_03c401b5",
+  "intent": "Multi-step 384-well plate prep: coating solution addition, waste removal, or staged water washes with delays",
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "mount_p300": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "culture.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "384-Well Plate Prep",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_pre_airgap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p300",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      }
+    ]
+  }
+}

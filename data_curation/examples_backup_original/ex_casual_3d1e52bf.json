@@ -1,0 +1,578 @@
+{
+  "id": "ex_casual_3d1e52bf",
+  "intent": "Run a viral DNA/RNA extraction using the Zymo kit on the mag deck. Basically add proteinase K and lysis buffer to lyse the samples, then do the magnetic bead cleanup with a bunch of wash steps - two different wash buffers plus ethanol washes. Let everything dry, then add water to get the clean DNA/RNA out and move it to a fresh plate.",
+  "config": {
+    "labware": {
+      "s_tips": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "5"
+      },
+      "magplate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "3"
+      },
+      "flatplate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "3"
+      },
+      "Liquid Waste": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "11"
+      },
+      "Opentrons 24 TubeRack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "8"
+      },
+      "Trough with Reagents": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "s_pip",
+        "tipracks": [
+          "s_tips"
+        ]
+      },
+      "left": {
+        "model": "p300m",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "mag_gen",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "zymo-quick.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Zymo Quick-DNA/RNA Viral Kit",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "s_tips"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "magplate"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "flatplate"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "Liquid Waste"
+      },
+      {
+        "slot": "8",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "Opentrons 24 TubeRack"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Trough with Reagents"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "s_pip",
+        "tipracks": [
+          "s_tips"
+        ]
+      },
+      {
+        "mount": "left",
+        "model": "p300m",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "mag_gen",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding Proteinase K to each well:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding viral buffer + beads to samples:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 160
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 160
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 160
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Mixing samples+buffer+beads:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "magheight"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on magdeck for 5 minutes"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 180
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 180
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "tvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "dvol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing supernatant:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 165
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 165
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 165
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 185
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "magheight"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 3 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Allowing beads to air dry for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing any excess ethanol from wells:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 180,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Allowing beads to air dry for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding NF-Water to wells for elution:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 80
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating at room temp for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "magheight"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring elution to final plate:"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 60
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Congratulations!"
+      }
+    ]
+  }
+}

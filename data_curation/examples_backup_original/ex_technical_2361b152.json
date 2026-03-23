@@ -1,0 +1,427 @@
+{
+  "id": "ex_technical_2361b152",
+  "intent": "Execute Illumina DNA Prep tagmentation workflow: Mix 138\u00b5L eBLT with 138\u00b5L TBS, distribute 20\u00b5L to thermocycler wells, add 30\u00b5L sample and mix. Heat to 55\u00b0C for 5 minutes. Add 10\u00b5L ST2, mix, transfer 60\u00b5L to magnetic module for bead cleanup with three 100\u00b5L TWB washes. Elute in 40\u00b5L EPM/water mix, transfer 45\u00b5L to PCR wells, manually add 10\u00b5L index adapters, then perform 3-step PCR amplification with 72\u00b0C extension, 98\u00b0C denaturation, and 9 cycles of 98\u00b0C/60\u00b0C/72\u00b0C.",
+  "config": {
+    "labware": {
+      "temp_block": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "2"
+      },
+      "tc_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "4"
+      },
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "6"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "1"
+      },
+      "block": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "3"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "Temperature Module",
+        "slot": "9"
+      },
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "3"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "4ee4d6.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "4ee4d6.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "temp_block"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "block"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "Temperature Module",
+        "slot": "9",
+        "label": "temp"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "3",
+        "label": "tc"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "6",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 138,
+        "source_labware": "reagents_block",
+        "source_well": "eblt",
+        "dest_labware": "reagents_block",
+        "dest_well": "empty 1",
+        "new_tip": "always",
+        "mix_before": [
+          10,
+          100
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 138,
+        "source_labware": "reagents_block",
+        "source_well": "tbs",
+        "dest_labware": "reagents_block",
+        "dest_well": "empty 1",
+        "new_tip": "never",
+        "mix_after": [
+          10,
+          100
+        ]
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "right",
+        "volume": 20,
+        "source_labware": "reagents_block",
+        "source_well": "empty 1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          40
+        ]
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 75
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "reagents_block",
+        "source_well": "st2",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 60,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 60,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "reagents_res",
+        "dest_well": "waste",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please refill the p300 tip box."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "reagents_res",
+        "source_well": "twb",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          70
+        ]
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": [
+          138,
+          138
+        ],
+        "source_labware": "reagents_block",
+        "source_well": "epm",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": [
+          138,
+          138
+        ],
+        "source_labware": "reagents_res",
+        "source_well": "water",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "reagents_res",
+        "dest_well": "waste",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 40,
+        "source_labware": "reagents_block",
+        "source_well": "empty 2",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          30
+        ]
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 45,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please remove the 96 well plate from the thermocycler\n                 and add 10 ul from the index adapter plate to A3-H3, A4-B4.\n                 Then return the plate to the thermocycler."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 105
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile",
+        "repetitions": "reps"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Part 1 - Tagmentation, Clean Up,\n                 Amplify Tagmented DNA steps are complete."
+      }
+    ]
+  }
+}

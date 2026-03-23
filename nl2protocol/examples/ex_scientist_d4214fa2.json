@@ -1,0 +1,95 @@
+{
+  "id": "ex_technical_d4214fa2",
+  "source_file": "08e3eb.ot2.apiv2.py",
+  "intent_precise": "Custom Plate Filling: Using reservoir (reservoir, slot 11). (1) Transfer 50\u00b5L from source to destination. (2) Wait 1 seconds. (3) Pause: pause_msg",
+  "intent_concise": "Distribute reagents to plate. (volumes 6\u00b5L-50\u00b5L)",
+  "intent": "For this custom plate filling protocol, you'll need to use the reservoir that's positioned in slot 11. Transfer exactly 50\u00b5L from the source to your destination wells, then wait 1 second after each transfer to allow proper settling. The system will pause at designated points with a message prompt, so just follow the on-screen instructions when that happens.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Custom Plate Filling",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips300"
+      },
+      {
+        "slot": "11",
+        "load_name": "agilent_48_reservoir_5000ul",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p50_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "m50vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 6
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "m50vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "pause_msg"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "10"
+      },
+      "reservoir": {
+        "load_name": "agilent_48_reservoir_5000ul",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p50_multi",
+        "tipracks": []
+      }
+    }
+  }
+}

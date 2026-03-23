@@ -1,0 +1,150 @@
+{
+  "id": "ex_concise_b34788d5",
+  "intent": "Dilute samples in buffer tubes, then transfer to Visby cartridges with mixing",
+  "config": {
+    "labware": {
+      "tips1000": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "1"
+      },
+      "poolRack": {
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "slot": "5"
+      },
+      "sampRack": {
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "mnt1000": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips1000"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "115d98.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Visby Test without Pooling p1000",
+    "author": "Dipro <dipro@basisdx.org>, Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "tips1000"
+      },
+      {
+        "slot": "5",
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "label": "poolRack"
+      },
+      {
+        "slot": "2",
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "label": "sampRack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt1000",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips1000"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": "sampVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt1000",
+        "volume": "gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt1000",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt1000",
+        "repetitions": 1,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": "sampVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt1000",
+        "volume": "gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt1000",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol complete!"
+      }
+    ]
+  }
+}

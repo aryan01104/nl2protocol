@@ -1,0 +1,155 @@
+{
+  "id": "ex_concise_8277a45b",
+  "intent": "Dilute samples to 15\u00b5L total volume, add 2.5\u00b5L mastermix, mix at 4\u00b0C",
+  "config": {
+    "labware": {
+      "Water reservoir": {
+        "load_name": "perkinelmer_12_reservoir_21000ul",
+        "slot": "2"
+      },
+      "Mastermix_plate": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "MasterMix plate"
+      },
+      "Diluted_plate": {
+        "load_name": "appliedbiosystemsenduraplate_96_aluminumblock_220ul",
+        "slot": "Diluted RNA plate"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck_1": {
+        "module_type": "temperature",
+        "slot": "10"
+      },
+      "tempdeck_2": {
+        "module_type": "temperature",
+        "slot": "7"
+      },
+      "Mag_mod": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "0b97ae-protocol-2B.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "QIAseq FastSelect Fragmentation",
+    "author": "Trevor <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "perkinelmer_12_reservoir_21000ul",
+        "label": "Water reservoir"
+      },
+      {
+        "slot": "MasterMix plate",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "Mastermix_plate"
+      },
+      {
+        "slot": "Diluted RNA plate",
+        "load_name": "appliedbiosystemsenduraplate_96_aluminumblock_220ul",
+        "label": "Diluted_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "10",
+        "label": "tempdeck_1"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "7",
+        "label": "tempdeck_2"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "Mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck_2",
+        "celsius": 4
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "Water_Vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "Water_Vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 2.5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          5,
+          10
+        ]
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Click continue when ready to turn the cooling plates off"
+      },
+      {
+        "command_type": "deactivate",
+        "module": "tempdeck_1"
+      },
+      {
+        "command_type": "deactivate",
+        "module": "tempdeck_2"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n        Process Complete. Remove Plate from Position 7 and incubate according\n        to FastSelect 5/16/23S, Table 3\n    "
+      }
+    ]
+  }
+}

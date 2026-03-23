@@ -1,0 +1,277 @@
+{
+  "id": "ex_casual_d52551c8",
+  "intent": "Clean up NGS libraries with magnetic beads - you know, the usual bead cleanup protocol. Add beads to samples, let them bind, stick it on the magnet, wash twice with ethanol, dry the beads, add elution buffer and shake it up off the deck, then pull off the clean DNA into a new plate.",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "twintec_pcr_plate",
+        "slot": "magnetic plate"
+      },
+      "elution plate": {
+        "load_name": "twintec_pcr_plate",
+        "slot": "2"
+      },
+      "reagent reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "p20_multi_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "p300_multi_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "ngs_cleanup.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "NGS Library Cleanup with Ampure XP Beads",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "magnetic plate",
+        "load_name": "twintec_pcr_plate",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "twintec_pcr_plate",
+        "label": "elution plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reagent reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_multi_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_multi_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_multi_mount",
+        "repetitions": 5,
+        "volume": "volume_of_beads"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_multi_mount",
+        "volume": "volume_of_beads",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_multi_mount",
+        "repetitions": 10,
+        "volume": "volume_of_beads"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_incubation_time_in_minutes"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_settling_time_on_magnet_in_minutes"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_multi_mount",
+        "volume": 175,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "waste",
+        "dest_well": "1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount",
+        "labware": "waste",
+        "well": "1"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_multi_mount",
+        "volume": 180,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_multi_mount",
+        "volume": 180,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "waste",
+        "dest_well": "0",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount",
+        "labware": "waste",
+        "well": "0"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_multi_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_multi_mount",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "waste",
+        "dest_well": "1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_multi_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "drying_time_in_minutes"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_multi_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_multi_mount",
+        "volume": "volume_EB_in_ul"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_multi_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove PCR plate, seal and shake at 1800 RPM for 2 minutes. Return PCR plate to magnetic module and incubate for 3 minutes before resuming."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_multi_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_multi_mount",
+        "volume": "volume_final_elution_in_ul"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_multi_mount",
+        "volume": "volume_final_elution_in_ul"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_multi_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_multi_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      }
+    ]
+  }
+}

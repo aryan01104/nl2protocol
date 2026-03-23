@@ -1,0 +1,160 @@
+{
+  "id": "ex_casual_cb788968",
+  "intent": "Take diluted phage samples from a 96-well plate and spot them onto agar plates - basically dispensing the same sample from each well of the source plate onto the same position on multiple agar plates. The robot will go column by column and put drops on however many plates you specify.",
+  "config": {
+    "labware": {
+      "agar1": {
+        "load_name": "127x85_agar_plate1",
+        "slot": "1"
+      },
+      "agar2": {
+        "load_name": "127x85_agar_plate2",
+        "slot": "2"
+      },
+      "agar3": {
+        "load_name": "127x85_agar_plate3",
+        "slot": "3"
+      },
+      "agar4": {
+        "load_name": "127x85_agar_plate4",
+        "slot": "4"
+      },
+      "agar5": {
+        "load_name": "127x85_agar_plate5",
+        "slot": "5"
+      },
+      "agar6": {
+        "load_name": "127x85_agar_plate6",
+        "slot": "6"
+      },
+      "agar7": {
+        "load_name": "127x85_agar_plate7",
+        "slot": "7"
+      },
+      "agar8": {
+        "load_name": "127x85_agar_plate8",
+        "slot": "8"
+      },
+      "agar9": {
+        "load_name": "127x85_agar_plate9",
+        "slot": "9"
+      },
+      "dilution_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "11"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "659888.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Dispensing Diluted Phage to Agar Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "127x85_agar_plate1",
+        "label": "agar1"
+      },
+      {
+        "slot": "2",
+        "load_name": "127x85_agar_plate2",
+        "label": "agar2"
+      },
+      {
+        "slot": "3",
+        "load_name": "127x85_agar_plate3",
+        "label": "agar3"
+      },
+      {
+        "slot": "4",
+        "load_name": "127x85_agar_plate4",
+        "label": "agar4"
+      },
+      {
+        "slot": "5",
+        "load_name": "127x85_agar_plate5",
+        "label": "agar5"
+      },
+      {
+        "slot": "6",
+        "load_name": "127x85_agar_plate6",
+        "label": "agar6"
+      },
+      {
+        "slot": "7",
+        "load_name": "127x85_agar_plate7",
+        "label": "agar7"
+      },
+      {
+        "slot": "8",
+        "load_name": "127x85_agar_plate8",
+        "label": "agar8"
+      },
+      {
+        "slot": "9",
+        "load_name": "127x85_agar_plate9",
+        "label": "agar9"
+      },
+      {
+        "slot": "11",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "dilution_plate"
+      },
+      {
+        "slot": "10",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p20_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\n"
+      }
+    ]
+  }
+}

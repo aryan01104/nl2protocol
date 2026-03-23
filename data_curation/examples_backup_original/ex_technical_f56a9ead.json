@@ -1,0 +1,94 @@
+{
+  "id": "ex_technical_f56a9ead",
+  "intent": "Execute a mastermix distribution protocol across 9 destination plates using multi-channel pipettes. Select from 6 predefined reagent types (synth1, screen10, seq5, lba, lbk, pcr) with volumes ranging 8-30\u00b5L per well. Transfer reagents from specified source plate columns to sequential destination wells, with batch dispensing optimization (1-9 dispenses per aspiration cycle). Use P20 multi-channel for volumes <20\u00b5L, P300 multi-channel for larger volumes, dispensing 1mm above well bottom.",
+  "config": {
+    "labware": {
+      "source_plate": {
+        "load_name": "source_labware",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": null,
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "quintara_onsite_part3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Mastermix Filling 9 Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "source_labware",
+        "label": "source_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": null,
+        "model": null,
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": null,
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "disp_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Select Resume for another round"
+      }
+    ]
+  }
+}

@@ -1,0 +1,344 @@
+{
+  "id": "ex_casual_8406bb42",
+  "intent": "Clean up the DNA samples by pulling off the supernatant with the magnet on, add PCR mix and mix it up, move everything to a new plate for the thermocycler, add the index adapters, mix again, then take it out for PCR amplification",
+  "config": {
+    "labware": {
+      "cycler_plate": {
+        "load_name": "customabnest_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "thermo_tubes": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "3"
+      },
+      "index_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "3"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "6"
+      },
+      "reagent_resv": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "liquid_trash": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "mag_module": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "ff5763_part3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina DNA Prep Part 3, Amplify Tagmented DNA",
+    "author": "John C. Lynch <john.lynch@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "customabnest_96_wellplate_200ul",
+        "label": "cycler_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "thermo_tubes"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "index_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent_resv"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "liquid_trash"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_1"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag_module"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~DISCARDING SUPERNATANT~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_supernatant"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_supernatant"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING MASTER MIX~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 30,
+        "labware": "pcr_mix",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 40,
+        "labware": "pcr_mix",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_mastermix"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_mastermix"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 40
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~MOVING TO 96 WELL PLATE~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 60
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_plate"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_plate"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 60
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please centrifuge plate in slot 2 at 280 x g for 3 seconds, return to slot 2 when done"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING ADAPTERS~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "airgap_index"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "airgap_index"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "airgap_index"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "airgap_index"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~MIXING~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Run complete, please move sample plate to off-deck thermocycler"
+      }
+    ]
+  }
+}

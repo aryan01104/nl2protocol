@@ -1,0 +1,204 @@
+{
+  "id": "ex_technical_33944655",
+  "intent": "Execute a solid-phase extraction (SPE) protocol for mass spectrometry sample preparation by transferring samples from 1.5mL tubes to SPE plates, performing two sequential methanol washes with air gaps and slow withdrawal techniques, adding MilliQ water to collection plates for elution, then transferring redissolved samples to a 96-well PCR plate with specified volumes and aspiration heights throughout the procedure.",
+  "config": {
+    "labware": {
+      "SPE stacked on collection plate": {
+        "load_name": "spestackedoncollection_96_wellplate_1600ul",
+        "slot": "5"
+      },
+      "collection plate": {
+        "load_name": "greiner_96_wellplate_2000ul",
+        "slot": "7"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      },
+      "final_plate": {
+        "load_name": "axygen_96_plate_200ul_pcr",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "mount_p300": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "mount_m300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "mass_spec.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Mass Spec Sample Prep",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "spestackedoncollection_96_wellplate_1600ul",
+        "label": "SPE stacked on collection plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "greiner_96_wellplate_2000ul",
+        "label": "collection plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "10",
+        "load_name": "axygen_96_plate_200ul_pcr",
+        "label": "final_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "mount_m300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p300",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p300",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESUME WHEN READY"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Refill MeOH"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESUME WHEN READY"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Refill MQ"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESUME WHEN READY"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_sample_redissolved"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      }
+    ]
+  }
+}

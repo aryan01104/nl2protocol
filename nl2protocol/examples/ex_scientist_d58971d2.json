@@ -1,0 +1,166 @@
+{
+  "id": "ex_technical_d58971d2",
+  "source_file": "1477ea.ot2.apiv2.py",
+  "intent_precise": "Cherrypicking Final: (1) Transfer 198\u00b5L from source A1 to destination A1. (2) Mix 5 times at 80\u00b5L. (3) Mix 5 times at 5\u00b5L. (4) Mix 5 times at 80\u00b5L.",
+  "intent_concise": "Perform cherry picking. (volumes 2\u00b5L-198\u00b5L)",
+  "intent": "For the cherrypicking final step, transfer 198\u00b5L from source well A1 to destination well A1. Once the transfer is complete, you'll need to perform a series of mixing steps to ensure proper homogenization: first mix 5 times at 80\u00b5L volume, then switch to 5 times at 5\u00b5L volume for more gentle mixing, and finish with another 5 cycles at 80\u00b5L volume.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Cherrypicking Final",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "DROP USED 200ul TIPS HERE"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "DROP USED 20ul TIPS HERE"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 198,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 80
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left",
+        "labware": "spots300",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 2
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 5,
+        "volume": 5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "spots20",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 80
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left",
+        "labware": "spots300",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "DROP USED 200ul TIPS HERE": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      },
+      "DROP USED 20ul TIPS HERE": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

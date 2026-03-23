@@ -22,6 +22,10 @@ dist/
 # Generated protocols
 generated_protocol.py
 
+# Test results
+test_results/
+llm_failed_output*.txt
+
 # OS
 .DS_Store
 Thumbs.db

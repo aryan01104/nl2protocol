@@ -1,0 +1,106 @@
+{
+  "id": "ex_technical_5994c30d",
+  "source_file": "pooling.ot2.apiv2.py",
+  "intent_precise": "Pooling - 2ml Tuberack to 15ml Tuberack: Using 2ml tuberack (tuberack, slot 2), 15ml tuberack 1 (tuberack, slot 4), 15ml tuberack 2 (tuberack, slot 1). (1) Pause for manual intervention. (2) Transfer from source to destination. (3) Wait 1 seconds.",
+  "intent_concise": "Execute 10-step liquid handling protocol. (using 20\u00b5L)",
+  "intent": "For this pooling step, you'll be working with the 2ml tuberack in slot 2 as your source, along with the two 15ml tuberacks - tuberack 1 in slot 4 and tuberack 2 in slot 1 as your destinations. First, pause the protocol to allow for any manual adjustments you need to make, then proceed with transferring the samples from the 2ml tubes to the appropriate 15ml tubes. After each transfer, wait 1 second before moving to the next step to ensure proper sample handling.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Pooling - 2ml Tuberack to 15ml Tuberack",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "eurofins_96x2ml_tuberack",
+        "label": "2ml tuberack"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "label": "15ml tuberack 1"
+      },
+      {
+        "slot": "1",
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "label": "15ml tuberack 2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "2ml tuberack": {
+        "load_name": "eurofins_96x2ml_tuberack",
+        "slot": "2"
+      },
+      "15ml tuberack 1": {
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "slot": "4"
+      },
+      "15ml tuberack 2": {
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

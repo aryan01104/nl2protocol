@@ -1,0 +1,166 @@
+{
+  "id": "ex_technical_78eb5f1c",
+  "intent": "Execute a Gibson assembly cloning protocol by setting temperature modules to 4\u00b0C, then distribute 9\u00b5L backbone DNA from reservoir to assembly plate wells using multichannel pipette, add 1\u00b5L DNA fragments from fragment plate to corresponding assembly wells, and finally add 10\u00b5L Gibson assembly master mix to each well using single-channel pipette with 3x mixing at 10\u00b5L volume",
+  "config": {
+    "labware": {
+      "gibson_tubes": {
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "slot": "3"
+      },
+      "fragment_plate": {
+        "load_name": "azentalifesciences_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "assembly_plate": {
+        "load_name": "azentalifesciences_96_aluminumblock_200ul",
+        "slot": "5"
+      },
+      "backbone_reservoir": {
+        "load_name": "azentalifesciences_12_reservoir_21000ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "temp_3": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "019a7d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Nucleic Acid Purification/Cloning",
+    "author": "Opentrons",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "label": "gibson_tubes"
+      },
+      {
+        "slot": "2",
+        "load_name": "azentalifesciences_96_wellplate_200ul",
+        "label": "fragment_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "azentalifesciences_96_aluminumblock_200ul",
+        "label": "assembly_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "azentalifesciences_12_reservoir_21000ul",
+        "label": "backbone_reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_1"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_3"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_1",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_3",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 9,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 1,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          3,
+          10
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

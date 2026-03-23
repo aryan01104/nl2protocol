@@ -1,0 +1,96 @@
+{
+  "id": "ex_technical_9d8f9c6a",
+  "intent": "Perform SYBR Green PCR plate preparation using CSV-guided cherrypicking methodology. First, dispense specified volumes of mastermix from individual tubes in the Eppendorf rack to designated wells in the ThermoFisher MicroAmp aluminum block PCR plate. Subsequently, transfer specified volumes of DNA samples from source wells in the BioRad aluminum block to corresponding destination wells, executing one mix cycle with 2\u00b5L volume post-transfer for homogenization.",
+  "config": {
+    "labware": {
+      "final PCR plate": {
+        "load_name": "thermofishermicroamp_96_aluminumblock_200ul",
+        "slot": "1"
+      },
+      "source DNA tubes": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "4"
+      },
+      "mastermix rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "pcr_prep.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "pcr_prep.ot2.apiv2",
+    "author": "Nick <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "thermofishermicroamp_96_aluminumblock_200ul",
+        "label": "final PCR plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "source DNA tubes"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "mastermix rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "mm_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "mm_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "p20_mount",
+        "seconds": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          1,
+          2
+        ]
+      }
+    ]
+  }
+}

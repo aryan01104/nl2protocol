@@ -1,0 +1,365 @@
+{
+  "id": "ex_technical_93ae3a49",
+  "intent": "Execute a mass spectrometry sample preparation protocol using CSV-defined sample mapping. Transfer 30\u00b5L aliquots from 2mL tube racks to 96-well deep well plates maintained at 4\u00b0C using temperature modules. Perform pre-wetting with each sample transfer, then dispense to destination wells at 12.5mm height with dual blow-out and touch-tip. Following sample transfers, use multichannel pipette to dispense 90\u00b5L acetonitrile to all columns of the destination plate for protein precipitation, incorporating 10\u00b5L air gaps and pre-wetting steps throughout.",
+  "config": {
+    "labware": {
+      "tiprack1": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "8"
+      },
+      "tiprack2": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "10"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "7"
+      },
+      "labware_slot_rack": {
+        "load_name": "tuberack",
+        "slot": "rack"
+      },
+      "labware_slot_7": {
+        "load_name": "well_plate",
+        "slot": "7"
+      },
+      "labware_slot_plate": {
+        "load_name": "well_plate",
+        "slot": "plate"
+      },
+      "labware_slot_rack_rack": {
+        "load_name": "tuberack",
+        "slot": "rack"
+      },
+      "labware_slot_10": {
+        "load_name": "well_plate",
+        "slot": "10"
+      },
+      "labware_slot_plate1": {
+        "load_name": "well_plate",
+        "slot": "plate1"
+      },
+      "labware_slot_12": {
+        "load_name": "well_plate",
+        "slot": "12"
+      },
+      "labware_slot_plate2": {
+        "load_name": "well_plate",
+        "slot": "plate2"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack1"
+        ]
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack2"
+        ]
+      }
+    },
+    "modules": {
+      "temp_mod_3": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "temp_mod_6": {
+        "module_type": "temperature",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "459cc2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom CSV Mass Spec Sample Prep",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack1"
+      },
+      {
+        "slot": "10",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack2"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "rack",
+        "load_name": "tuberack",
+        "label": null
+      },
+      {
+        "slot": "7",
+        "load_name": "well_plate",
+        "label": null
+      },
+      {
+        "slot": "plate",
+        "load_name": "well_plate",
+        "label": null
+      },
+      {
+        "slot": "rack",
+        "load_name": "tuberack",
+        "label": null
+      },
+      {
+        "slot": "10",
+        "load_name": "well_plate",
+        "label": null
+      },
+      {
+        "slot": "plate1",
+        "load_name": "well_plate",
+        "label": null
+      },
+      {
+        "slot": "12",
+        "load_name": "well_plate",
+        "label": null
+      },
+      {
+        "slot": "plate2",
+        "load_name": "well_plate",
+        "label": null
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack1"
+        ]
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack2"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod_3"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "6",
+        "label": "temp_mod_6"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_3",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_6",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the empty tip racks!"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": "airgap_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Press Resume on the Opentrons app to continue"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "mecn_volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "mecn_volume"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "mecn_volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "mecn_volume"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,139 @@
+{
+  "id": "ex_casual_ee5e63f0",
+  "intent": "Do a double ethanol wash on the mag deck plate - add ethanol from the reservoir, wait 30 seconds, then suck it out and throw it away. Do this twice with different ethanol sources and waste wells. At the end, use the small pipette to get any leftover liquid from the bottom of the wells.",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "res": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "p20mnt": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "p300mnt": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "3633ca.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ethanol Transfer",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "magplate"
+      },
+      {
+        "slot": "1",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20mnt",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 30 seconds"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20mnt"
+      }
+    ]
+  }
+}

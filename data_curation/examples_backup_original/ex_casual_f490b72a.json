@@ -1,0 +1,128 @@
+{
+  "id": "ex_casual_f490b72a",
+  "intent": "This is a plate prep protocol that can do different things depending on which day you're on. It can either add coating solution to certain wells in a pattern, remove old coating solution to waste, or do water washes in stages with waiting periods between different sets of rows. The robot picks specific wells in a repeating pattern across multiple 384-well plates.",
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "mount_p300": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "culture.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "384-Well Plate Prep",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_pre_airgap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p300",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      }
+    ]
+  }
+}

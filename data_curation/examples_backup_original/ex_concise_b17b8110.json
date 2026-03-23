@@ -1,0 +1,68 @@
+{
+  "id": "ex_concise_b17b8110",
+  "intent": "Transfer 200\u00b5L COVID-19 saliva samples from tubes to 96-well plate",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "00bbd7.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Covid-19 Saliva Sample Plating",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_after_asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

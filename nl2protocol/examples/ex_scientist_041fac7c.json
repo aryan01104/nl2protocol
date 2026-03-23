@@ -1,0 +1,129 @@
+{
+  "id": "ex_technical_041fac7c",
+  "source_file": "33b12a.ot2.apiv2.py",
+  "intent_precise": "CerTest VIASURE SARS-CoV-2 Real Time PCR Detection kit: Using pcr_plate (pcr_plate, slot 5), sample_plate (deep_well_plate, slot 6), controls (tuberack, slot 8). (1) Transfer 5\u00b5L from source A1 to destination A1. (2) Transfer 5\u00b5L from source to destination. (3) Transfer 5\u00b5L from source to destination. (4) Transfer 5\u00b5L from source to destination.",
+  "intent_concise": "Perform 4 liquid transfers. (using 5\u00b5L)",
+  "intent": "For the CerTest VIASURE SARS-CoV-2 Real Time PCR Detection kit, set up your workspace with the PCR plate in slot 5, deep well sample plate in slot 6, and controls tube rack in slot 8. Start by transferring 5\u00b5L from the sample plate well A1 to the corresponding PCR plate well A1, then continue with three more 5\u00b5L transfers following the same pattern from your source wells to their destination wells. Make sure to use fresh tips for each transfer to avoid cross-contamination between samples.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "CerTest VIASURE SARS-CoV-2 Real Time PCR Detection kit",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "controls"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          1,
+          5
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "pcr_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "5"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "6"
+      },
+      "controls": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

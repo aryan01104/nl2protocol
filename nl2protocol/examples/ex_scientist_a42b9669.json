@@ -1,0 +1,541 @@
+{
+  "id": "ex_technical_a42b9669",
+  "source_file": "sci-idt-normalase.ot2.apiv2.py",
+  "intent_precise": "IDT Normalase: Using norm_plate_deck (pcr_plate, slot 2), norm_plate_deck (pcr_plate, slot 1), reagent_tubes (plate, slot 5), norm_plate_thermo (pcr_plate, slot 9). With magnetic module, temperature module, thermocycler module. (1) Pause: ERROR? (2) Set temperature to 4\u00b0C. (3) Operate thermocycler. (4) Set temperature to 4\u00b0C. (5) Open thermocycler lid. (6) Pause: Ready (7) Transfer from source to destination. (8) Mix NORM1MixRep times. (9) Transfer from source to destination. (10) Mix NORM1MixRep times. (11) Transfer from source to destination. (12) Mix NORM1MixRep times. (13) Pause: Seal, Run NORM1 (15min) (14) Run thermocycler profile for 1 cycles. (15) Set temperature to 4\u00b0C. (16) Pause: Remove Seal (17) Pause: Seal, Run NORM1 (15min) (18) Pause: MOVE NORM PLATE TO POSITION 1, PLACE NEW PLATE IN THERMO (19) Transfer from source to destination. (20) Transfer from source to destination. (21) Mix NORM2MixRep times. (22) Transfer from source to destination. (23) Mix NORM2MixRep times. (24) Transfer from source to destination. (25) Mix NORM2MixRep times. (26) Pause: Seal, Run NORM2 (15min) (27) Run thermocycler profile for 1 cycles. (28) Set temperature to 4\u00b0C. (29) Pause: Remove Seal (30) Pause: Seal, Run NORM2 (15min) (31) Transfer from source to destination. (32) Mix NORMINACTMixRep times. (33) Transfer from source to destination. (34) Mix NORMINACTMixRep times. (35) Transfer from source to destination. (36) Mix NORMINACTMixRep times. (37) Pause: Seal, Run NORMINACT (2min) (38) Run thermocycler profile for 1 cycles. (39) Set temperature to 4\u00b0C. (40) Pause: Remove Seal (41) Pause: Seal, Run NORMINACT (2min)",
+  "intent_concise": "Perform temperature control (4\u00b0C), thermocycling.",
+  "intent": "For the IDT Normalase protocol, you'll be working with PCR plates in deck slots 1 and 2, reagent tubes in slot 5, and the thermocycler plate in slot 9, so first check for any errors, then set both the temperature module and thermocycler to 4\u00b0C and open the thermocycler lid when ready. Perform three rounds of transfers and mixing (NORM1MixRep times each), then seal and run the NORM1 profile for 15 minutes, followed by moving the normalized plate to position 1 and placing a fresh plate in the thermocycler for the second normalization round with NORM2MixRep mixing. After sealing and running NORM2 for 15 minutes, complete the protocol with three final transfers and NORMINACTMixRep mixing steps, then seal and run the NORMINACT profile for just 2 minutes to inactivate the enzyme. Remember to remove seals between thermocycler runs and keep everything at 4\u00b0C during pauses.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "IDT Normalase",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "norm_plate_deck"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "norm_plate_deck"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "reagent_tubes"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20M"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20S"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "norm_plate_thermo"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20M_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20M"
+        ]
+      },
+      {
+        "mount": "p20S_mount",
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tiprack_20S"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_block"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_block"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "8",
+        "label": "thermocycler"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A DRY RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A REACTION RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A MODULE RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "src_file_path"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 8 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 16 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 24 Samples"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "ERROR?"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "SETTING THERMO and TEMP BLOCK Temperature"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "thermocycler",
+        "celsius": 100
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_block",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Ready"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> NORMALASE I"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding NORM1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20M_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20M_mount",
+        "repetitions": "NORM1MixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20M_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20M_mount",
+        "repetitions": "NORM1MixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20M_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20M_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20M_mount",
+        "repetitions": "NORM1MixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORM1 (15min)"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_NORM1",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORM1 (15min)"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "MOVE NORM PLATE TO POSITION 1, PLACE NEW PLATE IN THERMO"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> POOLING SAMPLES"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "Poolvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "Poolvol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> NORMALASE II"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding NORM2"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORM2Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORM2Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORM2MixRep",
+        "volume": "NORM2MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORM2Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORM2Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORM2MixRep",
+        "volume": "NORM2MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORM1Vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORM2MixRep",
+        "volume": "NORM2MixVol"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORM2 (15min)"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_NORM2",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORM2 (15min)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding NORMINACT"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORMINACTMixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORMINACTMixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20S_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20S_mount",
+        "volume": "NORMINACTVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20S_mount",
+        "repetitions": "NORMINACTMixRep",
+        "volume": "NORM1MixVol"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORMINACT (2min)"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_NORMINACT",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run NORMINACT (2min)"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "norm_plate_deck": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "norm_plate_deck_1": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "1"
+      },
+      "reagent_tubes": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "5"
+      },
+      "tiprack_20M": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "4"
+      },
+      "tiprack_20S": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "5"
+      },
+      "norm_plate_thermo": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20M"
+        ]
+      },
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tiprack_20S"
+        ]
+      }
+    },
+    "modules": {
+      "mag_block": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_block": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "thermocycler": {
+        "module_type": "thermocycler",
+        "slot": "8"
+      }
+    }
+  }
+}

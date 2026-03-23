@@ -1,0 +1,81 @@
+{
+  "id": "ex_concise_b18bee52",
+  "intent": "Replicate drug library from mother plate to 1-6 daughter plates using multichannel transfers",
+  "config": {
+    "labware": {
+      "Prestwick (mother plate)": {
+        "load_name": "mother_plate_type",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "p10_multi_mount": {
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "drug_screening.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Drug Screening",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "mother_plate_type",
+        "label": "Prestwick (mother plate)"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p10_multi_mount",
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p10_multi_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p10_multi_mount",
+        "volume": "transfer_volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p10_multi_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p10_multi_mount",
+        "volume": "asp_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p10_multi_mount",
+        "volume": "transfer_volume"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p10_multi_mount"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p10_multi_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p10_multi_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "id": "ex_technical_e19cd4bb",
+  "source_file": "arcis-single-test.ot2.apiv2.py",
+  "intent_precise": "Arcis Blood Extraction and PCR Setup: Using Corning Plate (plate, slot 2), 10 Tube Rack (tuberack, slot 6), 1.5mL Tube Rack (tuberack, slot 5), Bioplastics Plate (plate, slot 3). (1) Distribute 5\u00b5L from source A1 to destination wells A1-A1 (6 wells).",
+  "intent_concise": "Perform distribute to A1-A1 (6 wells). (volumes 5\u00b5L-150\u00b5L)",
+  "intent": "For the Arcis Blood Extraction and PCR Setup, you'll be working with the Corning plate in slot 2, the 10-tube rack in slot 6, the 1.5mL tube rack in slot 5, and the Bioplastics plate in slot 3. Start by taking 5\u00b5L from source well A1 and distribute it to destination wells A1-A1, which should give you 6 wells total. Make sure to use proper pipetting technique to ensure accurate volume transfer across all wells.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Arcis Blood Extraction and PCR Setup",
+    "author": "Chaz <chaz@opentrons.com",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "Opentrons Tips"
+      },
+      {
+        "slot": "2",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "Corning Plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "10 Tube Rack"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "1.5mL Tube Rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "label": "Bioplastics Plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "label": "Bioplastics Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p50_mnt",
+        "model": "p50_single",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mnt",
+        "model": "p300_single",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mnt",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Opentrons Tips": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "1"
+      },
+      "Corning Plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "2"
+      },
+      "10 Tube Rack": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "6"
+      },
+      "1.5mL Tube Rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "5"
+      },
+      "Bioplastics Plate": {
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "slot": "3"
+      },
+      "Bioplastics Plate_4": {
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p50_single",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single",
+        "tipracks": []
+      }
+    }
+  }
+}

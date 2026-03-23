@@ -1,0 +1,98 @@
+{
+  "id": "ex_technical_cf063bc6",
+  "intent": "Transfer 5\u00b5L samples from a 96-well deep well plate to a 384-well PCR plate using a P20 multichannel pipette, with each sample dispensed into 3 replicate wells arranged in a specific pattern across columns 1-7 of the 384-well plate. Additionally, transfer 5\u00b5L of positive controls from wells A1 and A3 of a control plate to designated wells A8, A16, and A24 of the 384-well plate. Use fresh tips for each transfer to prevent cross-contamination.",
+  "config": {
+    "labware": {
+      "cfx_plate": {
+        "load_name": "hardshellbioradpcr_384_wellplate_50ul",
+        "slot": "3"
+      },
+      "control_plate": {
+        "load_name": "thermofisherscientificelutiontubes_96_wellplate_650ul",
+        "slot": "2"
+      },
+      "sample_plate_1": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "1"
+      },
+      "sample_plate_2": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "002af3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "qPCR 96 well -> 384 well transfer",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "hardshellbioradpcr_384_wellplate_50ul",
+        "label": "cfx_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "thermofisherscientificelutiontubes_96_wellplate_650ul",
+        "label": "control_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate_1"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate_2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

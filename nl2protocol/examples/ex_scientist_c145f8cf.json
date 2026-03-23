@@ -1,0 +1,198 @@
+{
+  "id": "ex_technical_c145f8cf",
+  "source_file": "43d313-part-8.ot2.apiv2.py",
+  "intent_precise": "43d313-part-8.ot2.apiv2: Using Tapestation Reagent (labware, slot 2), Reservoir (reservoir, slot 4), libraries (labware, slot Libraries at Room Temperature), mag_plate (plate, slot Agilent Tapestation Plate). With temperature module, magnetic module. (1) Pause: Please Refill the 300 uL Tip Box\n                     and Empty the Tip Waste (2) Pause: format (3) Disengage magnets to release beads. (4) Pause: Place Qubit 8-tube Flex Strips on aluminum block and resume (5) Transfer 198\u00b5L from source A1 to destination A1. (6) Pause: Library QC protocol complete",
+  "intent_concise": "Perform magnetic bead separation. (volumes 2\u00b5L-198\u00b5L)",
+  "intent": "For this library QC protocol using the Tapestation Reagent in slot 2, Reservoir in slot 4, libraries at room temperature, and the Agilent Tapestation Plate on the magnetic module, we'll need to start by refilling the 300 \u00b5L tip box and emptying the tip waste before formatting the system. Once you've disengaged the magnets to release the beads, place the Qubit 8-tube Flex Strips on the aluminum block and transfer 198 \u00b5L from source well A1 to destination well A1. After completing this transfer, the library QC protocol will be finished and ready for analysis.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "43d313-part-8.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips300"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "Tapestation Reagent"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reservoir"
+      },
+      {
+        "slot": "Libraries at Room Temperature",
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "label": "libraries"
+      },
+      {
+        "slot": "Agilent Tapestation Plate",
+        "load_name": "agilent_96_wellplate_200ul",
+        "label": "mag_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please Refill the 300 uL Tip Box\n                     and Empty the Tip Waste"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Tapestation Reagent"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place Qubit 8-tube Flex Strips on aluminum block and resume"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Libraries to Qubit Strip Tubes and Tapestation Plate"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "always"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Qubit solution to Qubit Flex Strip Tubes"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 198,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          160
+        ]
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Library QC protocol complete"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "9"
+      },
+      "Tapestation Reagent": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      },
+      "Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      },
+      "libraries": {
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "slot": "Libraries at Room Temperature"
+      },
+      "mag_plate": {
+        "load_name": "agilent_96_wellplate_200ul",
+        "slot": "Agilent Tapestation Plate"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  }
+}

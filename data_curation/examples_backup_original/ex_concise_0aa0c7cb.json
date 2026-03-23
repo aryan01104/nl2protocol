@@ -1,0 +1,80 @@
+{
+  "id": "ex_concise_0aa0c7cb",
+  "intent": "CSV-guided cherrypicking with automated pipette selection and post-transfer mixing",
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "sp_name",
+        "tipracks": []
+      },
+      "left": {
+        "model": "bp_name",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "44981c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "CSV Cherrypicking APIv2",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "sp_name",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "bp_name",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_n",
+        "volume": "mix_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

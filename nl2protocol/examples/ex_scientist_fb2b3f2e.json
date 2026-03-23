@@ -1,0 +1,464 @@
+{
+  "id": "ex_technical_fb2b3f2e",
+  "source_file": "78d33c.ot2.apiv2.py",
+  "intent_precise": "78d33c.ot2.apiv2: Using Reagents (labware, slot 2), Reservoir (reservoir, slot 8), output_plate (labware, slot Output plate at 4 Degrees C), mag_plate (labware, slot Mag Plate). With temperature module, magnetic module. (1) Pause: Please Refill the 300 uL Tip Boxes\n                     and Empty the Tip Waste (2) Pause: format (3) Set temperature to temp_mod_setting\u00b0C. (4) Disengage magnets to release beads. (5) Transfer 200\u00b5L from source (multiple wells) to destination (multiple wells). (6) Wait 1 seconds. (7) Transfer 149\u00b5L from source to destination. (8) Incubate for 10 minutes. (9) Engage magnets at height_engagemm height for bead separation. (10) Pause for incubation. (11) Transfer 200\u00b5L from source to destination. (12) Transfer 50\u00b5L from source to destination. (13) Wait 1 seconds. (14) Wait 0 seconds. (15) Wait 30 seconds. (16) Wait 0 seconds. (17) Pause for incubation. (18) Disengage magnets to release beads. (19) Transfer 16\u00b5L from source (multiple wells) to destination (multiple wells). (20) Wait 1 seconds. (21) Incubate for 2 minutes. (22) Engage magnets at height_engagemm height for bead separation. (23) Pause for incubation. (24) Transfer from fragmentation_mm 0 to column 0. (25) Wait 1 seconds. (26) Transfer 11\u00b5L from source to destination. (27) Disengage magnets to release beads.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (temp_mod_setting\u00b0C). (volumes 4\u00b5L-250\u00b5L, ~14 min total)",
+  "intent": "For this automated magnetic bead protocol, start by refilling the 300 \u00b5L tip boxes and emptying the tip waste, then set the temperature module to temp_mod_setting\u00b0C and disengage the magnets to release the beads. You'll be performing a series of transfers between the reagent plate (slot 2), reservoir (slot 8), the output plate at 4\u00b0C, and the magnetic plate - beginning with 200 \u00b5L and 149 \u00b5L transfers, followed by a 10-minute incubation before engaging the magnets at height_engage mm for bead separation. Continue with 200 \u00b5L and 50 \u00b5L transfers with various wait times (1, 30 seconds), then disengage magnets for a 16 \u00b5L transfer, incubate for 2 minutes, and re-engage magnets before completing the final transfers including 11 \u00b5L to the destination wells. Remember to pause for incubations as indicated and transfer from fragmentation position 0 to column 0 near the end of the protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "78d33c.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "Reagents"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reservoir"
+      },
+      {
+        "slot": "Output plate at 4 Degrees C",
+        "load_name": "eppendorf_twintec_on_opentrons_metal_block_033822",
+        "label": "output_plate"
+      },
+      {
+        "slot": "Mag Plate",
+        "load_name": "eppendorf_twintex_clickbio_adapter",
+        "label": "mag_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tiplist",
+        "well": "A1"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please Refill the 300 uL Tip Boxes\n                     and Empty the Tip Waste"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tiplist",
+        "well": "A1"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": "temp_mod_setting"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - KAPA Pure Beads"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 126
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 126
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 149
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 149
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 220
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 250
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_dry"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 16
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 16
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 16
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 16
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null,
+        "labware": "fragmentation_mm",
+        "well": "0"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4,
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4,
+        "labware": "fragmentation_mm",
+        "well": "0"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 14
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 14
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 11
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 11
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Remove output plate on the Temperature Module for off-deck cycler steps.\n     Then continue to DNA-PRE-PCR-2 Adapter Ligation protocol."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Reagents": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      },
+      "Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      },
+      "output_plate": {
+        "load_name": "eppendorf_twintec_on_opentrons_metal_block_033822",
+        "slot": "Output plate at 4 Degrees C"
+      },
+      "mag_plate": {
+        "load_name": "eppendorf_twintex_clickbio_adapter",
+        "slot": "Mag Plate"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  }
+}

@@ -1,0 +1,269 @@
+{
+  "id": "ex_technical_f9d19e6d",
+  "source_file": "peptide_enrichment.ot2.apiv2.py",
+  "intent_precise": "Magbead-Based Peptide Enrichment: Using magplate (deep_well_plate, slot 2), reagent reservoir (reservoir, slot 3), elution plate (plate, slot 4). With magnetic module. (1) Disengage magnets to release beads. (2) Transfer 200\u00b5L from source A1 to destination A1. (3) Transfer 150\u00b5L from source to destination. (4) Incubate for 5 minutes. (5) Engage magnets for bead separation. (6) Incubate for 5 minutes. (7) Transfer 400\u00b5L from source (A1, A1) to destination (A1, A1). (8) Wait 30 seconds. (9) Transfer 500\u00b5L from source A1 to destination A1. (10) Incubate for 25 minutes. (11) Disengage magnets to release beads. (12) Transfer 50\u00b5L from source to destination. (13) Transfer 40\u00b5L from source to destination. (14) Incubate for 1 minutes. (15) Pause: Sonicate for 1 minute to re-elute beads thoroughly. Resume when plate is in place on Magnetic Module (16) Engage magnets for bead separation. (17) Incubate for 1 minutes. (18) Transfer 65\u00b5L from source A1 to destination A1. (19) Disengage magnets to release beads.",
+  "intent_concise": "Perform magnetic bead separation. (volumes 40\u00b5L-500\u00b5L, ~38 min total)",
+  "intent": "For this magbead-based peptide enrichment protocol, you'll be working with the deep well plate in slot 2, the reagent reservoir in slot 3, and the elution plate in slot 4 using the magnetic module. Start by disengaging the magnets to release the beads, then transfer 200\u00b5L from source A1 to destination A1 followed by 150\u00b5L, and incubate for 5 minutes. Engage the magnets for bead separation, incubate another 5 minutes, then perform sequential transfers of 400\u00b5L and 500\u00b5L from A1 to A1 with a 30-second wait between them, followed by a 25-minute incubation. After disengaging magnets and transferring 50\u00b5L then 40\u00b5L with a 1-minute incubation, pause to sonicate the plate for 1 minute to thoroughly re-elute the beads, then return it to the magnetic module, engage magnets for 1 minute, transfer 65\u00b5L from A1 to A1, and finally disengage the magnets.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Magbead-Based Peptide Enrichment",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "usascientific_96_wellplate_2.4ml_deep",
+        "label": "magplate"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent reservoir"
+      },
+      {
+        "slot": "4",
+        "load_name": "thermoscientific_96_wellplate_300ul",
+        "label": "elution plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_single_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_single_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_single_mount",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_single_mount",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_single_mount",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_single_mount",
+        "volume": 500,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_single_mount",
+        "volume": 400,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_single_mount",
+        "volume": 500,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_single_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 25
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_single_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_single_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_single_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_single_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_single_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Sonicate for 1 minute to re-elute beads thoroughly. Resume when plate is in place on Magnetic Module"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_single_mount",
+        "volume": 65,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "usascientific_96_wellplate_2.4ml_deep",
+        "slot": "2"
+      },
+      "reagent reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      },
+      "elution plate": {
+        "load_name": "thermoscientific_96_wellplate_300ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  }
+}

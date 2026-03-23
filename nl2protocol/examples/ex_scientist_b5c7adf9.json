@@ -1,0 +1,75 @@
+{
+  "id": "ex_technical_b5c7adf9",
+  "source_file": "quintara_onsite_part1_384.ot2.apiv2.py",
+  "intent_precise": "384 Plate to 96 Plate: Using source_plate (plate, slot 1), dest_plate (plate, slot 2). (1) Transfer from source to destination.",
+  "intent_concise": "Execute 5-step liquid handling protocol.",
+  "intent": "For this 384 to 96 plate consolidation protocol, you'll be working with the source plate in slot 1 and the destination plate in slot 2. Simply transfer the samples from the 384-well source plate to the corresponding wells in the 96-well destination plate. Make sure both plates are properly secured in their respective slots before beginning the transfer process.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "384 Plate to 96 Plate",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "appliedbiosystem_384_wellplate_40ul",
+        "label": "source_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "quintara_96_wellplate_300ul",
+        "label": "dest_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "source_plate": {
+        "load_name": "appliedbiosystem_384_wellplate_40ul",
+        "slot": "1"
+      },
+      "dest_plate": {
+        "load_name": "quintara_96_wellplate_300ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

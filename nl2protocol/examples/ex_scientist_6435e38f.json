@@ -1,0 +1,125 @@
+{
+  "id": "ex_technical_6435e38f",
+  "source_file": "08fd01.ot2.apiv2.py",
+  "intent_precise": "PCR Prep and Pooling with 384 Plates: Using pool_plate (plate, slot 7), reservoir (reservoir, slot 6). (1) Transfer 12\u00b5L from source to destination. (2) Transfer 3\u00b5L from source to destination.",
+  "intent_concise": "Perform PCR setup. (volumes 3\u00b5L-12\u00b5L)",
+  "intent": "For the PCR prep and pooling protocol using 384 plates, you'll be working with the pool plate in slot 7 and the reservoir in slot 6. Start by transferring 12\u00b5L from your source wells to the corresponding destination wells, then follow up with a second transfer of 3\u00b5L from source to destination. Make sure to maintain accuracy with these volumes since they're critical for proper PCR setup and pooling efficiency.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "PCR Prep and Pooling with 384 Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "custom_384_wellplate_50ul",
+        "label": "pool_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "water_tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nADDING WATER\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nADDING SAMPLE\n\n"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 3
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "pool_plate": {
+        "load_name": "custom_384_wellplate_50ul",
+        "slot": "7"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "6"
+      },
+      "water_tiprack": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

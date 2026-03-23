@@ -1,0 +1,163 @@
+{
+  "id": "ex_technical_ce63a571",
+  "source_file": "mass_spec_prep.ot2.apiv2.py",
+  "intent_precise": "Mass Spec Sample Prep: Using plate (plate, slot 2), sample tubes (labware, slot 2). With temperature module. (1) Distribute 10\u00b5L from source A1 to destination wells A1, A1, A1. (2) Set temperature to 50\u00b0C. (3) Incubate for 1.0 hours. (4) Set temperature to 4\u00b0C.",
+  "intent_concise": "Perform distribute to A1, A1, A1, temperature control (4\u00b0C, 50\u00b0C). (volumes 10\u00b5L-50\u00b5L, ~60 min total)",
+  "intent": "For the Mass Spec Sample Prep protocol, you'll be working with the plate in slot 2 along with the sample tubes, also in slot 2, using the temperature module. Start by taking 10\u00b5L from source well A1 and distribute it into destination wells A1, A1, and A1, then set the temperature module to 50\u00b0C and let everything incubate for exactly 1 hour. Once the incubation is complete, bring the temperature down to 4\u00b0C to finish the prep.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Mass Spec Sample Prep",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "label": "sample tubes"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          5,
+          50
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol finished. Remove plate from 4\u02daC temperature module when ready."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "2"
+      },
+      "sample tubes": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "1"
+      }
+    }
+  }
+}

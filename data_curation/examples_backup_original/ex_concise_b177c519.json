@@ -1,0 +1,192 @@
+{
+  "id": "ex_concise_b177c519",
+  "intent": "Blood extraction and PCR setup: reagent addition, sample processing through 3 plates, final PCR mix preparation in 20 wells",
+  "config": {
+    "labware": {
+      "Opentrons Tips": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "1"
+      },
+      "Corning Plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "2"
+      },
+      "10 Tube Rack": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "6"
+      },
+      "1.5mL Tube Rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "5"
+      },
+      "Bioplastics Plate": {
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "slot": "3"
+      },
+      "Bioplastics Plate_4": {
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p50_mnt": {
+        "model": "p50_single",
+        "tipracks": []
+      },
+      "p300_mnt": {
+        "model": "p300_single",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "arcis-single-test.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Arcis Blood Extraction and PCR Setup",
+    "author": "Chaz <chaz@opentrons.com",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "Opentrons Tips"
+      },
+      {
+        "slot": "2",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "Corning Plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "10 Tube Rack"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "1.5mL Tube Rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "label": "Bioplastics Plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "bioplastics_96_wellplate_100ul",
+        "label": "Bioplastics Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p50_mnt",
+        "model": "p50_single",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mnt",
+        "model": "p300_single",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mnt",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mnt",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete."
+      }
+    ]
+  }
+}

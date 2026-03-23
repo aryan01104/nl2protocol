@@ -1,0 +1,64 @@
+{
+  "id": "ex_technical_8f078f9f",
+  "intent": "Transfer a specified volume of media from a 195mL NEST reservoir to individual tubes in a custom 24-position 2mL tuberack using a P1000 single-channel pipette. Execute two sequential transfers per tube with 50\u00b5L air gaps before and after each transfer, using fresh tips for each transfer operation.",
+  "config": {
+    "labware": {
+      "custom tuberack": {
+        "load_name": "custom_24_tuberack_2000ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "aliquotting.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Media Aliquotting",
+    "author": "Nick <ndiehl@opentrons.com",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "custom_24_tuberack_2000ul",
+        "label": "custom tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": "transfer_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p1000_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      }
+    ]
+  }
+}

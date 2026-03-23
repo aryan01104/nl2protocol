@@ -1,0 +1,91 @@
+{
+  "id": "ex_technical_407bd7bb",
+  "intent": "Perform tube-to-tube transfers using a P1000 single-channel pipette, aspirating 500\u00b5L from each source tube in a 6x4 tube rack at specified height above bottom, implementing a user-defined delay period, then dispensing into corresponding destination tubes in a 6x5 tube rack at specified dispense height, processing 1-24 samples with fresh tips for each transfer",
+  "config": {
+    "labware": {
+      "Source Tube Rack": {
+        "load_name": "6x4_0.6inch_t6",
+        "slot": "1"
+      },
+      "Dest Tube Rack": {
+        "load_name": "6x5_half_inch_t1_t3",
+        "slot": "2"
+      },
+      "tiprack1000": {
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack1000"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "384b23-tube-transfer.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom Tube to Tube transfer",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "6x4_0.6inch_t6",
+        "label": "Source Tube Rack"
+      },
+      {
+        "slot": "2",
+        "load_name": "6x5_half_inch_t1_t3",
+        "label": "Dest Tube Rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "label": "tiprack1000"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack1000"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 500
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 500
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

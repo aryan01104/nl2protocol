@@ -1,0 +1,118 @@
+{
+  "id": "ex_concise_9523dc70",
+  "intent": "Distribute from 4 tubes to 4 full 96-well plates with volume tracking",
+  "config": {
+    "labware": {
+      "p1000s_rack": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "1"
+      },
+      "tube_rack": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "4"
+      },
+      "deepwell_a1": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "6"
+      },
+      "deepwell_a3": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "deepwell_a4": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "5"
+      },
+      "deepwell_b3": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000s_rack"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "7e4c3e-4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "7e4c3e-4.ot2.apiv2",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "p1000s_rack"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "tube_rack"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "deepwell_a1"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "deepwell_a3"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "deepwell_a4"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "deepwell_b3"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000s_rack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "WARNING: Not enough liquid in 50ml tube"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "WARNING: Not enough liquid in 15ml tube"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

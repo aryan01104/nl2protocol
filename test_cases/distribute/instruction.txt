@@ -1,0 +1,1 @@
+Distribute 100uL of reagent from reservoir well A1 to all wells in column 1 of the destination plate (A1 through H1).

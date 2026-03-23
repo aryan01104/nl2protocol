@@ -1,0 +1,239 @@
+{
+  "id": "ex_technical_8cd3fb31",
+  "source_file": "78d33c-part-2.ot2.apiv2.py",
+  "intent_precise": "78d33c-part-2.ot2.apiv2: Using Reagents (labware, slot 2), sampleplate (labware, slot Sample Plate at 4 Degrees). With temperature module, magnetic module. (1) Pause: format (2) Set temperature to 4\u00b0C. (3) Disengage magnets to release beads. (4) Transfer 2\u00b5L from reagent12 0 to destination A1. (5) Incubate for 2 minutes. (6) Pause: Transfer sample plate to pre-heated,\n    off-deck cycler for 1 minute. Then return the plate\n    to the Temperature Module at 4 degrees and resume. (7) Incubate for 2 minutes. (8) Transfer 4\u00b5L from adapters 0 to destination A1. (9) Wait 1 seconds. (10) Wait 1 seconds. (11) Wait 1 seconds. (12) Wait 1 seconds. (13) Pause: Adapter Ligation protocol complete.\n     Proceed to off deck cycler steps\n     and Library Purification Indexing protocol",
+  "intent_concise": "Perform magnetic bead separation, temperature control (4\u00b0C). (volumes 2\u00b5L-37\u00b5L)",
+  "intent": "Start by setting up the reagents in slot 2 and the sample plate in the designated slot at 4\u00b0C, then initialize the temperature module to 4\u00b0C and disengage the magnets to release the beads. Add 2\u00b5L from reagent12 to well A1, incubate for 2 minutes, then transfer the sample plate to the pre-heated off-deck cycler for 1 minute before returning it to the 4\u00b0C temperature module and resuming the protocol. After another 2-minute incubation, add 4\u00b5L from the adapters to well A1, wait 4 seconds total, then pause for the off-deck cycler steps before proceeding to the Library Purification Indexing protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "78d33c-part-2.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "Reagents"
+      },
+      {
+        "slot": "Sample Plate at 4 Degrees",
+        "load_name": "eppendorf_twintec_on_opentrons_metal_block_033822",
+        "label": "sampleplate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Reagent 12"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 2,
+        "source_labware": "reagent12",
+        "source_well": "0",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          16
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Reagent 12"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Transfer sample plate to pre-heated,\n    off-deck cycler for 1 minute. Then return the plate\n    to the Temperature Module at 4 degrees and resume."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Holding at 4 degrees for 2 minutes"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Adapters"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 4,
+        "source_labware": "adapters",
+        "source_well": "0",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          2,
+          10
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Enzyme Mix"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 26
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 26,
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 37,
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 37,
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Adapter Ligation protocol complete.\n     Proceed to off deck cycler steps\n     and Library Purification Indexing protocol"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Reagents": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      },
+      "sampleplate": {
+        "load_name": "eppendorf_twintec_on_opentrons_metal_block_033822",
+        "slot": "Sample Plate at 4 Degrees"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  }
+}

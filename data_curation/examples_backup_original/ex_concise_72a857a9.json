@@ -1,0 +1,74 @@
+{
+  "id": "ex_concise_72a857a9",
+  "intent": "Consolidate 4 deepwell plates to 1 PCR plate: transfer 20\u00b5L from cols 1&4, 2\u00b5L from cols 2&3 per set",
+  "config": {
+    "labware": {
+      "dest_plate": {
+        "load_name": "quintara_96_wellplate_300ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "quintara_onsite_part1.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Four 96 Deepwell to PCR Plate",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "quintara_96_wellplate_300ul",
+        "label": "dest_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n-----------Filling Destination Plate-------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      }
+    ]
+  }
+}

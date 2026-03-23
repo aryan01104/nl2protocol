@@ -1,15 +1,38 @@
 from pydantic import BaseModel, Field, model_validator, field_validator, ValidationInfo
 from typing import List, Optional, Literal, Union, Annotated, Dict, Any
 
+"""
+crucial file for STEP 2
+
+main artifact: Protocol Schema, and its validation capabilities
+- at a high level, using the defined pydantic class to verify the outputted json to see if:
+    - each labware item defined exaclty as in config and not otherwise (1)
+    - each pipette item defined exactly as in config and not otherwise (2)
+    - for cmds
+        - (1), (2) for all its labware and pipette field
+        - voulume related cmds are within its pipette bounds
+
+can we also
+- look at starting volumes and capacities so we:
+    - dont overdispense into well #NOTE
+    - overexpect from reservoirs #NOTE
+
+at a high level, protocol schema model validation does this;
+takes: json input
+returns: protocol schema object, which if it exist succesful is heavily validated by (atomic) liquid, and actual config/setup
+    constraints
+"""
+
 
 # ============================================================================
 # LABWARE & PIPETTE DEFINITIONS
 # ============================================================================
 
 class Labware(BaseModel):
-    slot: str = Field(..., description="The deck slot (1-11, or D1-D3 for Flex)")
+    slot: str = Field(..., description="The deck slot (1-11, or D1-D3 for Flex). If on_module is set, this should match the module's slot.")
     load_name: str = Field(..., description="The Opentrons API name for the labware (e.g., 'corning_96_wellplate_360ul_flat')")
     label: Optional[str] = Field(None, description="A human-readable name to reference this labware in commands")
+    on_module: Optional[str] = Field(None, description="Module label or slot to load this labware onto (e.g., 'mag_mod' or '6'). If set, labware is loaded onto the module instead of directly on the deck.")
 
 
 class Pipette(BaseModel):
@@ -96,6 +119,38 @@ class ReturnTip(BaseModel):
 
 
 # ============================================================================
+# FLOW CONTROL COMMANDS
+# ============================================================================
+
+class Pause(BaseModel):
+    """Pause the protocol for manual intervention."""
+    command_type: Literal["pause"] = "pause"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context (for command tracking)")
+    message: str = Field(..., description="Message to display to user during pause")
+
+
+class Delay(BaseModel):
+    """Insert a delay/wait in the protocol."""
+    command_type: Literal["delay"] = "delay"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context (for command tracking)")
+    seconds: Optional[float] = Field(None, ge=0, description="Delay in seconds")
+    minutes: Optional[float] = Field(None, ge=0, description="Delay in minutes")
+
+    @model_validator(mode='after')
+    def validate_delay_time(self) -> 'Delay':
+        if self.seconds is None and self.minutes is None:
+            raise ValueError("Either 'seconds' or 'minutes' must be specified")
+        return self
+
+
+class Comment(BaseModel):
+    """Add a comment to the run log."""
+    command_type: Literal["comment"] = "comment"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context (for command tracking)")
+    message: str = Field(..., description="Comment text to log")
+
+
+# ============================================================================
 # COMPLEX (COMPOUND) COMMANDS
 # ============================================================================
 
@@ -138,6 +193,123 @@ class Consolidate(BaseModel):
 
 
 # ============================================================================
+# HARDWARE MODULES
+# ============================================================================
+
+class Module(BaseModel):
+    """Hardware module attached to the deck."""
+    module_type: Literal["temperature", "magnetic", "heater_shaker", "thermocycler"] = Field(
+        ..., description="Type of module"
+    )
+    slot: str = Field(..., description="Deck slot where module is placed")
+    label: Optional[str] = Field(None, description="Label to reference this module")
+
+
+# ============================================================================
+# MODULE COMMANDS
+# ============================================================================
+
+class SetTemperature(BaseModel):
+    """Set temperature on a temperature module or heater-shaker."""
+    command_type: Literal["set_temperature"] = "set_temperature"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    celsius: float = Field(..., description="Target temperature in Celsius")
+
+
+class WaitForTemperature(BaseModel):
+    """Wait for module to reach target temperature."""
+    command_type: Literal["wait_for_temperature"] = "wait_for_temperature"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class DeactivateModule(BaseModel):
+    """Deactivate/turn off a module."""
+    command_type: Literal["deactivate"] = "deactivate"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class EngageMagnets(BaseModel):
+    """Engage magnets on a magnetic module."""
+    command_type: Literal["engage_magnets"] = "engage_magnets"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    height: Optional[float] = Field(None, description="Height in mm from labware bottom")
+
+
+class DisengageMagnets(BaseModel):
+    """Disengage/lower magnets on a magnetic module."""
+    command_type: Literal["disengage_magnets"] = "disengage_magnets"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class SetShakeSpeed(BaseModel):
+    """Set shake speed on a heater-shaker module."""
+    command_type: Literal["set_shake_speed"] = "set_shake_speed"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    rpm: int = Field(..., ge=0, description="Shake speed in RPM (0 to stop)")
+
+
+class OpenLatch(BaseModel):
+    """Open the latch on a heater-shaker module."""
+    command_type: Literal["open_latch"] = "open_latch"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class CloseLatch(BaseModel):
+    """Close the latch on a heater-shaker module."""
+    command_type: Literal["close_latch"] = "close_latch"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class OpenLid(BaseModel):
+    """Open the lid on a thermocycler module."""
+    command_type: Literal["open_lid"] = "open_lid"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class CloseLid(BaseModel):
+    """Close the lid on a thermocycler module."""
+    command_type: Literal["close_lid"] = "close_lid"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+
+
+class SetBlockTemperature(BaseModel):
+    """Set thermocycler block temperature."""
+    command_type: Literal["set_block_temperature"] = "set_block_temperature"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    celsius: float = Field(..., description="Target temperature in Celsius")
+    hold_time_seconds: Optional[float] = Field(None, description="Hold time in seconds")
+    hold_time_minutes: Optional[float] = Field(None, description="Hold time in minutes")
+
+
+class SetLidTemperature(BaseModel):
+    """Set thermocycler lid temperature."""
+    command_type: Literal["set_lid_temperature"] = "set_lid_temperature"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    celsius: float = Field(..., description="Target temperature in Celsius")
+
+
+class RunProfile(BaseModel):
+    """Run a thermocycler temperature profile (PCR cycles)."""
+    command_type: Literal["run_profile"] = "run_profile"
+    pipette: Literal["left", "right"] = Field(..., description="Pipette context")
+    module: str = Field(..., description="Module label or slot")
+    steps: List[Dict[str, Any]] = Field(..., description="List of {temperature, hold_time_seconds} steps")
+    repetitions: int = Field(1, ge=1, description="Number of times to repeat the profile")
+
+
+# ============================================================================
 # DISCRIMINATED UNION OF ALL COMMANDS
 # ============================================================================
 
@@ -153,10 +325,28 @@ Command = Annotated[
         PickUpTip,
         DropTip,
         ReturnTip,
+        # Flow control commands
+        Pause,
+        Delay,
+        Comment,
         # Complex commands
         Transfer,
         Distribute,
         Consolidate,
+        # Module commands
+        SetTemperature,
+        WaitForTemperature,
+        DeactivateModule,
+        EngageMagnets,
+        DisengageMagnets,
+        SetShakeSpeed,
+        OpenLatch,
+        CloseLatch,
+        OpenLid,
+        CloseLid,
+        SetBlockTemperature,
+        SetLidTemperature,
+        RunProfile,
     ],
     Field(discriminator="command_type")
 ]
@@ -172,27 +362,58 @@ class ProtocolSchema(BaseModel):
     author: str = "Biolab AI"
     labware: List[Labware]
     pipettes: List[Pipette]
+    modules: Optional[List[Module]] = Field(default_factory=list, description="Hardware modules")
     commands: List[Command]
 
     @field_validator('labware')
     @classmethod
-    def validate_labware_against_config(cls, v: List[Labware], info: ValidationInfo) -> List[Labware]:
-        """Validate that protocol labware is a subset of lab config."""
+    def validate_output_against_input_config(cls, v: List[Labware], info: ValidationInfo) -> List[Labware]:
+        """Validate that protocol labware is a subset of lab config.
+
+        Labware can be loaded either:
+        1. Directly on a deck slot (must be in config labware)
+        2. On a module (on_module field set, must match config labware with on_module)
+        """
         config = info.context.get('config') if info.context else None
         if not config or 'labware' not in config:
             return v
 
+        # Build config labware set including on_module info
+        # Tuple: (load_name, slot, label, on_module)
         config_set = {
-            (lw['load_name'], lw['slot'], lw.get('label', ''))
+            (lw['load_name'], lw['slot'], lw.get('label', ''), lw.get('on_module', ''))
             for lw in config['labware'].values()
         }
-        protocol_set = {
-            (lw.load_name, lw.slot, lw.label or '')
-            for lw in v
-        }
 
-        if not protocol_set <= config_set:
-            invalid = protocol_set - config_set
+        # Also build a mapping of config labware by label for reference
+        config_by_label = {}
+        for label, lw in config['labware'].items():
+            config_by_label[label] = lw
+
+        # Build set of valid module references (both slot and label)
+        module_refs = set()
+        if 'modules' in config:
+            for label, mod in config['modules'].items():
+                module_refs.add(label)  # Module label
+                module_refs.add(mod['slot'])  # Module slot
+
+        invalid = set()
+        for lw in v:
+            lw_tuple = (lw.load_name, lw.slot, lw.label or '', lw.on_module or '')
+
+            if lw_tuple not in config_set:
+                # Check if it's a labware-on-module that matches config by label
+                if lw.label and lw.label in config_by_label:
+                    config_lw = config_by_label[lw.label]
+                    # Allow if the config labware is on the same module
+                    config_tuple = (config_lw['load_name'], config_lw['slot'],
+                                    config_lw.get('label', ''), config_lw.get('on_module', ''))
+                    if lw_tuple != config_tuple:
+                        invalid.add(lw_tuple)
+                else:
+                    invalid.add(lw_tuple)
+
+        if invalid:
             raise ValueError(f"Labware not in config: {invalid}")
         return v
 
@@ -218,6 +439,31 @@ class ProtocolSchema(BaseModel):
             raise ValueError(f"Pipettes not in config: {invalid}")
         return v
 
+    @field_validator('modules')
+    @classmethod
+    def validate_modules_against_config(cls, v: Optional[List[Module]], info: ValidationInfo) -> Optional[List[Module]]:
+        """Validate that protocol modules is a subset of lab config."""
+        if not v:
+            return v
+
+        config = info.context.get('config') if info.context else None
+        if not config or 'modules' not in config:
+            return v
+
+        config_set = {
+            (mod['module_type'], mod['slot'])
+            for mod in config['modules'].values()
+        }
+        protocol_set = {
+            (mod.module_type, mod.slot)
+            for mod in v
+        }
+
+        if not protocol_set <= config_set:
+            invalid = protocol_set - config_set
+            raise ValueError(f"Modules not in config: {invalid}")
+        return v
+
     @model_validator(mode='after')
     def validate_references(self, info: ValidationInfo) -> 'ProtocolSchema':
         # =================================================================
@@ -234,6 +480,25 @@ class ProtocolSchema(BaseModel):
         # =================================================================
         pipette_lookup: Dict[str, Pipette] = {p.mount: p for p in self.pipettes}
 
+        # =================================================================
+        # Build module lookup: reference (slot or label) → Module object
+        # =================================================================
+        module_lookup: Dict[str, Module] = {}
+        if self.modules:
+            for mod in self.modules:
+                module_lookup[mod.slot] = mod
+                if mod.label:
+                    module_lookup[mod.label] = mod
+
+        # Module parameter ranges (min, max)
+        MODULE_TEMP_RANGES = {
+            "temperature": (4, 95),      # Temperature module: 4-95°C
+            "heater_shaker": (37, 95),   # Heater-shaker: 37-95°C
+            "thermocycler": (4, 99),     # Thermocycler block: 4-99°C
+        }
+        THERMOCYCLER_LID_RANGE = (37, 110)  # Lid: 37-110°C
+        HEATER_SHAKER_RPM_RANGE = (200, 3000)  # 200-3000 RPM
+
         # Pipette capacity lookup (min, max) in µL
         # Order matters: check longer names first to avoid "p10" matching "p1000"
         pipette_capacities = [
@@ -245,7 +510,7 @@ class ProtocolSchema(BaseModel):
         ]
 
         # Map mount → capacity based on pipette model
-        mount_to_capacity: Dict[str, tuple] = {}
+        mount_to_capacity: Dict[str, tuple] = {} # a dictionary of pipette address, capacity
         for mount, pip in pipette_lookup.items():
             for model_key, capacity in pipette_capacities:
                 if model_key in pip.model.lower():
@@ -263,7 +528,7 @@ class ProtocolSchema(BaseModel):
                     f"Available: {set(pipette_lookup.keys())}"
                 )
 
-            # Check labware references exist and resolve them
+            # for cmd, does labware exist for all its labware field?... if not raise error
             labware_fields = ['labware', 'source_labware', 'dest_labware']
             for field in labware_fields:
                 if hasattr(cmd, field):
@@ -276,7 +541,7 @@ class ProtocolSchema(BaseModel):
 
             # Check volume is within pipette capacity
             if cmd.pipette in mount_to_capacity:
-                min_vol, max_vol = mount_to_capacity[cmd.pipette]
+                min_vol, max_vol = mount_to_capacity[cmd.pipette] # since capacity is a coordinate
 
                 # Check main volume field
                 if hasattr(cmd, 'volume') and cmd.volume is not None:
@@ -299,6 +564,46 @@ class ProtocolSchema(BaseModel):
                     if mix_vol < min_vol or mix_vol > max_vol:
                         raise ValueError(
                             f"Command {i}: mix_after volume {mix_vol}µL outside pipette range ({min_vol}-{max_vol}µL)"
+                        )
+
+            # =============================================================
+            # Validate module commands
+            # =============================================================
+            if hasattr(cmd, 'module'):
+                module_ref = cmd.module
+                if module_ref not in module_lookup:
+                    raise ValueError(
+                        f"Command {i}: module '{module_ref}' not defined. "
+                        f"Available: {set(module_lookup.keys()) if module_lookup else 'none'}"
+                    )
+
+                mod = module_lookup[module_ref]
+
+                # Validate temperature ranges
+                if hasattr(cmd, 'celsius'):
+                    temp = cmd.celsius
+                    if cmd.command_type in ('set_temperature', 'set_block_temperature'):
+                        temp_range = MODULE_TEMP_RANGES.get(mod.module_type)
+                        if temp_range:
+                            min_temp, max_temp = temp_range
+                            if temp < min_temp or temp > max_temp:
+                                raise ValueError(
+                                    f"Command {i}: temperature {temp}°C outside {mod.module_type} range ({min_temp}-{max_temp}°C)"
+                                )
+                    elif cmd.command_type == 'set_lid_temperature':
+                        min_temp, max_temp = THERMOCYCLER_LID_RANGE
+                        if temp < min_temp or temp > max_temp:
+                            raise ValueError(
+                                f"Command {i}: lid temperature {temp}°C outside range ({min_temp}-{max_temp}°C)"
+                            )
+
+                # Validate heater-shaker RPM
+                if hasattr(cmd, 'rpm') and cmd.rpm is not None:
+                    rpm = cmd.rpm
+                    min_rpm, max_rpm = HEATER_SHAKER_RPM_RANGE
+                    if rpm != 0 and (rpm < min_rpm or rpm > max_rpm):
+                        raise ValueError(
+                            f"Command {i}: RPM {rpm} outside heater-shaker range ({min_rpm}-{max_rpm} RPM, or 0 to stop)"
                         )
 
         return self

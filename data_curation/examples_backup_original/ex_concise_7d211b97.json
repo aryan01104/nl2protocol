@@ -1,0 +1,128 @@
+{
+  "id": "ex_concise_7d211b97",
+  "intent": "Dispense 250\u00b5L WISTD + 250\u00b5L water to DBS plate wells",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "2"
+      },
+      "trough1": {
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "slot": "5"
+      },
+      "trough2": {
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "slot": "9"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3e3c9d-protocols-Adding-WISTD-Water.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Version Update - Adding WISTD and Water to DBS 96-Well Plate ",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "label": "trough1"
+      },
+      {
+        "slot": "9",
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "label": "trough2"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 250,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 250,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

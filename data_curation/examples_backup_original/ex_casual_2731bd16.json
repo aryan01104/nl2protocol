@@ -1,0 +1,99 @@
+{
+  "id": "ex_casual_2731bd16",
+  "intent": "Set up PCR2 plates by moving barcodes and PCR1 products over to new plates, then add the master mix. If it's plasma samples, just transfer them straight over, but for other samples you need to dilute with water first. The robot pauses partway through so you can reload tips, then finishes by adding master mix and mixing everything up.",
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "76ba23-pcr2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR2 set up",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "consolidate",
+        "pipette": "right",
+        "volume": [
+          8,
+          2
+        ],
+        "source_labware": "",
+        "source_wells": [],
+        "dest_labware": "column",
+        "dest_well": "0",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replenish the tips in slots 8 and 11. Then resume."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": [
+          6.5,
+          6.5
+        ],
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 4,
+        "volume": 10
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PCR2 set up is complete.\n                 Please proceed with PCR2 thermocycling followed by the pooling\n                 and clean up steps."
+      }
+    ]
+  }
+}

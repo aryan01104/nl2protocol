@@ -1,0 +1,343 @@
+{
+  "id": "ex_casual_5e8ca43c",
+  "intent": "Run the COVID extraction protocol - take patient samples, mix them with magnetic beads, heat them up twice to break open the virus, pull out the beads with the magnet, wash everything clean, then get the purified genetic material out in a small volume for testing.",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "usascientific_96_wellplate_2.4ml_deep",
+        "slot": "deepwell plate"
+      },
+      "reagent reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "rxn_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "reaction plate"
+      },
+      "elution chips": {
+        "load_name": "neo_48_wellplate_40ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "tempdeck": {
+        "module_type": "Temperature Module Gen2",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "assay2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "HP COVID-19 Assay 2 V1",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "deepwell plate",
+        "load_name": "usascientific_96_wellplate_2.4ml_deep",
+        "label": "magplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent reservoir"
+      },
+      {
+        "slot": "reaction plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "rxn_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "neo_48_wellplate_40ul",
+        "label": "elution chips"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      },
+      {
+        "module_type": "Temperature Module Gen2",
+        "slot": "3",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please empty tips from waste before resuming."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please empty liquid waste (slot 11) before resuming."
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_reps",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "settling_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_reps",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          5,
+          100
+        ]
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          5,
+          100
+        ],
+        "mix_after": [
+          5,
+          100
+        ]
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": "temp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 220,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          5,
+          100
+        ]
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "settling_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Move NEO to GNA instrument."
+      }
+    ]
+  }
+}

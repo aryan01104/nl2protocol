@@ -1,0 +1,130 @@
+{
+  "id": "ex_technical_6f36b271",
+  "source_file": "culture.ot2.apiv2.py",
+  "intent_precise": "384-Well Plate Prep: Using tuberack (tuberack, slot 2). (1) Pause for incubation. (2) Transfer from source to destination. (3) Incubate for 10 minutes. (4) Incubate for 10 minutes. (5) Incubate for 10 minutes.",
+  "intent_concise": "Execute 20-step liquid handling protocol. (~31 min total)",
+  "intent": "For the 384-Well Plate Prep protocol, you'll be working with the tuberack positioned in slot 2. Start by pausing for the initial incubation step, then transfer your samples from the source to the destination wells. After the transfer, you'll need to incubate the plate for three consecutive 10-minute periods - just run each 10-minute incubation back-to-back to complete the protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "384-Well Plate Prep",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_pre_airgap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p300",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "opentrons_15_tuberack_falcon_15ml_conical",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

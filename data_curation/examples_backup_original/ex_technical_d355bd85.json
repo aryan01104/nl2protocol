@@ -1,0 +1,191 @@
+{
+  "id": "ex_technical_d355bd85",
+  "intent": "Execute anti-CD154 immunolabeling protocol on peptide- and PMA-stimulated cells across multiple test columns. Add 5\u00b5L anti-CD154 antibody to 200\u00b5L cell suspensions in row A wells with mixing. Distribute 40\u00b5L aliquots to rows B-E, supplementing with 60\u00b5L culture medium per well. Stimulate with 5\u00b5L peptide 1 (row B), 5\u00b5L peptide 2 (row C), 10\u00b5L peptide 3 (row D), and 12\u00b5L PMA/calcium ionophore (row E), mixing after each addition.",
+  "config": {
+    "labware": {
+      "Culture Plate": {
+        "load_name": "labware_cultureplate",
+        "slot": "slot_cultureplate"
+      },
+      "Rack with Snap Cap Tubes": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "slot": "slot_snapcaps"
+      },
+      "Rack with Screw Cap Tubes": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_screwcap",
+        "slot": "slot_screwcaps"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "6cb818.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "6cb818.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "slot_cultureplate",
+        "load_name": "labware_cultureplate",
+        "label": "Culture Plate"
+      },
+      {
+        "slot": "slot_snapcaps",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "label": "Rack with Snap Cap Tubes"
+      },
+      {
+        "slot": "slot_screwcaps",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_screwcap",
+        "label": "Rack with Screw Cap Tubes"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 160
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 160
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 40
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

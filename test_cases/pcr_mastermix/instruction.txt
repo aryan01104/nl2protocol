@@ -1,0 +1,5 @@
+Set up a PCR plate for 24 samples:
+1. Distribute 10.5uL of master mix from tube rack A1 to wells A1-H3 of the PCR plate (24 wells total)
+2. Transfer 2uL of DNA template from sample plate wells A1-H3 to the corresponding wells in the PCR plate
+3. Mix each well 3 times at 10uL after adding template
+Use the p20 pipette for the DNA template transfers and mixing. Use a new tip for each sample to avoid cross-contamination.

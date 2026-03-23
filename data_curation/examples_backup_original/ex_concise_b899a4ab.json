@@ -1,0 +1,186 @@
+{
+  "id": "ex_concise_b899a4ab",
+  "intent": "Transfer blood samples to 96-well plate, add BF3-MeOH and WISTD reagents to each well",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "omegaquant_96_wellplate_1000ul",
+        "slot": "2"
+      },
+      "trough_1": {
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "slot": "3"
+      },
+      "trough_2": {
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "slot": "5"
+      },
+      "tiprack_300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "4"
+      },
+      "tiprack_50": {
+        "load_name": "tiprack_200ul_extended",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p50_single",
+        "tipracks": [
+          "tiprack_50"
+        ]
+      },
+      "left": {
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack_300"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3e3c9d-protocol-master-rbc-transfer.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Version Update - Master RBC Transfer",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "omegaquant_96_wellplate_1000ul",
+        "label": "plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "label": "trough_1"
+      },
+      {
+        "slot": "5",
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "label": "trough_2"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack_300"
+      },
+      {
+        "slot": "6",
+        "load_name": "tiprack_200ul_extended",
+        "label": "tiprack_50"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p50_single",
+        "tipracks": [
+          "tiprack_50"
+        ]
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack_300"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 250,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 250,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

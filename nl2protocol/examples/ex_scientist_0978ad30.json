@@ -1,0 +1,232 @@
+{
+  "id": "ex_technical_0978ad30",
+  "source_file": "1adec6-7.ot2.apiv2.py",
+  "intent_precise": "ProcartaPlex Protocol-2 [7/7]: (1) Pause for incubation. (2) Wait 1 seconds. (3) Pause: msg (4) Wait 1 seconds. (5) Wait 1 seconds. (6) Mix 3 times at 100\u00b5L. (7) Wait 2 seconds. (8) Wait 1 seconds. (9) Mix 3 times at 100\u00b5L. (10) Wait 2 seconds. (11) Wait 1 seconds. (12) Mix 3 times at 100\u00b5L. (13) Wait 2 seconds. (14) Wait 1 seconds.",
+  "intent_concise": "Execute 42-step liquid handling protocol. (volumes 20\u00b5L-200\u00b5L)",
+  "intent": "For the final step of ProcartaPlex Protocol-2, pause for incubation and wait for the message prompt, then proceed with a series of mixing cycles. Mix the samples 3 times at 100\u00b5L volume, wait 2 seconds between each mixing cycle, and repeat this mixing pattern three times total with 1-second pauses between cycles. Make sure to maintain the precise timing - each mix should be followed by exactly 2 seconds of waiting, with 1-second intervals separating the three mixing rounds.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "ProcartaPlex Protocol-2 [7/7]",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 25uL of Detection Antibody to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 25
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 45
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 50uL of SAP to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 120uL of Reading Buffer to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 120
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 140
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

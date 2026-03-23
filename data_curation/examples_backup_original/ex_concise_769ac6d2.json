@@ -1,0 +1,121 @@
+{
+  "id": "ex_concise_769ac6d2",
+  "intent": "Remove 50\u00b5L gelatin, add 140\u00b5L cell suspension per well across multiple 96-well plates",
+  "config": {
+    "labware": {
+      "tips300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "1"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "00a214-protocol-1.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Seeding Plates with Mammalian Cells",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips300"
+      },
+      {
+        "slot": "10",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace tips."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 140
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 140
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

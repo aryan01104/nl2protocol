@@ -1,0 +1,125 @@
+{
+  "id": "ex_casual_e95b3609",
+  "intent": "Set up an Illumina beadchip amplification by first adding some MA1 reagent to all the wells in row A of the deep plate, then transferring a bit of sample from the source plate to most of those wells, and finally adding some NaOH to all the wells to complete the reaction setup",
+  "config": {
+    "labware": {
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      },
+      "aplate": {
+        "load_name": "axygen_96_wellplate",
+        "slot": "3"
+      },
+      "deep_plate": {
+        "load_name": "abgene_96_wellplate_800ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p10mnt": {
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "1601a9.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina Beadchip Amplification",
+    "author": "Chaz <chaz@opentrons.com",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      },
+      {
+        "slot": "3",
+        "load_name": "axygen_96_wellplate",
+        "label": "aplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "abgene_96_wellplate_800ul",
+        "label": "deep_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p10mnt",
+        "model": "p10_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p10mnt",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "deep_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p10mnt",
+        "volume": 4,
+        "source_labware": "aplate",
+        "source_well": "A1",
+        "dest_labware": "deep_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p10mnt",
+        "volume": 4,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "deep_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p10mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p10mnt"
+      }
+    ]
+  }
+}

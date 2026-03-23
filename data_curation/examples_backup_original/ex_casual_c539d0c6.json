@@ -1,0 +1,73 @@
+{
+  "id": "ex_casual_c539d0c6",
+  "intent": "Pool PCR samples from a 384-well plate into a 96-well plate. Take small 3 microliter samples from different wells in the big plate and combine them into specific wells in the smaller plate. Do this for 4 different groups, putting each group into every other well across the first row.",
+  "config": {
+    "labware": {
+      "pcr_plate_384": {
+        "load_name": "custom_384_wellplate_50ul",
+        "slot": "8"
+      },
+      "pool_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "08fd01-pt3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR Prep and Pooling with 384 Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "custom_384_wellplate_50ul",
+        "label": "pcr_plate_384"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "pool_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 3
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

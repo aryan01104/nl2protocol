@@ -1,0 +1,94 @@
+{
+  "id": "ex_concise_f6ac7151",
+  "intent": "CSV-guided water normalization across multiple PCR plates with subsequent well mixing and pooling",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "reservoir_slot"
+      },
+      "tube_rack": {
+        "load_name": "opentrons_24_tuberack_nest_2ml_snapcap",
+        "slot": "tube_rack_slot"
+      }
+    },
+    "pipettes": {
+      "pipette_mount": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "74b303.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Four Plate Normalization",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "reservoir_slot",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "tube_rack_slot",
+        "load_name": "opentrons_24_tuberack_nest_2ml_snapcap",
+        "label": "tube_rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipette_mount",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipette_mount",
+        "repetitions": "mix_repetitions",
+        "volume": "mix_volume"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipette_mount",
+        "volume": "pooling_volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipette_mount",
+        "volume": "pooling_volume",
+        "labware": "pools",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      }
+    ]
+  }
+}

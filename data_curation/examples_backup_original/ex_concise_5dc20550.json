@@ -1,0 +1,82 @@
+{
+  "id": "ex_concise_5dc20550",
+  "intent": "Fill capsules from reservoir using P1000 with air gap, dispense to custom 10x10 racks",
+  "config": {
+    "labware": {
+      "capsule_assembly": {
+        "load_name": "custom_300_other_100x500ul_100x500ul_100x500ul",
+        "slot": "1"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "capsule_filling.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Capsule Filling 3x Custom 10x10 Racks",
+    "author": "Nick <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "custom_300_other_100x500ul_100x500ul_100x500ul",
+        "label": "capsule_assembly"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": "transfer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": "transfer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p1000_mount"
+      }
+    ]
+  }
+}

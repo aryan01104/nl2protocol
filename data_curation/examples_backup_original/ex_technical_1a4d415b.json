@@ -1,0 +1,122 @@
+{
+  "id": "ex_technical_1a4d415b",
+  "intent": "Execute post-PCR indexing purification by transferring 5\u00b5L of Post-Indexing Cleanup Enzyme Mix from reagent block column 1 to sample plate columns 1 through n (where n = ceiling of sample count divided by 8), followed by 10x mixing cycles at 20\u00b5L volume per transfer using P20 multichannel pipette with filter tips, maintaining sample plate at 4\u00b0C throughout the procedure",
+  "config": {
+    "labware": {
+      "Reagents": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      },
+      "sampleplate": {
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "slot": "Sample Plate at 4 Degrees"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "43d313-part-6.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "43d313-part-6.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "Reagents"
+      },
+      {
+        "slot": "Sample Plate at 4 Degrees",
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "label": "sampleplate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 5
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "message"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Post-Indexing Cleanup Enzyme Mixture"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 5,
+        "source_labware": "postindexcleanup_enz_mx",
+        "source_well": "0",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          20
+        ]
+      }
+    ]
+  }
+}

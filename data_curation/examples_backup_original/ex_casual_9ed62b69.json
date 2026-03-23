@@ -1,0 +1,107 @@
+{
+  "id": "ex_casual_9ed62b69",
+  "intent": "Take samples from a tube rack and put them into plate wells, but first empty out whatever's already in those wells. The robot reads a file that tells it which tube goes to which well, checks that the barcodes match what you scanned, then does the emptying and filling for each sample. It uses fresh tips each time and goes slowly to make sure it gets everything.",
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "eurofins_96x2ml_tuberack",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "redoreplacementpicking.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Redo Replacement Picking (Irish Life Sciences 96 Well \\\nPlate 2200 \u00b5L)",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "eurofins_96x2ml_tuberack",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      }
+    ]
+  }
+}

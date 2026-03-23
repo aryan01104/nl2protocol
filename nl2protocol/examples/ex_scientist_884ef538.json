@@ -1,0 +1,116 @@
+{
+  "id": "ex_technical_884ef538",
+  "source_file": "37de37.ot2.apiv2.py",
+  "intent_precise": "Cherrypicking DNA and Pooling with CSV input: Using final_plate (plate, slot 4), reservoir (reservoir, slot 5). (1) Transfer from source A1 to destination A1. (2) Transfer from source A1 to destination A1. (3) Transfer 5\u00b5L from source to destination.",
+  "intent_concise": "Perform cherry picking. (using 5\u00b5L)",
+  "intent": "For this DNA cherrypicking and pooling protocol, you'll be working with the final plate in slot 4 and the reservoir in slot 5. Start by transferring from source well A1 to destination well A1, then repeat this same A1 to A1 transfer once more. Finally, transfer exactly 5\u00b5L from the source to the destination well to complete the pooling step.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Cherrypicking DNA and Pooling with CSV input",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "final_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          5,
+          20
+        ],
+        "mix_after": [
+          5,
+          20
+        ]
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "final_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "4"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

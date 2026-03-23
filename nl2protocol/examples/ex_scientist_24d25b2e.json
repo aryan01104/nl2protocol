@@ -1,0 +1,166 @@
+{
+  "id": "ex_technical_24d25b2e",
+  "source_file": "08fd01-pt2.ot2.apiv2.py",
+  "intent_precise": "PCR Prep and Pooling with 384 Plates: Using pcr_plate (plate, slot 8), pool_plate (plate, slot 9), index_plate (pcr_plate, slot 7), reservoir (reservoir, slot 5). (1) Transfer 16\u00b5L from source to destination. (2) Transfer 8\u00b5L from source to destination. (3) Transfer 2\u00b5L from source to destination.",
+  "intent_concise": "Perform PCR setup. (volumes 2\u00b5L-16\u00b5L)",
+  "intent": "For this PCR prep and pooling protocol with 384 plates, you'll be working with the PCR plate in slot 8, the pool plate in slot 9, the index plate in slot 7, and the reservoir in slot 5. Start by transferring 16\u00b5L from the source to your destination wells, then follow up with an 8\u00b5L transfer from source to destination. Finally, complete the setup by adding 2\u00b5L from source to destination to finish your PCR reaction mix preparation.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "PCR Prep and Pooling with 384 Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "custom_384_wellplate_50ul",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "custom_384_wellplate_50ul",
+        "label": "pool_plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "index_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "mmx_tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nADDING MASTERMIX\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 16
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 16
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nADDING INDEX\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 8
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nADDING SAMPLE\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "pcr_plate": {
+        "load_name": "custom_384_wellplate_50ul",
+        "slot": "8"
+      },
+      "pool_plate": {
+        "load_name": "custom_384_wellplate_50ul",
+        "slot": "9"
+      },
+      "index_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "7"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "mmx_tiprack": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

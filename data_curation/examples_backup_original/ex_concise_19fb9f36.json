@@ -1,0 +1,259 @@
+{
+  "id": "ex_concise_19fb9f36",
+  "intent": "mRNA encapsulation assay with sample dilutions and mRNA serial dilutions across test plates",
+  "config": {
+    "labware": {
+      "25 ug/mL Sample Stock and mRNA Stock": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "slot": "7"
+      },
+      "Sample Plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "4"
+      },
+      "Buffer Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "37ffa5.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "37ffa5.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "label": "25 ug/mL Sample Stock and mRNA Stock"
+      },
+      {
+        "slot": "4",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "Sample Plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Buffer Reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "right",
+        "volume": [
+          40,
+          30,
+          20
+        ],
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nDistributing TE to Test Plate\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nDistributing TE-Triton to Test Plate\n"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": [
+          100,
+          100,
+          100
+        ],
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": "vols",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": "vols",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nAdding Sample to Test Plate\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "right",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSerial Dilution of mRNA in Test Plate\n"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          3,
+          100
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProcess complete for all test plates\n"
+      }
+    ]
+  }
+}

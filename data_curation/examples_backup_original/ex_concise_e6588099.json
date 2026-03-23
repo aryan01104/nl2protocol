@@ -1,0 +1,352 @@
+{
+  "id": "ex_concise_e6588099",
+  "intent": "Magnetic bead purification: add beads, wash 2x with ethanol, elute with water, transfer to elution plate",
+  "config": {
+    "labware": {
+      "Reagent Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      },
+      "sample_plate": {
+        "load_name": "labware_pcr_plate",
+        "slot": "Sample Plate"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "4"
+      },
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3fad82-part-3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "3fad82-part-3.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reagent Reservoir"
+      },
+      {
+        "slot": "Sample Plate",
+        "load_name": "labware_pcr_plate",
+        "label": "sample_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "4",
+        "label": "tc"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "message"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    reagent reservoir in deck slot 1:\n    col 1 - beads\n    col 2 - 80% ethanol\n    col 4 - water\n    col 12 - waste\n    "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    inactive cycler\n    "
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    transfer beads to sample plate\n    wait, engage magnet, wait\n\n    liquid handling method for beads:\n    slow flow rate for aspiration and dispense\n    wait for liquid to finish moving after aspiration and dispense\n    dispense to a surface\n    withdraw tip slowly from liquid\n    "
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    remove supernatant from beads\n    "
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 25,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    wash beads twice with 80 percent ethanol\n    return tips for reuse with 2nd wash\n\n    liquid handling method for ethanol:\n    fast flow rate for blow out\n    pre-wet the tips twice (saturate air)\n    15 ul air gap\n    dispense from top\n    no tip touch (tip reuse)\n    delayed blowout after dispense (let etoh fall to bottom of tip first)\n    repeat blowout (for complete dispense)\n    "
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 115
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n        let beads air dry\n        "
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n        add water to beads and mix\n        wait\n        engage magnet\n        wait\n        "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 12,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          5,
+          10
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n        transfer eluate to elution plate\n        "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

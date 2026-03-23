@@ -1,0 +1,87 @@
+{
+  "id": "ex_technical_e140fe70",
+  "intent": "Transfer TE buffer volumes from a 195mL reservoir to specified wells in a 96-well PCR plate using a P300 pipette, then transfer corresponding DNA volumes from matching wells in a source PCR plate to the destination plate using a P20 pipette with 3x mixing at 2\u00b5L volume, with all transfer volumes and well positions defined by CSV input file",
+  "config": {
+    "labware": {
+      "Plate 1": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "6"
+      },
+      "Plate 2": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "30174a.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "DNA dilution using .csv file",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "Plate 1"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "Plate 2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

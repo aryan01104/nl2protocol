@@ -1,0 +1,436 @@
+{
+  "id": "ex_technical_6e77b323",
+  "intent": "Execute NGS library preparation using KAPA Hyper Plus kit part 1: distribute 3\u00b5L fragmentation master mix to pre-PCR plate wells, add 7\u00b5L DNA samples, incubate at 37\u00b0C for 8 minutes, add 2\u00b5L end repair/A-tailing master mix and incubate at 65\u00b0C for 30 minutes, add 10\u00b5L ligation master mix and incubate at 20\u00b0C for 60 minutes, perform magnetic bead cleanup with 17.6\u00b5L beads and dual 80% ethanol washes, elute in 10\u00b5L water, then prepare final PCR reaction by combining 6\u00b5L KAPA mix, 4\u00b5L purified library, 1\u00b5L P7 index, and 1\u00b5L P5 index, followed by thermocycling with initial denaturation at 98\u00b0C and 15 cycles of amplification",
+  "config": {
+    "labware": {
+      "reagent_block": {
+        "load_name": "labware_tube_strip_or_plate",
+        "slot": "5"
+      },
+      "mag_plate": {
+        "load_name": "labware_pre_pcr_plate",
+        "slot": "4"
+      },
+      "temporary_plate": {
+        "load_name": "labware_dna_sample_plate",
+        "slot": "1"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "2"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "9"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "1f96ca.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "1f96ca.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "labware_tube_strip_or_plate",
+        "label": "reagent_block"
+      },
+      {
+        "slot": "4",
+        "load_name": "labware_pre_pcr_plate",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "labware_dna_sample_plate",
+        "label": "temporary_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "2",
+        "label": "tc"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "9",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 12
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "message"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": 3,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 7,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 15
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 85
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 17.6,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          20,
+          20
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          5,
+          5
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 20
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": 6,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 4,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 1,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 1,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 105
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile",
+        "repetitions": "reps"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      }
+    ]
+  }
+}

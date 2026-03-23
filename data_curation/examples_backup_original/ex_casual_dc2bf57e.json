@@ -1,0 +1,232 @@
+{
+  "id": "ex_casual_dc2bf57e",
+  "intent": "Run a plasmid DNA prep using magnetic beads - basically lyse the cells, neutralize, use clearing beads to get rid of debris, then bind the DNA to magnetic beads, wash it a bunch of times to clean it up, and finally elute the pure DNA into a clean plate. There's some centrifuge steps and heating involved too.",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "deepwell plate"
+      },
+      "collection plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "elution plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "3"
+      },
+      "reagent reservoir 1": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "reagent reservoir 2": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "mount_m300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "miniprep.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Zymo Zyppy\u2122-96 Plasmid MagBead Miniprep",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "deepwell plate",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "magplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "collection plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "elution plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent reservoir 1"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "reagent reservoir 2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_m300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol_per_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": 10
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount_m300",
+        "repetitions": "mixreps",
+        "volume": "vol_mix"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount_m300",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_incubation"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_settling"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge the extraction plate. Replace on magnetic module when finished."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Discard plate on magnetic module. Move collection plate (slot 2) to the magnetic module (slot 1)"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the collection plate (slot 1) to a heating block for 30mins 65C to remove the residual ethanol. Replace the plate onto the magnetic module when complete."
+      }
+    ]
+  }
+}

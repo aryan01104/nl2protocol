@@ -1,0 +1,186 @@
+{
+  "id": "ex_technical_7089bcf1",
+  "source_file": "1980cd.ot2.apiv2.py",
+  "intent_precise": "Sarah Daley Protocol (check mesoscale.com link): Using Controls (reservoir, slot 2), Sample plate (plate, slot 3), First test plate (plate, slot 5), Second test plate (plate, slot 6). (1) Distribute 150\u00b5L from source A1 to destination wells A1-A1 (4 wells).",
+  "intent_concise": "Perform distribute to A1-A1 (4 wells). (volumes 25\u00b5L-150\u00b5L)",
+  "intent": "For the Sarah Daley Protocol, you'll need to set up your deck with the Controls reservoir in slot 2, the Sample plate in slot 3, and your First and Second test plates in slots 5 and 6 respectively. Start by taking 150\u00b5L from source well A1 and distribute it to the A1 wells across all 4 destination plates. Make sure to check the mesoscale.com link for any additional protocol details before you begin.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Sarah Daley Protocol (check mesoscale.com link)",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Controls"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "Sample plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "First test plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "Second test plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "First test plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "Second test plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Detection Antibody"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "First test plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "Second test plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 25,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Controls": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "Sample plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "3"
+      },
+      "First test plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "5"
+      },
+      "Second test plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "6"
+      },
+      "First test plate_5": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "5"
+      },
+      "Second test plate_6": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "6"
+      },
+      "Detection Antibody": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

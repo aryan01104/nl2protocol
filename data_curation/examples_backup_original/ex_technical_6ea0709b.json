@@ -1,0 +1,395 @@
+{
+  "id": "ex_technical_6ea0709b",
+  "intent": "Perform DNA repair and end-prep using ligation sequencing kit workflow: transfer 12\u00b5L end-prep mastermix to samples, execute thermocycler profile (20\u00b0C for 5min, then 65\u00b0C for 5min), perform AMPure XP bead cleanup with 1:1 bead ratio (60\u00b5L beads to 60\u00b5L sample), conduct two sequential 200\u00b5L ethanol washes on magnetic module, and elute purified DNA in 61\u00b5L nuclease-free water with final transfer to clean PCR plate",
+  "config": {
+    "labware": {
+      "tc_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "mag_plate": {
+        "load_name": "thermofisher_96_midi_storage_plate_800ul",
+        "slot": "4"
+      },
+      "temp_rack": {
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "slot": "6"
+      },
+      "final_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      },
+      "tipsracks_single": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipsracks_single"
+        ]
+      }
+    },
+    "modules": {
+      "tc_mod": {
+        "module_type": "Thermocycler Module",
+        "slot": "1"
+      },
+      "mag_mod": {
+        "module_type": "mag_gen",
+        "slot": "1"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "516336.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ligation Sequencing Kit: DNA Repair and End-Prep",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "thermofisher_96_midi_storage_plate_800ul",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "label": "temp_rack"
+      },
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "final_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tipsracks_single"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipsracks_single"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "Thermocycler Module",
+        "slot": "1",
+        "label": "tc_mod"
+      },
+      {
+        "module_type": "mag_gen",
+        "slot": "1",
+        "label": "mag_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "mag_engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "delay_mins"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 6
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 12,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          30
+        ]
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Spin down the plate and resume."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Pre-Heating the thermocycler to 20C."
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 20
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": 70
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Put the sample plate into the thermocycler"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc_mod",
+        "steps": "profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "deactivate",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 300
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 60,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 60,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          3,
+          60
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate on Hula Mixer for 5 minutes and spin down the samples.\n                 Then place back on the magnet and click resume."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Spin down and place samples back on the maget.\n              Then click resume."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 61,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          60
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "deactivate",
+        "module": "temp_mod"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      }
+    ]
+  }
+}

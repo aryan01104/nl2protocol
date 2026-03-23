@@ -1,0 +1,761 @@
+{
+  "id": "ex_technical_25f2958d",
+  "intent": "Execute a nucleic acid purification protocol using magnetic PEG beads with the following steps: (1) Add calculated bead volume based on reaction volume and bead ratio to samples, mix thoroughly with 5 repetitions, (2) Incubate for 10 minutes then engage magnetic module at specified height, (3) Remove supernatant after 7-minute magnetic separation, (4) Perform two sequential ethanol washes at 120-200\u00b5L per well with 2-minute incubations, (5) Air dry beads for 10 minutes, (6) Elute purified nucleic acids in specified elution volume using water with spray-down technique and 5-cycle bead mixing, (7) Final magnetic separation for 10 minutes and transfer eluate to clean plate",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "well_plate",
+        "slot": "2"
+      },
+      "elution_plate": {
+        "load_name": "well_plate",
+        "slot": "10"
+      },
+      "waste_labware": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "11"
+      },
+      "reagent_rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "6"
+      },
+      "reagent_res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      },
+      "EMPTY TIP RACK": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "mag_cleanup.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "1, Bio-Rad Test Nucleic Acid Purification with PEG",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "well_plate",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "10",
+        "load_name": "well_plate",
+        "label": "elution_plate"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste_labware"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "reagent_rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent_res"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "EMPTY TIP RACK"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~PLEASE REPLACE TIPRACKS~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~PLEASE EMPTY TRASH~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING BEADS~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~REMOVING WASTE~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "bead_incubate_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_incubate_time"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "bead_mag_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_mag_time"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING ETHANOL~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "etoh_wash_vol",
+        "labware": "ethanol",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "etoh_wash_vol",
+        "labware": "ethanol",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~REMOVING ETHANOL~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "etoh_wash_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "etoh_wash_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "etoh_wash_vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "etoh_dry_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "etoh_dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~ADDING WATER~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "elute_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "elute_time"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "bead_mag_time_elute"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_mag_time_elute"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n~~~~~~PLEASE VISUALLY INSPECT THE MAGNETIC MODULE PLATE SEPARATION~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~REMOVING ELUTE~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "elute_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "elute_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "USING SINGLE CHANNEL FOR UNFILLED COLUMN\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "elute_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "elute_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      }
+    ]
+  }
+}

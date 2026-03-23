@@ -1,0 +1,70 @@
+{
+  "id": "ex_technical_f0b58cce",
+  "source_file": "063611-part-2.ot2.apiv2.py",
+  "intent_precise": "063611-part-2.ot2.apiv2: (1) Wait 10 seconds.",
+  "intent_concise": "Execute 7-step liquid handling protocol.",
+  "intent": "For protocol 063611-part-2.ot2.apiv2, you'll need to start by simply waiting for 10 seconds before proceeding with any further steps. This brief pause allows the system to stabilize and ensures proper timing for the subsequent protocol stages.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "063611-part-2.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "4"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "4"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

@@ -1,0 +1,266 @@
+{
+  "id": "ex_technical_e94033bd",
+  "source_file": "3662e6.ot2.apiv2.py",
+  "intent_precise": "Custom Drug Dilution Assay: (1) Transfer 60\u00b5L from media A1 to media A1. (2) Distribute 10\u00b5L from source A1 to destination wells A1-A1 (4 wells). (3) Mix 5 times at 300\u00b5L in cells A1. (4) Transfer 60\u00b5L from cells A1 to cells A1.",
+  "intent_concise": "Perform distribute to A1-A1 (4 wells). (volumes 10\u00b5L-300\u00b5L)",
+  "intent": "For the Custom Drug Dilution Assay, start by transferring 60\u00b5L from media well A1 to itself, then distribute 10\u00b5L from source A1 into destination well A1 (repeat this for all 4 wells in the A1 position). Next, you'll need to mix the contents in cells A1 exactly 5 times using a 300\u00b5L volume setting to ensure proper homogenization. Finally, complete the protocol by transferring 60\u00b5L from cells A1 back to the same well A1.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Custom Drug Dilution Assay",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "mnt10",
+        "model": "p10_multi",
+        "tipracks": []
+      },
+      {
+        "mount": "mnt300",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 100\u00b5L of Media to all wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "media",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "media",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 100,
+        "labware": "media",
+        "well": "A1"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Performing 10x dilutions..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt10",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          4,
+          10
+        ],
+        "mix_after": [
+          4,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt10",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          1,
+          7
+        ],
+        "mix_after": [
+          4,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt10",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          1,
+          7
+        ],
+        "mix_after": [
+          4,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt10",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          1,
+          7
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 100\u00b5L of cells to all wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 5,
+        "volume": 300,
+        "labware": "cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300",
+        "labware": "cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 100,
+        "labware": "cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p10_multi",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    }
+  }
+}

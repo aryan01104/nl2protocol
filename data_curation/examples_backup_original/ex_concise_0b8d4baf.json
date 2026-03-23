@@ -1,0 +1,156 @@
+{
+  "id": "ex_concise_0b8d4baf",
+  "intent": "Magnetic bead cleanup: 5min incubation, remove supernatant, user centrifuge step, 3min incubation, remove residual liquid",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "res": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "p20mnt": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "p300mnt": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "12213d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ethanol Transfer with User",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "magplate"
+      },
+      {
+        "slot": "1",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20mnt",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing 150uL of liquid from each well"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove plate and centrifuge. Click RESUME when ready"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 3 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20mnt"
+      }
+    ]
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "id": "ex_technical_e9f104d5",
+  "intent": "Execute a cherrypicking protocol transferring specified volumes from designated wells in a source plate to corresponding wells in a destination plate, with transfer volumes and well coordinates defined by CSV input data. Configure pipette tip usage according to specified reuse parameters (never, once, or always) and utilize automated liquid handling between labware positioned on deck slots 2 and 3.",
+  "config": {
+    "labware": {
+      "Source Labware": {
+        "load_name": "sp_type",
+        "slot": "2"
+      },
+      "Destination Labware": {
+        "load_name": "dp_type",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_model",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "7a3e4b.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Cherrypicking with Source and Destination",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "sp_type",
+        "label": "Source Labware"
+      },
+      {
+        "slot": "3",
+        "load_name": "dp_type",
+        "label": "Destination Labware"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_model",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "Source Labware",
+        "source_well": "A1",
+        "dest_labware": "Destination Labware",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+Prepare an ELISA plate with 8 patient samples, each in a 7-point 2-fold serial dilution plus blank, run in duplicate:
+
+1. First, add 100uL of sample diluent (reservoir A1) to columns 2-8 of the dilution plate (rows A-H) for the dilution series
+2. Transfer 200uL of each patient sample from tube rack positions A1-D1 and A2-D2 to column 1 of the dilution plate (rows A-H)
+3. Perform serial dilution: transfer 100uL from column 1 to column 2, mix 5 times at 150uL, then column 2 to 3, and so on through column 7. Use the same tip for each sample's dilution series.
+4. Transfer 50uL from each well of the dilution plate (columns 1-8, rows A-H) to the ELISA plate in duplicate - first set goes to columns 1-8, second set goes to columns 9-12 (only columns 1-4 used for second replicate due to plate width)
+5. Add 50uL of detection antibody from reservoir A2 to all sample wells in the ELISA plate
+6. Pause for user to incubate plate for 1 hour at room temperature
+
+Change tips between different patient samples to prevent cross-contamination.

@@ -1,0 +1,136 @@
+{
+  "id": "ex_technical_156f6e03",
+  "intent": "Transfer 5\u00b5L saliva samples from a source 96-well plate to a destination 96-well plate using a P20 multi-channel pipette. Execute column-wise transfers with configurable aspiration and dispensing heights, flow rates, and post-aspiration delay. Optionally maintain source plate at specified temperature (4-95\u00b0C) using temperature module. Process up to 96 samples with automated tip management and filtered tip usage.",
+  "config": {
+    "labware": {
+      "source_plate_label": {
+        "load_name": "well_plate_on_alum_lname",
+        "slot": "2"
+      },
+      "source_plate_label_3": {
+        "load_name": "well_plate_lname",
+        "slot": "3"
+      },
+      "destination plate": {
+        "load_name": "well_plate_lname",
+        "slot": "6"
+      },
+      "tiprack": {
+        "load_name": "filtered_20_lname",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "right_pipette_lname",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "300073-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Saliva sample transfer from source to target well plate",
+    "author": "Eskil <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "well_plate_on_alum_lname",
+        "label": "source_plate_label"
+      },
+      {
+        "slot": "3",
+        "load_name": "well_plate_lname",
+        "label": "source_plate_label"
+      },
+      {
+        "slot": "6",
+        "load_name": "well_plate_lname",
+        "label": "destination plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "filtered_20_lname",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "right_pipette_lname",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace empty tip racks"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": "temperature"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "sample_volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "post_aspiration_wait"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "sample_volume"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~ Protocol finished ~~~~"
+      }
+    ]
+  }
+}

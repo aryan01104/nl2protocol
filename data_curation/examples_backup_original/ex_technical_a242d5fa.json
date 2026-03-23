@@ -1,0 +1,235 @@
+{
+  "id": "ex_technical_a242d5fa",
+  "intent": "Perform magnetic bead-based library clean-up for Illumina Nextera XT NGS libraries using AMPure XP beads at specified bead ratio. Transfer initial sample volume to magnetic plate, add calculated bead volume, incubate 5 minutes at room temperature, engage magnetic separation for 2 minutes, remove supernatant, perform two 200\u00b5L 80% ethanol washes with 30-second incubations, air dry for specified time, add resuspension buffer volume, re-engage magnet for 2 minutes, and transfer final volume of purified libraries to output plate.",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "Load Plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      },
+      "Final Plate (empty)": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "1"
+      },
+      "Reservoir, 12-channel": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_type",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_deck": {
+        "module_type": "mag_gen",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "nexteraXT_dna_library_prep_part2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina Nextera XT NGS Prep 2: Clean-Up Libraries",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Load Plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Final Plate (empty)"
+      },
+      {
+        "slot": "2",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "Reservoir, 12-channel"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "mag_gen",
+        "slot": "4",
+        "label": "mag_deck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "init_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "pip_mount",
+        "volume": "bead_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake at 1800 rpm for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "total_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 220,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "rsb_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake at 1800 rpm for 2 minutes."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "final_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      }
+    ]
+  }
+}

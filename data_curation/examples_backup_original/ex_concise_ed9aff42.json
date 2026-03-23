@@ -1,0 +1,94 @@
+{
+  "id": "ex_concise_ed9aff42",
+  "intent": "Distribute selected mastermix reagent across 9 plates with automated batch dispensing",
+  "config": {
+    "labware": {
+      "source_plate": {
+        "load_name": "source_labware",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": null,
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "quintara_onsite_part3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Mastermix Filling 9 Plates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "source_labware",
+        "label": "source_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": null,
+        "model": null,
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": null,
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "disp_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": null,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Select Resume for another round"
+      }
+    ]
+  }
+}

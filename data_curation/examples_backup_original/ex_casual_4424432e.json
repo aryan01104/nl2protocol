@@ -1,0 +1,178 @@
+{
+  "id": "ex_casual_4424432e",
+  "intent": "Fill up to 6 plates with media and drugs based on a CSV file. The robot reads the CSV to know how much of each liquid to put in each well - first it adds the growth media from big 50mL tubes, then adds different antibiotics or drugs from smaller 15mL tubes. It keeps track of how much liquid is left in each tube and tells you when to refill them.",
+  "config": {
+    "labware": {
+      "tuberack_15_50": {
+        "load_name": "tuberack_mixed_lname",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "017860.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "CSV Plate Filling - Upgrade for OT2",
+    "author": "Nick & Eskil (update) <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "tuberack_mixed_lname",
+        "label": "tuberack_15_50"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace two 50ml media tubes filled to 50ml line before resuming."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nBeginning media transfer\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "v"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "v"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nBeginning antibiotic transfers\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "disp_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      }
+    ]
+  }
+}

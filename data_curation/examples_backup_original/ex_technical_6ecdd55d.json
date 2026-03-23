@@ -1,0 +1,96 @@
+{
+  "id": "ex_technical_6ecdd55d",
+  "intent": "Perform nanopore library aliquoting by adding 8.5\u00b5L water to each column of the source plate, mixing 3 times with 14\u00b5L volume, then distribute 2\u00b5L aliquots from each source column to corresponding columns across multiple destination plates using a P20 multichannel pipette at 0.5x flow rate",
+  "config": {
+    "labware": {
+      "Source Plate": {
+        "load_name": "barcode_96_wellplate_200ul",
+        "slot": "9"
+      },
+      "water_res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "quintara_onsite_nanopore.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Nanopore Aliquoting",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "barcode_96_wellplate_200ul",
+        "label": "Source Plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "water_res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------------ADDING BARCODE TO PLATES--------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 8.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 8.5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 3,
+        "volume": 14
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 2,
+        "labware": "dest_cols",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      }
+    ]
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "id": "ex_concise_e79e3273",
+  "intent": "Transfer COVID patient samples from tubes to 96-well plate, single or double extraction mode with 1-94 or 1-47 samples respectively",
+  "config": {
+    "labware": {
+      "dwp": {
+        "load_name": "kingfisher_96_deepwell_plate_2ml",
+        "slot": "2"
+      },
+      "tiprack_1000ul": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack_1000ul"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "6f2d9b.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "COVID-19 Patient Sample Prep",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "kingfisher_96_deepwell_plate_2ml",
+        "label": "dwp"
+      },
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "tiprack_1000ul"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack_1000ul"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the empty tip rack."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p1000_mount",
+        "volume": "sample_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      }
+    ]
+  }
+}

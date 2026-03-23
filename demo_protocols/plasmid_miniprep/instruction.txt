@@ -1,0 +1,40 @@
+Perform plasmid DNA extraction from 8 bacterial culture samples using a magnetic bead-based miniprep kit:
+
+Setup:
+- Deep well plate column 1 (A1-H1) contains 1mL overnight bacterial cultures (already pelleted)
+- Reservoir A1 contains Resuspension Buffer (with RNase A)
+- Reservoir A2 contains Lysis Buffer
+- Reservoir A3 contains Neutralization Buffer
+- Reservoir A4 contains Magnetic Bead suspension
+- Reservoir A5 contains Wash Buffer 1
+- Reservoir A6 contains Wash Buffer 2 (80% ethanol)
+- Reservoir A7 contains Elution Buffer (TE or water)
+- Magnetic module holds the processing plate
+
+Protocol:
+1. Add 250uL Resuspension Buffer to each bacterial pellet (A1-H1 of deep well plate)
+2. Mix vigorously 10 times at 200uL to resuspend pellets completely
+3. Add 250uL Lysis Buffer to each well
+4. Mix gently 5 times at 200uL - do not vortex (avoid shearing genomic DNA)
+5. Pause for 3 minutes - allow complete lysis
+6. Add 350uL Neutralization Buffer to each well
+7. Mix immediately 5 times at 300uL
+8. Pause - user centrifuges plate to pellet debris, then transfers 750uL cleared lysate to magnetic plate
+9. Add 30uL Magnetic Beads to each well of magnetic plate
+10. Mix 10 times at 200uL to bind DNA to beads
+11. Pause for 5 minutes - allow DNA binding
+12. Engage magnetic module - beads collect at side
+13. Pause for 2 minutes - beads fully separated
+14. Aspirate and discard supernatant carefully (avoid disturbing beads)
+15. Add 500uL Wash Buffer 1, mix 5 times
+16. Engage magnet, pause, remove wash
+17. Add 500uL Wash Buffer 2, mix 5 times
+18. Engage magnet, pause, remove wash
+19. Repeat Wash Buffer 2 step
+20. Pause for 5 minutes - air dry beads (do not over-dry)
+21. Disengage magnet, add 50uL Elution Buffer
+22. Mix 10 times to resuspend beads and elute DNA
+23. Engage magnet, pause for 2 minutes
+24. Transfer 45uL eluted DNA to clean tubes/plate
+
+Use fresh tips for each sample throughout to prevent cross-contamination.

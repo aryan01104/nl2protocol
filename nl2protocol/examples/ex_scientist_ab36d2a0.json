@@ -1,0 +1,149 @@
+{
+  "id": "ex_technical_ab36d2a0",
+  "source_file": "3b3d2f.ot2.apiv2.py",
+  "intent_precise": "Plate Loading for ddPCR: Using tube_block (labware, slot 4 Degree Tube Block). With temperature module. (1) Set temperature to 4\u00b0C. (2) Transfer 6\u00b5L from source to destination. (3) Wait 10 seconds. (4) Pause: format (5) Wait 2 seconds. (6) Wait 2 seconds. (7) Wait 2 seconds. (8) Pause: Please load remaining samples in\n                                     column-wise order starting with A1 like\n                                     A1-D1, A2-D2 etc.) and\n                                     postive control (last) in temperature\n                                     block. (9) Transfer 6\u00b5L from source to destination.",
+  "intent_concise": "Perform temperature control (4\u00b0C). (volumes 4\u00b5L-16\u00b5L)",
+  "intent": "For the ddPCR plate loading protocol, start by setting the tube block in slot 4 to 4\u00b0C, then transfer 6\u00b5L from your source to the destination well and wait 10 seconds before pausing to format. During the pause, load your remaining samples in column-wise order starting with A1 (so A1-D1, then A2-D2, etc.) and place your positive control last in the temperature block. After loading is complete, transfer another 6\u00b5L from source to destination to finish the protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Plate Loading for ddPCR",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4 Degree Tube Block",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "tube_block"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5.5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 3.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 16.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 16.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please load remaining samples in\n                                     column-wise order starting with A1 like\n                                     A1-D1, A2-D2 etc.) and\n                                     postive control (last) in temperature\n                                     block."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5.5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tube_block": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "4 Degree Tube Block"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  }
+}

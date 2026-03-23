@@ -1,0 +1,417 @@
+{
+  "id": "ex_casual_fdd72e27",
+  "intent": "Run a nucleic acid extraction using magnetic beads - basically add lysis buffer and samples, let it sit, then do three wash steps with the magnetic module to clean everything up. Finish by adding water to get the DNA/RNA off the beads and transfer the final clean product to a new plate.",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "extrPlate",
+        "slot": "Extraction Plate"
+      },
+      "Sample Plate (Input)": {
+        "load_name": "sampPlate",
+        "slot": "4"
+      },
+      "Elution Plate": {
+        "load_name": "elutePlate",
+        "slot": "1"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p300mnt": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "18d6a1.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "MGI Easy Nucleic Acid Extraction Kit",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "Extraction Plate",
+        "load_name": "extrPlate",
+        "label": "magplate"
+      },
+      {
+        "slot": "4",
+        "load_name": "sampPlate",
+        "label": "Sample Plate (Input)"
+      },
+      {
+        "slot": "1",
+        "load_name": "elutePlate",
+        "label": "Elution Plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "10",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": "tipMax"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300mnt",
+        "volume": 300,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Engaging MagDeck and incubating for 4 minutes..."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maghts:A1"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 460uL of Lysis Mix to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt",
+        "labware": "all_tips",
+        "well": "0"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300mnt",
+        "volume": 460,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt",
+        "labware": "all_tips",
+        "well": "0"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 200uL of sample to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300mnt",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300mnt",
+        "repetitions": 8,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 10 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Engaging MagDeck and incubating for 5 minutes..."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maghts:A1"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing 660uL of supernatant..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Drying for 10 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 75uL RF Water to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300mnt",
+        "volume": 75,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt",
+        "labware": "all_tips",
+        "well": "0"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Engaging MagDeck and incubating for 4 minutes..."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maghts:A1"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring elutes..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 75
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 75
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

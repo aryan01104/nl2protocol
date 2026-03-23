@@ -1,0 +1,1095 @@
+{
+  "id": "ex_casual_e27e615c",
+  "intent": "Set up a nanopore sequencing prep where you mix some enzymes with your samples, add different barcodes to each one so you can tell them apart later, then pool everything together. Clean it up twice with magnetic beads and ethanol washes, add the sequencing adapters, and clean it up again. The robot handles all the pipetting and mixing while you just need to put the samples through a quick thermal cycler step in the middle.",
+  "config": {
+    "labware": {
+      "barcode_plate": {
+        "load_name": "barcode_96_wellplate_200ul",
+        "slot": "1"
+      },
+      "mag_plate": {
+        "load_name": "axygen_96_wellplate_2000ul",
+        "slot": "3"
+      },
+      "sample_plate": {
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "slot": "4"
+      },
+      "sample_plus_barcode_plate": {
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "reag_rack": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "slot": "5"
+      },
+      "reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "onsite_egenesis_part2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ligation Sequencing Amplicons Native Barcoding",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "barcode_96_wellplate_200ul",
+        "label": "barcode_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "axygen_96_wellplate_2000ul",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "label": "sample_plus_barcode_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "label": "reag_rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "6",
+        "label": "mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n-------------------MAKING FIRST MIX-------------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--MIXING AND DISTRIBUTING MIX--\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 15,
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 3.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 3.5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 10
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------DISTRIBUTING BARCODE------------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 7.75
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 7.75
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 1.25
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 1.25
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 7
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 1,
+        "volume": 7
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------POOLING SAMPLES------------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING BEADS TO PLATE-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 15,
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------INCUBATING-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 60
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------REMOVING SUPERNATANT-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "bead_and_samp_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "bead_and_samp_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "aspirate_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "aspirate_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----------------TWO ETHANOL WASHES-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 175
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 175
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------REMOVING SUPERNATANT-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------ADDING NUC FREE WATER-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 35
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 35
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------INCUBATING-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 3,
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 35
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 35
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 60
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING TO FRESH WELL-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 30
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------ADDING FINAL MIX-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 2,
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 20
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING BEADS TO PLATE-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "bead_vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 20,
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------INCUBATING-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 3,
+        "volume": 45
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 60
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------REMOVING SUPERNATANT-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 70
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----------------TWO WASHES-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 125
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 125
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 125
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------REMOVING SUPERNATANT-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 125
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 145
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------ADDING NUC FREE WATER-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 15,
+        "volume": 15
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------INCUBATING-----------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 3,
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 60
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING TO FRESH WELL-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      }
+    ]
+  }
+}

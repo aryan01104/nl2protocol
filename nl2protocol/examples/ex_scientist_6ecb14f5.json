@@ -1,0 +1,253 @@
+{
+  "id": "ex_technical_6ecb14f5",
+  "source_file": "04f310.ot2.apiv2.py",
+  "intent_precise": "04f310.ot2.apiv2: Using 10-Tube Rack with Water Source Tube (tuberack, slot 1), ouput plate (plate, slot 5), intermediate plate (plate, slot 8), bleach reservoir (reservoir, slot 9). (1) Wait 10 seconds. (2) Wait 0 seconds. (3) Wait 0 seconds. (4) Wait 0 seconds. (5) Wait 0 seconds. (6) Wait 0 seconds. (7) Wait 0 seconds. (8) Wait 0 seconds. (9) Mix 10 times at 16\u00b5L. (10) Wait 0 seconds. (11) Wait 0 seconds. (12) Transfer from source to destination.",
+  "intent_concise": "Execute 34-step liquid handling protocol. (volumes 16\u00b5L-18\u00b5L)",
+  "intent": "For this protocol, set up your OT-2 with the 10-tube rack containing the water source tube in slot 1, your output plate in slot 5, intermediate plate in slot 8, and bleach reservoir in slot 9. Start with a 10-second wait, then proceed to mix the sample 10 times using 16\u00b5L volumes before transferring from the source to your destination wells. The system will handle the timing automatically between steps, so just make sure your plates are properly positioned and the liquid handling is calibrated correctly.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "04f310.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "10-Tube Rack with Water Source Tube"
+      },
+      {
+        "slot": "5",
+        "load_name": "redefinedbiorad_96_wellplate_200ul",
+        "label": "ouput plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "redefinedbiorad_96_wellplate_200ul",
+        "label": "intermediate plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "agilent_1_reservoir_290ml",
+        "label": "bleach reservoir"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "input plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n***\nSTEP 1 - water to output plate\n***\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_water"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_water"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n***\nSTEP 2 - sample to output plates\n     (with intermediate dilution as needed)\n***\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 16
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "v"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "v"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n***\nfinished - use the Opentrons app (click jupyter link)\n    to locate and download the output csv file\n***\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "10-Tube Rack with Water Source Tube": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "1"
+      },
+      "ouput plate": {
+        "load_name": "redefinedbiorad_96_wellplate_200ul",
+        "slot": "5"
+      },
+      "intermediate plate": {
+        "load_name": "redefinedbiorad_96_wellplate_200ul",
+        "slot": "8"
+      },
+      "bleach reservoir": {
+        "load_name": "agilent_1_reservoir_290ml",
+        "slot": "9"
+      },
+      "input plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

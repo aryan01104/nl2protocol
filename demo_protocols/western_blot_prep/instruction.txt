@@ -1,0 +1,24 @@
+Prepare protein samples for SDS-PAGE Western blot analysis:
+
+Setup:
+- Tube rack A1-A6 contains 6 protein lysate samples (20-50 uL each)
+- Tube rack B1 contains 4X Laemmli sample buffer (with BME/DTT already added)
+- Tube rack B2 contains protein ladder/marker
+- Temperature module for sample denaturation
+
+Protocol:
+1. Transfer 15uL of each protein sample from A1-A6 to fresh tubes in C1-C6
+2. Add 5uL of 4X Laemmli buffer to each sample tube (C1-C6) for 1X final concentration
+3. Mix each sample 5 times at 15uL to ensure complete mixing with loading buffer
+4. Add 5uL of protein ladder to tube C7 (ready-to-load, no buffer needed)
+5. Set temperature module to 95°C
+6. Pause - user transfers sample tubes to temperature module
+7. Comment: "Denature samples at 95C for 5 minutes"
+8. Pause for 5 minutes - samples denaturing
+9. Set temperature module to 4°C to cool samples
+10. Pause - samples ready for loading onto gel
+
+Final volumes: 20uL per sample (15uL lysate + 5uL 4X buffer), 5uL ladder
+User loads 10-20uL per lane depending on gel capacity.
+
+Use fresh tips for each protein sample to prevent cross-contamination.

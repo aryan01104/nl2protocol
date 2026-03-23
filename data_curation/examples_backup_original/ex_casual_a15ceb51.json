@@ -1,0 +1,91 @@
+{
+  "id": "ex_casual_a15ceb51",
+  "intent": "Fill the top row of several plates with 10\u00b5L of QE buffer from the reservoir, making sure to blow out and add a little air gap to prevent dripping",
+  "config": {
+    "labware": {
+      "tips": {
+        "load_name": "tip_name",
+        "slot": "10"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "pipmnt": {
+        "model": "pip_name",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "0fa015.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Plate Filling QE in NEST Plate",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "tip_name",
+        "label": "tips"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipmnt",
+        "model": "pip_name",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipmnt",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipmnt",
+        "volume": "disp_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipmnt",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete."
+      }
+    ]
+  }
+}

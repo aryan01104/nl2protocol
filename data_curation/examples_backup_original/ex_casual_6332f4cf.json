@@ -1,0 +1,91 @@
+{
+  "id": "ex_casual_6332f4cf",
+  "intent": "Take water from a big reservoir and add 250\u00b5L to each well that has samples in the 96-well plate. Mix up the water source a few times first, then go column by column adding water to however many samples you have.",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "2"
+      },
+      "trough": {
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "slot": "1"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "3e3c9d-protocol-Adding-Water-RBC.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Version Update - Adding Water to RBC 96-Well Plate",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "electronmicroscopysciences_1_reservoir_100000ul",
+        "label": "trough"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 250,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

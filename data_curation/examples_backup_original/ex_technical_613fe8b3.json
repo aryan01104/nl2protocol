@@ -1,0 +1,283 @@
+{
+  "id": "ex_technical_613fe8b3",
+  "intent": "Execute a FluoGene HLA NX assay setup by first combining water and PCR mix reagents in tube rack positions A1-A3, then performing a large-volume transfer of DNA dilution to PCR mix with 10x pre-mixing and 20x post-mixing cycles at 200\u00b5L per cycle. Distribute the combined reagent mixture to reservoir wells, then dispense 8\u00b5L aliquots across 96-well or 384-well PCR plates using multi-channel pipetting with touch-tip protocols and disposal volume management between transfers.",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "nunc_96_wellplate_500ul",
+        "slot": "7"
+      },
+      "tube_rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "118e8c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "FluoGene HLA NX 96-Well or 384-Well Setup",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "nunc_96_wellplate_500ul",
+        "label": "reservoir"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "tube_rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please place an unused, clean source plate in deck slot 7."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 4
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "tip_max"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "tip_max"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "remaining"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "remaining"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "dispense_volume"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "disposal_volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "disposal_volume"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

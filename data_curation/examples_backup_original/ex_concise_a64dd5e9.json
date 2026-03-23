@@ -1,0 +1,268 @@
+{
+  "id": "ex_concise_a64dd5e9",
+  "intent": "SARS-CoV-2 neutralization assay: serum distribution, serial dilution, virus addition, dual incubations with transfer, overlay addition",
+  "config": {
+    "labware": {
+      "serum_res": {
+        "load_name": "agilent_1_reservoir_290ml",
+        "slot": "7"
+      },
+      "virus_res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "076f67.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "SARS-COV2 (VSV) Neutralization Assay",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "agilent_1_reservoir_290ml",
+        "label": "serum_res"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "virus_res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace empty tip racks"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------ADDING SERUM TO PLATES----------------\n\n"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "m300_mount",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 80
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 80
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "serum_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "serum_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------SERIALLY DILUTING----------------\n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 3,
+        "volume": 40
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\n \u02da"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------ADDING VIRUS----------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 40
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place plate in incubator at 37C for one hour"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------DISCARDING MEDIA & TRANSFER TO NEW PLATE-------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 60
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place plate in incubator at 37C for one hour"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------TRANSFERRING OVERLAY-------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 140
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 140
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

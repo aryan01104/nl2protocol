@@ -1,0 +1,230 @@
+{
+  "id": "ex_casual_29675010",
+  "intent": "Set up a drug dilution experiment with four plates at different concentrations. First add media to most of the wells, then do serial dilutions going from a concentrated drug stock down through the plates, mixing each time. If we're adding cells, mix them up and add 100\u00b5L to each well at the end.",
+  "config": {
+    "labware": {
+      "Drug Stock 200uM": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "11"
+      },
+      "Media+IL-2+OKT3+CD28": {
+        "load_name": "axygen_1_reservoir_90ml",
+        "slot": "2"
+      },
+      "Cells": {
+        "load_name": "axygen_1_reservoir_90ml",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "mnt10": {
+        "model": "p10_multi",
+        "tipracks": []
+      },
+      "mnt300": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "41ece2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom Drug Dilution Assay (version 2)",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "Drug Stock 200uM"
+      },
+      {
+        "slot": "2",
+        "load_name": "axygen_1_reservoir_90ml",
+        "label": "Media+IL-2+OKT3+CD28"
+      },
+      {
+        "slot": "5",
+        "load_name": "axygen_1_reservoir_90ml",
+        "label": "Cells"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt10",
+        "model": "p10_multi",
+        "tipracks": []
+      },
+      {
+        "mount": "mnt300",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring Media to columns 2-12 ..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "Media+IL-2+OKT3+CD28",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "Media+IL-2+OKT3+CD28",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": "vol",
+        "labware": "Media+IL-2+OKT3+CD28",
+        "well": "A1"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Performing 10x dilutions..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt10",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          4,
+          10
+        ],
+        "mix_after": [
+          4,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt10"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 100\u00b5L of cells to columns 2-12..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 5,
+        "volume": 300,
+        "labware": "Cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "Cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60,
+        "labware": "Cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 100,
+        "labware": "Cells",
+        "well": "A1"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

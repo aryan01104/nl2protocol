@@ -1,0 +1,124 @@
+{
+  "id": "ex_technical_f9da9abd",
+  "source_file": "43d313-part-9.ot2.apiv2.py",
+  "intent_precise": "43d313-part-9.ot2.apiv2: Using Pools (tuberack, slot 2), libraries (labware, slot Libraries at Room Temperature). With temperature module. (1) Pause: Please Refill the 300 uL Tip Box\n                     and Empty the Tip Waste (2) Pause: format (3) Set temperature to 4\u00b0C. (4) Transfer from source A1 to destination A1. (5) Pause: Pooling protocol complete",
+  "intent_concise": "Perform temperature control (4\u00b0C).",
+  "intent": "For this pooling protocol, start by refilling the 300 \u00b5L tip box and emptying the tip waste, then set up your format before setting the temperature module to 4\u00b0C. Once everything is ready, transfer the sample from source well A1 to destination well A1 using the pools in the tube rack at slot 2 and the libraries from the labware at room temperature. The protocol will pause to let you know when the pooling is complete.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "43d313-part-9.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips300"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "Pools"
+      },
+      {
+        "slot": "Libraries at Room Temperature",
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "label": "libraries"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please Refill the 300 uL Tip Box\n                     and Empty the Tip Waste"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Transfer CSV-specified library volume to\n    one of four pool tubes (24 libraries / pool)"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Pooling protocol complete"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "9"
+      },
+      "Pools": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "2"
+      },
+      "libraries": {
+        "load_name": "eppendorftwin.tec96_96_aluminumblock_200ul",
+        "slot": "Libraries at Room Temperature"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  }
+}

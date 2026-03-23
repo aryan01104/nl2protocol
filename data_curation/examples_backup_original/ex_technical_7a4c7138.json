@@ -1,0 +1,112 @@
+{
+  "id": "ex_technical_7a4c7138",
+  "intent": "Execute a manual cleave protocol with ACN wash and elution using on-deck vacuum. First, dispense specified volume of ACN reagent to occupied wells in 96-well tube rack using multi-channel or single-channel pipettes based on well occupancy patterns. Pause for vacuum removal of ACN, then perform 4 sequential elution steps with specified elution buffer volume to the same wells. Include barcode verification of reagents and maintain tip tracking throughout the protocol.",
+  "config": {
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "manual_cleave.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Manual Cleave, ACN + Elution (On-Deck Vacuum)",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "REFILL TIPRACKS BEFORE RESUMING."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "reagent_transfer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "reagent_transfer_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Vacuum ACN before replacing plates and resuming."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "elution_transfer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "elution_transfer_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

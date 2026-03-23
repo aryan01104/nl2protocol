@@ -1,0 +1,131 @@
+{
+  "id": "ex_technical_b99efb32",
+  "intent": "Execute a drop-casting protocol to deposit polymer solutions onto silicon wafer substrates. Transfer specified volumes from three source vials to 96-well mixing plate wells according to CSV parameters, mix solutions with defined repetitions and volume, then dispense final volumes onto wafer grid positions at specified height and flow rate with programmed delay times between steps.",
+  "config": {
+    "labware": {
+      "mix_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "1"
+      },
+      "solutions": {
+        "load_name": "vial_rack_8x20ml_vials",
+        "slot": "2"
+      },
+      "wafer": {
+        "load_name": "grid",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "4d9b8b.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Drop Casting Polymer to Silicon Wafer",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "mix_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "vial_rack_8x20ml_vials",
+        "label": "solutions"
+      },
+      {
+        "slot": "3",
+        "load_name": "grid",
+        "label": "wafer"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nMaking Next Solution on Mix Plate"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "int"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "int"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nAdding to Wafer Plate\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount",
+        "labware": "tips",
+        "well": "A1"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "mix_reps",
+        "volume": "mix_vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "int"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "int"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

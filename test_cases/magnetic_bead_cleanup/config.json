@@ -1,0 +1,37 @@
+{
+    "labware": {
+        "tiprack_300_1": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "tiprack_300_2": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "4"
+        },
+        "sample_plate": {
+            "load_name": "nest_96_wellplate_2ml_deep",
+            "slot": "6",
+            "on_module": "mag_mod"
+        },
+        "reagent_reservoir": {
+            "load_name": "nest_12_reservoir_15ml",
+            "slot": "5"
+        },
+        "elution_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "3"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300_1", "tiprack_300_2"]
+        }
+    },
+    "modules": {
+        "mag_mod": {
+            "module_type": "magnetic",
+            "slot": "6"
+        }
+    }
+}

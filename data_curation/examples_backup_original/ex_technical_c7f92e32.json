@@ -1,0 +1,155 @@
+{
+  "id": "ex_technical_c7f92e32",
+  "intent": "Execute magnetic bead-based library cleanup for Illumina COVIDSeq protocol: engage magnetic module for 3 minutes to pellet beads, remove 5\u00b5L supernatant from each well of 96-well PCR plate using P20 multichannel pipette with precise bottom aspiration offset, transfer cleared supernatant to PCR strip tubes, then pool all 55\u00b5L library aliquots from strip tubes into single 1.5mL collection tube using P300 multichannel pipette",
+  "config": {
+    "labware": {
+      "tips20ul": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "7"
+      },
+      "pcr_strip": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "8"
+      },
+      "tuberack": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "slot": "5"
+      },
+      "plate_1": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tips20ul"
+        ]
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "04eeb1-part-7.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina COVIDSeq Test: Pool and Clean Up Libraries",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tips20ul"
+      },
+      {
+        "slot": "8",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "pcr_strip"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "label": "tuberack"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "plate_1"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tips20ul"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "3",
+        "label": "mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Vortex and Centrifuge PCR Strip. Then click Resume."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 55
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 55
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      }
+    ]
+  }
+}

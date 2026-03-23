@@ -1,0 +1,463 @@
+{
+  "id": "ex_technical_3ac6c4f8",
+  "intent": "Execute a magnetic bead-based DNA extraction protocol transferring 200\u00b5L samples from heater shaker plate to magnetic module, add 240\u00b5L reagent 4 with 15-cycle mixing, engage magnet for 5 minutes then remove 440\u00b5L supernatant, perform two sequential wash steps with reagents 5 and 6 (200\u00b5L each with 5-cycle mixing and supernatant removal), add 30\u00b5L elution reagent 7 with 10-cycle mixing, engage magnet again and transfer final 30\u00b5L eluate to collection plate",
+  "config": {
+    "labware": {
+      "final_plate": {
+        "load_name": "abgene_96_wellplate_2000ul",
+        "slot": "1"
+      },
+      "reag_plate": {
+        "load_name": "abgene_96_wellplate_2000ul",
+        "slot": "8"
+      },
+      "mag_plate": {
+        "load_name": "abgene_96_wellplate_2000ul",
+        "slot": "4"
+      },
+      "hs_plate": {
+        "load_name": "abgene_96_wellplate_2000ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "4"
+      },
+      "heater_shaker": {
+        "module_type": "heater_shaker",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "0530d8-pt2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "DNA Extraction with Heater Shaker - Part 2",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "abgene_96_wellplate_2000ul",
+        "label": "final_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "abgene_96_wellplate_2000ul",
+        "label": "reag_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "abgene_96_wellplate_2000ul",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "abgene_96_wellplate_2000ul",
+        "label": "hs_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag_mod"
+      },
+      {
+        "module_type": "heater_shaker",
+        "slot": "10",
+        "label": "heater_shaker"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "close_latch",
+        "module": "heater_shaker"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the tips and click Resume."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING SAMPLE TO MAG PLATE-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------TRANSFERRING CONTROLS TO MAG PLATE-----------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------ADDING 240 REAGENT----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 120
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 120
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 120
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------REMOVING SUPERNATANT----------------\n\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------TWO WASHES----------------\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------ADDING 200 REAGENT----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------------REMOVING SUPERNATANT---------------\n\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------ADDING 30ul REAGENT----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 10,
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 10,
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      }
+    ]
+  }
+}

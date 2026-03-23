@@ -1,0 +1,19 @@
+Seed HEK293 cells into a 96-well plate for a drug treatment experiment:
+
+Seed 10,000 cells per well in 100uL complete DMEM medium across the entire 96-well plate.
+
+Setup:
+- Reservoir contains cell suspension at 100,000 cells/mL in complete DMEM
+- Destination is a sterile 96-well tissue culture plate
+
+Protocol:
+1. Mix the cell suspension reservoir gently before starting to ensure even cell distribution
+2. Distribute 100uL of cell suspension to all 96 wells of the plate (columns 1-12, rows A-H)
+3. Use the same tip for distribution since it's a homogeneous cell suspension
+4. Work column by column to maintain consistent cell settling
+
+Tips:
+- Keep cell suspension cold if possible to slow settling
+- Work quickly to ensure even distribution
+- User should gently rock plate after seeding to distribute cells evenly
+- Incubate at 37C, 5% CO2 overnight before treatment

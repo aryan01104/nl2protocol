@@ -1,0 +1,419 @@
+{
+  "id": "ex_casual_53f2634e",
+  "intent": "This does the cleanup step after tagmentation - adds stop buffer to halt the reaction, mixes everything up, moves samples to the magnetic module to capture beads, throws away the liquid on top, then does a couple wash cycles with TWB buffer to clean up the beads, ending with the plate ready for the next step.",
+  "config": {
+    "labware": {
+      "starting_tray": {
+        "load_name": "customabnest_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "thermo_tubes": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "3"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "5"
+      },
+      "reagent_resv": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "liquid_trash": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "mag_module": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "ff5763_part2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina DNA Prep Part 2, Post-Tagmentation Clean-up",
+    "author": "AUTHOR NAME <authoremail@company.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "customabnest_96_wellplate_200ul",
+        "label": "starting_tray"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "thermo_tubes"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent_resv"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "liquid_trash"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_1"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag_module"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING TSB~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "airgap_20"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "airgap_20"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~MIXING~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 55
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please move sample plate from slot 2 to off-deck thermocycler then return to slot 2.Click 'Resume' when set"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~MOVING SAMPLES FROM 2 TO 4~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "incubate 3 minutes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~DISCARDING SUPERNATANT~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "step5_vol_supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~TWB WASH AND SUPER REMOVAL~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 120
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "step6_vol_supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING TWB AND MIXING~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_300"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 120
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Clean up complete, please move on to part 3 of the protocol, leaving the plate engaged on the magnetic module"
+      }
+    ]
+  }
+}

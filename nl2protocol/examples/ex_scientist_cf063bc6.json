@@ -1,0 +1,100 @@
+{
+  "id": "ex_technical_cf063bc6",
+  "source_file": "002af3.ot2.apiv2.py",
+  "intent_precise": "qPCR 96 well -> 384 well transfer: Using cfx_plate (pcr_plate, slot 3), control_plate (plate, slot 2), sample_plate_1 (deep_well_plate, slot 1), sample_plate_2 (deep_well_plate, slot 4). (1) Distribute 5\u00b5L from source A1 to destination wells A1, A1, A1.",
+  "intent_concise": "Perform distribute to A1, A1, A1. (using 5\u00b5L)",
+  "intent": "For the qPCR 96 well to 384 well transfer protocol, you'll be working with the cfx_plate (PCR plate) in slot 3, control_plate in slot 2, and sample plates 1 and 2 (both deep well plates) in slots 1 and 4 respectively. Start by taking 5\u00b5L from the source well A1 and distribute it equally across three destination wells, all located at position A1. Make sure you're transferring the full 5\u00b5L volume precisely to each of those A1 destination wells.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "qPCR 96 well -> 384 well transfer",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "hardshellbioradpcr_384_wellplate_50ul",
+        "label": "cfx_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "thermofisherscientificelutiontubes_96_wellplate_650ul",
+        "label": "control_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate_1"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "sample_plate_2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "cfx_plate": {
+        "load_name": "hardshellbioradpcr_384_wellplate_50ul",
+        "slot": "3"
+      },
+      "control_plate": {
+        "load_name": "thermofisherscientificelutiontubes_96_wellplate_650ul",
+        "slot": "2"
+      },
+      "sample_plate_1": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "1"
+      },
+      "sample_plate_2": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

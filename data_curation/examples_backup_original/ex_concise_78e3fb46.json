@@ -1,0 +1,297 @@
+{
+  "id": "ex_concise_78e3fb46",
+  "intent": "Omega Mag-Bind bacterial DNA purification: RNase treatment, bead binding with MSL/ethanol, magnetic separation, 2x SPM washes, air dry",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "2"
+      },
+      "ethanol_reservoir": {
+        "load_name": "axygen_1_reservoir_90ml",
+        "slot": "3"
+      },
+      "tuberack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "6"
+      },
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "2a370c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Omega Mag-Bind Bacterial DNA 96 Kit",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "axygen_1_reservoir_90ml",
+        "label": "ethanol_reservoir"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "tuberack"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "mag_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the empty tip racks!"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 20,
+        "volume": 25
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": 400,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 20,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 528
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 528
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p1000_mount",
+        "repetitions": 20,
+        "volume": 500
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 400
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 400
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p1000_mount",
+        "repetitions": 20,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 20,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol Complete!"
+      }
+    ]
+  }
+}

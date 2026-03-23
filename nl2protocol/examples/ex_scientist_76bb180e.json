@@ -1,0 +1,121 @@
+{
+  "id": "ex_technical_76bb180e",
+  "source_file": "7e4c3e-6.ot2.apiv2.py",
+  "intent_precise": "7e4c3e-6.ot2.apiv2: Using applied_biosystems_plate (plate, slot 6), tube_rack (tuberack, slot 4), pcr_strip (labware, slot 5). (1) Transfer 101\u00b5L from source (A1, A1) to destination (A1, A1). (2) Transfer 8\u00b5L from source to destination.",
+  "intent_concise": "Execute 6-step liquid handling protocol. (volumes 8\u00b5L-200\u00b5L)",
+  "intent": "For this protocol, you'll be working with an Applied Biosystems plate in slot 6, a tube rack in slot 4, and a PCR strip in slot 5. Start by transferring 101\u00b5L from well A1 in the source to well A1 in the destination, then follow up with an 8\u00b5L transfer from the same source to destination wells. Make sure to use the OT-2 system with the apiv2 protocol labeled 7e4c3e-6 for these sequential transfers.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "7e4c3e-6.ot2.apiv2",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "p1000s_rack"
+      },
+      {
+        "slot": "6",
+        "load_name": "appliedbiosystemsmicroampoptical384wellreactionplatewithbarcode_384_wellplate_30ul",
+        "label": "applied_biosystems_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "tube_rack"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "pcr_strip"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000s_rack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "once"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 100.8,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 8
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 8
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "p1000s_rack": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "1"
+      },
+      "applied_biosystems_plate": {
+        "load_name": "appliedbiosystemsmicroampoptical384wellreactionplatewithbarcode_384_wellplate_30ul",
+        "slot": "6"
+      },
+      "tube_rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "4"
+      },
+      "pcr_strip": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000s_rack"
+        ]
+      }
+    }
+  }
+}

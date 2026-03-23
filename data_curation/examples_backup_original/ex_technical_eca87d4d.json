@@ -1,0 +1,129 @@
+{
+  "id": "ex_technical_eca87d4d",
+  "intent": "Execute a protein normalization protocol across 1-7 Greiner 96-well plates using P300 and P20 multichannel pipettes. First, transfer specified volumes of diluent from a 12-well reservoir to destination wells based on CSV input data (volumes >20\u00b5L use P300, \u226420\u00b5L use P20). After email notification and manual addition of protein plate to position 8, transfer calculated protein volumes from source wells to destination plates with post-transfer mixing (4 cycles at 50\u00b5L for P300, 20\u00b5L for P20). Protocol includes automated email status updates.",
+  "config": {
+    "labware": {
+      "proteinPlate": {
+        "load_name": "greinerbioone_96_wellplate_200ul_650161",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "mnt300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "mnt20": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "243973.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Protein Normalizaton with Email Notifications",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "greinerbioone_96_wellplate_200ul_650161",
+        "label": "proteinPlate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "mnt20",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Beginning protocol. Transferring diluents...\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt300",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt20"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt20",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt20"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please add protein plate to deck."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt300",
+        "volume": "float",
+        "source_labware": "proteinPlate",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          4,
+          50
+        ]
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt20",
+        "volume": "float",
+        "source_labware": "proteinPlate",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          4,
+          20
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

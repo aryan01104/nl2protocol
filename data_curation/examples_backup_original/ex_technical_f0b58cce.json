@@ -1,0 +1,68 @@
+{
+  "id": "ex_technical_f0b58cce",
+  "intent": "Perform custom tiprack reformatting for multi-channel pipette operation using alternating nozzles. Using a P300 multi-channel pipette, transfer tips from full 300\u00b5L tipracks (slots 7-9) to empty tipracks (slots 4-6) by picking from row E and placing in specific wells to create an alternating tip pattern. Move tips from rows B, D, F to rows C, E, G respectively, and transfer row E tips to row A in empty boxes to accommodate 4-tip multi-channel operation.",
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "063611-part-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "063611-part-2.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "4"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "4"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      }
+    ]
+  }
+}

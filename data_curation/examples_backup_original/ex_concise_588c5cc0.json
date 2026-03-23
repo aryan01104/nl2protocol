@@ -1,0 +1,53 @@
+{
+  "id": "ex_concise_588c5cc0",
+  "intent": "Execute customizable PCR thermocycling protocol with initialization, cycling, and final extension steps",
+  "style": "concise",
+  "source_file": "thermocycler.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Thermocycler Example Protocol",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [],
+    "modules": [
+      {
+        "module_type": "type_tc",
+        "slot": "1",
+        "label": "tc_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "close_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": "lid_temp"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": "init_temp",
+        "hold_time_seconds": "init_time"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc_mod",
+        "steps": "profile",
+        "repetitions": "no_cycles"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": "fe_temp",
+        "hold_time_seconds": "fe_time"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": "final_temp"
+      }
+    ]
+  }
+}

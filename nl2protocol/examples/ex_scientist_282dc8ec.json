@@ -1,0 +1,141 @@
+{
+  "id": "ex_technical_282dc8ec",
+  "source_file": "anneal.ot2.apiv2.py",
+  "intent_precise": "1. Illumina COVIDSeq - Anneal RNA: Using sample plate (plate, slot 1), cDNA plate (plate, slot 2), reagent_plate (labware, slot reagent plate). With temperature module, magnetic module. (1) Set temperature to 4\u00b0C. (2) Disengage magnets to release beads. (3) Pause: \n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n (4) Transfer from source to destination. (5) Transfer from source to destination.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (4\u00b0C).",
+  "intent": "For the Illumina COVIDSeq RNA annealing step, you'll need to set up your sample plate in slot 1, cDNA plate in slot 2, and reagent plate in the designated reagent slot, making sure both the temperature and magnetic modules are ready. Start by setting the temperature module to 4\u00b0C, then disengage the magnets to release the beads from the previous step. Before you continue with the transfers, pause here to replace the 200\u03bcL filter tip racks with fresh ones. Once that's done, proceed with the two transfer steps from source to destination as outlined in the protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "1. Illumina COVIDSeq - Anneal RNA",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "label": "sample plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "label": "cDNA plate"
+      },
+      {
+        "slot": "reagent plate",
+        "load_name": "quantgene_96_aluminumblock_200ul",
+        "label": "reagent_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\nProtocol complete.\nSeal and shake at 1600 rpm for 1 minute.\nCentrifuge at 1000 \u00d7 g for 1 minute.\nPlace on the preprogrammed thermal cycler and run the COVIDSeq FSS program.\n\n\n\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "sample plate": {
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "slot": "1"
+      },
+      "cDNA plate": {
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "quantgene_96_aluminumblock_200ul",
+        "slot": "reagent plate"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  }
+}

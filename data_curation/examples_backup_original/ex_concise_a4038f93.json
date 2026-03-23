@@ -1,0 +1,451 @@
+{
+  "id": "ex_concise_a4038f93",
+  "intent": "Magnetic bead RNA extraction: lyse samples with proteinase K, bind RNA to beads, wash 3x, air dry, elute in 60\u00b5L buffer",
+  "config": {
+    "labware": {
+      "magPlate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "res12": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "res1": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "2"
+      },
+      "alBlock": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "4"
+      },
+      "sampPlate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "mnt300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "7cfbde.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "3D Black Bio RNA Extraction",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "magPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res12"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "res1"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "alBlock"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sampPlate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\nReplace the tips in slots 9, 6, and 3.             Move empty rack to slot 8"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300",
+        "labware": "all_tips",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": "mvol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 3 minutes"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": "add_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": "total_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 10uL of Proteinase K"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300",
+        "labware": "park_tips",
+        "well": "0"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nAdding 804uL of Lysis-Binding Mix + 200uL of Sample"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt300",
+        "volume": 201,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt300",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mnt300",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nPerforming Wash 1..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nPerforming Wash 2-1..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nPerforming Wash 2-2..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nRemoving any excess ethanol..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nLetting air dry for 10 minutes..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Please replace 96-Well Plate containing Samples     with clean plate for elutions"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nAdding 60uL of elution buffer to samples..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nIncubating at room temp for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nTransferring elution to final plate..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 60
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nCongratulations! The protocol is complete!"
+      }
+    ]
+  }
+}

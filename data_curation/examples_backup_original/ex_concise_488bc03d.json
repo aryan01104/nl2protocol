@@ -1,0 +1,488 @@
+{
+  "id": "ex_concise_488bc03d",
+  "intent": "Iron quantification assay: digest samples, add standards/samples in triplicate, sequential reagent addition with mixing",
+  "config": {
+    "labware": {
+      "digestion_plate": {
+        "load_name": "zinsser_96_wellplate_1898ul",
+        "slot": "2"
+      },
+      "analysis_plate": {
+        "load_name": "hellma_96_wellplate_300ul",
+        "slot": "2"
+      },
+      "sample_block": {
+        "load_name": "rrlcustom_40_wellplate_1500ul",
+        "slot": "3"
+      },
+      "reagent_block": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      },
+      "acid_block": {
+        "load_name": "rrl_1_wellplate_180000ul",
+        "slot": "5"
+      },
+      "storage_block": {
+        "load_name": "corning_96_wellplate_200ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "072463.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Simplified Fe Quantification Assay",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "zinsser_96_wellplate_1898ul",
+        "label": "digestion_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "hellma_96_wellplate_300ul",
+        "label": "analysis_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "rrlcustom_40_wellplate_1500ul",
+        "label": "sample_block"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent_block"
+      },
+      {
+        "slot": "5",
+        "load_name": "rrl_1_wellplate_180000ul",
+        "label": "acid_block"
+      },
+      {
+        "slot": "6",
+        "load_name": "corning_96_wellplate_200ul",
+        "label": "storage_block"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace empty tip racks."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n-----------ADDING WATER TO DIGESTION PLATE------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "aliquot_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "aliquot_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----ADDING SAMPLE IN TRIPLICATE TO DIGESTION PLATE----\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "aliquot_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "aliquot_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n-----------ADDING ACID AND MIXING------------\n\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 1200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Cover the digestion plate.\n                     Temperature block will go to 95C for 12 hours."
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": "digestion_temp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "digestion_time"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 25
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove cover from digestion plate.\n                     Place reagent block and analysis plate on deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----ADDING CALIBRATION STANDARDS IN TRIPLICATE----\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------MIXING DIGESTION PLATE----------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING SAMPLE TO ANALYSIS PLATE----\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "sample_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move analysis plate on slot 2 to slot 4 temp. module"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 95
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 25
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove analysis plate and move back to slot 2.\n                     Put digestion plate back on temp. mod on slot 4."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING WATER TO ANALYSIS PLATE----\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 46
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 46
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING REAG A TO ANALYSIS PLATE----\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 30
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 45
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING REAG B TO ANALYSIS PLATE----\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 49
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 49
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING REAG C TO ANALYSIS PLATE----\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 75
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 75
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n----TRANSFERRING TO STORAGE BLOCK----\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "ex_technical_cedc4960",
+  "intent": "Execute compound distribution across multiple 96-well PCR plates using a P20 single-channel pipette. Transfer specified volumes from source wells (tube rack and 384-well plate) to destination wells across seven 96-well plates with controlled aspiration/dispensing speeds, wicking technique, and automated tip management. Protocol includes mid-run pause for plate replacement and tip rack refresh.",
+  "config": {
+    "labware": {
+      "labware_slot_8": {
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "slot": "8"
+      },
+      "labware_slot_9": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "mount_p20": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "compound_plating.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Compound Plating",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "label": null
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": null
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p20",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p20",
+        "volume": "sum"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p20",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 96-well plates and tip racks. Insert two new tip racks in positions 10 and 11, remove all 96-well plates from positions 1-7, and insert five new 96-well plates in positions 1-5.\n\n\n\n"
+      }
+    ]
+  }
+}

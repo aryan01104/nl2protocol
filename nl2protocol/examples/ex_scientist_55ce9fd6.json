@@ -1,0 +1,70 @@
+{
+  "id": "ex_technical_55ce9fd6",
+  "source_file": "cherrypicking.ot2.apiv2.py",
+  "intent_precise": "Cherrypicking: Using None (labware, slot slot). (1) Pause: Please refill tipracks before resuming. (2) Transfer from source A1 to destination A1.",
+  "intent_concise": "Perform cherry picking.",
+  "intent": "For this cherrypicking protocol, you'll need to start by pausing to refill the tipracks before we begin any transfers. Once the tipracks are ready, go ahead and transfer the sample from source well A1 directly to destination well A1. Make sure to follow standard pipetting techniques throughout the process.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Cherrypicking",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "slot",
+        "load_name": "lower",
+        "label": null
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please refill tipracks before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipette_mount",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "labware_slot_slot": {
+        "load_name": "lower",
+        "slot": "slot"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "ex_casual_4d78363e",
+  "intent": "Move a small amount of RNA samples over to the cDNA plate - just 6.2 microliters from each well using the multichannel pipette",
+  "config": {
+    "labware": {
+      "rna": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "4"
+      },
+      "cdna": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "7e4c3e-3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "7e4c3e-3.ot2.apiv2",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "rna"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "cdna"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 6.2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

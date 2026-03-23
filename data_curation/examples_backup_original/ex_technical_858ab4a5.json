@@ -1,0 +1,354 @@
+{
+  "id": "ex_technical_858ab4a5",
+  "intent": "Perform a two-stage serial dilution workflow for RNA samples: first dilute samples to 0.1\u00b5g/\u00b5L in 100\u00b5L total volume, then perform secondary dilution to specified concentration. Transfer 15\u00b5L of final dilutions to aluminum block plate with 135\u00b5L HS diluent, create triplicates via 50\u00b5L transfers, incubate at 70\u00b0C for 2 minutes followed by 4\u00b0C for 5 minutes, and fill remaining wells with blank solution at 50\u00b5L per well.",
+  "config": {
+    "labware": {
+      "final plate": {
+        "load_name": "microampenduraplate_96_aluminumblock_200ul",
+        "slot": "3"
+      },
+      "dilution plate 1": {
+        "load_name": "dil_plate_type",
+        "slot": "2"
+      },
+      "reagent reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "9"
+      },
+      "sample_plate": {
+        "load_name": "rna_starting_format",
+        "slot": "sample sources"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "tempdeck2": {
+        "module_type": "temperature",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "fa_workflow.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "FA Workflow",
+    "author": "Nick <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "microampenduraplate_96_aluminumblock_200ul",
+        "label": "final plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "dil_plate_type",
+        "label": "dilution plate 1"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent reservoir"
+      },
+      {
+        "slot": "sample sources",
+        "load_name": "rna_starting_format",
+        "label": "sample_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "tempdeck1"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "10",
+        "label": "tempdeck2"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Ensure temperature module on slot 10 is set to 70C and temperature module on slot 1 is set to 4C. If not, please cancel run, set these temperatures, and run protocol again once these temperatures are reached."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": "dil_1_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "mix_reps",
+        "volume": 20
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mix_reps",
+        "volume": 80
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "desired_conc",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mix_reps",
+        "volume": 80
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 135
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 135
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 27
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 27
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": 15,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mix_reps",
+        "volume": 120
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mix_reps",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the plate in slot 3 and place on the temperature module on slot 10. Resume when finished."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the plate from temperature module on slot 10 to temperature module on slot 1."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge the plate on temperature module on slot 1. Replace on temperature module on slot 3 and remove plate seal when complete."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mix_reps",
+        "volume": 50
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Plate on slot 3 is complete. Remove and place second clean plate on aluminum block on slot 3 for full-plate buffer addition."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 200,
+        "source_labware": "rinse_buffer",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      }
+    ]
+  }
+}

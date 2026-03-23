@@ -1,0 +1,548 @@
+{
+  "id": "ex_casual_57ebb243",
+  "intent": "Set up a DNA extraction using magnetic beads - first add a bunch of different reagents to the samples while keeping some cold and some at room temp, mix everything every half hour for 2 hours, move samples to the magnetic plate, add the magnetic beads, use the magnet to pull down the beads, wash twice with ethanol, let it dry, then add water to get the clean DNA out",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "MAG PLATE"
+      },
+      "samples": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "slot": "SAMPLES"
+      },
+      "cool_reagents": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "slot": "COOL REAGENTS"
+      },
+      "HOT REAGENTS": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "2"
+      },
+      "waste_res": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "9"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "FINAL RACK": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_mod_samp": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "temp_mod_reagent": {
+        "module_type": "temperature",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "1440ad.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Extraction with Mag-Bind TotalPure NGS kit",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "MAG PLATE",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "SAMPLES",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "label": "samples"
+      },
+      {
+        "slot": "COOL REAGENTS",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "label": "cool_reagents"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "HOT REAGENTS"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste_res"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "FINAL RACK"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod_samp"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "6",
+        "label": "temp_mod_reagent"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace all 300ul tip racks. Empty trash if needed."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_samp",
+        "celsius": 37
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_reagent",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Add Room Temp Reagents \n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Add Cool Temp Non Viscous Reagents \n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Add Cool Temp Viscous Reagents \n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Mix Every 30 Minutes for Two Hours \n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 30
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Add Final Viscous Reagent \n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "cool_reag_visc_post_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "reagent_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Transfer Samples to Mag Plate \n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 105
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 105
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Adding MagBeads \n\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "mag_bead_mix_resuspend_reps",
+        "volume": "mag_bead_mix_resuspend_vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Apply Magnet \n\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Removing Supernatant \n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 205
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 205
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Two Washes \n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n Adding Water \n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 20,
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      }
+    ]
+  }
+}

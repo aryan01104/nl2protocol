@@ -1,0 +1,107 @@
+{
+  "id": "ex_technical_86a2df3e",
+  "source_file": "ELISA_protocol_part3.ot2.apiv2.py",
+  "intent_precise": "Substrate and Stop Solution Addition: Using trough (reservoir, slot 8), plate (plate, slot 9). (1) Transfer 200\u00b5L from source to destination. (2) Wait 2 seconds. (3) Incubate for 30 minutes. (4) Transfer 100\u00b5L from source A1 to destination A1.",
+  "intent_concise": "Execute 11-step liquid handling protocol. (volumes 100\u00b5L-200\u00b5L, ~30 min total)",
+  "intent": "For the substrate and stop solution addition step, take your trough from slot 8 and transfer 200\u00b5L to each well of the plate in slot 9, then wait 2 seconds before incubating the entire plate for 30 minutes at room temperature. After the incubation period, add 100\u00b5L of stop solution from well A1 of your source trough directly to well A1 of the destination plate to halt the reaction.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Substrate and Stop Solution Addition",
+    "author": "Alise <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "trough"
+      },
+      {
+        "slot": "9",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "trough": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "8"
+      },
+      "plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

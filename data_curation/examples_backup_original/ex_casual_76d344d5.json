@@ -1,0 +1,75 @@
+{
+  "id": "ex_casual_76d344d5",
+  "intent": "Take media from two big reservoirs and fill up tubes in several tube racks. The first few racks get filled from one reservoir, the rest from the second reservoir. Do two transfers per tube to get the right amount, and use a fresh tip for each tube.",
+  "config": {
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "0bd707.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Media Aliquotting",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": "transfer_vol",
+        "source_labware": "source",
+        "source_well": "0",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p1000_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": "transfer_vol",
+        "source_labware": "source",
+        "source_well": "1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p1000_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "id": "ex_technical_a0c615d7",
+  "intent": "Execute PCR plate preparation by dispensing 8.5\u00b5L mastermix from tube rack positions A1-A3 to designated wells in a 384-well plate using multichannel pipette, followed by addition of 1\u00b5L sample volumes from positions A6 and A8 with 5-cycle mixing at 5\u00b5L volume. Complete with positive control and water blanks in final two columns, applying touch-tip technique and precise well positioning.",
+  "config": {
+    "labware": {
+      "strips": {
+        "load_name": "ssibio_96_tuberack_200ul",
+        "slot": "8"
+      },
+      "plate384": {
+        "load_name": "thermofishermicroamp_384_wellplate_50ul",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "magmax.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom 384-Well Plate PCR Prep",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "ssibio_96_tuberack_200ul",
+        "label": "strips"
+      },
+      {
+        "slot": "11",
+        "load_name": "thermofishermicroamp_384_wellplate_50ul",
+        "label": "plate384"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 8.5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Ensure samples are loaded in place before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 1,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          5,
+          5
+        ]
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": 1,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          5,
+          5
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Remove plate, seal, and place in QuantStudio 5 cycler."
+      }
+    ]
+  }
+}

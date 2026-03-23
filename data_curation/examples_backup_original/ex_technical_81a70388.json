@@ -1,0 +1,195 @@
+{
+  "id": "ex_technical_81a70388",
+  "intent": "Perform magnetic bead-based nucleic acid purification by sequentially adding 90\u00b5L binding buffer, 120\u00b5L sample with 2-minute incubation, 120\u00b5L binding enhancer, and 30\u00b5L magnetic beads to a 500\u00b5L deep well plate with mixing steps. Transfer lysate to magnetic module, engage magnets for 10 minutes, add 50\u00b5L wash buffer with mixing and 10-minute incubation, perform magnetic separation, wash with 100\u00b5L wash buffer, add 100\u00b5L elution buffer with 10-minute incubation, then transfer final 100\u00b5L purified product to a 360\u00b5L flat-bottom plate.",
+  "config": {
+    "labware": {
+      "Eppendorf DWP 500ul": {
+        "load_name": "eppendorf_96_deepwellplate_500ul",
+        "slot": "9"
+      },
+      "corning": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "8"
+      },
+      "magplate": {
+        "load_name": "eppendorf_96_deepwellplate_2000ul",
+        "slot": "Eppendorf DWP 2000ul"
+      },
+      "res": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "5fe7a2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Nucleic Acid Purification",
+    "author": "Chaz <chaz@opentrons.com",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "eppendorf_96_deepwellplate_500ul",
+        "label": "Eppendorf DWP 500ul"
+      },
+      {
+        "slot": "8",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "corning"
+      },
+      {
+        "slot": "Eppendorf DWP 2000ul",
+        "load_name": "eppendorf_96_deepwellplate_2000ul",
+        "label": "magplate"
+      },
+      {
+        "slot": "11",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "10",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol1",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "reps",
+        "volume": "vol2"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pausing operation for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maght"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pausing operation for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 50,
+        "source_labware": "res",
+        "source_well": "A5",
+        "dest_labware": "magplate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 200,
+        "labware": "magplate",
+        "well": "A1"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pausing operation for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 250,
+        "labware": "magplate",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Pausing. Make sure a Corning 360ul plate is in slot 8     before resuming. When ready, click RESUME."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pausing operation for 10 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      }
+    ]
+  }
+}

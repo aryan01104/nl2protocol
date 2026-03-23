@@ -1,0 +1,86 @@
+{
+  "id": "ex_technical_1ece1396",
+  "intent": "Execute a cherrypicking protocol to transfer specified volumes from designated source wells to sequential destination wells according to CSV input data. Configure pipette based on volume requirements, load appropriate tip racks in slots 1, 4, 7, and 10, then systematically aspirate and dispense volumes from source labware (single or multiple plates) to destination plate in slot 3, with configurable tip usage strategy.",
+  "config": {
+    "labware": {
+      "Destination Labware": {
+        "load_name": "dp_type",
+        "slot": "3"
+      },
+      "Source Labware": {
+        "load_name": "sp_type",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_model",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "cherrypicking_simple.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Cherrypicking (Simple)",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "dp_type",
+        "label": "Destination Labware"
+      },
+      {
+        "slot": "2",
+        "load_name": "sp_type",
+        "label": "Source Labware"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_model",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "id": "ex_concise_1af66523",
+  "intent": "CSV-guided dilutions: diluent + sample transfers to chilled 48-well plate with mixing",
+  "config": {
+    "labware": {
+      "final_rack": {
+        "load_name": "sh_48_wellplate_2500ul",
+        "slot": "2"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "2"
+      },
+      "diluent_rack": {
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "onsite-bms-48plate.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Dilution with CSV File and Custom Tube Rack",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "sh_48_wellplate_2500ul",
+        "label": "final_rack"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "label": "diluent_rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace 20ul tip rack"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount",
+        "labware": "tips20",
+        "well": "A1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount",
+        "labware": "tips20",
+        "well": "A1"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace 1000ul tip rack"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount",
+        "labware": "tips1000",
+        "well": "A1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount",
+        "labware": "tips1000",
+        "well": "A1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~ADDING DILUENT~~~~\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": "dil_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": "dil_vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~ADDING SAMPLE~~~~\n\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 2,
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

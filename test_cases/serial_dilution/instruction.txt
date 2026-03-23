@@ -1,0 +1,3 @@
+Perform a 2-fold serial dilution across row A (wells A1 to A12).
+Add 100uL of diluent from the reservoir to wells A2-A12 first.
+Then transfer 100uL from A1 to A2 and mix, then A2 to A3 and mix, continuing to A12.

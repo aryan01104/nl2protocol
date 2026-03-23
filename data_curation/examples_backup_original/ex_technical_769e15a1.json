@@ -1,0 +1,81 @@
+{
+  "id": "ex_technical_769e15a1",
+  "intent": "Transfer 384 spheroids from a Corning 384-well source plate to an Akura 384-well destination plate using a P20 multichannel pipette. Aspirate 20\u00b5L from each source well at 0.2mm above bottom at 15.0\u00b5L/s flow rate, then dispense into destination wells at 3mm above bottom with -0.9mm Y-offset at 7.5\u00b5L/s flow rate. Execute slow withdrawal with 1-second delay and 16x reduced speed after each transfer. Change tips after 32 transfers (256 spheroids).",
+  "config": {
+    "labware": {
+      "spheroid source plate": {
+        "load_name": "corning_384_wellplate_90ul",
+        "slot": "4"
+      },
+      "destination plate": {
+        "load_name": "akura_384_wellplate_50ul",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "spheroidtransfer.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Spheroid Transfer",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "corning_384_wellplate_90ul",
+        "label": "spheroid source plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "akura_384_wellplate_50ul",
+        "label": "destination plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "VOL_SPHEROID"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "VOL_SPHEROID"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

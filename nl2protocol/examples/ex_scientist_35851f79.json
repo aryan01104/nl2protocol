@@ -1,0 +1,266 @@
+{
+  "id": "ex_technical_35851f79",
+  "source_file": "111210-part-4.ot2.apiv2.py",
+  "intent_precise": "111210-part-4.ot2.apiv2: Using pcr_plate (pcr_plate, slot 4), temp_plate (plate, slot 6), reagents (labware, slot 5). With thermocycler module, temperature module. (1) Operate thermocycler. (2) Set temperature to 4\u00b0C. (3) Open thermocycler lid. (4) Adjust temperature. (5) Transfer 15\u00b5L from source to destination. (6) Transfer 5\u00b5L from source to destination. (7) Transfer 20\u00b5L from source to destination. (8) Transfer 10\u00b5L from source to destination. (9) Mix 7 times at 25\u00b5L. (10) Pause: Please centrifuge the PCR plate with samples and then return it\n                onto the thermocycler module. (11) Close thermocycler lid. (12) Run thermocycler profile for 1 cycles. (13) Set temperature to 4\u00b0C. (14) Open thermocycler lid. (15) Pause: Centrifuge the PCR plate briefly and then place either on ice\n                 or the temperature module. Prepare for the next protocol",
+  "intent_concise": "Perform temperature control (4\u00b0C), thermocycling. (volumes 5\u00b5L-25\u00b5L)",
+  "intent": "For this PCR setup protocol, start by operating the thermocycler and setting the temperature module to 4\u00b0C, then open the thermocycler lid and make sure your PCR plate is in slot 4, temperature plate in slot 6, and reagents in slot 5. Transfer your reagents in sequence: 15\u00b5L, then 5\u00b5L, then 20\u00b5L, and finally 10\u00b5L from source to destination wells, followed by mixing 7 times at 25\u00b5L volume. After the transfers, you'll need to centrifuge the PCR plate with samples and return it to the thermocycler module, then close the lid and run 1 cycle of the thermocycler profile. Once that's complete, set the temperature back to 4\u00b0C, open the lid, and give the plate a brief centrifuge before placing it on ice or the temperature module for the next protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "111210-part-4.ot2.apiv2",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tipracks_200ul"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tipracks_20ul"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "temp_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "label": "reagents"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tipracks_20ul"
+        ]
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipracks_200ul"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "3",
+        "label": "tc_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pre-Cooling Temperature Module to 4\u00b0C"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Heating Thermocycler Lid to 70\u00b0C"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pre-Cooling Thermocycler Block to 4\u00b0C"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": 103
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "wait_for_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 7,
+        "volume": 25
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please centrifuge the PCR plate with samples and then return it\n                onto the thermocycler module."
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc_mod",
+        "steps": "profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge the PCR plate briefly and then place either on ice\n                 or the temperature module. Prepare for the next protocol"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tipracks_200ul": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      },
+      "tipracks_20ul": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "6"
+      },
+      "pcr_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "4"
+      },
+      "temp_plate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "6"
+      },
+      "reagents": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tipracks_20ul"
+        ]
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipracks_200ul"
+        ]
+      }
+    },
+    "modules": {
+      "tc_mod": {
+        "module_type": "thermocycler",
+        "slot": "3"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  }
+}

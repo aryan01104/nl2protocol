@@ -1,0 +1,96 @@
+{
+  "id": "ex_casual_73f52c5f",
+  "intent": "Add reagent to sample tubes in two rounds with an hour break in between. The robot figures out which wells have samples, picks up the right number of tips to handle them efficiently, and dispenses the reagent. It keeps track of which tips were used and validates that you're using the right reagent by scanning barcodes.",
+  "config": {
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "121d15-repeat.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Manual Cleave with Repeat for 2nd EDA",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": ""
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": ""
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Waiting 1 hour until 2nd EDA"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 60
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Starting 2nd EDA"
+      }
+    ]
+  }
+}

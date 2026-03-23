@@ -1,0 +1,243 @@
+{
+  "id": "ex_concise_4c27f6a4",
+  "intent": "Automated restriction enzyme digestion with thermocycler incubation and heat kill",
+  "config": {
+    "labware": {
+      "tc_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "temp_block": {
+        "load_name": "opentrons_24_aluminumblock_18x0.5ml_3x1.5ml_3x1.5ml",
+        "slot": "4"
+      },
+      "tiprack_300ul": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "6"
+      },
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack_300ul"
+        ]
+      }
+    },
+    "modules": {
+      "tc_mod": {
+        "module_type": "thermocycler",
+        "slot": "1"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "010526.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Restriction Digests",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_aluminumblock_18x0.5ml_3x1.5ml_3x1.5ml",
+        "label": "temp_block"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack_300ul"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack_300ul"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "1",
+        "label": "tc_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please refill the water tubes."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Load Enzymes into the Aluminum\n              Block on the Temperature Module."
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "water_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "tc_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "buffer_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "tc_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "tc_plate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          2,
+          20
+        ]
+      },
+      {
+        "command_type": "wait_for_temperature",
+        "module": "temp_mod",
+        "celsius": "temp_mod_temperature"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "enzyme_vol",
+        "labware": "enzymes_db",
+        "well": "A1"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "enzyme_vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 6,
+        "volume": 20,
+        "labware": "tc_plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 37,
+        "hold_time_seconds": "digest_duration"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": 70
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": "heat_kill_temperature",
+        "hold_time_seconds": "heat_kill_duration"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      }
+    ]
+  }
+}

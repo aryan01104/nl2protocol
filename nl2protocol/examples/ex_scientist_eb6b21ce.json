@@ -1,0 +1,100 @@
+{
+  "id": "ex_technical_eb6b21ce",
+  "source_file": "0175a4.ot2.apiv2.py",
+  "intent_precise": "Saliva 3:1|2:1 pooling protocol: (1) Transfer 500\u00b5L from source to destination.",
+  "intent_concise": "Execute 9-step liquid handling protocol. (using 500\u00b5L)",
+  "intent": "For the Saliva 3:1|2:1 pooling protocol, you'll need to transfer 500\u00b5L from each source sample to the designated destination well. This is a straightforward single-step transfer, so just make sure you're using a clean pipette tip for each sample to avoid cross-contamination. Double-check that you're moving exactly 500\u00b5L from source to destination for each pooling step.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Saliva 3:1|2:1 pooling protocol",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "tips_1000"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips_1000"
+        ]
+      },
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips_1000"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 500
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 500
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 500
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 500
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips_1000": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips_1000"
+        ]
+      },
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips_1000"
+        ]
+      }
+    }
+  }
+}

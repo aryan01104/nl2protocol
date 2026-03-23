@@ -1,0 +1,188 @@
+{
+  "id": "ex_concise_56de8015",
+  "intent": "Multi-stage PCR setup: preamp mixing, off-deck amplification pause, duplicate loading with OpenArray mastermix",
+  "config": {
+    "labware": {
+      "loadPlate": {
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "slot": "3"
+      },
+      "tubeRack": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "pipMnt": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3d942d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom PCR Setup from CSV",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "label": "loadPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "label": "tubeRack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipMnt",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 2,
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 2.5,
+        "labware": "preampPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 2.5,
+        "source_labware": "srcPlate",
+        "source_well": "A1",
+        "dest_labware": "preampPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 2,
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 3.75,
+        "labware": "loadPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 3.75,
+        "labware": "loadPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 1.25,
+        "source_labware": "preampPlate",
+        "source_well": "A1",
+        "dest_labware": "loadPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 1.25,
+        "source_labware": "preampPlate",
+        "source_well": "A1",
+        "dest_labware": "loadPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete! Please start OpenArray process."
+      }
+    ]
+  }
+}

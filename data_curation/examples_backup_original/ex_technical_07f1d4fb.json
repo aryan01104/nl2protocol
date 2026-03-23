@@ -1,0 +1,93 @@
+{
+  "id": "ex_technical_07f1d4fb",
+  "intent": "Execute a mass spectrometry sample preparation protocol by transferring 900\u00b5L of supernatant from source tubes to destination tubes at reduced aspiration flow rate, followed by sample drying and reconstitution with 100\u00b5L mobile phase A from reservoir well A1, including 5x mixing at 100\u00b5L volume after reconstitution",
+  "config": {
+    "labware": {
+      "source tubes": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "1"
+      },
+      "destination tubes": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "2"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "mass_spec.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Mass Spec Sample Prep",
+    "author": "Nick <ndiehl@opentrons.com",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "source tubes"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "destination tubes"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": "vol_supernatant",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p1000_mount",
+        "volume": "vol_reconstitution",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          5,
+          100
+        ]
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      }
+    ]
+  }
+}

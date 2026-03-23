@@ -1,0 +1,159 @@
+{
+  "id": "ex_concise_0d067609",
+  "intent": "Normalize DNA samples to target concentration, then transfer to PCR plate with water",
+  "config": {
+    "labware": {
+      "sample_plate": {
+        "load_name": "micronic_96_rack_300ul_tubes",
+        "slot": "5"
+      },
+      "pcr_plate": {
+        "load_name": "abgene_96_wellplate_200ul",
+        "slot": "6"
+      },
+      "Water Reservoir": {
+        "load_name": "thermofishernunc_96_wellplate_2000ul",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "08aeaa.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom Normalization & Transfer",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "micronic_96_rack_300ul_tubes",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "abgene_96_wellplate_200ul",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "thermofishernunc_96_wellplate_2000ul",
+        "label": "Water Reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "sample_plate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          15
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Normalization Step is Complete!"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding nuclease-free water to corresponding sample wells on\n                the PCR plate."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": "water_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "pcr_plate",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring samples to PCR plate!"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": 5,
+        "source_labware": "sample_plate",
+        "source_well": "A1",
+        "dest_labware": "pcr_plate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          15
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      }
+    ]
+  }
+}

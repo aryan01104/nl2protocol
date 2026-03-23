@@ -1,0 +1,136 @@
+{
+  "id": "ex_concise_7cf8e0b1",
+  "intent": "Transfer 5\u00b5L saliva samples between 96-well plates using multi-channel pipette with optional temperature control",
+  "config": {
+    "labware": {
+      "source_plate_label": {
+        "load_name": "well_plate_on_alum_lname",
+        "slot": "2"
+      },
+      "source_plate_label_3": {
+        "load_name": "well_plate_lname",
+        "slot": "3"
+      },
+      "destination plate": {
+        "load_name": "well_plate_lname",
+        "slot": "6"
+      },
+      "tiprack": {
+        "load_name": "filtered_20_lname",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "right_pipette_lname",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "300073-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Saliva sample transfer from source to target well plate",
+    "author": "Eskil <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "well_plate_on_alum_lname",
+        "label": "source_plate_label"
+      },
+      {
+        "slot": "3",
+        "load_name": "well_plate_lname",
+        "label": "source_plate_label"
+      },
+      {
+        "slot": "6",
+        "load_name": "well_plate_lname",
+        "label": "destination plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "filtered_20_lname",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "right_pipette_lname",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace empty tip racks"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": "temperature"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "sample_volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "post_aspiration_wait"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "sample_volume"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~ Protocol finished ~~~~"
+      }
+    ]
+  }
+}

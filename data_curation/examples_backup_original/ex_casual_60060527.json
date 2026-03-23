@@ -1,0 +1,86 @@
+{
+  "id": "ex_casual_60060527",
+  "intent": "Pick specific samples from source plates and move them to a destination plate based on a list you provide. The robot will grab the right pipette tips, suck up whatever volume you specified from each well you want, and put it in the next available spot on the destination plate.",
+  "config": {
+    "labware": {
+      "Destination Labware": {
+        "load_name": "dp_type",
+        "slot": "3"
+      },
+      "Source Labware": {
+        "load_name": "sp_type",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_model",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "cherrypicking_simple.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Cherrypicking (Simple)",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "dp_type",
+        "label": "Destination Labware"
+      },
+      {
+        "slot": "2",
+        "load_name": "sp_type",
+        "label": "Source Labware"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_model",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      }
+    ]
+  }
+}

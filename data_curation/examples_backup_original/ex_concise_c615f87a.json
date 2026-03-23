@@ -1,0 +1,323 @@
+{
+  "id": "ex_concise_c615f87a",
+  "intent": "NGS library prep: tagmentation with Tn5, SDS stop, PCR amplification with i7 primers",
+  "config": {
+    "labware": {
+      "tc_plate": {
+        "load_name": "abgene_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "Tn5 + 5x TD Buffer (col 1, PCR plate on ISOFREEZE block)": {
+        "load_name": "abgene_96_wellplate_200ul_isofreeze_block",
+        "slot": "4"
+      },
+      "0.2% SDS (col 1, PCR plate)": {
+        "load_name": "abgene_96_wellplate_200ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "ngs_prep.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "NGS Library Prep",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "abgene_96_wellplate_200ul",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "abgene_96_wellplate_200ul_isofreeze_block",
+        "label": "Tn5 + 5x TD Buffer (col 1, PCR plate on ISOFREEZE block)"
+      },
+      {
+        "slot": "5",
+        "load_name": "abgene_96_wellplate_200ul",
+        "label": "0.2% SDS (col 1, PCR plate)"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "1",
+        "label": "tc"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 80
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 6,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          3,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 55,
+        "hold_time_minutes": 21
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 2.5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          3,
+          10
+        ]
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 55,
+        "hold_time_minutes": 21
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace Tn5 + 5x TD Buffer plate (slot 1) with new amplification plate on ISOFREEZE block. Replace SDS plate (slot 2) with I7 primer plate before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 16,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m20_mount",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace DNA plate on thermocycler with amplification plate before resuming."
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 105
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile1",
+        "repetitions": 1
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile2",
+        "repetitions": 11
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 68,
+        "hold_time_minutes": 5
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol completed"
+      }
+    ]
+  }
+}

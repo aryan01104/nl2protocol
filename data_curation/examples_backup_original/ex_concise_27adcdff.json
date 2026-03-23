@@ -1,0 +1,66 @@
+{
+  "id": "ex_concise_27adcdff",
+  "intent": "CSV-guided cherry-picking transfers between multiple plates with P300 single-channel pipette",
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "5a2a35.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "5a2a35.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

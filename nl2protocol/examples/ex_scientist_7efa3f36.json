@@ -1,0 +1,58 @@
+{
+  "id": "ex_technical_7efa3f36",
+  "source_file": "6d3eda.ot2.apiv2.py",
+  "intent_precise": "6d3eda.ot2.apiv2: (1) Pause: Replace the tips (2) Transfer from source A1 to destination A1.",
+  "intent_concise": "Execute 5-step liquid handling protocol.",
+  "intent": "First, pause the protocol and replace the pipette tips with fresh ones. Then transfer the sample from well A1 in the source plate to well A1 in the destination plate.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "6d3eda.ot2.apiv2",
+    "author": "Unknown",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "id": "ex_technical_0416b97b",
+  "source_file": "3633ca.ot2.apiv2.py",
+  "intent_precise": "Ethanol Transfer: Using magplate (pcr_plate, slot 2), res (reservoir, slot 1). With magnetic module. (1) Engage magnets for bead separation. (2) Transfer 150\u00b5L from source to destination. (3) Wait 30 seconds. (4) Transfer 150\u00b5L from source to destination. (5) Transfer 15\u00b5L from source to destination.",
+  "intent_concise": "Perform magnetic bead separation. (volumes 15\u00b5L-150\u00b5L)",
+  "intent": "For the ethanol transfer step, first engage the magnets on the magnetic module to separate the beads in the PCR plate located in slot 2. Once the beads are captured, transfer 150\u00b5L of ethanol from the reservoir in slot 1 to the appropriate wells, wait 30 seconds for proper mixing, then perform another 150\u00b5L transfer followed by a final 15\u00b5L transfer to complete the wash protocol. Make sure to maintain the magnetic engagement throughout all transfers to keep the beads properly separated.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Ethanol Transfer",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "magplate"
+      },
+      {
+        "slot": "1",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20mnt",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 30 seconds"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20mnt"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "res": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  }
+}

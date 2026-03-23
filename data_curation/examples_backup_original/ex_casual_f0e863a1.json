@@ -1,0 +1,443 @@
+{
+  "id": "ex_casual_f0e863a1",
+  "intent": "Run a magnetic bead ELISA on 12 samples - mix beads with samples on the shaker, wash them on the magnet, add detection antibodies and shake again, wash again, add substrate to develop color, stop the reaction, then transfer the liquid to a clean plate for reading the results.",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "3"
+      },
+      "reagents": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "11"
+      },
+      "wash": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "5"
+      },
+      "waste": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      },
+      "final": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "7"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "10"
+      },
+      "tips for final transfer": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "4"
+      },
+      "tips for reuse": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    },
+    "modules": {
+      "hs_mod": {
+        "module_type": "heater_shaker",
+        "slot": "1"
+      },
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "9"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "sci-bead-based-elisa-for-sars-cov-2-surrogate-virus-neutralization-test.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "bead-based ELISA",
+    "author": "Boren Lin",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "reagents"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "wash"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste"
+      },
+      {
+        "slot": "7",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "final"
+      },
+      {
+        "slot": "10",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips for final transfer"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips for reuse"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "heater_shaker",
+        "slot": "1",
+        "label": "hs_mod"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "9",
+        "label": "mag_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "close_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 2,
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "close_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "set_shake_speed",
+        "module": "hs_mod",
+        "rpm": "speed"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time"
+      },
+      {
+        "command_type": "close_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "MAG_HEIGHT"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "wash_vol",
+        "labware": "wash_rev",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "wash_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "MAG_HEIGHT"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~Target Capture~~~~~~~~\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Load the Plate onto the Magnet"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Shaker"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Magnet"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~Detection Ab Binding~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Shaker"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Magnet"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~Signal Development~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Shaker"
+      },
+      {
+        "command_type": "open_latch",
+        "module": "hs_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Move the Plate to the Magnet"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "MAG_HEIGHT"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "FINAL_VOL"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "FINAL_VOL"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Ready for OD measurement"
+      }
+    ]
+  }
+}

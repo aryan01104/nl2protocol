@@ -1,0 +1,112 @@
+{
+  "id": "ex_concise_9e685135",
+  "intent": "Distribute master mix and primers to sample wells with mixing",
+  "config": {
+    "labware": {
+      "sample_plate": {
+        "load_name": "well_plate",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "fill_proto.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Reverse Transcriptase Preparation",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "well_plate",
+        "label": "sample_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~~ADDING MIX~~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 1,
+        "volume": "reag_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n~~~~~~~~~~~~~~~ADDING PRIMER~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 1
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 1,
+        "volume": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

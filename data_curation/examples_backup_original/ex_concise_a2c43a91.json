@@ -1,0 +1,720 @@
+{
+  "id": "ex_concise_a2c43a91",
+  "intent": "Poly(A) RNA isolation and fragmentation using magnetic beads: bind, wash, elute, rebind, wash, elute in reaction buffer, fragment at 94\u00b0C",
+  "config": {
+    "labware": {
+      "reagent_plate": {
+        "load_name": "labware_tempmod",
+        "slot": "Reagent Plate at 4 Degrees C"
+      },
+      "output_plate": {
+        "load_name": "labware_tempmod2",
+        "slot": "Output Plate at 4 Degrees C"
+      },
+      "mag_plate": {
+        "load_name": "labware_magneticmodule",
+        "slot": "Magnetic Module Plate - 300 uL PCR Plate + Adapter"
+      },
+      "Reagent Reservoir": {
+        "load_name": "labware_reservoir",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "Temperature Module",
+        "slot": "1"
+      },
+      "temp2": {
+        "module_type": "Temperature Module",
+        "slot": "4"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "9"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "0479ad.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "0479ad.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "Reagent Plate at 4 Degrees C",
+        "load_name": "labware_tempmod",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "Output Plate at 4 Degrees C",
+        "load_name": "labware_tempmod2",
+        "label": "output_plate"
+      },
+      {
+        "slot": "Magnetic Module Plate - 300 uL PCR Plate + Adapter",
+        "load_name": "labware_magneticmodule",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "labware_reservoir",
+        "label": "Reagent Reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "Temperature Module",
+        "slot": "1",
+        "label": "temp"
+      },
+      {
+        "module_type": "Temperature Module",
+        "slot": "4",
+        "label": "temp2"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "9",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp2",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nEnsure output plate is placed on the temperature module in slot 4\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nEnsure reagents in sufficient volume are present on deck\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.11 - mix 50 uL beads with input RNA samples\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.12 and 1.2.13 - denaturation of RNA\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\nRemove magnetic module plate for off-deck incubation\n    (65 degrees 5 min, cool to 4 degrees C). Return and resume.\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.14 - binding of poly A RNA\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.15 - engage magnets\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.16 - remove supernatant\n"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 75
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 75
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 170
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.17 - 1.2.22 - disengage, wash, engage, discard, repeat\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 144
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 144
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.23 - add Tris and mix\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 43
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 43
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.24 and 1.2.25 - first elution\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\nRemove magnetic module plate for off-deck incubation\n    (lid 90, 80 degrees 2 min, cool to 25 degrees C). Return and resume.\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.26 and 1.2.27 - rebind RNA to beads\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 80
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.28 and 1.2.29 - engage magnets and discard sup\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 75
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 75
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 170
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.30 and 1.2.31 - disengage magnets and add wash buffer\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 144
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 144
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.32 - 1.2.35 - engage, discard sup, disengage\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 110
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 70
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.36 - elution in 1st strand rxn bf + random primer\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 11.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 11.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.37 - fragmentation\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\nRemove mag plate and vortex, then off-deck incubation\n    (lid 105, 94 degrees 15 min, cool to 4 degrees -\n    on ice ASAP upon 65 degrees). Quick spin. Return plate and resume.\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nSTEP 1.2.38 and 1.2.39 - collect eluate\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "height_engage"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "column2",
+        "dest_well": "0",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nfinished - confirm 10 uL eluate volumes\n    (manually adjust if necessary), proceed with part-2 cDNA synthesis\n"
+      }
+    ]
+  }
+}

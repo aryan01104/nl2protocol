@@ -1,0 +1,112 @@
+{
+  "id": "ex_technical_16a1168e",
+  "source_file": "rem-pcr-plate.ot2.apiv2.py",
+  "intent_precise": "Dispense PCR Master Mix (plates): Using master trough (reservoir, slot 2), master-plate (pcr_plate, slot 1), pcr-plate (pcr_plate, slot 5). (1) Pause for incubation. (2) Transfer from source to destination. (3) Wait 0 seconds. (4) Pause: format (5) Pause: format",
+  "intent_concise": "Perform PCR setup.",
+  "intent": "Set up the PCR master mix dispensing by placing the master trough reservoir in slot 2, the master plate in slot 1, and the PCR plate in slot 5. First, pause for the incubation step, then transfer the master mix from the source to the destination wells. After the transfer is complete, wait briefly and pause to check the plate format at each step to ensure proper dispensing.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Dispense PCR Master Mix (plates)",
+    "author": "REM Analytics <emily.jamieson@remanalytics.ch>",
+    "labware": [
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_tiprack_20ul",
+        "label": "tiprack_20"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "master trough"
+      },
+      {
+        "slot": "1",
+        "load_name": "96w_pcr_plate2",
+        "label": "master-plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "96w_pcr_plate2",
+        "label": "pcr-plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p10_multi",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tiprack_20": {
+        "load_name": "opentrons_96_tiprack_20ul",
+        "slot": "6"
+      },
+      "master trough": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "master-plate": {
+        "load_name": "96w_pcr_plate2",
+        "slot": "1"
+      },
+      "pcr-plate": {
+        "load_name": "96w_pcr_plate2",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p10_multi",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    }
+  }
+}

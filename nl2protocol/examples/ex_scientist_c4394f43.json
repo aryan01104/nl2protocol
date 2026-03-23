@@ -1,0 +1,148 @@
+{
+  "id": "ex_technical_c4394f43",
+  "source_file": "standard-biotools-da-96.ot2.apiv2.py",
+  "intent_precise": "Standard Biotools Dynamic Array 96.96: Load 4 uL: Using AssayPlate (plate, slot 4), SamplePlate (plate, slot 5), IFC (labware, slot 2). (1) Pause for incubation. (2) Pause for incubation. (3) Pause for incubation. (4) Pause for incubation.",
+  "intent_concise": "Execute 18-step liquid handling protocol.",
+  "intent": "For this Standard Biotools Dynamic Array 96.96 protocol, you'll need to load 4 \u00b5L using the AssayPlate in slot 4, SamplePlate in slot 5, and the IFC in slot 2. The protocol includes four incubation pauses that you'll need to wait for during the run - the system will prompt you when each pause occurs. Make sure all your plates are properly positioned in their designated slots before starting the 4 \u00b5L loading sequence.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Standard Biotools Dynamic Array 96.96: Load 4 uL",
+    "author": "Standard Biotools Inc",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "AssayPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "SamplePlate"
+      },
+      {
+        "slot": "2",
+        "load_name": "dynamic_array_96_96",
+        "label": "IFC"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transfer Assay Mix - Assay Wellplate to IFC (Assay Inlets)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transfer Final Sample Mix - Sample Wellplate to IFC (Sample Inlets)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol Complete!"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "AssayPlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "4"
+      },
+      "SamplePlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "5"
+      },
+      "IFC": {
+        "load_name": "dynamic_array_96_96",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "id": "ex_technical_596cf2c3",
+  "source_file": "quintara_onsite_part1.ot2.apiv2.py",
+  "intent_precise": "Four 96 Deepwell to PCR Plate: Using dest_plate (plate, slot 3). (1) Transfer from source to destination.",
+  "intent_concise": "Perform PCR setup.",
+  "intent": "Take the destination plate from slot 3 and set up a transfer from the four 96 deepwell source plates to the PCR plate. You'll need to transfer the samples from each source well to the corresponding destination wells on the PCR plate. Make sure to use the dest_plate that's positioned in slot 3 for this Four 96 Deepwell to PCR Plate protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Four 96 Deepwell to PCR Plate",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "quintara_96_wellplate_300ul",
+        "label": "dest_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n-----------Filling Destination Plate-------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "dest_plate": {
+        "load_name": "quintara_96_wellplate_300ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

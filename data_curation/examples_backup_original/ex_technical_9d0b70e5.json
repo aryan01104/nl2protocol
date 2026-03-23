@@ -1,0 +1,76 @@
+{
+  "id": "ex_technical_9d0b70e5",
+  "intent": "Transfer 300\u00b5L from each 2mL Eppendorf tube in the MCT tube racks to corresponding 1mL test tube vials, aspirating from 10mm above the bottom of source tubes and dispensing 20mm above the bottom of destination vials, with blow-out and touch-tip for each transfer using a P300 single-channel pipette",
+  "config": {
+    "labware": {
+      "tips": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "mnt300": {
+        "model": "p300_single",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "6b8c90.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "48 MCT to 1mL Vial",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_single",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

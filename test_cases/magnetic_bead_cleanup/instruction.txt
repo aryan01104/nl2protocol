@@ -1,0 +1,18 @@
+Perform magnetic bead DNA cleanup on 24 samples in column 1-3 of the sample plate:
+
+Setup: Reservoir A1 contains magnetic beads, A2 contains 80% ethanol, A3 contains elution buffer. The sample plate with DNA samples should be placed on the magnetic module.
+
+Protocol:
+1. Add 50uL of magnetic beads from reservoir A1 to each sample well (A1-H3), mix 10 times at 100uL to resuspend beads thoroughly
+2. Pause for 5 minutes to allow DNA binding
+3. Engage magnets and pause for 3 minutes to pellet beads
+4. Carefully aspirate and discard 140uL of supernatant from each well, aspirating slowly from the side opposite the magnets
+5. First ethanol wash: Add 200uL of 80% ethanol from reservoir A2 to each well. Wait 30 seconds, then remove ethanol.
+6. Second ethanol wash: Repeat step 5 with fresh ethanol
+7. Pause for 5 minutes with magnets engaged to air-dry beads (do not over-dry)
+8. Disengage magnets
+9. Add 30uL of elution buffer from reservoir A3 to each well, mix 10 times to resuspend beads
+10. Engage magnets and pause 2 minutes
+11. Transfer 25uL of eluate (containing purified DNA) to the elution plate in corresponding positions, being careful not to disturb the bead pellet
+
+Use fresh tips for adding clean reagents. Reuse tips within the same sample for waste removal steps.

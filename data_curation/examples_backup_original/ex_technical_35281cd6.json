@@ -1,0 +1,143 @@
+{
+  "id": "ex_technical_35281cd6",
+  "intent": "Execute a CSV-guided liquid handling protocol to prepare custom emulsions by dispensing aqueous solutions from 50mL falcon tubes in slot 10 followed by oil phases from tubes in slot 11 into VP Scientific 2000\u00b5L 48-well plates across slots 7-8-9. Use P300 single-channel pipette for volumes <300\u00b5L and P1000 for larger volumes, implementing liquid height tracking with touch-tip and 2-second delay after each aspiration, dispensing 3mm below well surface with blow-out.",
+  "config": {
+    "labware": {
+      "aq_rack": {
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "slot": "10"
+      },
+      "oil_rack": {
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "03f9cd.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom Emulsions via CSV File",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "label": "aq_rack"
+      },
+      {
+        "slot": "11",
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "label": "oil_rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------------ADDING AQUEOUS TO PLATES---------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------------ADDING OIL TO PLATES---------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

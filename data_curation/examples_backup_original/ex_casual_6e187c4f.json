@@ -1,0 +1,119 @@
+{
+  "id": "ex_casual_6e187c4f",
+  "intent": "Add 8 microliters of master mix to specific columns in two PCR plates for COVID testing, keeping everything at the right temperature and pausing between plates to refill the master mix if needed",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "reservoir_type",
+        "slot": "Master Mix Reservoir"
+      },
+      "Plate 1": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "11"
+      },
+      "Plate 2": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "04eeb1-part-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina COVIDSeq Test: Synthesize First Strand cDNA",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "Master Mix Reservoir",
+        "load_name": "reservoir_type",
+        "label": "reservoir"
+      },
+      {
+        "slot": "11",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Plate 1"
+      },
+      {
+        "slot": "8",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Plate 2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": "temperature"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "m20",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "includeCols"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please refill the master mix before continuing to Plate 2.\n                Click Resume when ready."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "m20",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "includeCols"
+      }
+    ]
+  }
+}

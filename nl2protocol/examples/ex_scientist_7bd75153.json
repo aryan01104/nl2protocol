@@ -1,0 +1,247 @@
+{
+  "id": "ex_technical_7bd75153",
+  "source_file": "111210-part-7.ot2.apiv2.py",
+  "intent_precise": "111210-part-7.ot2.apiv2: Using tc_plate (pcr_plate, slot 3), temp_plate (labware, slot 5), pcr_tubes (labware, slot 2). With thermocycler module, temperature module. (1) Pause: Please replace the empty tip racks! (2) Set temperature to 4\u00b0C. (3) Pause: Temperature Module has been cooled to 4\u00b0C.\n              Please place your samples and reagents on the\n              temperature module. (4) Transfer 11\u00b5L from source to destination. (5) Mix 7 times at 10\u00b5L. (6) Transfer 11\u00b5L from source to destination. (7) Mix 7 times at 10\u00b5L. (8) Pause: Centrifuge tubes as needed and return them to the\n                 aluminum block. (9) Open thermocycler lid. (10) Transfer 20\u00b5L from source to destination. (11) Transfer 20\u00b5L from source to destination. (12) Operate thermocycler. (13) Set temperature to 95\u00b0C. (14) Run thermocycler profile for 8 cycles. (15) Set temperature to 72\u00b0C. (16) Set temperature to 4\u00b0C. (17) Set temperature to 4\u00b0C. (18) Open thermocycler lid.",
+  "intent_concise": "Perform temperature control (4\u00b0C, 72\u00b0C, 95\u00b0C), thermocycling. (volumes 10\u00b5L-20\u00b5L)",
+  "intent": "For protocol 111210-part-7, set up your workstation with the PCR plate in slot 3, temperature module with labware in slot 5, and PCR tubes in slot 2, then replace the tip racks and cool the temperature module to 4\u00b0C before placing your samples and reagents on it. Transfer 11\u00b5L from source to destination twice, mixing 7 times at 10\u00b5L after each transfer, then centrifuge the tubes and return them to the aluminum block. Open the thermocycler lid and transfer 20\u00b5L from source to destination twice, then run the thermocycler through its profile: start at 95\u00b0C, run 8 cycles, hold at 72\u00b0C, cool to 4\u00b0C twice, and finally open the lid when complete.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "111210-part-7.ot2.apiv2",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tipracks_20ul"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "label": "temp_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "pcr_tubes"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tipracks_20ul"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "2",
+        "label": "tc_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the empty tip racks!"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pre-Cooling Temperature Module to 4\u00b0C"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Temperature Module has been cooled to 4\u00b0C.\n              Please place your samples and reagents on the\n              temperature module."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 10.6
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 10.6
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 7,
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 10.6
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 10.6
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 7,
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Centrifuge tubes as needed and return them to the\n                 aluminum block."
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc_mod",
+        "celsius": 103
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 95,
+        "hold_time_minutes": 15
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc_mod",
+        "steps": "profile",
+        "repetitions": 8
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 72,
+        "hold_time_minutes": 5
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4,
+        "hold_time_minutes": 5
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol Complete!"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tipracks_20ul": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "6"
+      },
+      "tc_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "3"
+      },
+      "temp_plate": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_screwcap",
+        "slot": "5"
+      },
+      "pcr_tubes": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": [
+          "tipracks_20ul"
+        ]
+      }
+    },
+    "modules": {
+      "tc_mod": {
+        "module_type": "thermocycler",
+        "slot": "2"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  }
+}

@@ -1,0 +1,405 @@
+{
+  "id": "ex_technical_d56b09dc",
+  "intent": "Execute PCR amplification setup by transferring 10\u00b5L Twist UDI adapters from cold plate to magnetic plate wells, add 25\u00b5L KAPA HiFi HotStart ReadyMix with mixing, perform thermocycling, then execute magnetic bead purification with 50\u00b5L bead addition, dual ethanol washes at 200\u00b5L each, elute in 22\u00b5L buffer, and transfer final 20\u00b5L purified product to PCR plate",
+  "config": {
+    "labware": {
+      "pcr_plate": {
+        "load_name": "pcr_plate_type",
+        "slot": "1"
+      },
+      "rsvr": {
+        "load_name": "res_type",
+        "slot": "8"
+      },
+      "kapa_labware": {
+        "load_name": "mm_labware_type",
+        "slot": "5"
+      },
+      "Twist UDI Plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "4"
+      },
+      "twist_udi": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "Twist UDI Plate"
+      },
+      "magplate": {
+        "load_name": "mag_plate_type",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20name",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300name",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "cold_mod",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "mag_version",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "21e4d8-pt3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Twist Library Prep || Part 3: PCR Amplification",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "pcr_plate_type",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "res_type",
+        "label": "rsvr"
+      },
+      {
+        "slot": "5",
+        "load_name": "mm_labware_type",
+        "label": "kapa_labware"
+      },
+      {
+        "slot": "4",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Twist UDI Plate"
+      },
+      {
+        "slot": "Twist UDI Plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "twist_udi"
+      },
+      {
+        "slot": "8",
+        "load_name": "mag_plate_type",
+        "label": "magplate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20name",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300name",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "cold_mod",
+        "slot": "4",
+        "label": "temp_mod"
+      },
+      {
+        "module_type": "mag_version",
+        "slot": "10",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_times",
+        "volume": ""
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "Twist Adapters",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "p20mag",
+        "mix_before": "p20"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "KAPA HiFi HotStart ReadyMix",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "p300mag",
+        "mix_before": "p300"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 50uL of Magbeads, mixing, & transferring..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 90
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 5 minutes at room temperature..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating with magnetic engaged for 1 minute..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing supernatant..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding ethanol..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 1 minute..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Air drying for 5 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 22uL of elution buffer..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 5,
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 2 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 3 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 20uL of elution to PCR plate..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

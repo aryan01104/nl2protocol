@@ -1,0 +1,27 @@
+Set up a cell viability assay testing 6 drug compounds at 8 concentrations each:
+
+Setup:
+- Drug plate contains pre-prepared 8-point dose-response dilutions for 6 drugs:
+  * Drug 1 in column 1 (A1-H1, highest to lowest concentration)
+  * Drug 2 in column 2, Drug 3 in column 3, etc. through Drug 6 in column 6
+- Cell plate contains adherent cells at 80% confluency with 100uL media per well
+- Reservoir A1 contains fresh complete media
+- Reservoir A2 contains MTT reagent (3mg/mL)
+- Reservoir A3 contains DMSO solubilization solution
+
+Protocol:
+1. Transfer 10uL of each drug dilution from drug plate to cell plate in triplicate:
+   - Drug 1 (column 1 of drug plate) goes to columns 1, 2, 3 of cell plate
+   - Drug 2 (column 2 of drug plate) goes to columns 4, 5, 6 of cell plate
+   - Continue pattern: each drug tested in 3 adjacent columns
+   - Use new tip for each drug compound, but same tip within a compound's dilutions
+2. For vehicle controls: Add 10uL fresh media to column 11 and 12 (rows A-H) of cell plate
+3. Mix all treated wells gently 3 times at 50uL
+4. Pause protocol - user removes plate for 24-hour incubation at 37°C, 5% CO2
+5. Comment: "After incubation, return plate to deck and resume protocol"
+6. Add 20uL MTT reagent to all wells (columns 1-12, rows A-H)
+7. Pause for 4 hours MTT incubation (cells reduce MTT to formazan)
+8. Carefully aspirate 100uL of media from each well without disturbing the cell layer
+9. Add 100uL DMSO to each well to solubilize formazan crystals
+10. Mix each well 5 times at 80uL to ensure complete solubilization
+11. Pause - user transfers plate to plate reader for absorbance measurement at 570nm

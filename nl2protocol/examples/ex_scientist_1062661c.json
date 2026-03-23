@@ -1,0 +1,92 @@
+{
+  "id": "ex_technical_1062661c",
+  "source_file": "9ot019.ot2.apiv2.py",
+  "intent_precise": "Glycerol Stock: Using plate (labware, slot next), glycerol_reservoir (plate, slot next).",
+  "intent_concise": "Execute 6-step liquid handling protocol. (using 500\u00b5L)",
+  "intent": "Take the labware plate from the next slot and set up your glycerol reservoir plate in the following slot. You'll be preparing glycerol stocks using these two plates as your source materials. Make sure both plates are properly positioned and accessible before starting the glycerol stock preparation protocol.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Glycerol Stock",
+    "author": "Tim Dobbs <tim@bioartbot.org>",
+    "labware": [
+      {
+        "slot": "next",
+        "load_name": "labware_type",
+        "label": "plate"
+      },
+      {
+        "slot": "next",
+        "load_name": "glycerol_plate",
+        "label": "glycerol_reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "**CHECK BEFORE RUNNING**"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Ensure you have enough glycerol (500ul for each cryo tube)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Ensure you have matched the expected culture platemap:"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "pipette_mount",
+        "volume": 500,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "pipette_mount",
+        "volume": 500,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "labware_type",
+        "slot": "next"
+      },
+      "glycerol_reservoir": {
+        "load_name": "glycerol_plate",
+        "slot": "next"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  }
+}

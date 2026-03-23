@@ -1,0 +1,4424 @@
+{
+  "id": "ex_technical_69747fc2",
+  "intent": "Execute an IDT xGEN EZ library preparation protocol with fragmentation/end repair/A-tailing (10.5\u00b5L FRERAT reagent), adapter ligation (30\u00b5L LIG reagent), magnetic bead cleanup using AMPure beads (0.8x ratio), PCR amplification with indexed primers (5\u00b5L barcodes + 25\u00b5L PCR mastermix), followed by two sequential AMPure cleanups (0.65x and 1.2x ratios) with ethanol washes and RSB elution. Protocol includes thermocycler incubations, magnetic separation steps, and configurable sample throughput for 8-24 samples across 1-3 columns.",
+  "config": {
+    "labware": {
+      "sample_plate_mag": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "1"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "reservoir_2": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "3"
+      },
+      "tiprack_20": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "4"
+      },
+      "tiprack_200_1": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "5"
+      },
+      "tiprack_200_2": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "6"
+      },
+      "sample_plate_thermo": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "7"
+      },
+      "tiprack_200_3": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      },
+      "sample_plate_mag_11": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "11"
+      },
+      "reagent_plate_15": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "15"
+      },
+      "tiprack_20_4": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "4"
+      },
+      "tiprack_200_1_5": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "5"
+      },
+      "tiprack_200_2_6": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "6"
+      },
+      "sample_plate_thermo_20": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "20"
+      },
+      "tiprack_200_3_9": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      },
+      "p300_mount_2": {
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      "p20_mount_3": {
+        "model": "p10_multi",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    },
+    "modules": {
+      "mag_block": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_block": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "thermocycler": {
+        "module_type": "thermocycler",
+        "slot": "19"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "sci-idt-xgen-ez.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "IDT xGEN EZ",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_mag"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_1"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_2"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_thermo"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_3"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_mag"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "reservoir"
+      },
+      {
+        "slot": "15",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_1"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_2"
+      },
+      {
+        "slot": "20",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_thermo"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_3"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_multi",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      {
+        "mount": "p20_mount",
+        "model": "p10_multi",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_block"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_block"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "19",
+        "label": "thermocycler"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A DRY RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A REACTION RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "TIP REUSING"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "NO TIP REUSING"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A NO MODULE RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A MODULE RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS PROTOCOL WILL REUSE TIPS FOR WASHES"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "src_file_path"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 8 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 16 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 24 Samples"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "ERROR?"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "SETTING THERMO and TEMP BLOCK Temperature"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "thermocycler",
+        "celsius": 100
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_block",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Ready"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Fragmenting / End Repair / A-Tailing"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding FRERAT"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "FRERATMixRep",
+        "volume": "FRERATMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "FRERATMixRep",
+        "volume": "FRERATMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "FRERATVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "FRERATMixRep",
+        "volume": "FRERATMixVol"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run FRERAT (60min)"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_FRERAT",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run FRERAT (~60min)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adapter Ligation"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding Lig"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "LIGMixRep",
+        "volume": "LIGMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "LIGMixRep",
+        "volume": "LIGMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "LIGVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "LIGMixRep",
+        "volume": "LIGMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run LIG (15min)"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_LIG",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run LIG (20min)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Cleanup 1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PLACE sample_plate_mag MAGNET"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING AMPure (0.8x)"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4.2
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Repeating 2 washes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Residual ETOH"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "AIR DRY"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding RSB"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Transferring Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Amplification"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding Barcodes"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "PrimerMixRep",
+        "volume": "PrimerMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "PrimerMixRep",
+        "volume": "PrimerMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "PrimerVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "PrimerMixRep",
+        "volume": "PrimerMixVol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding PCR"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 2,
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 2,
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 2,
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run PCR (~30min)"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_1",
+        "repetitions": 1
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_2",
+        "repetitions": "PCRCYCLES"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_3",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove Seal"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PLACE sample_plate_mag MAGNET"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run PCR (~30min)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Cleanup 2"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING AMPure (0.65x)"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESET TIPS"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Repeating 2 washes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Residual ETOH"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "AIR DRY"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding RSB"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESET TIPS"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Transferring Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Cleanup 3"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING AMPure (1.2x)"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESET TIPS"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Repeating 2 washes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Residual ETOH"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "AIR DRY"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding RSB"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "RESET TIPS"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Transferring Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "TransferSup"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      }
+    ]
+  }
+}

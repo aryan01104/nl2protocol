@@ -1,0 +1,166 @@
+{
+  "id": "ex_concise_48734786",
+  "intent": "Temperature-controlled PCR prep: add mastermix and saliva samples with mixing at 4\u00b0C",
+  "config": {
+    "labware": {
+      "sample_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "pcrstripplate_96_wellplate_200ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3b0db0.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Temperature Controlled PCR Prep With Tube Strips",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "pcrstripplate_96_wellplate_200ul",
+        "label": "reagent_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 15,
+        "labware": "mastermix",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "asp_delay"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "asp_delay"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "mix_reps",
+        "volume": 15
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "asp_delay"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

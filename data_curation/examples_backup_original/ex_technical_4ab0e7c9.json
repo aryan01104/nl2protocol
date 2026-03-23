@@ -1,0 +1,130 @@
+{
+  "id": "ex_technical_4ab0e7c9",
+  "intent": "Execute rhAmpSeq library preparation PCR setup by dispensing 5\u00b5L of library mix to sample wells on magnetic module, followed by sequential addition of 2\u00b5L each of forward and reverse PCR primers to the same wells. Perform single mix after each reagent addition using p20 multichannel pipette with reduced flow rates and controlled Z-axis movement speeds.",
+  "config": {
+    "labware": {
+      "sample_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_module": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "pcr_prep1.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "rhAmpSeq Library Prep Part 1 - PCR Prep 1",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "reagent_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_module"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m20_mount",
+        "repetitions": 1,
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m20_mount",
+        "repetitions": 1,
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Protocol Complete."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Paused"
+      }
+    ]
+  }
+}

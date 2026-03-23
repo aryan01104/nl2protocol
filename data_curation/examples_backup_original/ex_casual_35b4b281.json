@@ -1,0 +1,289 @@
+{
+  "id": "ex_casual_35b4b281",
+  "intent": "Clean up DNA libraries using magnetic beads - mix beads with samples, pull them down with the magnet, wash twice with ethanol, let everything dry, then add buffer to get the clean DNA back. Finally split the cleaned samples between two plates for different uses.",
+  "config": {
+    "labware": {
+      "Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      },
+      "magplate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "Mag Plate"
+      },
+      "96-well plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "384-well plate": {
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p50mnt": {
+        "model": "p50_multi",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "19fc32.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Library Prep Clean Up",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reservoir"
+      },
+      {
+        "slot": "Mag Plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "magplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "96-well plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "label": "384-well plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p50mnt",
+        "model": "p50_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p50mnt",
+        "repetitions": 5,
+        "volume": 30
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 15,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p50mnt",
+        "repetitions": 10,
+        "volume": 40
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50mnt",
+        "volume": 25,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p50mnt",
+        "repetitions": 10,
+        "volume": 25
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p50mnt",
+        "volume": 24
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p50mnt",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p50mnt",
+        "volume": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50mnt"
+      }
+    ]
+  }
+}

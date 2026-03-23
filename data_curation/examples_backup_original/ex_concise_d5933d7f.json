@@ -1,0 +1,120 @@
+{
+  "id": "ex_concise_d5933d7f",
+  "intent": "CSV-guided buffer and sample transfers with automated liquid tracking and mixing",
+  "config": {
+    "labware": {
+      "Reservoir": {
+        "load_name": "labware_reservoir",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "6b51bd.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "6b51bd.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "labware_reservoir",
+        "label": "Reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "message"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "buffer supply is exhausted"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

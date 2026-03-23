@@ -1,0 +1,884 @@
+{
+  "id": "ex_casual_f28d73cd",
+  "intent": "Run the full Swift DNA library prep protocol automatically - it'll fragment your DNA samples, do the ligation chemistry, clean everything up with magnetic beads and ethanol washes, add the indexing primers, run PCR amplification, then do a final cleanup. The robot handles all the temperature cycling, magnetic separations, and liquid transfers. You just need to load your samples and reagents, and it spits out ready-to-sequence libraries.",
+  "config": {
+    "labware": {
+      "rt_reagents": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "3"
+      },
+      "cool_reagents": {
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "slot": "5"
+      },
+      "reaction_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "pip_type",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300gen",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magmod",
+        "slot": "1"
+      },
+      "tempdeck": {
+        "module_type": "Temperature Module",
+        "slot": "3"
+      },
+      "thermocycler": {
+        "module_type": "thermocycler",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "swift-2s-turbo-fully-automated.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Swift 2S Turbo DNA Library Kit Protocol: Fully Automated",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "rt_reagents"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "label": "cool_reagents"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "reaction_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "pip_type",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300gen",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magmod",
+        "slot": "1",
+        "label": "magdeck"
+      },
+      {
+        "module_type": "Temperature Module",
+        "slot": "3",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "6",
+        "label": "thermocycler"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "s_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 2,
+        "volume": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "thermocycler",
+        "celsius": 70
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 32,
+        "hold_time_minutes": "f_time"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 65,
+        "hold_time_minutes": 30
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": "s_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 2,
+        "volume": "s_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 20,
+        "hold_time_minutes": 20
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 200
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 48
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 48
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 80
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Engaging Magnetic Module and incubating for 6 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 6
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 108
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 108
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 210
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 15
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 190
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 210
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 30
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Letting beads dry for 30 seconds."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 30
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 2 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Engaging Magnetic Module and incubating for 6 minutes."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 6
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "You selected \"No\" to automated indexing. Please add         indices to samples. When ready to continue, click RESUME."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 6,
+        "volume": "s_vol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": "s_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": "plate_temp"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "thermocycler",
+        "celsius": 105
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": ""
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "cycled_steps",
+        "repetitions": "cycles"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": "plate_temp"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 5,
+        "volume": 60
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 32.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 32.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 60
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 82.5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 82.5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 180
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 15
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 190
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 210
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 30
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 4 minutes,     then engaging Magnetic Module."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 22
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Swift 2S Turbo DNA Library Kit completed.     Store freshly prepared libraries at 4C (-20C for long term),     or proceed to quantification."
+      }
+    ]
+  }
+}

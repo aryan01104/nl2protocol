@@ -1,0 +1,530 @@
+{
+  "id": "ex_technical_7fcbcaa2",
+  "intent": "Execute NEBNext Ultra II Directional RNA Library Prep part 2: perform first strand cDNA synthesis by adding 8\u00b5L strand specificity reagent and 2\u00b5L first strand enzyme mix to 10\u00b5L fragmented RNA samples, incubate off-deck (25\u00b0C/10min, 42\u00b0C/15min, 70\u00b0C/15min). Proceed with second strand synthesis by adding 8\u00b5L reaction buffer, 4\u00b5L enzyme mix, and 48\u00b5L nuclease-free water, incubate at 16\u00b0C for 1 hour. Complete with magnetic bead cleanup using 72\u00b5L beads per 40\u00b5L sample aliquot, perform two 100\u00b5L 80% ethanol washes, air dry, elute in 26.5\u00b5L 0.1x TE buffer, and combine eluates into final plate.",
+  "config": {
+    "labware": {
+      "Reagent Reservoir": {
+        "load_name": "labware_reservoir",
+        "slot": "1"
+      },
+      "mag_plate": {
+        "load_name": "labware_pcr_plate",
+        "slot": "Mag Plate"
+      },
+      "reagent_block": {
+        "load_name": "labware_tube_strip",
+        "slot": "4 Degree Block"
+      },
+      "RNA Sample Plate on Chilled Aluminum Block": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "7"
+      },
+      "Elution Plate": {
+        "load_name": "labware_pcr_plate",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "4"
+      },
+      "temp": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "7805de-part-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "7805de-part-2.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "labware_reservoir",
+        "label": "Reagent Reservoir"
+      },
+      {
+        "slot": "Mag Plate",
+        "load_name": "labware_pcr_plate",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "4 Degree Block",
+        "load_name": "labware_tube_strip",
+        "label": "reagent_block"
+      },
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "RNA Sample Plate on Chilled Aluminum Block"
+      },
+      {
+        "slot": "8",
+        "load_name": "labware_pcr_plate",
+        "label": "Elution Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "message"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "volume"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    reagent reservoir in deck slot 1:\n    col 1 - beads\n    col 2 - freshly prepared 80 percent ethanol\n    col 4 - 0.1x TE\n    col 10 - waste\n    col 11 - waste\n    col 12 - waste\n    "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    mag plate on magnetic module\n    "
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    reagent block for tube strips on 4 degree temperature module\n    "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    elution plate in deck slot 8\n    "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    First strand cDNA synthesis:\n    add strand specificity reagent\n    add first strand synthesis enzyme mix\n    mix\n    "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 8,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 2,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          10
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    Second strand cDNA synthesis:\n    add second strand reaction buffer\n    add second strand enzyme mix\n    add nuclease-free water\n    mix\n    "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 8,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 4,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 48,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          40
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    bead clean up of double-stranded cDNA\n    move half the cDNA volume to a second well\n    "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    add beads and mix, wait\n\n    liquid handling method for beads:\n    slow flow rate for aspiration and dispense\n    wait for liquid to finish moving after aspiration and dispense\n    withdraw tip slowly from liquid\n    "
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 55
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "engage_offset"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    remove sup\n\n    add 80 percent ethanol\n    remove sup\n    repeat\n\n    liquid handling method for ethanol:\n    prewet tips\n    15 ul air gap\n    dispense from top\n    repeated delayed blowout\n    increased blow out flow rate\n    "
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 62
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 127
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 115
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 115
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    air dry beads\n    "
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    add TE and mix\n    "
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 26.5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          10,
+          15
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n    combine eluates and transfer to elution plate\n    "
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

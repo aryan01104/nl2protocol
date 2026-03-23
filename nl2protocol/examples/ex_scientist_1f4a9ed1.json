@@ -1,0 +1,130 @@
+{
+  "id": "ex_technical_1f4a9ed1",
+  "source_file": "pcr.ot2.apiv2.py",
+  "intent_precise": "PCR Prep: Using reservoir (reservoir, slot 2), sample plate (labware, slot 3). With temperature module. (1) Set temperature to 4\u00b0C. (2) Pause for incubation. (3) Transfer from source to destination. (4) Transfer from source to destination. (5) Mix reps_mix times at 10\u00b5L. (6) Pause for manual intervention.",
+  "intent_concise": "Perform temperature control (4\u00b0C). (using 10\u00b5L)",
+  "intent": "For the PCR Prep protocol, start by setting up your temperature module at 4\u00b0C and let it equilibrate during the pause. You'll be working with the reservoir in slot 2 and the sample plate in slot 3, so go ahead and transfer your reagents from source to destination twice as specified. Once that's done, mix everything thoroughly by pipetting up and down reps_mix times using 10\u00b5L volumes, then pause for any manual adjustments you need to make before proceeding.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "PCR Prep",
+    "author": "Krishna <krishna.soma@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "sample plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_mm"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "reps_mix",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "sample plate": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "1"
+      }
+    }
+  }
+}

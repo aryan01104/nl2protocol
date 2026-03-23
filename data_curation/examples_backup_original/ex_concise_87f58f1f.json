@@ -1,0 +1,104 @@
+{
+  "id": "ex_concise_87f58f1f",
+  "intent": "Distribute SPR (350\u00b5L), VHB (350\u00b5L), and water (50\u00b5L) from reservoirs to row A of three separate 96-deep well plates",
+  "config": {
+    "labware": {
+      "spr_well": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "4"
+      },
+      "vhb_well": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "5"
+      },
+      "water_well": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      },
+      "spr_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "7"
+      },
+      "vhb_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "8"
+      },
+      "water_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "mount_m300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "3308b4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR/qPCR Prep",
+    "author": "Opentrons",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "spr_well"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "vhb_well"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "water_well"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "spr_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "vhb_plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "water_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_m300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount_m300",
+        "volume": "volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      }
+    ]
+  }
+}

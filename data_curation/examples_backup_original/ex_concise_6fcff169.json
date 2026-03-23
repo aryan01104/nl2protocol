@@ -1,0 +1,58 @@
+{
+  "id": "ex_concise_6fcff169",
+  "intent": "Pool 20\u00b5L samples from multiple plate wells into single collection tube",
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "315118.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "mock pooling",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      }
+    ]
+  }
+}

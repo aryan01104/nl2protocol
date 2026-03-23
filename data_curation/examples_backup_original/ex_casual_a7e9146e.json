@@ -1,0 +1,389 @@
+{
+  "id": "ex_casual_a7e9146e",
+  "intent": "Run a viral RNA/DNA extraction protocol - basically add protease and lysis buffer to samples, mix them up, incubate for 10 minutes, add alcohol, wash the columns three times with some centrifuge steps in between, elute the nucleic acids with water, then spread small amounts across a 384-well plate for analysis.",
+  "config": {
+    "labware": {
+      "Sample Tube Rack": {
+        "load_name": "opentrons_15_tuberack_8000ul",
+        "slot": "1"
+      },
+      "Final tube rack": {
+        "load_name": "binding_column_tuberack",
+        "slot": "2"
+      },
+      "Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      },
+      "final_plate_384": {
+        "load_name": "filtrouslab_384_wellplate_50ul",
+        "slot": "8"
+      },
+      "tiprack1000": {
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack1000"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "45a320.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "ReliaPrep\u2122 Viral TNA Miniprep System, Custom Workflow",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_15_tuberack_8000ul",
+        "label": "Sample Tube Rack"
+      },
+      {
+        "slot": "2",
+        "load_name": "binding_column_tuberack",
+        "label": "Final tube rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reservoir"
+      },
+      {
+        "slot": "8",
+        "load_name": "filtrouslab_384_wellplate_50ul",
+        "label": "final_plate_384"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "label": "tiprack1000"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tiprack1000"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Pro-K to Tube Rack\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Sample to Tube Rack\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Cell Lysis Buffer to Tube Rack\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p1000_mount",
+        "repetitions": 12,
+        "volume": 380
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nIncubating and Adding Isopropanol\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n              Incubation complete. Please ensure empty tubes have binding\n              columns prepped."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Isopropanol to Tube Rack, then Binding Column\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 250
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 250
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p1000_mount",
+        "repetitions": 12,
+        "volume": 600
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 670
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 670
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n            Centrifuge samples with binding columns for 1 minute at 15000 RPM.\n            Remove the binding column/collection tube from the centrifuge.\n            Discard the collection tube containing flowthrough.\n            Place the binding column into a new collection tube.\n            Select \"Resume\" on the Opentrons App to continue.\n            "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n3 Washes\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 500
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 500
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n                Recap samples, centrifuge for approximately 1 minute at\n                approximately 15000 RPM. Discard the collection tube\n                containing the flowthrough and place the column into a new\n                collection tube. Place back on the tube rack\n                and select \"Resume\".\n                "
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n            Please ensure that empty tubes are on the even columns of the final\n            tube rack on Slot 2. Select \"Resume\" on the Opentrons App for\n            100ul of Nuclease free water to be added to these empty tubes\n            on the odd number columns of the tube rack.\n            "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Water to Tube Rack\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n            Place binding column in tubes populated with nuclease free water.\n            Select \"Resume\" on the Opentrons App for 100ul of Nuclease free\n            water to be added to these binding column tubes on the odd number\n            columns of the tube rack.\n             "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nAdding Water to Tube Rack\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n            Centrifuge tubes for approximately 1 minute at 1500 RPM.\n            Be careful with the 1.5 ml tube caps.\n            Point the cap toward the bottom of the centrifuge.\n             "
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 4
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      }
+    ]
+  }
+}

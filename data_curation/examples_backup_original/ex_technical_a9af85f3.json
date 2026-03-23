@@ -1,0 +1,283 @@
+{
+  "id": "ex_technical_a9af85f3",
+  "intent": "Execute a Luminex immunoassay protocol transferring 50\u00b5L magnetic beads from reservoir well A1 to all columns of two 96-well plates, then transfer 200\u00b5L samples from 24-well source plates distributing 100\u00b5L to duplicate wells, followed by dispensing specified volumes of antibodies and SA-PE reagent to all plate columns with incubation pauses between each transfer step",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "0e7175-pt2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Luminex Assay Bead and Antibody Transfer",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount",
+        "labware": "full_tips",
+        "well": "A1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount",
+        "labware": "alternate_tips",
+        "well": "A1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------Transferring Beads----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate sample then select \"Resume\" on the Opentrons App."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------Transferring Sample----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 200,
+        "labware": "source_col_set",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace alternate tip rack on slot 11,\n                            then select \"Resume\" on the Opentrons App."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate sample then select \"Resume\" on the Opentrons App."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------Transferring Antibodies----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "antibody_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "antibody_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate sample then select \"Resume\" on the Opentrons App."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n---------------Transferring SA-PE----------------\n\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "sape_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": "sape_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

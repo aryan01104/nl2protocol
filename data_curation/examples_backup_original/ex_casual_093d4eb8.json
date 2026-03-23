@@ -1,0 +1,177 @@
+{
+  "id": "ex_casual_093d4eb8",
+  "intent": "Set up a compound dilution series across two plates using DMSO. Add DMSO to most wells, put your compound stock in the first column, then do serial dilutions going across both plates - transferring some solution from each column to the next and mixing well each time to get a nice concentration gradient.",
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": null,
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "056f47.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "DMSO and Compound Stock Solution Addition - Part 2",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": null,
+        "label": "plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "dmso_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "dmso_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "dmso_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "dmso_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nTransferring Compound \n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "compound_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "dilution_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 6,
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "dilution_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 6,
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "dilution_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 6,
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\n\n\n\n\n"
+      }
+    ]
+  }
+}

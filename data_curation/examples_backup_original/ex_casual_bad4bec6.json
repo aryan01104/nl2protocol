@@ -1,0 +1,359 @@
+{
+  "id": "ex_casual_bad4bec6",
+  "intent": "Extract viral DNA/RNA from swab samples using magnetic beads - basically add lysis buffer to break open cells, mix with magnetic beads to capture nucleic acids, wash with ethanol a couple times while using the magnet to pull beads to one side, then elute the clean DNA/RNA and set up PCR reactions",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "supernat": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      },
+      "ethanol": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "10"
+      },
+      "mastermix_tubes": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "7"
+      },
+      "pcr_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "8"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_deck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "5f7d18.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Viral Nucleic Acid Isolation from Oral and Nasal swabs",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "supernat"
+      },
+      {
+        "slot": "10",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "ethanol"
+      },
+      {
+        "slot": "7",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "mastermix_tubes"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_deck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace all 200 ul tip racks on Slots 3, 6, and 9"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please empty tips from waste before resuming."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING MAGBIO CTL MEDIUM ---------\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 290,
+        "source_labware": "lysis_buffer",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "samp_and_lys_rep",
+        "volume": 200
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING BINDING BUFFER ---------\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 510,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "incubate_bind_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- RESUSPEND MAG-S1 BEADS BEFORE ENGAGE ---------\n"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "shake_well",
+        "volume": 200
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ENGAGE MAGDECK WITH 2 ETHANOL WASHES ---------\n"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "mag_engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- REMOVING SUPERNATANT ---------\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING ETHANOL ---------\n"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 500,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_dry_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING NUCLEASE-FREE WATER ---------\n"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "nuc_free_water_vol_well",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 15,
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "bead_dry_time_nuc_water"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "mag_engage_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING MASTERMIX TO PCR PLATE ---------\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n--------- ADDING ELUATE TO PCR PLATE ---------\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 2,
+        "volume": 15
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      }
+    ]
+  }
+}

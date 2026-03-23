@@ -1,0 +1,147 @@
+{
+  "id": "ex_technical_cba12f02",
+  "intent": "Execute a two-step cell treatment procedure on up to 4 Corning 96-well plates: First, aspirate 132\u00b5L supernatant from each well at 0.2mm from bottom using slow aspiration rate (0.2x), dispensing to waste reservoir. Second, transfer 100\u00b5L treatment compounds from corresponding treatment plates to cell plates with 20\u00b5L air gap, dispensing 4mm below meniscus at 0.3x rate, followed by blowout and touch tip.",
+  "config": {
+    "labware": {
+      "waste": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "9"
+      },
+      "tiprack_refill": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "3"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "6"
+      },
+      "working_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "PLATE_SLOT:A1"
+      },
+      "treat_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "TREAT_PLATE_SLOT:A1"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "sci-lucif-assay3-for4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Luciferase Reporter Assay for NF-kB Activation (up to 4 plates) - Protocol 3: Treatment",
+    "author": "Boren Lin, Opentrons",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack_refill"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack"
+      },
+      {
+        "slot": "PLATE_SLOT:A1",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "working_plate"
+      },
+      {
+        "slot": "TREAT_PLATE_SLOT:A1",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "treat_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~REMOVE SUPERNATANT~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~TREAT CELLS~~~~~~~~\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place a New Full Tipbox on Slot 3"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount",
+        "labware": "tips_refill_loc",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "TREATMENT_VOL"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "id": "ex_technical_d9e506cb",
+  "intent": "Execute magnetic bead-based nucleic acid extraction protocol: Add 20\u00b5L magnetic beads to samples with 10x mixing at 30\u00b5L volume, incubate 5 minutes without magnet then 3 minutes with magnet engaged at 13.7mm height, remove 60\u00b5L supernatant, perform two sequential ethanol washes with 150\u00b5L each followed by 1-minute incubations and aspiration, air dry for 5 minutes, add 50\u00b5L elution buffer with 10x mixing at 40\u00b5L volume, engage magnet for 5 minutes, then transfer final 50\u00b5L eluate to clean plate",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "axygen_96_wellplate_300ul",
+        "slot": "2"
+      },
+      "elutionplate": {
+        "load_name": "axygen_96_wellplate_300ul",
+        "slot": "3"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "p300mnt": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "245eb2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Nucleic Acid Extraction",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "axygen_96_wellplate_300ul",
+        "label": "magplate"
+      },
+      {
+        "slot": "3",
+        "load_name": "axygen_96_wellplate_300ul",
+        "label": "elutionplate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "6",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 20ul of magbeads to samples..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 20
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300mnt",
+        "repetitions": 10,
+        "volume": 30
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 5 minutes (no magnet)..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "magheight"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 3 minutes (mag engaged)..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing supernatant..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 60
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt",
+        "labware": "tiprack",
+        "well": "0"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 1 minute (mag engaged)..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing supernatant..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Beginning ethanol wash 1..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Beginning ethanol wash 2..."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Air drying for 5 minutes..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding elution buffer..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 50
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300mnt",
+        "repetitions": 10,
+        "volume": 40
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "magheight"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 5 minutes (mag engaged)..."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

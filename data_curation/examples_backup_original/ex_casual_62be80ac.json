@@ -1,0 +1,328 @@
+{
+  "id": "ex_casual_62be80ac",
+  "intent": "Set up adapter ligation by adding the mix to samples, move everything to the magnetic plate, add cleanup beads and mix well, use the magnet to pull down beads and remove the liquid on top, wash the beads twice with buffer, get rid of any leftover liquid, add elution buffer and let it sit for 10 minutes, then collect the final clean DNA library into a fresh plate",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "thermofisher_96_midi_storage_plate_800ul",
+        "slot": "2"
+      },
+      "temp_rack": {
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "slot": "4"
+      },
+      "sample_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      },
+      "tipsracks_single": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipsracks_single"
+        ]
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "516336-part-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ligation Sequencing Kit: Adapter Ligation and Clean-Up",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "thermofisher_96_midi_storage_plate_800ul",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_aluminumblock_generic_2ml_screwcap",
+        "label": "temp_rack"
+      },
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tipsracks_single"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tipsracks_single"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_mod",
+        "height": "mag_engage_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "delay_mins"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          30
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_before": [
+          3,
+          40
+        ],
+        "mix_after": [
+          3,
+          50
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate on Hula Mixer for 5 minutes and spin down the samples.\n                 Then place back on the magnet and click resume."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 250
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 250
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Spin down and place samples back on the maget.\n              Then click resume."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "m300_mount",
+        "volume": 15,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          3,
+          15
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace old BioRad PCR plate with new BioRad PCR plate for\n              storing the new DNA library."
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "deactivate",
+        "module": "temp_mod"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_mod"
+      }
+    ]
+  }
+}

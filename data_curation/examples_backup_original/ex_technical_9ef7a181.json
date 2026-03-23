@@ -1,0 +1,60 @@
+{
+  "id": "ex_technical_9ef7a181",
+  "intent": "Using a P20 multichannel pipette, transfer 20\u00b5L from each column of a 96-well BioRad aluminum block plate to designated wells in a PCR strip tube. Process samples in two batches: transfer from columns 1-6 to PCR strip well A1, and from columns 7-12 to PCR strip well A2. Handle up to 96 samples organized in 8-sample columns.",
+  "config": {
+    "labware": {
+      "biorad_96_well": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "4"
+      },
+      "pcr_strip": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "7e4c3e-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "7e4c3e-2.ot2.apiv2",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "biorad_96_well"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "pcr_strip"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

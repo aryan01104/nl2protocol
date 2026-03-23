@@ -1,0 +1,148 @@
+{
+  "id": "ex_casual_481e0a06",
+  "intent": "Run the first part of plant DNA extraction - add lysis buffer to samples, heat them up for 10 minutes, add precipitation solution and put on ice for a bit with some mixing, then move the clear liquid on top to clean plates",
+  "config": {
+    "labware": {
+      "res_lysis": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "4"
+      },
+      "res_precip": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "49de51-pt1.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "MagMAX Plant DNA Isolation Kit [1/2]",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "res_lysis"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res_precip"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 590uL of buffer to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 196
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 196
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please remove plate for 10min incubation @ 65C. When ready     return plate(s) to deck and click RESUME"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 130uL of precipitation to solution to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please remove plate(s), invert 2-3 times, and incubate on     ice for 5 minutes. When ready to continue, place plates back on deck and     click RESUME"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 400uL of supernatant to deep well plates"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete. Store samples or move to DNA     purification"
+      }
+    ]
+  }
+}

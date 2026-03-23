@@ -1,0 +1,122 @@
+{
+  "id": "ex_concise_5a6b0ede",
+  "intent": "CSV-guided water and DNA transfers to PCR plate wells",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "ek_scientific_reservoir",
+        "slot": "6"
+      },
+      "pcr_plate": {
+        "load_name": "vwrpcr_96_wellplate_200ul",
+        "slot": "8"
+      },
+      "tiprack_300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "9"
+      },
+      "dna_stock": {
+        "load_name": "vwr_square_96_microplate_2000ul",
+        "slot": "10"
+      },
+      "tiprack_10": {
+        "load_name": "geb_96_tiprack_10ul",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "p10_mount": {
+        "model": "p10_single",
+        "tipracks": [
+          "tiprack_10"
+        ]
+      },
+      "p300_mount": {
+        "model": "p300_single",
+        "tipracks": [
+          "tiprack_300"
+        ]
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "0add76.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "DNA and Water Transfer with CSV File",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "6",
+        "load_name": "ek_scientific_reservoir",
+        "label": "reservoir"
+      },
+      {
+        "slot": "8",
+        "load_name": "vwrpcr_96_wellplate_200ul",
+        "label": "pcr_plate"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack_300"
+      },
+      {
+        "slot": "10",
+        "load_name": "vwr_square_96_microplate_2000ul",
+        "label": "dna_stock"
+      },
+      {
+        "slot": "11",
+        "load_name": "geb_96_tiprack_10ul",
+        "label": "tiprack_10"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p10_mount",
+        "model": "p10_single",
+        "tipracks": [
+          "tiprack_10"
+        ]
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single",
+        "tipracks": [
+          "tiprack_300"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": "vol_water",
+        "source_labware": "reservoir",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p10_mount",
+        "volume": "vol_dna",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

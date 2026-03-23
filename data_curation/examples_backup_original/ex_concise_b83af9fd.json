@@ -1,0 +1,109 @@
+{
+  "id": "ex_concise_b83af9fd",
+  "intent": "CSV-guided normalization with RSB buffer, sample transfer with mixing, then pool 5\u00b5L aliquots",
+  "config": {
+    "labware": {
+      "sample plate": {
+        "load_name": "eppendorfmetaladapter_96_wellplate_200ul",
+        "slot": "5"
+      },
+      "normalization plate": {
+        "load_name": "eppendorfmetaladapter_96_wellplate_200ul",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "pooling.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Normalization and Pooling",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "eppendorfmetaladapter_96_wellplate_200ul",
+        "label": "sample plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "eppendorfmetaladapter_96_wellplate_200ul",
+        "label": "normalization plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          5,
+          10
+        ]
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      }
+    ]
+  }
+}

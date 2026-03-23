@@ -1,0 +1,178 @@
+{
+  "id": "ex_technical_80ed5534",
+  "intent": "Execute a CSV-driven liquid handling protocol to dispense media and multiple drug compounds across up to 6 x 96-well plates. First, distribute variable volumes of media (0-300\u00b5L) from 50mL tubes using P20 and P300 pipettes with dynamic volume tracking. Subsequently, transfer drug compounds (5-50\u00b5L each) from up to 36 source tubes in 15mL racks to destination wells according to CSV specifications. Implement height tracking for all source vessels, automated tip management, and pause protocols for tube replacement when volumes drop below threshold levels.",
+  "config": {
+    "labware": {
+      "tuberack_15_50": {
+        "load_name": "tuberack_mixed_lname",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "017860.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "CSV Plate Filling - Upgrade for OT2",
+    "author": "Nick & Eskil (update) <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "8",
+        "load_name": "tuberack_mixed_lname",
+        "label": "tuberack_15_50"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace two 50ml media tubes filled to 50ml line before resuming."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nBeginning media transfer\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "v"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "v"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nBeginning antibiotic transfers\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "disp_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      }
+    ]
+  }
+}

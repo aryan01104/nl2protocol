@@ -1,0 +1,146 @@
+{
+  "id": "ex_technical_c4394f43",
+  "intent": "Execute a Standard Biotools Dynamic Array 96.96 loading protocol: aspirate 4.1\u00b5L and dispense 4.0\u00b5L from assay plate wells to IFC assay inlets using multichannel P20, then transfer samples from sample plate to IFC sample inlets, processing in 6-well chunks with variable pipetting speeds (normal 1.0x, slow 0.66x, slowest 0.1x) and delay periods of 0.5s aspiration/1.0s dispense",
+  "config": {
+    "labware": {
+      "AssayPlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "4"
+      },
+      "SamplePlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "5"
+      },
+      "IFC": {
+        "load_name": "dynamic_array_96_96",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "standard-biotools-da-96.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Standard Biotools Dynamic Array 96.96: Load 4 uL",
+    "author": "Standard Biotools Inc",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "AssayPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "SamplePlate"
+      },
+      {
+        "slot": "2",
+        "load_name": "dynamic_array_96_96",
+        "label": "IFC"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transfer Assay Mix - Assay Wellplate to IFC (Assay Inlets)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transfer Final Sample Mix - Sample Wellplate to IFC (Sample Inlets)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol Complete!"
+      }
+    ]
+  }
+}

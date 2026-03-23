@@ -1,0 +1,139 @@
+{
+  "id": "ex_technical_e1cebe2f",
+  "intent": "Execute Illumina COVIDSeq RNA annealing protocol by transferring 8.5\u00b5L of EPH3 buffer from reagent plate well A1 to corresponding wells in cDNA plate, followed by transferring 8.5\u00b5L RNA samples from sample plate to cDNA plate wells with precise pipetting techniques including bottom aspiration, slow withdrawal, and wicking for optimal mixing across 96 samples using multichannel P20 pipette",
+  "config": {
+    "labware": {
+      "sample plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "1"
+      },
+      "cDNA plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "reagent plate"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "anneal.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "1. Illumina COVIDSeq - Anneal RNA",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "sample plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "cDNA plate"
+      },
+      {
+        "slot": "reagent plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "reagent_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\nProtocol complete.\nSeal and shake at 1600 rpm for 1 minute.\nCentrifuge at 1000 \u00d7 g for 1 minute.\nPlace on the preprogrammed thermal cycler and run the COVIDSeq FSS program.\n\n\n\n"
+      }
+    ]
+  }
+}

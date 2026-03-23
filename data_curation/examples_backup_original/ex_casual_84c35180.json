@@ -1,0 +1,112 @@
+{
+  "id": "ex_casual_84c35180",
+  "intent": "Fill up some ELISA plates with whatever reagent you're using - could be blocking buffer, antibodies, substrate, whatever. The robot will grab from the reservoir and fill all the wells in each plate, going column by column. You can pause between plates if you need to wash them first.",
+  "config": {
+    "labware": {
+      "format": {
+        "load_name": "labware_reservoir",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "30450c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Add Bulk Reagent to ELISA Plates",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "labware_reservoir",
+        "label": "format"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "disposal_volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      }
+    ]
+  }
+}

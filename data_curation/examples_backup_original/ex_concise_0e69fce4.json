@@ -1,0 +1,268 @@
+{
+  "id": "ex_concise_0e69fce4",
+  "intent": "Magnetic bead cleanup: transfer samples, separate on magnet, collect supernatant, add water and IPB buffer, mix and incubate",
+  "config": {
+    "labware": {
+      "thermo_tubes": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "3"
+      },
+      "sample_plate": {
+        "load_name": "customabnest_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "midi_plate_2": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "3"
+      },
+      "midi_plate_1": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "6"
+      },
+      "reagent_resv": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "liquid_trash": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "mag_module": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "ff5763_part4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina DNA Prep Part 4, Clean Up Libraries First Half",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "thermo_tubes"
+      },
+      {
+        "slot": "2",
+        "load_name": "customabnest_96_wellplate_200ul",
+        "label": "sample_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "midi_plate_2"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "midi_plate_1"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reagent_resv"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "liquid_trash"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp_1"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag_module"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~MOVING SAMPLES TO MAGNETS~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 70
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 70
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~MOVING SUPERNATANT~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_supernatant"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_supernatant"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_module"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING NFW~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 40
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "airgap_nfwater"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "airgap_nfwater"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 40
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~ADDING IPB~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 45
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 45
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "First half of library cleanup completed. Please dispose of AB Gene plate in slot 2 and now empty Deep Well Plate on magnetic module. Deep Well Plate in slot 3 should be moved to magnetic module"
+      }
+    ]
+  }
+}

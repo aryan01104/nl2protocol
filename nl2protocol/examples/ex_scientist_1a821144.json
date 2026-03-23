@@ -1,0 +1,2541 @@
+{
+  "id": "ex_technical_1a821144",
+  "source_file": "bms-illumina-dna-prep.ot2.apiv2.py",
+  "intent_precise": "Illumina DNA Prep - BMS: Using sample_plate_mag (pcr_plate, slot 2), reservoir (reservoir, slot 2), reservoir (deep_well_plate, slot 2), reagent_plate (labware, slot 6). With magnetic module, temperature module, thermocycler module, thermocycler module, magnetic module, temperature module, thermocycler module, thermocycler module. (1) Pause for manual intervention. (2) Pause: ERROR? (3) Set temperature to 4\u00b0C. (4) Operate thermocycler. (5) Set temperature to 4\u00b0C. (6) Open thermocycler lid. (7) Mix 3 times at 20\u00b5L. (8) Transfer from source to destination. (9) Mix TagMixRep times. (10) Wait 2 seconds. (11) Mix 3 times at 20\u00b5L. (12) Transfer from source to destination. (13) Mix TagMixRep times. (14) Mix 3 times at 20\u00b5L. (15) Transfer from source to destination. (16) Mix TagMixRep times. (17) Close thermocycler lid. (18) Run thermocycler profile for 1 cycles. (19) Set temperature to 10\u00b0C. (20) Open thermocycler lid. (21) Pause: Seal, Run ERAT (60min) (22) Open thermocycler lid. (23) Transfer from source to destination. (24) Mix TSBMixRep times. (25) Transfer from source to destination. (26) Mix TSBMixRep times. (27) Transfer from source to destination. (28) Mix TSBMixRep times. (29) Close thermocycler lid. (30) Run thermocycler profile for 1 cycles. (31) Set temperature to 10\u00b0C. (32) Open thermocycler lid. (33) Pause: PLACE sample_plate on MAGNET (34) Engage magnets at 8.5mm height for bead separation. (35) Incubate for 1 minutes. (36) Engage magnets at 7mm height for bead separation. (37) Incubate for 1 minutes. (38) Engage magnets at 5mm height for bead separation. (39) Incubate for 1 minutes. (40) Wait 6 seconds. (41) Wait 6 seconds. (42) Transfer 10\u00b5L from source to destination. (43) Wait 6 seconds. (44) Wait 6 seconds. (45) Transfer 10\u00b5L from source to destination. (46) Wait 6 seconds. (47) Wait 6 seconds. (48) Transfer 10\u00b5L from source to destination. (49) Disengage magnets to release beads. (50) Transfer 100\u00b5L from source to destination. (51) Mix TWBMixRep times. (52) Transfer 100\u00b5L from source to destination. (53) Mix TWBMixRep times. (54) Transfer 100\u00b5L from source to destination. (55) Mix TWBMixRep times. (56) Engage magnets at 8.5mm height for bead separation. (57) Incubate for 1 minutes. (58) Engage magnets at 7mm height for bead separation. (59) Incubate for 1 minutes. (60) Engage magnets at 5mm height for bead separation. (61) Incubate for 1 minutes. (62) Wait 6 seconds. (63) Wait 6 seconds. (64) Transfer 10\u00b5L from source to destination. (65) Wait 6 seconds. (66) Wait 6 seconds. (67) Transfer 10\u00b5L from source to destination. (68) Wait 6 seconds. (69) Wait 6 seconds. (70) Transfer 10\u00b5L from source to destination. (71) Disengage magnets to release beads. (72) Engage magnets at 5mm height for bead separation. (73) Engage magnets at 3mm height for bead separation. (74) Wait 30 seconds. (75) Disengage magnets to release beads. (76) Transfer from source to destination. (77) Mix wells multiple wells in plate, PCRMixRep cycles. (78) Wait 0 seconds. (79) Transfer from source to destination. (80) Mix wells multiple wells in plate, PCRMixRep cycles. (81) Wait 0 seconds. (82) Transfer from source to destination. (83) Mix wells multiple wells in plate, PCRMixRep cycles. (84) Wait 0 seconds. (85) Transfer from source to destination. (86) Mix BarcodeMixRep times. (87) Transfer from source to destination. (88) Mix BarcodeMixRep times. (89) Transfer from source to destination. (90) Mix BarcodeMixRep times. (91) Pause: PLACE sample_plate on THERMO (92) Close thermocycler lid. (93) Run thermocycler profile for 1 cycles. (94) Run thermocycler profile for 5 cycles. (95) Run thermocycler profile for 1 cycles. (96) Set temperature to 4\u00b0C. (97) Open thermocycler lid. (98) Pause: PLACE sample_plate on MAGNET (99) Engage magnets at 8.5mm height for bead separation. (100) Incubate for 1 minutes. (101) Engage magnets at 7mm height for bead separation. (102) Incubate for 1 minutes. (103) Engage magnets at 5mm height for bead separation. (104) Incubate for 1 minutes. (105) Wait 0 seconds. (106) Transfer from source to destination. (107) Wait 0 seconds. (108) Wait 0 seconds. (109) Transfer from source to destination. (110) Wait 0 seconds. (111) Wait 0 seconds. (112) Transfer from source to destination. (113) Wait 0 seconds. (114) Disengage magnets to release beads. (115) Transfer 40\u00b5L from source to destination. (116) Mix 5 times at 60\u00b5L. (117) Mix 10 times. (118) Transfer from source to destination. (119) Mix AMPureMixRep times. (120) Mix 3 times. (121) Transfer from source to destination. (122) Mix AMPureMixRep times. (123) Mix 3 times. (124) Transfer from source to destination. (125) Mix AMPureMixRep times. (126) Pause for incubation. (127) Engage magnets at 8.5mm height for bead separation. (128) Incubate for 1 minutes. (129) Engage magnets at 7.5mm height for bead separation. (130) Incubate for 1 minutes. (131) Engage magnets at 7mm height for bead separation. (132) Incubate for 1 minutes. (133) Engage magnets at 6mm height for bead separation. (134) Incubate for 1 minutes. (135) Engage magnets at 5mm height for bead separation. (136) Incubate for 1 minutes. (137) Wait 0 seconds. (138) Transfer from source to destination. (139) Wait 0 seconds. (140) Wait 0 seconds. (141) Transfer from source to destination. (142) Wait 0 seconds. (143) Wait 0 seconds. (144) Transfer from source to destination. (145) Wait 0 seconds. (146) Disengage magnets to release beads. (147) Mix 10 times at 100\u00b5L. (148) Transfer from source to destination. (149) Mix AMPureMixRep times. (150) Mix 3 times at 100\u00b5L. (151) Transfer from source to destination. (152) Mix AMPureMixRep times. (153) Mix 3 times at 100\u00b5L. (154) Transfer from source to destination. (155) Mix AMPureMixRep times. (156) Pause for incubation. (157) Engage magnets at 8.5mm height for bead separation. (158) Incubate for 1 minutes. (159) Engage magnets at 7.5mm height for bead separation. (160) Incubate for 1 minutes. (161) Engage magnets at 7mm height for bead separation. (162) Incubate for 1 minutes. (163) Engage magnets at 6mm height for bead separation. (164) Incubate for 1 minutes. (165) Engage magnets at 5mm height for bead separation. (166) Incubate for 1 minutes. (167) Wait 6 seconds. (168) Wait 6 seconds. (169) Transfer 10\u00b5L from source to destination. (170) Wait 6 seconds. (171) Wait 6 seconds. (172) Wait 6 seconds. (173) Transfer 10\u00b5L from source to destination. (174) Wait 6 seconds. (175) Wait 6 seconds. (176) Wait 6 seconds. (177) Transfer 10\u00b5L from source to destination. (178) Wait 6 seconds. (179) Transfer from source to destination. (180) Wait 6 seconds. (181) Transfer from source to destination. (182) Wait 6 seconds. (183) Transfer from source to destination. (184) Wait 6 seconds. (185) Wait 30 seconds. (186) Wait 6 seconds. (187) Transfer from source to destination. (188) Wait 7 seconds. (189) Wait 6 seconds. (190) Transfer from source to destination. (191) Wait 7 seconds. (192) Wait 6 seconds. (193) Transfer from source to destination. (194) Wait 7 seconds. (195) Pause for incubation. (196) Engage magnets at 6mm height for bead separation. (197) Wait 30 seconds. (198) Disengage magnets to release beads. (199) Transfer from source to destination. (200) Transfer from source to destination. (201) Mix wells multiple wells in plate, RSBMixRep cycles. (202) Wait 0 seconds. (203) Transfer from source to destination. (204) Mix wells multiple wells in plate, RSBMixRep cycles. (205) Wait 0 seconds. (206) Transfer from source to destination. (207) Mix wells multiple wells in plate, RSBMixRep cycles. (208) Wait 0 seconds. (209) Pause for incubation. (210) Engage magnets at 5mm height for bead separation. (211) Incubate for 4 minutes. (212) Transfer from source (multiple wells) to destination (multiple wells). (213) Transfer from source (multiple wells) to destination (multiple wells). (214) Transfer from source (multiple wells) to destination (multiple wells). (215) Disengage magnets to release beads.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (4\u00b0C, 10\u00b0C), thermocycling. (volumes 10\u00b5L-200\u00b5L, ~38 min total)",
+  "intent": "For the Illumina DNA Prep - BMS protocol, you'll be working with the sample plate in the magnetic module (slot 2), reagent reservoirs, and the thermocycler modules set to 4\u00b0C initially. Start by pausing for any manual checks, then proceed through the tagmentation steps with 20\u00b5L mixing volumes (3 times each) and TagMixRep cycles, followed by thermocycler runs and the 60-minute ERAT incubation. The magnetic bead separations require specific height gradients (8.5mm \u2192 7mm \u2192 5mm) with 1-minute incubations at each level, and you'll perform two wash cycles with 100\u00b5L TWB and 10\u00b5L transfers between 6-second waits. Complete the protocol with PCR amplification (1 + 5 + 1 cycles), dual AMPure cleanups using 40\u00b5L beads mixed at 60\u00b5L volume, ethanol washes, and final elution in RSB buffer with 4-minute magnetic separation before transferring the cleaned libraries to the final plate.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Illumina DNA Prep - BMS",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_mag"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "reservoir"
+      },
+      {
+        "slot": "6",
+        "load_name": "armadillo_96_aluminumblock_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_1"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_2"
+      },
+      {
+        "slot": "12",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_thermo"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_3"
+      },
+      {
+        "slot": "15",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_mag"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "reservoir"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "reservoir"
+      },
+      {
+        "slot": "19",
+        "load_name": "armadillo_96_aluminumblock_200ul",
+        "label": "reagent_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "label": "tiprack_20"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_1"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_2"
+      },
+      {
+        "slot": "25",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "sample_plate_thermo"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "label": "tiprack_200_3"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      },
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_block"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_block"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "10",
+        "label": "thermocycler"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "11",
+        "label": "thermocycler"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag_block"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp_block"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "23",
+        "label": "thermocycler"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "24",
+        "label": "thermocycler"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A DRY RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A REACTION RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "TIP REUSING"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "NO TIP REUSING"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A NO MODULE RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS IS A MODULE RUN"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "THIS PROTOCOL WILL REUSE TIPS FOR WASHES"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "src_file_path"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 8 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 16 Samples"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "There are 24 Samples"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "ERROR?"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "SETTING THERMO and TEMP BLOCK Temperature"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "thermocycler",
+        "celsius": 100
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_block",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> TAGMENTATION"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding Tagmentation Mix "
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TagMixRep",
+        "volume": "TagMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TagMixRep",
+        "volume": "TagMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "TagVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TagMixRep",
+        "volume": "TagMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_TAG",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal, Run ERAT (60min)"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adapter Ligation"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding Tagmentation Stop Buffer"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "TSBMixRep",
+        "volume": "TSBMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "TSBMixRep",
+        "volume": "TSBMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "TSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "TSBMixRep",
+        "volume": "TSBMixVol"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Run PTC (15min)"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PTC",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PLACE sample_plate on MAGNET"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> TAGMENTATION WASH"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Repeating 3 washes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TWBMixRep",
+        "volume": "TWBMixVol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TWBMixRep",
+        "volume": "TWBMixVol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 100
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "TWBMixRep",
+        "volume": "TWBMixVol"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Residual Supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 3
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> AMPLIFICATION"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "ADDING PCR"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "PCRVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "PCRMixRep",
+        "volume": "PCRMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding Barcodes"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "BarcodeMixRep",
+        "volume": "BarcodeMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "BarcodeMixRep",
+        "volume": "BarcodeMixVol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "BarcodeVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": "BarcodeMixRep",
+        "volume": "BarcodeMixVol"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PLACE sample_plate on THERMO"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Seal, Run PCR (25min)"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_1",
+        "repetitions": 1
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_2",
+        "repetitions": 5
+      },
+      {
+        "command_type": "run_profile",
+        "module": "thermocycler",
+        "steps": "profile_PCR_3",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "thermocycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocycler"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Seal, Run PCR (60min)"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "PLACE sample_plate on MAGNET"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> CLEANUP"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "=============================================="
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Transferring Supernatant"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING WATER"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 40
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 60
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING AMPure (0.8x)"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> TRANSFERRING SUPERNAT TO NEW COLUMNS 7, 8, 9"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> ADDING AMPure (0.8x)"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "AMPureVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "AMPureMixRep",
+        "volume": "AMPureMixVol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 8.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7.5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 7
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 1
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Supernatant..."
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Repeating 2 washes"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "ETOHMaxVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 200
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Removing Residual ETOH"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 6
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "AIR DRY"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 0.5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Adding RSB"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "RSBVol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "RSBMixRep",
+        "volume": "RSBMixVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET ENGAGE"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_block",
+        "height": 5
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "--> Transferring Supernatant"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "MAGNET DISENGAGE"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_block"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "sample_plate_mag": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "reservoir_2": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "armadillo_96_aluminumblock_200ul",
+        "slot": "6"
+      },
+      "tiprack_20": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "4"
+      },
+      "tiprack_200_1": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "5"
+      },
+      "tiprack_200_2": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "6"
+      },
+      "sample_plate_thermo": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "12"
+      },
+      "tiprack_200_3": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      },
+      "sample_plate_mag_15": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "15"
+      },
+      "reagent_plate_19": {
+        "load_name": "armadillo_96_aluminumblock_200ul",
+        "slot": "19"
+      },
+      "tiprack_20_4": {
+        "load_name": "opentrons_96_filtertiprack_20ul",
+        "slot": "4"
+      },
+      "tiprack_200_1_5": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "5"
+      },
+      "tiprack_200_2_6": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "6"
+      },
+      "sample_plate_thermo_25": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "25"
+      },
+      "tiprack_200_3_9": {
+        "load_name": "opentrons_96_filtertiprack_200ul",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tiprack_200_1",
+          "tiprack_200_2",
+          "tiprack_200_3"
+        ]
+      },
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tiprack_20"
+        ]
+      }
+    },
+    "modules": {
+      "mag_block": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_block": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "thermocycler": {
+        "module_type": "thermocycler",
+        "slot": "10"
+      },
+      "thermocycler_11": {
+        "module_type": "thermocycler",
+        "slot": "11"
+      },
+      "mag_block_1": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "temp_block_3": {
+        "module_type": "temperature",
+        "slot": "3"
+      },
+      "thermocycler_23": {
+        "module_type": "thermocycler",
+        "slot": "23"
+      },
+      "thermocycler_24": {
+        "module_type": "thermocycler",
+        "slot": "24"
+      }
+    }
+  }
+}

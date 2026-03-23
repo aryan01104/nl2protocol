@@ -1,0 +1,39 @@
+{
+  "id": "ex_technical_8f6f35bc",
+  "source_file": "i7g1ym.ot2.apiv2.py",
+  "intent_precise": "Utility: Rearrange pipette tips for 24-well spacing:",
+  "intent_concise": "Execute 2-step liquid handling protocol.",
+  "intent": "Take the pipette tips and rearrange them to match the 24-well plate spacing pattern. Make sure the tip spacing aligns properly with the well centers so we can pipette into all wells simultaneously without any offset issues. This utility step will set up the tips for efficient multi-channel pipetting across the entire 24-well format.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Utility: Rearrange pipette tips for 24-well spacing",
+    "author": "Tim Fallon <tfallon@ucsd.edu>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  }
+}

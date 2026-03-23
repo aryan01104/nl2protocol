@@ -9,28 +9,81 @@ import requests
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+from .errors import RobotConnectionError
+
+
+def diagnose_connection_error(ip: str, error: Exception) -> str:
+    """Diagnose connection error and return user-friendly message."""
+    error_str = str(error).lower()
+
+    if "connection refused" in error_str:
+        return (
+            f"Connection refused by {ip}.\n"
+            "The robot may not be running or the HTTP API is disabled.\n"
+            "Try restarting the robot."
+        )
+    elif "timeout" in error_str or "timed out" in error_str:
+        return (
+            f"Connection to {ip} timed out.\n"
+            "The robot may be powered off or on a different network.\n"
+            "Check that your computer and robot are on the same WiFi network."
+        )
+    elif "no route to host" in error_str or "network is unreachable" in error_str:
+        return (
+            f"Cannot reach {ip} - network unreachable.\n"
+            "Check your network connection and verify the robot's IP address."
+        )
+    elif "name or service not known" in error_str or "nodename nor servname" in error_str:
+        return (
+            f"Cannot resolve hostname: {ip}.\n"
+            "Use the robot's IP address instead (e.g., 192.168.1.100)."
+        )
+    else:
+        return f"Connection failed: {error}"
+
 
 class RobotClient:
     """Client for communicating with Opentrons robots via HTTP API."""
 
     API_VERSION = "3"
 
-    def __init__(self, ip: str, name: Optional[str] = None):
+    def __init__(self, ip: str, name: Optional[str] = None, demo_mode: bool = False):
         self.ip = ip
         self.name = name or f"Robot@{ip}"
         self.base_url = f"http://{ip}:31950"
         self.headers = {"Opentrons-Version": self.API_VERSION}
+        self.demo_mode = demo_mode
 
-    def health_check(self) -> bool:
-        """Check if robot is reachable and healthy."""
+        if demo_mode:
+            print("[DEMO MODE] Robot operations will be simulated")
+
+    def health_check(self, raise_on_error: bool = False) -> bool:
+        """Check if robot is reachable and healthy.
+
+        Args:
+            raise_on_error: If True, raise RobotConnectionError with details on failure
+        """
+        if self.demo_mode:
+            print(f"[DEMO MODE] Health check passed for {self.name}")
+            return True
+
         try:
             response = requests.get(
                 f"{self.base_url}/health",
                 headers=self.headers,
                 timeout=5
             )
-            return response.status_code == 200
-        except requests.RequestException:
+            if response.status_code == 200:
+                return True
+            elif raise_on_error:
+                raise RobotConnectionError(
+                    self.ip,
+                    f"Robot returned unexpected status: {response.status_code}"
+                )
+            return False
+        except requests.RequestException as e:
+            if raise_on_error:
+                raise RobotConnectionError(self.ip, diagnose_connection_error(self.ip, e))
             return False
 
     def get_robot_info(self) -> Optional[Dict[str, Any]]:
@@ -53,10 +106,20 @@ class RobotClient:
 
         Returns:
             Protocol ID if successful, None otherwise.
+
+        Raises:
+            FileNotFoundError: If protocol file doesn't exist
+            RobotConnectionError: If upload fails due to connection issues
         """
         path = Path(protocol_path)
         if not path.exists():
             raise FileNotFoundError(f"Protocol file not found: {protocol_path}")
+
+        if self.demo_mode:
+            demo_protocol_id = f"demo-protocol-{path.stem}"
+            print(f"[DEMO MODE] Protocol '{path.name}' uploaded successfully")
+            print(f"[DEMO MODE] Protocol ID: {demo_protocol_id}")
+            return demo_protocol_id
 
         try:
             with open(path, 'rb') as f:
@@ -71,13 +134,22 @@ class RobotClient:
             if response.status_code in (200, 201):
                 data = response.json()
                 return data.get('data', {}).get('id')
+            elif response.status_code == 400:
+                # Protocol validation error
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('errors', [{}])[0].get('detail', response.text)
+                except:
+                    error_msg = response.text
+                raise RobotConnectionError(self.ip, f"Protocol rejected by robot: {error_msg}")
             else:
-                print(f"Upload failed: {response.status_code} - {response.text}")
-                return None
+                raise RobotConnectionError(
+                    self.ip,
+                    f"Upload failed with status {response.status_code}: {response.text[:200]}"
+                )
 
         except requests.RequestException as e:
-            print(f"Upload error: {e}")
-            return None
+            raise RobotConnectionError(self.ip, diagnose_connection_error(self.ip, e))
 
     def create_run(self, protocol_id: str) -> Optional[str]:
         """
@@ -86,6 +158,11 @@ class RobotClient:
         Returns:
             Run ID if successful, None otherwise.
         """
+        if self.demo_mode:
+            demo_run_id = f"demo-run-{protocol_id.replace('demo-protocol-', '')}"
+            print(f"[DEMO MODE] Run created: {demo_run_id}")
+            return demo_run_id
+
         try:
             response = requests.post(
                 f"{self.base_url}/runs",
@@ -107,6 +184,10 @@ class RobotClient:
 
     def start_run(self, run_id: str) -> bool:
         """Start a created run."""
+        if self.demo_mode:
+            print(f"[DEMO MODE] Run started: {run_id}")
+            return True
+
         try:
             response = requests.post(
                 f"{self.base_url}/runs/{run_id}/actions",
@@ -178,4 +259,8 @@ def create_robot_from_config(config_path: str = "robot_config.json") -> Optional
         print("Robot config missing 'robot_ip' field")
         return None
 
-    return RobotClient(ip=ip, name=config.get('robot_name'))
+    return RobotClient(
+        ip=ip,
+        name=config.get('robot_name'),
+        demo_mode=config.get('demo_mode', False)
+    )

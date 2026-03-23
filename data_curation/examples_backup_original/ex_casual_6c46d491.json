@@ -1,0 +1,139 @@
+{
+  "id": "ex_casual_6c46d491",
+  "intent": "Set up the first step of COVID sequencing by adding EPH3 buffer to the cDNA plate, then transferring samples over. Keep the reagents cold and use careful pipetting with slow movements to avoid bubbles. After it's done, you'll need to shake it, spin it down, and put it on the thermal cycler.",
+  "config": {
+    "labware": {
+      "sample plate": {
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "slot": "1"
+      },
+      "cDNA plate": {
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "reagent_plate": {
+        "load_name": "quantgene_96_aluminumblock_200ul",
+        "slot": "reagent plate"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      },
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "7"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "anneal.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "1. Illumina COVIDSeq - Anneal RNA",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "label": "sample plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "agilentwithnonskirted_96_wellplate_200ul",
+        "label": "cDNA plate"
+      },
+      {
+        "slot": "reagent plate",
+        "load_name": "quantgene_96_aluminumblock_200ul",
+        "label": "reagent_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "7",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n\n\n\nReplace 200ul filtertipracks before resuming.\n\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_eph3"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\nProtocol complete.\nSeal and shake at 1600 rpm for 1 minute.\nCentrifuge at 1000 \u00d7 g for 1 minute.\nPlace on the preprogrammed thermal cycler and run the COVIDSeq FSS program.\n\n\n\n"
+      }
+    ]
+  }
+}

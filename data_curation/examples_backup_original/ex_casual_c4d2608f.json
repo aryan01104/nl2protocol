@@ -1,0 +1,118 @@
+{
+  "id": "ex_casual_c4d2608f",
+  "intent": "Take RNA samples from tubes and move them to plates for quantitation. The robot will look at a spreadsheet to see which samples go where and how much to transfer. It'll wet the tips first to be more accurate, then move the samples over using the right pipette depending on what kind of tubes you're starting with.",
+  "config": {
+    "labware": {
+      "tc_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "Optiplate": {
+        "load_name": "optiplate_96_wellplate_400ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "thermocyc": {
+        "module_type": "thermocycler",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "7ada78.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "RNA Quantitation",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "optiplate_96_wellplate_400ul",
+        "label": "Optiplate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "1",
+        "label": "thermocyc"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "PRE-WET"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "DONE PRE-WET"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "thermocyc"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nMOVING SAMPLES TO PLATE\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

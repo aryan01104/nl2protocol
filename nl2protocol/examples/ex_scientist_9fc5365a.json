@@ -1,0 +1,120 @@
+{
+  "id": "ex_technical_9fc5365a",
+  "source_file": "ELISA_protocol_part1.ot2.apiv2.py",
+  "intent_precise": "ELISA: Dilution: Using tuberack_1 (tuberack, slot 1), tuberack_4 (tuberack, slot 4). (1) Transfer from source (A1, A1) to destination (A1, A1). (2) Mix 3 times at 200\u00b5L.",
+  "intent_concise": "Perform serial dilution. (using 200\u00b5L)",
+  "intent": "For the ELISA dilution step, you'll need to set up tuberacks in slots 1 and 4 - these will be your tuberack_1 and tuberack_4 respectively. Transfer the sample from position A1 in tuberack_1 to position A1 in tuberack_4, then mix the solution 3 times using 200\u00b5L volume to ensure proper dilution.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "ELISA: Dilution",
+    "author": "Alise <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "tuberack_1"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "tuberack_4"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "label": "tiprack_1000"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p1000_single",
+        "tipracks": [
+          "tiprack_1000"
+        ]
+      },
+      {
+        "mount": "right",
+        "model": "p300_single",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 3,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tuberack_1": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "1"
+      },
+      "tuberack_4": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "4"
+      },
+      "tiprack_1000": {
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single",
+        "tipracks": [
+          "tiprack_1000"
+        ]
+      },
+      "right": {
+        "model": "p300_single",
+        "tipracks": []
+      }
+    }
+  }
+}

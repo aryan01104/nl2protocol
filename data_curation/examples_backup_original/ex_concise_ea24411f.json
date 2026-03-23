@@ -1,0 +1,87 @@
+{
+  "id": "ex_concise_ea24411f",
+  "intent": "Reformat 4x 96-well plates to 1x 384-well qPCR plate, quadrant mapping with controls",
+  "config": {
+    "labware": {
+      "384 Well PCR Plate": {
+        "load_name": "appliedbiosystems_microamp_optical_384_wellplate_30ul",
+        "slot": "1"
+      },
+      "tuberack": {
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "39b4c7.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Reformat 96 Well Plates to 384 Well Plate for qPCR",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "appliedbiosystems_microamp_optical_384_wellplate_30ul",
+        "label": "384 Well PCR Plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_24_aluminumblock_nest_1.5ml_snapcap",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": "temperature"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p20_mount",
+        "volume": "sample_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

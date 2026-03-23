@@ -1,0 +1,132 @@
+{
+  "id": "ex_technical_34867a87",
+  "source_file": "6401f1.ot2.apiv2.py",
+  "intent_precise": "6401f1.ot2.apiv2: Using Plate (plate, slot 1), PCRMix1 (tuberack, slot 2), Sample (plate, slot 3), POS_NTC (plate, slot 6). (1) Wait 10 seconds. (2) Pause for incubation. (3) Wait 3 seconds. (4) Wait 1 seconds. (5) Transfer from source A1 to destination A1.",
+  "intent_concise": "Execute 10-step liquid handling protocol.",
+  "intent": "For this PCR setup protocol, you'll need to load the main plate in slot 1, PCRMix1 tube rack in slot 2, sample plate in slot 3, and the POS_NTC plate in slot 6. Start by waiting 10 seconds, then pause the system for incubation, followed by a 3-second wait and then a 1-second wait. Finally, transfer the contents from well A1 in the source plate to well A1 in the destination plate.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "6401f1.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "hardshell_96_wellplate_200ul",
+        "label": "Plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "beckman_24_tuberack_1000ul",
+        "label": "PCRMix1"
+      },
+      {
+        "slot": "3",
+        "load_name": "lvl_96_wellplate_1317.97ul",
+        "label": "Sample"
+      },
+      {
+        "slot": "6",
+        "load_name": "lvl_96_wellplate_1317.97ul",
+        "label": "POS_NTC"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "right",
+        "seconds": 3
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "right",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Plate": {
+        "load_name": "hardshell_96_wellplate_200ul",
+        "slot": "1"
+      },
+      "PCRMix1": {
+        "load_name": "beckman_24_tuberack_1000ul",
+        "slot": "2"
+      },
+      "Sample": {
+        "load_name": "lvl_96_wellplate_1317.97ul",
+        "slot": "3"
+      },
+      "POS_NTC": {
+        "load_name": "lvl_96_wellplate_1317.97ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

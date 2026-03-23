@@ -1,0 +1,491 @@
+{
+  "id": "ex_casual_a8375d07",
+  "intent": "Set up a qPCR plate by adding mastermix to the wells first, then add your DNA samples and a control, mix everything really well by pipetting up and down a bunch of times, and finally split each sample into three wells to make triplicates",
+  "config": {
+    "labware": {
+      "final_plate": {
+        "load_name": "final_plate_slot4",
+        "slot": "4"
+      },
+      "mastermix_rack": {
+        "load_name": "usalowbind_24_aluminumblock_2000ul",
+        "slot": "1"
+      },
+      "dna_samples": {
+        "load_name": "usastrips_96_aluminumblock_200ul",
+        "slot": "7"
+      },
+      "control_plate": {
+        "load_name": "control_plate",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "25a03d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "qPCR Prep in Triplicates",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "final_plate_slot4",
+        "label": "final_plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "usalowbind_24_aluminumblock_2000ul",
+        "label": "mastermix_rack"
+      },
+      {
+        "slot": "7",
+        "load_name": "usastrips_96_aluminumblock_200ul",
+        "label": "dna_samples"
+      },
+      {
+        "slot": "9",
+        "load_name": "control_plate",
+        "label": "control_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing mastermix to sample wells"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 48
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 24
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 24
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 48
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing mastermix to control"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 48
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 24
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 24
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 48
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing sample to mastermix"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 3,
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding control to mastermix"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": 3,
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 12
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Moving sample to next well"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 18
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Moving control to next well"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 18
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 4
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

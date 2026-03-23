@@ -1,0 +1,685 @@
+{
+  "id": "ex_technical_1d71af91",
+  "source_file": "7e3b31.ot2.apiv2.py",
+  "intent_precise": "7e3b31.ot2.apiv2: Using Reservoir (reservoir, slot 2), Reagents (reservoir, slot 5), RNA Samples (pcr_plate, slot 4), cycler_plate (pcr_plate, slot 5). With thermocycler module, magnetic module. (1) Wait 10 seconds. (2) Open thermocycler lid. (3) Set temperature to 4\u00b0C. (4) Disengage magnets to release beads. (5) Transfer from source to destination. (6) Pause: format (7) Pause for incubation. (8) Wait 0 seconds. (9) Pause: format (10) Pause: format (11) Pause: format (12) Wait 1 seconds. (13) Wait 1 seconds. (14) Pause: Seal the cycler plate for step - Incubate 1 RBP (15) Operate thermocycler. (16) Close thermocycler lid. (17) Run thermocycler profile for 1 cycles. (18) Open thermocycler lid. (19) Set temperature to 4\u00b0C. (20) Pause: Unseal the cycler plate and place it on the magnetic module. (21) Engage magnets for bead separation. (22) Pause for incubation. (23) Disengage magnets to release beads. (24) Engage magnets for bead separation. (25) Pause for incubation. (26) Disengage magnets to release beads. (27) Pause: Seal the mag plate for step - Incubate 2 RBP.\n    Place it on the cycler. Resume. (28) Operate thermocycler. (29) Close thermocycler lid. (30) Run thermocycler profile for 1 cycles. (31) Open thermocycler lid. (32) Set temperature to 4\u00b0C. (33) Pause: Unseal the cycler plate and place it on the magnetic module. Resume. (34) Incubate for 5 minutes. (35) Engage magnets for bead separation. (36) Pause for incubation. (37) Disengage magnets to release beads. (38) Engage magnets for bead separation. (39) Pause for incubation. (40) Disengage magnets to release beads. (41) Pause: Seal the mag plate for step - Incubate RFP.\n    Place it on the cycler. Resume. (42) Operate thermocycler. (43) Close thermocycler lid. (44) Run thermocycler profile for 1 cycles. (45) Open thermocycler lid. (46) Set temperature to 4\u00b0C. (47) Pause: Unseal the cycler plate and place it on the magnetic module.\n    Place a fresh PCR plate on the cycler block. (48) Set temperature to 20\u00b0C. (49) Engage magnets for bead separation. (50) Pause for incubation. (51) Pause: Seal the cycler plate for step - First Strand Synthesis. Resume. (52) Operate thermocycler. (53) Close thermocycler lid. (54) Run thermocycler profile for 1 cycles. (55) Open thermocycler lid. (56) Set temperature to 4\u00b0C. (57) Pause: Unseal the cycler plate. Resume. (58) Pause: Seal the cycler plate for step - Incubate 2 CDP. Resume. (59) Operate thermocycler. (60) Close thermocycler lid. (61) Run thermocycler profile for 1 cycles. (62) Open thermocycler lid. (63) Pause: Unseal the cycler plate and move it to the magnetic module. Resume. (64) Set temperature to 4\u00b0C. (65) Incubate for 15 minutes. (66) Engage magnets for bead separation. (67) Pause for incubation. (68) Pause for incubation. (69) Disengage magnets to release beads. (70) Incubate for 2 minutes. (71) Engage magnets for bead separation. (72) Pause for incubation. (73) Pause: Place a fresh PCR plate (for output ds cDNA) in deck slot 4. Resume. (74) Pause: part 1 protocol steps are complete. Seal and store\n     output double-stranded cDNA plate (deck slot 4) at -20 C up to 7 days.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (4\u00b0C, 20\u00b0C), thermocycling. (volumes 20\u00b5L-200\u00b5L, ~23 min total)",
+  "intent": "For this RNA processing protocol (7e3b31.ot2.apiv2), you'll be working with the reservoir in slot 2, reagents in slot 5, RNA samples in the PCR plate at slot 4, and the cycler plate in slot 5, using both the thermocycler and magnetic modules. Start by opening the thermocycler lid and setting it to 4\u00b0C, then disengage the magnets to release beads and transfer your samples - you'll go through three main incubation cycles where you'll seal the plates, run single thermocycler cycles, then move between the magnetic module for bead separation (engaging/disengaging magnets with brief pauses) and back to the cycler. The key temperature transitions are 4\u00b0C for most steps, 20\u00b0C before first strand synthesis, and you'll need specific incubation times of 5 minutes after the second RBP step and 15 minutes during the final CDP incubation, finishing with a 2-minute incubation before the final bead separation and transferring your double-stranded cDNA to a fresh PCR plate in slot 4 for storage at -20\u00b0C.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "7e3b31.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Reservoir"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest500ul_96_reservoir_500ul",
+        "label": "Reagents"
+      },
+      {
+        "slot": "4",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "RNA Samples"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "cycler_plate"
+      },
+      {
+        "slot": "Mag Plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "mag_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "4",
+        "label": "cycler"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Make RBP"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "right",
+        "seconds": 1
+      },
+      {
+        "command_type": "delay",
+        "pipette": "right",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Incubate 1 RBP"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the cycler plate for step - Incubate 1 RBP"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "cycler",
+        "celsius": 65
+      },
+      {
+        "command_type": "close_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "cycler",
+        "steps": "mrna_denaturation",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Unseal the cycler plate and place it on the magnetic module."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Wash RBP"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_sup"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_sup"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Incubate 2 RBP"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the mag plate for step - Incubate 2 RBP.\n    Place it on the cycler. Resume."
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "cycler",
+        "celsius": 80
+      },
+      {
+        "command_type": "close_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "cycler",
+        "steps": "mrna_elution_1",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Unseal the cycler plate and place it on the magnetic module. Resume."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Make RFP"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Incubate RFP"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the mag plate for step - Incubate RFP.\n    Place it on the cycler. Resume."
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "cycler",
+        "celsius": 94
+      },
+      {
+        "command_type": "close_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "cycler",
+        "steps": "elution_2_frag_prime",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Unseal the cycler plate and place it on the magnetic module.\n    Place a fresh PCR plate on the cycler block."
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 20
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - First Strand cDNA Synthesis"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the cycler plate for step - First Strand Synthesis. Resume."
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "cycler",
+        "celsius": 70
+      },
+      {
+        "command_type": "close_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "cycler",
+        "steps": "synthesize_1st_strand",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Unseal the cycler plate. Resume."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Second Strand cDNA Synthesis"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Incubate 2 CDP"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal the cycler plate for step - Incubate 2 CDP. Resume."
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "cycler",
+        "celsius": 37
+      },
+      {
+        "command_type": "close_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "cycler",
+        "steps": "synthesize_2nd_strand",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "cycler"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Unseal the cycler plate and move it to the magnetic module. Resume."
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "cycler",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "STEP - Purify CDP"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 15
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_dry"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "time_engage"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place a fresh PCR plate (for output ds cDNA) in deck slot 4. Resume."
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "part 1 protocol steps are complete. Seal and store\n     output double-stranded cDNA plate (deck slot 4) at -20 C up to 7 days."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Reservoir": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "Reagents": {
+        "load_name": "nest500ul_96_reservoir_500ul",
+        "slot": "5"
+      },
+      "RNA Samples": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "4"
+      },
+      "cycler_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      },
+      "mag_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "Mag Plate"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "cycler": {
+        "module_type": "thermocycler",
+        "slot": "4"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  }
+}

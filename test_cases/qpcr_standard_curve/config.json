@@ -1,0 +1,44 @@
+{
+    "labware": {
+        "tiprack_20_1": {
+            "load_name": "opentrons_96_tiprack_20ul",
+            "slot": "1"
+        },
+        "tiprack_20_2": {
+            "load_name": "opentrons_96_tiprack_20ul",
+            "slot": "4"
+        },
+        "tiprack_300": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "7"
+        },
+        "reagent_tube_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+            "slot": "2"
+        },
+        "dilution_strip": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "5"
+        },
+        "qpcr_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "3"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p20_single_gen2",
+            "tipracks": ["tiprack_20_1", "tiprack_20_2"]
+        },
+        "right": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300"]
+        }
+    },
+    "modules": {
+        "temp_mod": {
+            "module_type": "temperature",
+            "slot": "6"
+        }
+    }
+}

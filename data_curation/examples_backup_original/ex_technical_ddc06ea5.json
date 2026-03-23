@@ -1,0 +1,71 @@
+{
+  "id": "ex_technical_ddc06ea5",
+  "intent": "Execute a custom CSV-defined liquid handling protocol using a P300 multichannel pipette to transfer specified volumes between multiple labware types (96-well plates, 24-tube rack, and 12-well reservoir) positioned across deck slots 2-11, with post-transfer mixing at 10 cycles using transfer volume or pipette maximum capacity, whichever is lower, followed by blowout at each destination well",
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "6c27ee.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom CSV Transfer",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": "mix_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

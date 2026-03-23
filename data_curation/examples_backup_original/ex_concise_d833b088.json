@@ -1,0 +1,368 @@
+{
+  "id": "ex_concise_d833b088",
+  "intent": "COVID-19 RNA extraction: magnetic bead binding, 3-step wash series, elution to chilled plate",
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "deepwell_type",
+        "slot": "deepwell plate"
+      },
+      "elutionplate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "elution plate"
+      },
+      "reagent reservoir 2": {
+        "load_name": "res_type",
+        "slot": "2"
+      },
+      "reagent reservoir 1": {
+        "load_name": "res_type",
+        "slot": "5"
+      },
+      "tiprack for parking": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "7"
+      },
+      "200\u00b5l filtertiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      },
+      "tempdeck": {
+        "module_type": "Temperature Module Gen2",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "extraction.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "COVID-19 Station B RNA Extraction",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "deepwell plate",
+        "load_name": "deepwell_type",
+        "label": "magplate"
+      },
+      {
+        "slot": "elution plate",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "elutionplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "res_type",
+        "label": "reagent reservoir 2"
+      },
+      {
+        "slot": "5",
+        "load_name": "res_type",
+        "label": "reagent reservoir 1"
+      },
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack for parking"
+      },
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "200\u00b5l filtertiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      },
+      {
+        "module_type": "Temperature Module Gen2",
+        "slot": "1",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please empty tips from waste before resuming."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please empty liquid waste (slot 11) before resuming."
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 180
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 180
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 5,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "settling_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol_per_trans",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_reps",
+        "volume": 150
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "settling_time"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_reps",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 10,
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "mag_height"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "settling_time"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

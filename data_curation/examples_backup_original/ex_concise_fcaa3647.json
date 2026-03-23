@@ -1,0 +1,343 @@
+{
+  "id": "ex_concise_fcaa3647",
+  "intent": "ProcartaPlex assay prep: add beads, wash, transfer samples/standards, incubate overnight",
+  "config": {
+    "labware": {
+      "sampPlate": {
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "slot": "5"
+      },
+      "standardsPlate": {
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "slot": "6"
+      },
+      "destPlate": {
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "slot": "4"
+      },
+      "rsvr": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "3"
+      },
+      "destPlate2": {
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "slot": "1"
+      },
+      "sampPlate2": {
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "mnt300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "1adec6-6.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "ProcartaPlex Protocol-1 [6/7]",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "label": "sampPlate"
+      },
+      {
+        "slot": "6",
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "label": "standardsPlate"
+      },
+      {
+        "slot": "4",
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "label": "destPlate"
+      },
+      {
+        "slot": "3",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "rsvr"
+      },
+      {
+        "slot": "1",
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "label": "destPlate2"
+      },
+      {
+        "slot": "2",
+        "load_name": "spl_96_wellplate_200ul_flat",
+        "label": "sampPlate2"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 30
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 150
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 50uL of beads to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 50uL of sample and standards to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt300",
+        "repetitions": 3,
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt300",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 70
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mnt300",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      }
+    ]
+  }
+}

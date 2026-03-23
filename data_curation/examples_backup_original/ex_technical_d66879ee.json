@@ -1,0 +1,248 @@
+{
+  "id": "ex_technical_d66879ee",
+  "intent": "Perform Illumina Nextera XT library normalization by transferring 20\u00b5L supernatant to magnetic plate, adding 45\u00b5L combined LNA1/LNB1 reagents, engaging magnetic separation for 2 minutes, removing supernatant, executing two wash cycles with 45\u00b5L LNW1, treating with 30\u00b5L 0.1N NaOH, and finally transferring 30\u00b5L normalized supernatant to output plate containing 30\u00b5L LNS1 storage buffer",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "Load Plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      },
+      "Final Plate (empty)": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "1"
+      },
+      "Reservoir, 12-channel": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_type",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_deck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "nexteraXT_dna_library_prep_part3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina Nextera XT NGS Prep 3: Normalize Libraries",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Load Plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Final Plate (empty)"
+      },
+      {
+        "slot": "2",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "Reservoir, 12-channel"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "mag_deck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 20,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "lna_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "Reservoir, 12-channel",
+        "dest_well": "A6",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pip_mount",
+        "repetitions": 5,
+        "volume": 50
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "lnb_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "Reservoir, 12-channel",
+        "dest_well": "A6",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pip_mount",
+        "repetitions": 10,
+        "volume": 50,
+        "labware": "Reservoir, 12-channel",
+        "well": "A6"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 45,
+        "source_labware": "Reservoir, 12-channel",
+        "source_well": "A6",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake at 1800 rpm for 30 minutes. Place the plate     back on the MagDeck in slot 4."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 65,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 45,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake at 1800 rpm for 5 minutes.         Place the plate back on the MagDeck in slot 4."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "pip_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake at 1800 rpm for 5 minutes. Place the plate back on         the MagDeck in slot 4."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag_deck"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "pip_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag_deck"
+      }
+    ]
+  }
+}

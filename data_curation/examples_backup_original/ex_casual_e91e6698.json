@@ -1,0 +1,483 @@
+{
+  "id": "ex_casual_e91e6698",
+  "intent": "Set up a DNA concentration assay - make a standard curve, plate your samples in duplicates or triplicates, add some detergent to half the wells and buffer to the other half, warm everything up for 10 minutes, then add the fluorescent dye that binds to DNA so you can measure how much DNA is in each sample",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "corning_12_reservoir",
+        "slot": "2"
+      },
+      "hs_plate": {
+        "load_name": "nunc_96_wellplate_400ul",
+        "slot": "3"
+      },
+      "hs_plate_6": {
+        "load_name": "nunc_96_wellplate_400ul",
+        "slot": "6"
+      },
+      "deep_plate": {
+        "load_name": "pyramid_96_wellplate_2000ul",
+        "slot": "4"
+      },
+      "tuberack_15": {
+        "load_name": "opentrons_15_tuberack_5000ul",
+        "slot": "7"
+      },
+      "tuberack_24": {
+        "load_name": "opentrons_24_tuberack_nest_2ml_snapcap",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "heater_shaker": {
+        "module_type": "heater_shaker",
+        "slot": "6"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "010d6c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Ribogreen Assay",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "corning_12_reservoir",
+        "label": "reservoir"
+      },
+      {
+        "slot": "3",
+        "load_name": "nunc_96_wellplate_400ul",
+        "label": "hs_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nunc_96_wellplate_400ul",
+        "label": "hs_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "pyramid_96_wellplate_2000ul",
+        "label": "deep_plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "opentrons_15_tuberack_5000ul",
+        "label": "tuberack_15"
+      },
+      {
+        "slot": "8",
+        "load_name": "opentrons_24_tuberack_nest_2ml_snapcap",
+        "label": "tuberack_24"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "heater_shaker",
+        "slot": "6",
+        "label": "heater_shaker"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "current_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "current_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "current_vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "close_latch",
+        "module": "heater_shaker"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------ADDING BUFFER TO PLATE------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 1,
+        "volume": 300
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------ADDING CALIBRATION-----------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 1,
+        "volume": 300
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------DUPLICATE PLATING------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 200
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------TRIPLICATE PLATING------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 5,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------ADDING SAMPLE------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 1,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------PLATING TRITON------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 1,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------PLATING TE------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 1,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 50
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place lid on plate on heater shaker"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove lid on plate on heater shaker"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "The protocol did not do the heater shaker steps - please cancel"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n------------PLATING DYE------------\n\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m300_mount",
+        "repetitions": 1,
+        "volume": 300
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": 100
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n    Plate is ready! Please remove, seal, and transport to the plate reader for\n    analysis. Please remember to tidy the robot deck and dispose of any waste.\n    "
+      }
+    ]
+  }
+}

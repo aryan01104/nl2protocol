@@ -1,0 +1,81 @@
+{
+  "id": "ex_concise_aca0ef87",
+  "intent": "Transfer 384 spheroids, 20\u00b5L each, between 384-well plates with slow withdrawal technique",
+  "config": {
+    "labware": {
+      "spheroid source plate": {
+        "load_name": "corning_384_wellplate_90ul",
+        "slot": "4"
+      },
+      "destination plate": {
+        "load_name": "akura_384_wellplate_50ul",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "spheroidtransfer.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Spheroid Transfer",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "corning_384_wellplate_90ul",
+        "label": "spheroid source plate"
+      },
+      {
+        "slot": "1",
+        "load_name": "akura_384_wellplate_50ul",
+        "label": "destination plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "VOL_SPHEROID"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "VOL_SPHEROID"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

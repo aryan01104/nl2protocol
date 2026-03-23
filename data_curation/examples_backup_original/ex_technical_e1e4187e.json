@@ -1,0 +1,265 @@
+{
+  "id": "ex_technical_e1e4187e",
+  "intent": "Perform luciferase reporter assay sample preparation by removing 100\u00b5L supernatant from cell cultures, washing with 100\u00b5L PBS buffer, lysing cells with 30\u00b5L lysis buffer followed by 5-minute incubation, then adding 100\u00b5L luciferase substrate reagent to each well across all 12 columns of up to 4 x 96-well plates for subsequent bioluminescence measurement",
+  "config": {
+    "labware": {
+      "lysis buffer, luciferase reagent": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "4"
+      },
+      "PBS": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "9"
+      },
+      "waste": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "6"
+      },
+      "tips_refill": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "3"
+      },
+      "tips": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "1"
+      },
+      "working_plate": {
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "slot": "PLATE_SLOT:A1"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "sci-lucif-assay4-for4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Luciferase Reporter Assay for NF-kB Activation (up to 4 plates) - Protocol 4: Luciferase Activity Measurement",
+    "author": "Boren Lin, Opentrons",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "lysis buffer, luciferase reagent"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "PBS"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips_refill"
+      },
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips"
+      },
+      {
+        "slot": "PLATE_SLOT:A1",
+        "load_name": "corning_96_wellplate_360ul_flat",
+        "label": "working_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place a New Full Tipbox on Slot 3"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~REMOVE SUPERNATANT and WASH~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount",
+        "labware": "tips_refill_loc",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "PBS_VOL"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount",
+        "labware": "tips_refill_loc",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~ADD LYSIS BUFFER~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "LYSIS_VOL"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n~~~~~~~~ADD LUCIFERASE ASSAY REAGENT~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "LUC_VOL"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "m300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      }
+    ]
+  }
+}

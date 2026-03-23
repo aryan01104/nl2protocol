@@ -1,0 +1,128 @@
+{
+  "id": "ex_technical_d71900fb",
+  "source_file": "04fed3.ot2.apiv2.py",
+  "intent_precise": "Custom Normalization: Using format (tuberack, slot slot), Diluent (reservoir, slot 5), Destination Plate (plate, slot 6). (1) Wait 10 seconds. (2) Transfer from source A1 to destination A1. (3) Mix 6 times at 20\u00b5L. (4) Transfer from source A1 to destination A1. (5) Mix 3 times at 20\u00b5L.",
+  "intent_concise": "Perform normalization. (using 20\u00b5L)",
+  "intent": "For the custom normalization protocol, set up your tuberack in slot 1, place the diluent reservoir in slot 5, and position the destination plate in slot 6. Start by waiting 10 seconds, then transfer from source well A1 to destination well A1, followed by mixing 6 times at 20\u00b5L volume. Next, perform another transfer from source A1 to destination A1, and finish by mixing 3 times at 20\u00b5L.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Custom Normalization",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "slot",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "format"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "Diluent"
+      },
+      {
+        "slot": "6",
+        "load_name": "genesee25221_96_wellplate_300ul",
+        "label": "Destination Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 6,
+        "volume": 20
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "format": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "slot"
+      },
+      "Diluent": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "5"
+      },
+      "Destination Plate": {
+        "load_name": "genesee25221_96_wellplate_300ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

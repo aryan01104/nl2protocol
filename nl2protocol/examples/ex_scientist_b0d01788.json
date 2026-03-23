@@ -1,0 +1,63 @@
+{
+  "id": "ex_technical_b0d01788",
+  "source_file": "normalization.ot2.apiv2.py",
+  "intent_precise": "Normalization with 50ml tube: Using plate (plate, slot 3). (1) Transfer from source A1 to destination A1.",
+  "intent_concise": "Perform normalization.",
+  "intent": "Take the plate from slot 3 and perform the normalization procedure using the 50ml tube. You'll need to transfer the sample from well A1 in the source plate to well A1 in the destination plate. Make sure to follow standard pipetting techniques to ensure accurate transfer during this normalization step.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Normalization with 50ml tube",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "plate_type",
+        "label": "plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_model",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "WARNING: Not enough liquid in 50ml tube"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "plate": {
+        "load_name": "plate_type",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "pip_model",
+        "tipracks": []
+      }
+    }
+  }
+}

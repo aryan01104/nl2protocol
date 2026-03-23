@@ -1,0 +1,173 @@
+{
+  "id": "ex_casual_6f0e33ff",
+  "intent": "Set up a PCR plate by putting mastermix into a bunch of wells, add some positive control to the last well, then grab samples from regular plates and move them over to the right spots in the 384-well plate, mixing everything as you go",
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "opentrons_24_tuberack_1500ul",
+        "slot": "5"
+      },
+      "pcr_plate_384": {
+        "load_name": "pr1ma_384_wellplate_50ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "13ea1e-part2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR Plate Prep with 384 Well Plate",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_1500ul",
+        "label": "tuberack"
+      },
+      {
+        "slot": "6",
+        "load_name": "pr1ma_384_wellplate_50ul",
+        "label": "pcr_plate_384"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace empty tip racks."
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "liquid_prompt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing Mastermix"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 7,
+        "labware": "mastermix_tube",
+        "well": "0"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 7
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\n\n\n"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding Positive Control"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 5.5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "mix_reps",
+        "volume": 12.5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding Sample"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 5.5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": "airgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p20_mount",
+        "repetitions": "mix_reps",
+        "volume": 12.5
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

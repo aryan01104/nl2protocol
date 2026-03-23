@@ -1,0 +1,100 @@
+{
+  "id": "ex_technical_9e9f0e7e",
+  "intent": "Execute a multi-plate buffer filling protocol dispensing 500\u00b5L of wash buffer 1 to deep well plate 1, 500\u00b5L of wash buffer 2 to deep well plate 2, and 100\u00b5L of elution buffer to individual wells of a 200\u00b5L Kingfisher plate. Use P300 multi-channel pipette with 20\u00b5L air gaps for wash buffer transfers across calculated column numbers based on sample count, and P1000 single-channel for elution buffer distribution with optimized aspiration batching.",
+  "config": {
+    "labware": {
+      "elution plate": {
+        "load_name": "kingfisher_96_wellplate_200ul",
+        "slot": "3"
+      },
+      "reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "p1000_mount": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "plate_fill.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Plate Filling",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "kingfisher_96_wellplate_200ul",
+        "label": "elution plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p1000_mount",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "vol_air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p1000_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p1000_mount",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p1000_mount",
+        "volume": "vol_elution_buffer"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p1000_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "id": "ex_concise_6e99f161",
+  "intent": "Pipette calibration: transfer 5\u00b5L, 50\u00b5L, 200\u00b5L across multiple wells/columns with optional touch-tip",
+  "config": {
+    "labware": {
+      "small_tips": {
+        "load_name": "generic_96_tiprack_20ul",
+        "slot": "1"
+      },
+      "big_tips": {
+        "load_name": "generic_96_tiprack_200ul",
+        "slot": "2"
+      },
+      "tuberack": {
+        "load_name": "custom_96_tubeholder_500ul",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "pip_mnt": {
+        "model": "pip_type",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "29414b.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Single-/Multi-Channel Calibration",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "generic_96_tiprack_20ul",
+        "label": "small_tips"
+      },
+      {
+        "slot": "2",
+        "load_name": "generic_96_tiprack_200ul",
+        "label": "big_tips"
+      },
+      {
+        "slot": "3",
+        "load_name": "custom_96_tubeholder_500ul",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mnt",
+        "model": "pip_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pip_mnt",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pip_mnt",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pip_mnt",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pip_mnt",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "pip_mnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mnt"
+      }
+    ]
+  }
+}

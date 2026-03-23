@@ -1,0 +1,135 @@
+{
+  "id": "ex_concise_8b8f700d",
+  "intent": "Compound serial dilution in DMSO, 6 steps per column with automated stock transfer and mixing",
+  "config": {
+    "labware": {
+      "compound management plate": {
+        "load_name": "greinerbioone_96_wellplate_340ul",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "mount_p300": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "mount_p20": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "dilution.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Compound Dilution",
+    "author": "Nick <ndiehl@opentrons.com",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "greinerbioone_96_wellplate_340ul",
+        "label": "compound management plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "mount_p20",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "mount_p300",
+        "volume": "float",
+        "source_labware": "substance_map",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          "mix_reps",
+          50
+        ]
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Check plate/spin down to ensure there are no air bubbles."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "mount_p300",
+        "volume": "float",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p300"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": "mix_reps",
+        "volume": "mix_vol",
+        "labware": "column",
+        "well": "0"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          "mix_reps",
+          "mix_vol"
+        ]
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

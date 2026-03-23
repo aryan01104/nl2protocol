@@ -2,19 +2,59 @@
 """
 Command-line interface for nl2protocol.
 
+Convert natural language instructions to Opentrons OT-2 protocol scripts.
+
 Usage:
-    nl2protocol -i "Your protocol description" [options]
+    nl2protocol -i "Your protocol description" -c lab_config.json
+    nl2protocol -i "Your protocol description" --generate-config
+    nl2protocol -i protocol.txt -c my_lab.json
+    nl2protocol -i experiment.pdf -d data.csv
 
 Options:
-    -c, --config    Lab configuration JSON file (default: lab_config.json)
-    -d, --data      CSV data file with experiment parameters
-    -o, --output    Output protocol path (default: generated_protocol.py)
-    -r, --retries   Max retry attempts (default: 3)
-    --robot         After successful simulation, prompt to upload to robot
+    -i, --intent        Protocol description (text, .txt file, or .pdf file)
+    -c, --config        Lab configuration JSON file (default: lab_config.json)
+    -d, --data          CSV data file with experiment parameters
+    -o, --output        Output protocol filename (timestamp auto-appended)
+    -r, --retries       Max retry attempts (default: 3)
+    --generate-config   Infer lab config from instruction (no config file needed)
+    --robot             After success, prompt to upload to OT-2 robot
+    --validate-only     Only validate config file, don't generate protocol
+
+Notes:
+    - Use --generate-config if you don't have a lab_config.json file
+    - Output files are timestamped (e.g., protocol_20240315_143022.py)
+    - Requires ANTHROPIC_API_KEY environment variable
 """
-import argparse
-import sys
+# Suppress verbose logging BEFORE any imports that use HuggingFace
 import os
+import sys
+import warnings
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
+# This disables the "unauthenticated requests" warning
+os.environ["HF_HUB_VERBOSITY"] = "error"
+
+# Suppress warnings
+warnings.filterwarnings("ignore", message=".*unauthenticated.*")
+warnings.filterwarnings("ignore", message=".*HF_TOKEN.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
+
+import logging
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+
+import argparse
+import json
+import re
+import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -26,20 +66,44 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  %(prog)s -i "Transfer 100uL from A1 to B1"
-  %(prog)s -i "Perform serial dilution" -d data.csv -o dilution_protocol.py
-  %(prog)s -i "Mix samples" -c my_lab.json -r 5
+  # Basic usage with existing config
+  %(prog)s -i "Transfer 100uL from plate A1 to B1" -c lab_config.json
 
-Compatibility:
-  - Opentrons OT-2 robot
-  - API version 2.15
+  # Auto-generate config from instruction (no config file needed)
+  %(prog)s -i "Serial dilution across row A" --generate-config
+
+  # Read instruction from file
+  %(prog)s -i protocol.txt -c my_lab.json
+
+  # With CSV data for parameterized protocols
+  %(prog)s -i "Distribute samples per data file" -c lab.json -d samples.csv
+
+  # Upload to robot after generation
+  %(prog)s -i "Mix wells A1-A6" -c lab.json --robot
+
+  # Validate config file only
+  %(prog)s --validate-only -c lab_config.json
+
+Sample instructions:
+  "Transfer 100uL from source plate well A1 to dest plate well B1"
+  "Perform a 2x serial dilution across row A starting with 200uL"
+  "Distribute 50uL from reservoir to all wells in column 1"
+  "Mix 3 times at 100uL in wells A1 through A8"
+  "Set temperature module to 37C, wait, then transfer samples"
+
+Environment:
+  ANTHROPIC_API_KEY    Required. Get from https://console.anthropic.com/
+
+Files:
+  lab_config.json      Lab equipment configuration (see lab_config.example.json)
+  robot_config.json    Robot connection settings (see robot_config.example.json)
         '''
     )
 
     parser.add_argument(
         '-i', '--intent',
         default=None,
-        help='Natural language description of the protocol'
+        help='Protocol description: literal text, .txt file, or .pdf file'
     )
 
     parser.add_argument(
@@ -57,7 +121,7 @@ Compatibility:
     parser.add_argument(
         '-o', '--output',
         default='generated_protocol.py',
-        help='Output path for generated protocol (default: generated_protocol.py)'
+        help='Output base path - timestamp auto-appended (default: generated_protocol.py)'
     )
 
     parser.add_argument(
@@ -80,9 +144,21 @@ Compatibility:
     )
 
     parser.add_argument(
+        '--generate-config',
+        action='store_true',
+        help='Infer lab config from instruction instead of using existing config file'
+    )
+
+    parser.add_argument(
         '-v', '--version',
         action='store_true',
         help='Show version and exit'
+    )
+
+    parser.add_argument(
+        '--setup',
+        action='store_true',
+        help='Interactive setup to configure your Anthropic API key'
     )
 
     return parser
@@ -90,7 +166,8 @@ Compatibility:
 
 def validate_args(args: argparse.Namespace) -> None:
     """Validate CLI arguments and raise errors for invalid inputs."""
-    if not os.path.isfile(args.config):
+    # Config file only required if not using --generate-config
+    if not args.generate_config and not os.path.isfile(args.config):
         raise FileNotFoundError(f"Config file not found: {args.config}")
 
     if args.data and not os.path.isfile(args.data):
@@ -111,6 +188,57 @@ def get_simulation_log_path(protocol_path: str) -> str:
     return str(path.parent / f"{path.stem}_simulation.log")
 
 
+def get_timestamped_output_path(output_path: str) -> str:
+    """Append timestamp to output filename."""
+    path = Path(output_path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return str(path.parent / f"{path.stem}_{timestamp}{path.suffix}")
+
+
+def resolve_intent(intent: str) -> str:
+    """Resolve intent - read from file if it's a .txt or .pdf path, else return as-is.
+
+    Args:
+        intent: Either literal text or a path to .txt/.pdf file
+
+    Returns:
+        The intent text (from file or as provided)
+
+    Raises:
+        FileNotFoundError: If file path provided but doesn't exist
+        ValueError: If PDF parsing fails or pypdf not installed
+    """
+    path = Path(intent)
+    suffix = path.suffix.lower()
+
+    # If it looks like a file path and exists, read it
+    if suffix in ('.txt', '.pdf') and path.exists():
+        if suffix == '.txt':
+            print(f"Reading intent from: {intent}")
+            return path.read_text().strip()
+
+        elif suffix == '.pdf':
+            try:
+                import pypdf
+            except ImportError:
+                raise ValueError(
+                    "PDF support requires pypdf. Install with: pip install pypdf"
+                )
+
+            print(f"Reading intent from: {intent}")
+            try:
+                reader = pypdf.PdfReader(intent)
+                text_parts = []
+                for page in reader.pages:
+                    text_parts.append(page.extract_text())
+                return "\n".join(text_parts).strip()
+            except Exception as e:
+                raise ValueError(f"Failed to read PDF: {e}")
+
+    # Otherwise treat as literal text
+    return intent
+
+
 def prompt_yes_no(question: str, default: bool = True) -> bool:
     """Prompt user for yes/no input."""
     suffix = "[Y/n]" if default else "[y/N]"
@@ -118,6 +246,107 @@ def prompt_yes_no(question: str, default: bool = True) -> bool:
     if not response:
         return default
     return response in ('y', 'yes')
+
+
+def handle_setup() -> int:
+    """
+    Interactive setup for API key configuration.
+
+    Returns:
+        0 on success, 1 on failure/cancel
+    """
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    print("\n" + "=" * 50)
+    print("nl2protocol Setup")
+    print("=" * 50)
+
+    # Check for existing key
+    existing_key = os.getenv("ANTHROPIC_API_KEY")
+    if existing_key:
+        masked = existing_key[:8] + "..." + existing_key[-4:] if len(existing_key) > 12 else "****"
+        print(f"\nExisting API key found: {masked}")
+        if not prompt_yes_no("Replace it?", default=False):
+            print("Setup complete. Using existing key.")
+            return 0
+
+    # Prompt for new key
+    print("\nGet your API key from: https://console.anthropic.com/")
+    print("(Create an account if you don't have one)\n")
+
+    try:
+        api_key = input("Enter your Anthropic API key: ").strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nSetup cancelled.")
+        return 1
+
+    if not api_key:
+        print("Error: API key cannot be empty.")
+        return 1
+
+    # Validate key format
+    if not api_key.startswith("sk-"):
+        print("\nWarning: API key usually starts with 'sk-'.")
+        if not prompt_yes_no("Save anyway?", default=False):
+            print("Setup cancelled.")
+            return 1
+
+    # Determine where to save
+    env_path = Path.cwd() / ".env"
+
+    # Read existing .env content if it exists
+    if env_path.exists():
+        content = env_path.read_text()
+        if "ANTHROPIC_API_KEY" in content:
+            # Replace existing key
+            content = re.sub(
+                r'ANTHROPIC_API_KEY=.*',
+                f'ANTHROPIC_API_KEY={api_key}',
+                content
+            )
+        else:
+            # Append to existing file
+            content = content.rstrip() + f"\nANTHROPIC_API_KEY={api_key}\n"
+    else:
+        content = f"ANTHROPIC_API_KEY={api_key}\n"
+
+    # Save
+    try:
+        env_path.write_text(content)
+    except Exception as e:
+        print(f"Error saving to {env_path}: {e}")
+        print(f"\nYou can manually set the key:")
+        print(f"  export ANTHROPIC_API_KEY={api_key}")
+        return 1
+
+    print(f"\nAPI key saved to: {env_path}")
+    print("Setup complete!")
+    print("\nYou can now run:")
+    print('  nl2protocol -i "Transfer 100uL from A1 to B1" -c lab_config.json')
+    return 0
+
+
+def offer_setup_on_missing_key() -> bool:
+    """
+    Offer to run setup when API key is missing.
+
+    Returns:
+        True if setup was run successfully, False otherwise
+    """
+    print("\nNo API key found.")
+
+    # Check if we're in an interactive terminal
+    if not sys.stdin.isatty():
+        print("Run 'nl2protocol --setup' to configure your API key.")
+        return False
+
+    if prompt_yes_no("Would you like to set it up now?", default=True):
+        return handle_setup() == 0
+    else:
+        print("\nTo set up later, run: nl2protocol --setup")
+        print("Or manually set: export ANTHROPIC_API_KEY=your-key-here")
+        return False
 
 
 def handle_robot_upload(protocol_path: str) -> bool:
@@ -171,23 +400,30 @@ def handle_robot_upload(protocol_path: str) -> bool:
     # Create client and connect
     robot = RobotClient(
         ip=config['robot_ip'],
-        name=config.get('robot_name')
+        name=config.get('robot_name'),
+        demo_mode=config.get('demo_mode', False)
     )
 
     print(f"Connecting to {robot.name} ({robot.ip})...")
 
-    if not robot.health_check():
-        print(f"Error: Cannot reach robot at {robot.ip}", file=sys.stderr)
+    try:
+        robot.health_check(raise_on_error=True)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
         return False
 
     print("Connected!")
 
     # Upload protocol
     print("Uploading protocol...")
-    protocol_id = robot.upload_protocol(protocol_path)
+    try:
+        protocol_id = robot.upload_protocol(protocol_path)
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return False
 
     if not protocol_id:
-        print("Error: Failed to upload protocol.", file=sys.stderr)
+        print("Error: Failed to upload protocol (no ID returned).", file=sys.stderr)
         return False
 
     print(f"Protocol uploaded. ID: {protocol_id}")
@@ -220,9 +456,13 @@ def main(argv: list = None) -> int:
         print(f"nl2protocol {__version__}")
         return 0
 
+    # Handle --setup
+    if args.setup:
+        return handle_setup()
+
     # Handle --validate-only
     if args.validate_only:
-        from .validation import validate_config_file
+        from .validate_config import validate_config_file
         result = validate_config_file(args.config)
         if result.valid:
             print(f"Config '{args.config}' is valid.")
@@ -243,37 +483,117 @@ def main(argv: list = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # Resolve intent (read from file if .txt or .pdf)
+    try:
+        intent = resolve_intent(args.intent)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # Apply timestamp to output path
+    output_path = get_timestamped_output_path(args.output)
+
     # Import here to allow --help to work without dependencies
     from .app import ProtocolAgent
+    from .errors import NL2ProtocolError, APIKeyError, ConfigFileError
 
-    agent = ProtocolAgent(config_path=args.config)
+    # Handle --generate-config mode
+    config_path = args.config
+    if args.generate_config:
+        from .config_generator import ConfigGenerator, format_config_for_display
+        import tempfile
 
-    result = agent.run_pipeline(
-        prompt=args.intent,
-        csv_path=args.data,
-        max_retries=args.retries
-    )
+        print("Inferring lab configuration from your instruction...")
+        try:
+            generator = ConfigGenerator()
+            generated_config = generator.generate(intent)
+        except APIKeyError as e:
+            # Offer interactive setup if key is missing
+            if offer_setup_on_missing_key():
+                # Retry with new key
+                try:
+                    from dotenv import load_dotenv
+                    load_dotenv(override=True)  # Reload .env
+                    generator = ConfigGenerator()
+                    generated_config = generator.generate(intent)
+                except APIKeyError:
+                    print("API key still not working. Please check your key.", file=sys.stderr)
+                    return 1
+            else:
+                return 1
+
+        if generated_config is None:
+            print("Error: Could not infer configuration from instruction.", file=sys.stderr)
+            return 1
+
+        # Display config to user
+        print(format_config_for_display(generated_config))
+        print("\nYou must arrange your equipment exactly as shown above.")
+        print("Ensure you have all the listed labware, pipettes, and modules.\n")
+
+        if not prompt_yes_no("Proceed with this configuration?", default=True):
+            print("Aborted.")
+            return 0
+
+        # Save to temp file for use
+        temp_config = tempfile.NamedTemporaryFile(
+            mode='w', suffix='.json', delete=False
+        )
+        json.dump(generated_config, temp_config, indent=2)
+        temp_config.close()
+        config_path = temp_config.name
+        print(f"\nUsing generated config: {config_path}")
+
+    try:
+        agent = ProtocolAgent(config_path=config_path)
+    except APIKeyError as e:
+        # Offer interactive setup if key is missing
+        if offer_setup_on_missing_key():
+            # Retry with new key
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(override=True)  # Reload .env
+                agent = ProtocolAgent(config_path=config_path)
+            except APIKeyError:
+                print("API key still not working. Please check your key.", file=sys.stderr)
+                return 1
+        else:
+            return 1
+    except ConfigFileError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    except NL2ProtocolError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        result = agent.run_pipeline(
+            prompt=intent,
+            csv_path=args.data,
+            max_retries=args.retries
+        )
+    except NL2ProtocolError as e:
+        print(f"\nError: {e}", file=sys.stderr)
+        return 1
 
     if result is None:
         print(f"\nFailed to generate valid protocol after {args.retries} attempts.", file=sys.stderr)
         return 1
 
-    script, simulation_log = result
-
     # Save protocol
-    with open(args.output, 'w') as f:
-        f.write(script)
-    print(f"\nProtocol saved to: {args.output}")
+    with open(output_path, 'w') as f:
+        f.write(result.script)
+    print(f"\nProtocol saved to: {output_path}")
 
     # Save simulation log alongside protocol
-    log_path = get_simulation_log_path(args.output)
+    log_path = get_simulation_log_path(output_path)
     with open(log_path, 'w') as f:
-        f.write(simulation_log)
+        f.write(result.simulation_log)
     print(f"Simulation log saved to: {log_path}")
 
     # Robot upload flow (if --robot flag is set)
     if args.robot:
-        upload_result = handle_robot_upload(args.output)
+        upload_result = handle_robot_upload(output_path)
         if upload_result is False:
             return 1
 

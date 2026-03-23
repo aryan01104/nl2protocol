@@ -1,0 +1,339 @@
+{
+  "id": "ex_technical_e4aa1fb4",
+  "intent": "Execute NEBNext Quarter Volume Library Prep Step 7 PCR enrichment protocol: Using single-tip pickup mode on p20 multichannel, dispense 1\u00b5L of selected i7 index row to each well of PCR plate columns. Transfer 12\u00b5L Q5 mastermix from temperature module at 4\u00b0C via reagent plate intermediate to PCR plate. Add 1\u00b5L selected i5 index column to PCR plate. Transfer 10\u00b5L library samples from magnetic module plate to PCR plate with 5x mixing cycles at 19\u00b5L volume. Maintain reduced pickup current (0.15mA) for single-tip operations.",
+  "config": {
+    "labware": {
+      "block": {
+        "load_name": "labware_tempmod",
+        "slot": "2"
+      },
+      "mag_plate": {
+        "load_name": "labware_plates",
+        "slot": "Library Prep Plate or Size Plate (96xA)"
+      },
+      "i7 indexes": {
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "slot": "5"
+      },
+      "i5 indexes": {
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "slot": "2"
+      },
+      "PCR Plate": {
+        "load_name": "labware_plates",
+        "slot": "8"
+      },
+      "Reagent Plate": {
+        "load_name": "labware_plates",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "Temperature Module",
+        "slot": "1"
+      },
+      "mag": {
+        "module_type": "magnetic",
+        "slot": "9"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "11bb6a-part-7.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "11bb6a-part-7.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "labware_tempmod",
+        "label": "block"
+      },
+      {
+        "slot": "Library Prep Plate or Size Plate (96xA)",
+        "load_name": "labware_plates",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "label": "i7 indexes"
+      },
+      {
+        "slot": "2",
+        "load_name": "eppendorf_96_wellplate_200ul",
+        "label": "i5 indexes"
+      },
+      {
+        "slot": "8",
+        "load_name": "labware_plates",
+        "label": "PCR Plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "labware_plates",
+        "label": "Reagent Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "Temperature Module",
+        "slot": "1",
+        "label": "temp"
+      },
+      {
+        "module_type": "magnetic",
+        "slot": "9",
+        "label": "mag"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "mag",
+        "height": "engage_height"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Ensure reagents in sufficient volume are present on deck."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Step - p20m 'one tip' add selected row i7 to PCR Plate"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "disposal_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Step - 1-tip p300m add Q5 Mastermix to Reagent Plate column 6"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "v"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Step - p20m transfer Q5 Mastermix to PCR Plate"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 12
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 12
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Step - p20m add selected column i5 to PCR Plate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 1
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Step - 10 uL sample to PCR plate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 10
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 19
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 19
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "mag"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Finished"
+      }
+    ]
+  }
+}

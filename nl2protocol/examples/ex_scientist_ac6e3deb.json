@@ -1,0 +1,176 @@
+{
+  "id": "ex_technical_ac6e3deb",
+  "source_file": "43163c.ot2.apiv2.py",
+  "intent_precise": "Nanomaterial toxicity assay: Using Experimental nanoparticle plate (plate, slot 3), Nanoparticles (reservoir, slot 5), GO/MoS2 prep plate (plate, slot 9), MoSe2 prep plate (plate, slot 6). (1) Distribute 25\u00b5L from source A1 to destination wells A1, A1, A1. (2) Distribute 50\u00b5L from source A1 to destination wells A1, A1, A1.",
+  "intent_concise": "Perform 2 distribution steps. (volumes 25\u00b5L-100\u00b5L)",
+  "intent": "For this nanomaterial toxicity assay, you'll be working with the Experimental nanoparticle plate in slot 3, Nanoparticles reservoir in slot 5, GO/MoS2 prep plate in slot 9, and MoSe2 prep plate in slot 6. Start by taking 25\u00b5L from source well A1 and distribute it to the three A1 destination wells, then follow up with a second distribution of 50\u00b5L from the same source A1 to those same three A1 destination wells. This setup will give you the proper nanoparticle concentrations needed for the toxicity screening.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Nanomaterial toxicity assay",
+    "author": "Unknown",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "label": "Experimental nanoparticle plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "Nanoparticles"
+      },
+      {
+        "slot": "9",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "GO/MoS2 prep plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "label": "MoSe2 prep plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 25,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          50
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 50
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Experimental nanoparticle plate": {
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "slot": "3"
+      },
+      "Nanoparticles": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "5"
+      },
+      "GO/MoS2 prep plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "9"
+      },
+      "MoSe2 prep plate": {
+        "load_name": "nest_96_wellplate_200ul_flat",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

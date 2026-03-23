@@ -1,0 +1,105 @@
+{
+  "id": "ex_technical_026c89de",
+  "source_file": "plate_fill.ot2.apiv2.py",
+  "intent_precise": "Drug Release Time Point Testing: Using source plate (plate, slot 1), reservoir (reservoir, slot 4). (1) Pause: Replace the tips (2) Transfer from source to destination.",
+  "intent_concise": "Execute 12-step liquid handling protocol.",
+  "intent": "For the Drug Release Time Point Testing protocol, you'll be working with the source plate in slot 1 and the reservoir in slot 4. First, pause the system and replace the tips to ensure clean transfers, then proceed to transfer the samples from the source plate to your destination wells. Make sure to maintain proper technique throughout the transfer process to preserve the integrity of your time point samples.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Drug Release Time Point Testing",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "label": "source plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "agilent_1_reservoir_290ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p1000",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace the tips"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p1000",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p1000",
+        "volume": "vol_transfer"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount_p1000"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "mount_p1000"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "source plate": {
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "slot": "1"
+      },
+      "reservoir": {
+        "load_name": "agilent_1_reservoir_290ml",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

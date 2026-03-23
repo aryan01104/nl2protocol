@@ -1,0 +1,60 @@
+{
+  "id": "ex_technical_370a6266",
+  "intent": "Execute library pooling for Illumina Nextera XT NGS preparation by transferring specified volumes from up to 96 library samples in a Bio-Rad 96-well PCR plate to 1-24 designated pooling tubes in an Eppendorf 2mL tube rack, using fresh tips for each transfer to prevent cross-contamination",
+  "config": {
+    "labware": {
+      "Load Plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "1"
+      },
+      "Tube Rack with 2mL Tube(s)": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_type",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "nexteraXT_dna_library_prep_part4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Illumina Nextera XT NGS Prep 4: Pool Libraries",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "Load Plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "Tube Rack with 2mL Tube(s)"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "pool_vol",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  }
+}

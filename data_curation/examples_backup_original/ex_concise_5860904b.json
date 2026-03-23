@@ -1,0 +1,225 @@
+{
+  "id": "ex_concise_5860904b",
+  "intent": "NEBNext adapter ligation: combine ligation reagents, add to fragmented samples, incubate 20\u00b0C/15min, add enzyme, incubate 37\u00b0C/15min",
+  "config": {
+    "labware": {
+      "temp_reagents": {
+        "load_name": "opentrons_24_aluminumblock_nest_0.5ml_screwcap",
+        "slot": "Opentrons 24-Well Aluminum Block"
+      },
+      "tc_plate": {
+        "load_name": "pcr_labware",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp": {
+        "module_type": "Temperature Module",
+        "slot": "2"
+      },
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "4b4a80-adapter_ligation.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "4b4a80-adapter_ligation.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "Opentrons 24-Well Aluminum Block",
+        "load_name": "opentrons_24_aluminumblock_nest_0.5ml_screwcap",
+        "label": "temp_reagents"
+      },
+      {
+        "slot": "4",
+        "load_name": "pcr_labware",
+        "label": "tc_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "Temperature Module",
+        "slot": "2",
+        "label": "temp"
+      },
+      {
+        "module_type": "thermocycler",
+        "slot": "3",
+        "label": "tc"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "right",
+        "repetitions": 10,
+        "volume": 250
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": [
+          null,
+          null
+        ],
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": null,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          10,
+          250
+        ]
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "mixture_volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          3,
+          null
+        ]
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "adapter_ligation_profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Important. Please ensure that the thermocycler lid is fully open to\n     avoid collision with the pipette"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "user_enzyme_volume",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          6,
+          15
+        ]
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 47
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "user_enzyme_profile",
+        "repetitions": 1
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 22
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adapter ligation step is complete"
+      }
+    ]
+  }
+}

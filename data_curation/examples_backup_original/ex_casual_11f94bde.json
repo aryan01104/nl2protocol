@@ -1,0 +1,73 @@
+{
+  "id": "ex_casual_11f94bde",
+  "intent": "Take bacterial cultures and do serial dilutions across multiple plates while spotting samples onto agar plates. Go column by column, diluting the bugs and dropping a bit onto agar plates to grow colonies. Do this for 5 sets of plates using the multichannel pipette.",
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "33y0f3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Bacterial Plating and Dilution",
+    "author": "Lachlan <lajamu@biosustain.dtu.dk",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "spot_vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "spot_vol"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          5,
+          20
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "spot_vol",
+        "labware": "plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Run Complete!"
+      }
+    ]
+  }
+}

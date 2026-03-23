@@ -1,0 +1,131 @@
+{
+  "id": "ex_casual_366fa3f6",
+  "intent": "Take samples and assays from two 96-well plates and load them into a special microfluidics chip. Use the multichannel pipette to move 4\u00b5L from each well, going slow and careful with delays to make sure everything transfers properly. Do the assays first, then the samples, working through the plates in small groups.",
+  "config": {
+    "labware": {
+      "AssayPlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "4"
+      },
+      "SamplePlate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "5"
+      },
+      "IFC": {
+        "load_name": "dynamic_array_48_48",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "standard-biotools-da-48.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Standard Biotools Dynamic Array 48.48: Load 4 uL",
+    "author": "Standard Biotools Inc",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "AssayPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "SamplePlate"
+      },
+      {
+        "slot": "2",
+        "load_name": "dynamic_array_48_48",
+        "label": "IFC"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transfer Assay Mix - Plate 1 to IFC (Assay Inlets)"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "cmtLine"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "Vol_Asp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": "Vol_Disp"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "Delay_Disp"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol Complete!"
+      }
+    ]
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "id": "ex_technical_8e1f5e9c",
+  "source_file": "18e62e.ot2.apiv2.py",
+  "intent_precise": "PCR Prep with 384-Well Plate and Temperature Module: Using tempPlate (labware, slot 2), destPlate (plate, slot 2). With temperature module. (1) Set temperature to 4\u00b0C. (2) Transfer 2\u00b5L from source to destination. (3) Mix 2 times at 5\u00b5L. (4) Transfer 5\u00b5L from source to destination. (5) Mix 3 times at 10\u00b5L.",
+  "intent_concise": "Perform temperature control (4\u00b0C). (volumes 2\u00b5L-10\u00b5L)",
+  "intent": "Set up your PCR prep using the tempPlate in slot 2 as your labware and the destPlate as your 384-well destination plate, making sure to activate the temperature module and cool it down to 4\u00b0C first. Start by transferring 2\u00b5L from your source to the destination wells, then mix twice using a 5\u00b5L volume to ensure good incorporation. Follow this with a 5\u00b5L transfer from source to destination, and finish by mixing three times at 10\u00b5L volume to get everything properly homogenized for your PCR reaction.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "PCR Prep with 384-Well Plate and Temperature Module",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "label": "tempPlate"
+      },
+      {
+        "slot": "2",
+        "load_name": "microampoptical_384_wellplate_30ul",
+        "label": "destPlate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipMnt",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "tempDeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempDeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt",
+        "labware": "tipLocs",
+        "well": "A1"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 2,
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 5
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 3,
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol is complete!"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tempPlate": {
+        "load_name": "opentrons_96_aluminumblock_generic_pcr_strip_200ul",
+        "slot": "2"
+      },
+      "destPlate": {
+        "load_name": "microampoptical_384_wellplate_30ul",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempDeck": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  }
+}

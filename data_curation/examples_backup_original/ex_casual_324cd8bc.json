@@ -1,0 +1,291 @@
+{
+  "id": "ex_casual_324cd8bc",
+  "intent": "Run a protein array experiment where you block some slides with buffer, wash them a couple times, add your samples and let them incubate for an hour with shaking, wash again, add secondary antibody for another hour, do some final washes, then take the slides off and scan them. The robot handles all the liquid transfers and timing for you.",
+  "config": {
+    "labware": {
+      "reagent reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "3"
+      },
+      "Teleshake with slides mounted": {
+        "load_name": "teleshake1536_64_slides_100ul",
+        "slot": "4"
+      },
+      "sample plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "protein_array.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Protein Array",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reagent reservoir"
+      },
+      {
+        "slot": "4",
+        "load_name": "teleshake1536_64_slides_100ul",
+        "label": "Teleshake with slides mounted"
+      },
+      {
+        "slot": "10",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "sample plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 150,
+        "labware": "set_a",
+        "well": "0"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 150,
+        "labware": "set_a",
+        "well": "1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 300
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Shake for 30 minutes at room temperature on TeleShake before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "pbst",
+        "source_well": "0",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "pause_str"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "pbst",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "pbst",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Prepare 1:1000 secondary antibody solution (2 ml total volume per slide) in PBST and place in channel 2 of the 12-channel reagent reservoir (slot 3)."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate the samples by gentle agitation for 1 hour using TeleShake before resuming."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "p300_mount",
+        "volume": 100,
+        "source_labware": "pbst",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "never"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Take off slides from FastFrame and place into 50 ml conical tube filled with 45 ml PBS, and wash by agitating on TeleShake for 5 minutes. Briefly rinse the slides 2 times using a 50 ml conical tube with ddH2O. Spin at 300 rpm using Beckman-Coulter Avant J-E Centrifuge at RT for 4 minutes. Scan the slides with GenePix 4400 A."
+      }
+    ]
+  }
+}

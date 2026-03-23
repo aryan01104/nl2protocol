@@ -1,0 +1,60 @@
+{
+  "id": "ex_technical_83e172dc",
+  "source_file": "315118.ot2.apiv2.py",
+  "intent_precise": "mock pooling: (1) Transfer 20\u00b5L from source to destination. (2) Wait 10 seconds.",
+  "intent_concise": "Execute 6-step liquid handling protocol. (using 20\u00b5L)",
+  "intent": "For the mock pooling protocol, take 20\u00b5L from your source well and transfer it directly to the destination well. Once you've completed the transfer, wait 10 seconds before proceeding to the next step.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "mock pooling",
+    "author": "Steve <protocols@opentrons.com>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left",
+        "labware": "tips_ordered",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      }
+    ]
+  },
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

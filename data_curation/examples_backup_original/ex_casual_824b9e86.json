@@ -1,0 +1,69 @@
+{
+  "id": "ex_casual_824b9e86",
+  "intent": "Take samples from different tubes in the rack and combine them all into one tube. The robot reads a CSV file to know which tubes to take from and how much to take from each one. It uses some special air gap tricks for the smaller volumes to make sure it transfers accurately.",
+  "config": {
+    "labware": {
+      "1.5ml tuberack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p20_mount": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "cherrypick.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Consolidation from .csv",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "1.5ml tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20_mount",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p20_mount",
+        "volume": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20_mount",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20_mount"
+      }
+    ]
+  }
+}

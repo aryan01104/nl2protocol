@@ -1,0 +1,64 @@
+{
+  "id": "ex_concise_2d2a9131",
+  "intent": "Aliquot clinical samples into 4 portions per sample: 1mL, 0.5mL, 0.5mL, 1mL",
+  "config": {
+    "labware": {
+      "Clinical Samples": {
+        "load_name": "lbwr",
+        "slot": "slot"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "7363e4.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "7363e4.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "slot",
+        "load_name": "lbwr",
+        "label": "Clinical Samples"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

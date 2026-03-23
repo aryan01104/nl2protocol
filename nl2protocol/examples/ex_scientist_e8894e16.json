@@ -1,0 +1,143 @@
+{
+  "id": "ex_technical_e8894e16",
+  "source_file": "3955db.ot2.apiv2.py",
+  "intent_precise": "Visby Test with Pooling p1000: Using poolRack (tuberack, slot 5). (1) Wait 1 seconds. (2) Mix 1 times. (3) Wait 1 seconds. (4) Wait 1 seconds.",
+  "intent_concise": "Execute 18-step liquid handling protocol. (using 100\u00b5L)",
+  "intent": "For the Visby Test with Pooling using the p1000 pipette, you'll be working with the poolRack located in slot 5 of the tube rack. Start by waiting 1 second, then perform a single mix, followed by another 1-second wait. After that, you'll need to wait an additional 1 second to complete the protocol sequence.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Visby Test with Pooling p1000",
+    "author": "Dipro <dipro@basisdx.org>, Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "label": "tips1000"
+      },
+      {
+        "slot": "5",
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "label": "poolRack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt1000",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips1000"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": 100
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": "pvol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt1000",
+        "volume": "gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt1000",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mnt1000",
+        "repetitions": 1,
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt1000",
+        "volume": "poolVol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mnt1000",
+        "volume": "gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt1000",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt1000"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol complete!"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips1000": {
+        "load_name": "opentrons_96_filtertiprack_1000ul",
+        "slot": "1"
+      },
+      "poolRack": {
+        "load_name": "basisdx_15_tuberack_12000ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "tips1000"
+        ]
+      }
+    }
+  }
+}

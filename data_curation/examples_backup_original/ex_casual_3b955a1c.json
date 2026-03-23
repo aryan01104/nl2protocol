@@ -1,0 +1,37 @@
+{
+  "id": "ex_casual_3b955a1c",
+  "intent": "Take all the tips from a full tip box and spread them out into two empty boxes, but only put them in every other row so there's more space between them. This way you can use the multichannel pipette with 24-well plates instead of the usual 96-well setup.",
+  "config": {
+    "pipettes": {
+      "pipette_mount": {
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "i7g1ym.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Utility: Rearrange pipette tips for 24-well spacing",
+    "author": "Tim Fallon <tfallon@ucsd.edu>",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "pipette_mount",
+        "model": "pipette_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipette_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipette_mount"
+      }
+    ]
+  }
+}

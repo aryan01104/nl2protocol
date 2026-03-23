@@ -1,0 +1,247 @@
+{
+  "id": "ex_casual_adc58bbf",
+  "intent": "Run the adapter ligation step for the Oncomine assay - add switch solution, then barcode adapters, then DNA ligase to the samples with mixing. If using the thermocycler, it'll run the temperature program automatically, otherwise just move the plate over when done.",
+  "config": {
+    "labware": {
+      "src_plate": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "Reagent Plate on Temp Deck"
+      },
+      "Sample Plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "7"
+      },
+      "dest_plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "Sample Plate on Thermocycler"
+      },
+      "dest_plate_Sample Plate on Temp Deck": {
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "slot": "Sample Plate on Temp Deck"
+      },
+      "Reagent Plate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "d_mod": {
+        "module_type": "dest_module",
+        "slot": "7"
+      },
+      "s_mod": {
+        "module_type": "src_module",
+        "slot": "4"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "657ee9-3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Oncomine Focus Assay - Pt 3: Ligate Adapters",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "Reagent Plate on Temp Deck",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "src_plate"
+      },
+      {
+        "slot": "7",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "Sample Plate"
+      },
+      {
+        "slot": "Sample Plate on Thermocycler",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "dest_plate"
+      },
+      {
+        "slot": "Sample Plate on Temp Deck",
+        "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+        "label": "dest_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "Reagent Plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "dest_module",
+        "slot": "7",
+        "label": "d_mod"
+      },
+      {
+        "module_type": "src_module",
+        "slot": "4",
+        "label": "s_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "s_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "d_mod"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "d_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "d_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 4,
+        "labware": "dest_plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 2,
+        "labware": "dest_plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 2,
+        "labware": "dest_plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "m20_mount",
+        "repetitions": 5,
+        "volume": 15
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "d_mod",
+        "celsius": 100
+      },
+      {
+        "command_type": "close_lid",
+        "module": "d_mod"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "d_mod",
+        "celsius": "temp",
+        "hold_time_minutes": "time"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "d_mod",
+        "celsius": 10
+      },
+      {
+        "command_type": "open_lid",
+        "module": "d_mod"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nProtocol complete!"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\nLiquid handling complete;         please move plate to Thermal Cycler.\n"
+      }
+    ]
+  }
+}

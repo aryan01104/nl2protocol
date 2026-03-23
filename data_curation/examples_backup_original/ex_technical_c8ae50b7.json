@@ -1,0 +1,351 @@
+{
+  "id": "ex_technical_c8ae50b7",
+  "intent": "Execute a bacterial lysis and PCR prep protocol for Listeria and Salmonella detection. First, prepare lysis buffers by adding 500\u00b5L of specific enzymes to designated buffer tubes with 10x mixing cycles at 200\u00b5L volume. Distribute 70\u00b5L lysis buffer to Listeria wells and 90\u00b5L to Salmonella wells in a temperature-controlled aluminum block. Transfer 30\u00b5L Listeria samples and 10\u00b5L Salmonella samples to respective lysis wells, mixing 3x at 50\u00b5L and 18\u00b5L volumes. Incubate at 37\u00b0C for 20 minutes, then 95\u00b0C for 10 minutes. Finally, transfer 5\u00b5L processed samples to PCR plate wells and add positive controls to designated positions.",
+  "config": {
+    "labware": {
+      "lysis buffer, C+, enzymes": {
+        "load_name": "opentrons_goldstandarddx_17_tuberack_lysis",
+        "slot": "6"
+      },
+      "sample plate": {
+        "load_name": "sample_rack_type",
+        "slot": "7"
+      },
+      "lysis_plate": {
+        "load_name": "bioplasticsbv_96_aluminumblock_200ul",
+        "slot": "lysis plate"
+      },
+      "PCR plate": {
+        "load_name": "bioplasticsbv_96_aluminumblock_100ul",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "P20_MOUNT": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "P300_MOUNT": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "10"
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "bacgene.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "BACGene",
+    "author": "Nick Diehl <ndiehl@opentrons.com",
+    "labware": [
+      {
+        "slot": "6",
+        "load_name": "opentrons_goldstandarddx_17_tuberack_lysis",
+        "label": "lysis buffer, C+, enzymes"
+      },
+      {
+        "slot": "7",
+        "load_name": "sample_rack_type",
+        "label": "sample plate"
+      },
+      {
+        "slot": "lysis plate",
+        "load_name": "bioplasticsbv_96_aluminumblock_200ul",
+        "label": "lysis_plate"
+      },
+      {
+        "slot": "8",
+        "load_name": "bioplasticsbv_96_aluminumblock_100ul",
+        "label": "PCR plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "P20_MOUNT",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "P300_MOUNT",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "10",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 0.25
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 37
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_seconds"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "P300_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "P300_MOUNT",
+        "repetitions": 10,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "P300_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_per_trans"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "P300_MOUNT",
+        "repetitions": 10,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "P300_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_overage"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_lysis_buffer_listeria"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_overage"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_lysis_buffer_salmonella"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "P300_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_listeria"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P300_MOUNT",
+        "volume": "vol_listeria"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "P300_MOUNT",
+        "repetitions": 3,
+        "volume": 50
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "P300_MOUNT"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol_salmonella"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol_salmonella"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "left",
+        "repetitions": 3,
+        "volume": 18
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 20
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 95
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 37
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "P20_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "P20_MOUNT"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_sample"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "P20_MOUNT",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_positive_control"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "P20_MOUNT",
+        "volume": "vol_positive_control"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "P20_MOUNT",
+        "volume": null
+      },
+      {
+        "command_type": "deactivate",
+        "module": "tempdeck"
+      }
+    ]
+  }
+}

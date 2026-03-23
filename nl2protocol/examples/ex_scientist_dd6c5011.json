@@ -1,0 +1,150 @@
+{
+  "id": "ex_technical_dd6c5011",
+  "source_file": "49de51-pt1.ot2.apiv2.py",
+  "intent_precise": "MagMAX Plant DNA Isolation Kit [1/2]: Using res_lysis (reservoir, slot 4), res_precip (reservoir, slot 1). (1) Transfer 196\u00b5L from source to destination. (2) Pause: Please remove plate for 10min incubation @ 65C. When ready     return plate(s) to deck and click RESUME (3) Transfer 130\u00b5L from source (multiple wells) to destination (multiple wells). (4) Pause: Please remove plate(s), invert 2-3 times, and incubate on     ice for 5 minutes. When ready to continue, place plates back on deck and     click RESUME (5) Transfer 200\u00b5L from source to destination.",
+  "intent_concise": "Execute 21-step liquid handling protocol. (volumes 130\u00b5L-200\u00b5L)",
+  "intent": "For the first half of the MagMAX Plant DNA Isolation Kit protocol, start by transferring 196\u00b5L from the lysis reservoir in slot 4 to your samples, then remove the plate for a 10-minute incubation at 65\u00b0C. Once that's complete, add 130\u00b5L from the precipitation reservoir in slot 1 to each well, then take the plate out again to invert it 2-3 times and incubate on ice for 5 minutes. Finally, transfer 200\u00b5L from your source wells to the destination wells to complete this portion of the extraction.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "MagMAX Plant DNA Isolation Kit [1/2]",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "res_lysis"
+      },
+      {
+        "slot": "1",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res_precip"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 590uL of buffer to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 196
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 196
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please remove plate for 10min incubation @ 65C. When ready     return plate(s) to deck and click RESUME"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Adding 130uL of precipitation to solution to wells..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 130
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please remove plate(s), invert 2-3 times, and incubate on     ice for 5 minutes. When ready to continue, place plates back on deck and     click RESUME"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 400uL of supernatant to deep well plates"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete. Store samples or move to DNA     purification"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "res_lysis": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "4"
+      },
+      "res_precip": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

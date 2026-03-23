@@ -1,0 +1,101 @@
+{
+  "id": "ex_technical_7eb6f726",
+  "source_file": "cell_culture.ot2.apiv2.py",
+  "intent_precise": "Cell Culture: Using tuberack (tuberack, slot 9).",
+  "intent_concise": "Execute 11-step liquid handling protocol.",
+  "intent": "For this cell culture protocol, you'll need to work with the tuberack that's positioned in slot 9 of your setup. Make sure you have easy access to it since you'll be handling the tubes from this rack throughout the procedure. The tuberack contains all the necessary reagents and samples you'll need for the cell culture work, so double-check that it's properly secured in slot 9 before you begin.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Cell Culture",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p300",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "mount_p20",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "opentrons_10_tuberack_falcon_4x50ml_6x15ml_conical",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

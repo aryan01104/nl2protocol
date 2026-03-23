@@ -1,0 +1,136 @@
+{
+  "id": "ex_casual_8aa465c9",
+  "intent": "Fill a bunch of caps with liquid using the multichannel pipette. It grabs liquid from the big reservoir and fills each cap, doing some blowout and touch tip to make sure it's clean. You can set how much liquid to put in each cap and whether to change tips between columns or keep using the same ones.",
+  "config": {
+    "labware": {
+      "Reservoir": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "063611.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "063611.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "Reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Important. Please make sure the tip box in slot 10 is\n        completely full and the tip box in slot 11 is completely empty before\n        clicking resume."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "4"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right",
+        "labware": "column",
+        "well": "A1"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please add full tipracks to slots 10 and 11"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": "fill_volume"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 25
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "right"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please add full tipracks to slots 10 and 11"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      }
+    ]
+  }
+}

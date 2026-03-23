@@ -1,0 +1,76 @@
+{
+  "id": "ex_technical_0ec1b8fa",
+  "intent": "Transfer 100\u00b5L aliquots from 5mL test tubes to 2mL Eppendorf SafeLock tubes using a P300 single-channel pipette. Aspirate from 40mm above the bottom of source vials, dispense 20mm above the bottom of destination tubes, followed by blowout and touch tip at -2mm offset. Execute one-to-one transfers for up to 48 samples across two tube racks each.",
+  "config": {
+    "labware": {
+      "tips": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "7"
+      }
+    },
+    "pipettes": {
+      "mnt300": {
+        "model": "p300_single",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "6b8c90-2.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "48 Samples to MCT",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "7",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mnt300",
+        "model": "p300_single",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mnt300",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mnt300",
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mnt300"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete!"
+      }
+    ]
+  }
+}

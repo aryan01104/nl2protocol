@@ -1,0 +1,100 @@
+{
+  "id": "ex_casual_5d850d61",
+  "intent": "Fill up some 384-well plates with two different master mixes - put the first mix across the top row of wells and the second mix across the second row, pulling from different spots in a reservoir plate",
+  "config": {
+    "labware": {
+      "tips": {
+        "load_name": "tip_name",
+        "slot": "10"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "11"
+      }
+    },
+    "pipettes": {
+      "pipmnt": {
+        "model": "pip_name",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "17cb2d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Plate Filling Master Mix in AB 384 Well Plate",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "tip_name",
+        "label": "tips"
+      },
+      {
+        "slot": "11",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipmnt",
+        "model": "pip_name",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing master mix 1..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipmnt",
+        "volume": "max_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipmnt",
+        "volume": "mm_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Distributing master mix 2..."
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipmnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipmnt",
+        "volume": "max_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipmnt",
+        "volume": "mm_vol"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipmnt"
+      }
+    ]
+  }
+}

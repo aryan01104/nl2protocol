@@ -1,0 +1,112 @@
+{
+  "id": "ex_technical_f3035e0d",
+  "source_file": "422b1e.ot2.apiv2.py",
+  "intent_precise": "Titration Procedure: Using dest_beaker (labware, slot 4), waste_beaker (labware, slot 8), tube_rack (tuberack, slot 9). (1) Transfer 1.0mL from source to destination. (2) Pause for incubation. (3) Transfer 1.0mL from source to destination.",
+  "intent_concise": "Execute 8-step liquid handling protocol. (using 1.0mL)",
+  "intent": "For this titration procedure, you'll be working with the destination beaker in slot 4, waste beaker in slot 8, and tube rack in slot 9. Start by transferring 1.0mL from your source to the destination, then pause to allow for incubation. Once the incubation period is complete, perform a second transfer of 1.0mL from the source to the destination to complete the titration.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Titration Procedure",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "11",
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "label": "p1000tips"
+      },
+      {
+        "slot": "4",
+        "load_name": "custom_beaker",
+        "label": "dest_beaker"
+      },
+      {
+        "slot": "8",
+        "load_name": "custom_beaker",
+        "label": "waste_beaker"
+      },
+      {
+        "slot": "9",
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "label": "tube_rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 1000
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 1000
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "wait_time"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 1000
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 1000
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "p1000tips": {
+        "load_name": "opentrons_96_tiprack_1000ul",
+        "slot": "11"
+      },
+      "dest_beaker": {
+        "load_name": "custom_beaker",
+        "slot": "4"
+      },
+      "waste_beaker": {
+        "load_name": "custom_beaker",
+        "slot": "8"
+      },
+      "tube_rack": {
+        "load_name": "opentrons_6_tuberack_falcon_50ml_conical",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p1000_single_gen2",
+        "tipracks": [
+          "p1000tips"
+        ]
+      }
+    }
+  }
+}

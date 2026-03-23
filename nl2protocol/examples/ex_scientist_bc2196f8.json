@@ -1,0 +1,159 @@
+{
+  "id": "ex_technical_bc2196f8",
+  "source_file": "4fa62e.ot2.apiv2.py",
+  "intent_precise": "PCR Preparation: Using tubes (tuberack, slot 5), temp_plate (plate, slot 5). With temperature module. (1) Set temperature to 8\u00b0C. (2) Transfer 5\u00b5L from source A1 to destination A1. (3) Pause: Please replace the master mix tubeand DNA sample tubes with positive control, NTC and oligo standard tubes before resuming. (4) Distribute 5\u00b5L from source A1 to destination wells A1, A1, A1.",
+  "intent_concise": "Perform distribute to A1, A1, A1, temperature control (8\u00b0C). (volumes 5\u00b5L-15\u00b5L)",
+  "intent": "For the PCR preparation, start by setting the temperature module to 8\u00b0C to keep everything cool. First, transfer 5\u00b5L from source A1 to destination A1, then pause the protocol so you can swap out the master mix and DNA sample tubes for the positive control, NTC, and oligo standard tubes. Once you've made that tube exchange, resume by distributing 5\u00b5L from source A1 into the three A1 destination wells.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "PCR Preparation",
+    "author": "Opentrons",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "opentrons_96_tiprack_10ul",
+        "label": "tips10"
+      },
+      {
+        "slot": "2",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tips300"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "label": "tubes"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "label": "temp_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p10_single",
+        "tipracks": [
+          "tips10"
+        ]
+      },
+      {
+        "mount": "left",
+        "model": "p300_single",
+        "tipracks": [
+          "tips300"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 8
+      },
+      {
+        "command_type": "distribute",
+        "pipette": "left",
+        "volume": 15,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_wells": [],
+        "new_tip": "once"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please replace the master mix tubeand DNA sample tubes with positive control, NTC and oligo standard tubes before resuming."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": 5,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "tips10": {
+        "load_name": "opentrons_96_tiprack_10ul",
+        "slot": "1"
+      },
+      "tips300": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "2"
+      },
+      "tubes": {
+        "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "slot": "5"
+      },
+      "temp_plate": {
+        "load_name": "opentrons_96_aluminumblock_biorad_wellplate_200ul",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p10_single",
+        "tipracks": [
+          "tips10"
+        ]
+      },
+      "left": {
+        "model": "p300_single",
+        "tipracks": [
+          "tips300"
+        ]
+      }
+    },
+    "modules": {
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "4"
+      }
+    }
+  }
+}

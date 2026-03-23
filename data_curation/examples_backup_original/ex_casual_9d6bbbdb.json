@@ -1,0 +1,102 @@
+{
+  "id": "ex_casual_9d6bbbdb",
+  "intent": "Take samples from the tube racks and move them over to the deep well plate, then add a bit of internal control mix to each sample well - the robot keeps track of which tips it's used so you don't waste them",
+  "config": {
+    "labware": {
+      "96-deepwell sample plate": {
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_type",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "generic_station_A.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Sample plating protocol",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "nest_96_wellplate_2ml_deep",
+        "label": "96-deepwell sample plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_type",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p1000_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "vol_sample",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Move deepwell plate (slot 4) to Station B for RNA extraction."
+      }
+    ]
+  }
+}

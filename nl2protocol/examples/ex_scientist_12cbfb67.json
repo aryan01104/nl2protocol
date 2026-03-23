@@ -1,0 +1,190 @@
+{
+  "id": "ex_technical_12cbfb67",
+  "source_file": "3d942d.ot2.apiv2.py",
+  "intent_precise": "Custom PCR Setup from CSV: Using loadPlate (plate, slot 3), tubeRack (tuberack, slot 5). (1) Wait 1 seconds. (2) Pause: msg (3) Mix 2 times at 20\u00b5L. (4) Distribute 2\u00b5L from srcPlate A1 to preampPlate wells A1, A1. (5) Mix 2 times at 15\u00b5L. (6) Distribute 1\u00b5L from preampPlate A1 to loadPlate wells A1-A1 (4 wells).",
+  "intent_concise": "Perform 2 distribution steps. (volumes 1\u00b5L-20\u00b5L)",
+  "intent": "For this custom PCR setup, you'll be working with the load plate in slot 3 and the tube rack in slot 5. Start by waiting 1 second, then pause for the message prompt before mixing 2 times at 20\u00b5L. Next, distribute 2\u00b5L from source plate well A1 to preamp plate wells A1 and A1, then mix 2 times at 15\u00b5L. Finally, distribute 1\u00b5L from preamp plate A1 to load plate wells A1-A1, covering all 4 wells in that range.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Custom PCR Setup from CSV",
+    "author": "Opentrons <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "label": "loadPlate"
+      },
+      {
+        "slot": "5",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "label": "tubeRack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pipMnt",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "msg"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 2,
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 2.5,
+        "labware": "preampPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 2.5,
+        "source_labware": "srcPlate",
+        "source_well": "A1",
+        "dest_labware": "preampPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "pipMnt",
+        "repetitions": 2,
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "pipMnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 3.75,
+        "labware": "loadPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": 3.75,
+        "labware": "loadPlate",
+        "well": "A1"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "pipMnt",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pipMnt"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 1.25,
+        "source_labware": "preampPlate",
+        "source_well": "A1",
+        "dest_labware": "loadPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pipMnt",
+        "volume": 1.25,
+        "source_labware": "preampPlate",
+        "source_well": "A1",
+        "dest_labware": "loadPlate",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_before": [
+          3,
+          5
+        ],
+        "mix_after": [
+          3,
+          4
+        ]
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Protocol complete! Please start OpenArray process."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "loadPlate": {
+        "load_name": "corning_384_wellplate_112ul_flat",
+        "slot": "3"
+      },
+      "tubeRack": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "slot": "5"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "id": "ex_concise_d3c64a38",
+  "intent": "Recovery agent addition, 2-min incubation, waste removal, pre-amp mix dispensing for 1-8 samples",
+  "config": {
+    "labware": {
+      "dummy_plate": {
+        "load_name": "eppendorf_96_aluminumblock_200ul",
+        "slot": "DUMMY PLATE"
+      },
+      "pre_amp_rack": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "PREAMP RACK"
+      },
+      "RECOVERY AGENT RACK": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "3"
+      },
+      "SAMPLE PLATE": {
+        "load_name": "eppendorf_96_aluminumblock_200ul",
+        "slot": "1"
+      },
+      "trash_res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "mag_mod": {
+        "module_type": "magnetic",
+        "slot": "10"
+      },
+      "temp_mod_reag": {
+        "module_type": "temperature",
+        "slot": "6"
+      },
+      "temp_mod": {
+        "module_type": "temperature",
+        "slot": "9"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "e9ff8d.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "3.1 & 3.2 Incubation Recovery & Pre-Amplification PCR",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "DUMMY PLATE",
+        "load_name": "eppendorf_96_aluminumblock_200ul",
+        "label": "dummy_plate"
+      },
+      {
+        "slot": "PREAMP RACK",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "pre_amp_rack"
+      },
+      {
+        "slot": "3",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "RECOVERY AGENT RACK"
+      },
+      {
+        "slot": "1",
+        "load_name": "eppendorf_96_aluminumblock_200ul",
+        "label": "SAMPLE PLATE"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "trash_res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "10",
+        "label": "mag_mod"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "6",
+        "label": "temp_mod_reag"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "9",
+        "label": "temp_mod"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~~ADDING RECOVERY AGENT~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "preairgap"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 1,
+        "volume": 130
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 125
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "preairgap"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 3
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "\n    Ensure the solution developed into a biphasic mixture, then select\n    \"Resume\" in the app.\n    "
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~REMOVING RECOVERY AGENT~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 125
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": "preairgap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 125
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Proceed directly to Pre-Amplification PCR.\n                 No cleanup step is required."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n~~~~~~~~~~~~~~~~ADDING PRE-AMP MIX~~~~~~~~~~~~~~~~\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 35
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": 35
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Pre-Amp mix is added.\n                 Transfer all solution to PCR strip tube.\n                 Cap firmly and invert 8x to mix. Centrifuge briefly.\n                 Incubate in a thermal cycler according to 3.2.D of the SOP"
+      }
+    ]
+  }
+}

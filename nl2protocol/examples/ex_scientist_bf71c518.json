@@ -1,0 +1,106 @@
+{
+  "id": "ex_technical_bf71c518",
+  "source_file": "2942dd.ot2.apiv2.py",
+  "intent_precise": "2942dd.ot2.apiv2: Using Fluidx Rack (tuberack, slot 9). (1) Wait 10 seconds. (2) Distribute from source A1 to destination wells A1, A1, A1. (3) Incubate for 30 minutes.",
+  "intent_concise": "Perform distribute to A1, A1, A1. (~30 min total)",
+  "intent": "For protocol 2942dd.ot2.apiv2, start by setting up the Fluidx rack in slot 9 as your tube rack, then wait 10 seconds before beginning the transfers. Next, you'll need to distribute from source tube A1 to destination wells A1, A1, and A1 - yes, that's three transfers to the same well A1. Once you've completed the distributions, incubate the samples for 30 minutes to allow the reaction to proceed.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "2942dd.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "9",
+        "load_name": "fluidx_96_tuberack_1000ul",
+        "label": "Fluidx Rack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "right",
+        "volume": "int",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "v",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": "v",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always",
+        "mix_after": [
+          "count_mix",
+          20
+        ]
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 30
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "workflow steps 1-4 are complete"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Fluidx Rack": {
+        "load_name": "fluidx_96_tuberack_1000ul",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      },
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

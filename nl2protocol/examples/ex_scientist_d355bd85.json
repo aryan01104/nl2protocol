@@ -1,0 +1,193 @@
+{
+  "id": "ex_technical_d355bd85",
+  "source_file": "6cb818.ot2.apiv2.py",
+  "intent_precise": "6cb818.ot2.apiv2: Using Culture Plate (plate, slot slot_cultureplate), Rack with Snap Cap Tubes (tuberack, slot slot_snapcaps), Rack with Screw Cap Tubes (tuberack, slot slot_screwcaps). (1) Wait 10 seconds. (2) Transfer 60\u00b5L from source to destination. (3) Transfer 5\u00b5L from source to destination. (4) Transfer 20\u00b5L from source to destination. (5) Transfer 160\u00b5L from source to destination. (6) Transfer 40\u00b5L from source to destination. (7) Transfer from source to destination. (8) Transfer 20\u00b5L from source to destination.",
+  "intent_concise": "Perform 7 liquid transfers. (volumes 5\u00b5L-160\u00b5L)",
+  "intent": "For protocol 6cb818.ot2.apiv2, you'll be working with a culture plate in the culture plate slot, along with snap cap and screw cap tube racks in their respective slots. Start by waiting 10 seconds, then perform a series of transfers between your source and destination wells: first 60\u00b5L, then 5\u00b5L, followed by 20\u00b5L, then 160\u00b5L, then 40\u00b5L, followed by one transfer without a specified volume, and finally 20\u00b5L. Make sure to use the appropriate pipette tips for each volume and maintain sterile technique throughout the transfers.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "6cb818.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "slot_cultureplate",
+        "load_name": "labware_cultureplate",
+        "label": "Culture Plate"
+      },
+      {
+        "slot": "slot_snapcaps",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "label": "Rack with Snap Cap Tubes"
+      },
+      {
+        "slot": "slot_screwcaps",
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_screwcap",
+        "label": "Rack with Screw Cap Tubes"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "right",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 60
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 5
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "left"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 160
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 160
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 40
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": 40
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "Culture Plate": {
+        "load_name": "labware_cultureplate",
+        "slot": "slot_cultureplate"
+      },
+      "Rack with Snap Cap Tubes": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_snapcap",
+        "slot": "slot_snapcaps"
+      },
+      "Rack with Screw Cap Tubes": {
+        "load_name": "opentrons_24_tuberack_nest_1.5ml_screwcap",
+        "slot": "slot_screwcaps"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

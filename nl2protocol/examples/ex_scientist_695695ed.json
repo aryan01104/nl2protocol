@@ -1,0 +1,158 @@
+{
+  "id": "ex_technical_695695ed",
+  "source_file": "12213d.ot2.apiv2.py",
+  "intent_precise": "Ethanol Transfer with User: Using magplate (pcr_plate, slot 2), res (reservoir, slot 1). With magnetic module. (1) Engage magnets for bead separation. (2) Incubate for 5 minutes. (3) Transfer 150\u00b5L from source to destination. (4) Wait 1 seconds. (5) Pause: Remove plate and centrifuge. Click RESUME when ready (6) Incubate for 3 minutes. (7) Transfer 15\u00b5L from source (multiple wells) to destination (multiple wells).",
+  "intent_concise": "Perform magnetic bead separation. (volumes 15\u00b5L-150\u00b5L, ~8 min total)",
+  "intent": "For this ethanol transfer protocol, you'll need to set up the PCR plate on the magnetic module in slot 2 and place the reservoir in slot 1. Start by engaging the magnets to separate the beads and let them incubate for 5 minutes, then transfer 150\u00b5L from the source to destination wells and wait 1 second. At this point, you'll need to pause the protocol to remove the plate for centrifugation - just click RESUME when you're ready to continue. Finally, incubate for another 3 minutes before making the final 15\u00b5L transfers from the multiple source wells to their corresponding destination wells.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "Ethanol Transfer with User",
+    "author": "Chaz <chaz@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "label": "magplate"
+      },
+      {
+        "slot": "1",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p20mnt",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "p300mnt",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "4",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 5 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Removing 150uL of liquid from each well"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300mnt",
+        "volume": 150
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300mnt"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Remove plate and centrifuge. Click RESUME when ready"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating on MagDeck for 3 minutes."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p20mnt"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p20mnt",
+        "volume": 15
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p20mnt"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+        "slot": "2"
+      },
+      "res": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "1"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "4"
+      }
+    }
+  }
+}

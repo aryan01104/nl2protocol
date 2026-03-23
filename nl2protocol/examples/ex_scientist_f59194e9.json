@@ -1,0 +1,194 @@
+{
+  "id": "ex_technical_f59194e9",
+  "source_file": "76174b.ot2.apiv2.py",
+  "intent_precise": "76174b.ot2.apiv2: Using OptiPlate (plate, slot 2), Sample Serial Dilutions (plate, slot 3), Anti-Ligand, Acceptor, Donor, Ligands (plate, slot 6). (1) Pause: format (2) Transfer 8\u00b5L from source to destination. (3) Pause: Place OptiPlate 2 in deck slot 2. Resume (4) Transfer 4\u00b5L from source to destination. (5) Pause: Robot paused. Resume when ready. (6) Transfer 4\u00b5L from source to destination. (7) Transfer 4\u00b5L from source to destination. (8) Pause: Robot paused. Resume when ready. (9) Transfer 4\u00b5L from source to destination.",
+  "intent_concise": "Perform 5 liquid transfers. (volumes 4\u00b5L-8\u00b5L)",
+  "intent": "For this HTRF assay protocol, you'll be working with three plates - the OptiPlate in slot 2, Sample Serial Dilutions in slot 3, and your reagent plate containing Anti-Ligand, Acceptor, Donor, and Ligands in slot 6. Start by formatting the plates as needed, then transfer 8\u00b5L from source to destination, followed by placing OptiPlate 2 in deck slot 2 before resuming. Next, you'll perform four sequential 4\u00b5L transfers from source to destination, with pause points built in between the second and third transfers, and again between the fourth and fifth transfers to allow for any manual adjustments. Make sure to resume the protocol after each pause when you're ready to proceed.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "76174b.ot2.apiv2",
+    "author": "Steve Plonk <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "perkinelmer_384_wellplate_105ul",
+        "label": "OptiPlate"
+      },
+      {
+        "slot": "3",
+        "load_name": "corning_96_wellplate_320ul",
+        "label": "Sample Serial Dilutions"
+      },
+      {
+        "slot": "6",
+        "load_name": "corning_96_wellplate_320ul",
+        "label": "Anti-Ligand, Acceptor, Donor, Ligands"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "format"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 8 uL Sample Serial Dilution to OptiPlate 1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 8
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 8
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Place OptiPlate 2 in deck slot 2. Resume"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 4 uL Ligand to OptiPlate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Robot paused. Resume when ready."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 4 uL anti-Ligand to OptiPlate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 4 uL acceptor to OptiPlate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Robot paused. Resume when ready."
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Transferring 4 uL donor to OptiPlate"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": 4
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Process Complete."
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "OptiPlate": {
+        "load_name": "perkinelmer_384_wellplate_105ul",
+        "slot": "2"
+      },
+      "Sample Serial Dilutions": {
+        "load_name": "corning_96_wellplate_320ul",
+        "slot": "3"
+      },
+      "Anti-Ligand, Acceptor, Donor, Ligands": {
+        "load_name": "corning_96_wellplate_320ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  }
+}

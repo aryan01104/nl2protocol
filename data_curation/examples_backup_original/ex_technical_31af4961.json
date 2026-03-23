@@ -1,0 +1,88 @@
+{
+  "id": "ex_technical_31af4961",
+  "intent": "Execute UTI batch qPCR setup by transferring 10\u00b5L samples from a 96-well 2mL deep well source plate to a 384-well 50\u00b5L destination plate using a P20 multichannel pipette. Perform column-wise transfers from the first two columns of the source plate, distributing each source column across multiple destination wells in corresponding rows of the 384-well plate.",
+  "config": {
+    "labware": {
+      "source_plate": {
+        "load_name": "thermofisherscientificdeepwell_96_wellplate_2000ul",
+        "slot": "4"
+      },
+      "dest_plate": {
+        "load_name": "thermofisher_384_wellplate_50ul",
+        "slot": "5"
+      },
+      "tips": {
+        "load_name": "opentrons_96_tiprack_20ul",
+        "slot": "6"
+      }
+    },
+    "pipettes": {
+      "m20_mount": {
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "2d7d86.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "UTI Batch qPCR Setup",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "4",
+        "load_name": "thermofisherscientificdeepwell_96_wellplate_2000ul",
+        "label": "source_plate"
+      },
+      {
+        "slot": "5",
+        "load_name": "thermofisher_384_wellplate_50ul",
+        "label": "dest_plate"
+      },
+      {
+        "slot": "6",
+        "load_name": "opentrons_96_tiprack_20ul",
+        "label": "tips"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m20_mount",
+        "model": "p20_multi_gen2",
+        "tipracks": [
+          "tips"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m20_mount",
+        "labware": "tip_cols",
+        "well": "A1"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m20_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m20_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      }
+    ]
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "id": "ex_casual_b9d89c69",
+  "intent": "This protocol does sample replacement picking - basically it takes samples from tubes and puts them into specific wells on a 384-well plate, but first it clears out whatever was already in those wells. It reads from input files to know which tube goes to which well, checks that the barcodes match up, then does the liquid handling with air gaps to make sure it gets everything out and transfers it properly.",
+  "config": {
+    "labware": {
+      "tuberack": {
+        "load_name": "eurofins_96x2ml_tuberack",
+        "slot": "2"
+      }
+    },
+    "pipettes": {
+      "p300_mount": {
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "redoreplacementpicking.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Redo Replacement Picking (Greiner Masterblock 384 Well \\\nPlate 225 \u00b5L)",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "eurofins_96x2ml_tuberack",
+        "label": "tuberack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p300_mount",
+        "model": "p300_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "p300_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p300_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p300_mount",
+        "volume": null
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      }
+    ]
+  }
+}

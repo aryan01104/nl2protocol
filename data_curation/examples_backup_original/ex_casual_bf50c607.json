@@ -1,0 +1,120 @@
+{
+  "id": "ex_casual_bf50c607",
+  "intent": "Take liquid from well A1 in the big plate and distribute 50\u00b5L into each well across the top row of the smaller plate, using air gaps to prevent contamination and dumping excess into the waste reservoir",
+  "config": {
+    "labware": {
+      "Plate 1": {
+        "load_name": "corning_6_wellplate_16.8ml_flat",
+        "slot": "1"
+      },
+      "Plate 2": {
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "slot": "2"
+      },
+      "Trash Plate": {
+        "load_name": "agilent_1_reservoir_290ml",
+        "slot": "3"
+      },
+      "tiprack": {
+        "load_name": "opentrons_96_tiprack_300ul",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "1c086c.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Custom Distribute Liquids Function",
+    "author": "Sakib <sakib.hossain@opentrons.com>",
+    "labware": [
+      {
+        "slot": "1",
+        "load_name": "corning_6_wellplate_16.8ml_flat",
+        "label": "Plate 1"
+      },
+      {
+        "slot": "2",
+        "load_name": "corning_24_wellplate_3.4ml_flat",
+        "label": "Plate 2"
+      },
+      {
+        "slot": "3",
+        "load_name": "agilent_1_reservoir_290ml",
+        "label": "Trash Plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_96_tiprack_300ul",
+        "label": "tiprack"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p300_single_gen2",
+        "tipracks": [
+          "tiprack"
+        ]
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "asp_vol"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Air Gap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "air_gap"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Air Gap"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "air_gap"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      }
+    ]
+  }
+}

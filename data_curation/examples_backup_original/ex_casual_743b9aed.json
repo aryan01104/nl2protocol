@@ -1,0 +1,68 @@
+{
+  "id": "ex_casual_743b9aed",
+  "intent": "Pick specific samples from wells in one plate and move them to different wells in another plate, using whatever volumes are listed in a spreadsheet. You can choose whether to use a fresh tip each time or reuse tips to save materials.",
+  "config": {
+    "labware": {
+      "Source Labware": {
+        "load_name": "sp_type",
+        "slot": "2"
+      },
+      "Destination Labware": {
+        "load_name": "dp_type",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "pip_mount": {
+        "model": "pip_model",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "7a3e4b.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Cherrypicking with Source and Destination",
+    "author": "Chaz <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "sp_type",
+        "label": "Source Labware"
+      },
+      {
+        "slot": "3",
+        "load_name": "dp_type",
+        "label": "Destination Labware"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "pip_mount",
+        "model": "pip_model",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "pip_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "pip_mount",
+        "volume": "vol",
+        "source_labware": "Source Labware",
+        "source_well": "A1",
+        "dest_labware": "Destination Labware",
+        "dest_well": "A1",
+        "new_tip": "tip_reuse"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "pip_mount"
+      }
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "ex_technical_b1485d22",
+  "intent": "Execute bacterial plating and serial dilution protocol using p20 multichannel pipette across 5 plate pairs. For each dilution plate, perform 1:3 serial dilutions from columns A1-A10, transferring 10\u00b5L between successive columns with 5x mixing at 20\u00b5L volume. Simultaneously spot 5\u00b5L from each dilution step onto corresponding agar plate wells using controlled dispensing at 0.025x rate and 2mm height above well bottom.",
+  "config": {
+    "pipettes": {
+      "left": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "33y0f3.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Bacterial Plating and Dilution",
+    "author": "Lachlan <lajamu@biosustain.dtu.dk",
+    "labware": [],
+    "pipettes": [
+      {
+        "mount": "left",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "spot_vol"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "spot_vol"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "left",
+        "volume": 10,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never",
+        "mix_after": [
+          5,
+          20
+        ]
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "spot_vol",
+        "labware": "plate",
+        "well": "A1"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "left"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Run Complete!"
+      }
+    ]
+  }
+}

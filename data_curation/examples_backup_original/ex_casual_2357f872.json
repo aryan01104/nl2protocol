@@ -1,0 +1,188 @@
+{
+  "id": "ex_casual_2357f872",
+  "intent": "Take out the old buffer from sample wells and replace it with fresh cold buffer, then let it sit for however long each step needs. The robot keeps track of the waste containers and tells you when to refill the buffer reservoirs or empty the waste.",
+  "config": {
+    "labware": {
+      "dialysis_plate": {
+        "load_name": "htd_96_wellplate_200ul",
+        "slot": "3"
+      },
+      "cool_buff": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "m300_mount": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp_mod_dia": {
+        "module_type": "temperature",
+        "slot": "10"
+      },
+      "temp_mod_buff": {
+        "module_type": "temperature",
+        "slot": "7"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "4f7a6f.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "SuperScript III: qRT-PCR Prep with CSV File",
+    "author": "Rami Farawi <rami.farawi@opentrons.com>",
+    "labware": [
+      {
+        "slot": "3",
+        "load_name": "htd_96_wellplate_200ul",
+        "label": "dialysis_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "cool_buff"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "m300_mount",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "10",
+        "label": "temp_mod_dia"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "7",
+        "label": "temp_mod_buff"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_dia",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp_mod_buff",
+        "celsius": 4
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nREMOVING WASTE TO RESERVOIR\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Replace all tip racks"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "transfer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "transfer_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Empty waste reservoirs on slots 8, 9, and 11"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nADDING BUFFER TO PLATE\n"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "buffer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "buffer_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\nREPLENISHING BUFFER TO TEMPERATURE MODULE\n"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "m300_mount",
+        "volume": "buffer_vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "m300_mount",
+        "volume": "buffer_vol"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "return_tip",
+        "pipette": "m300_mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": "incubation_time"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "\n\n\n\n"
+      }
+    ]
+  }
+}

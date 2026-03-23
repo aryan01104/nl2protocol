@@ -1,0 +1,431 @@
+{
+  "id": "ex_technical_560a1321",
+  "source_file": "6f4e2c.ot2.apiv2.py",
+  "intent_precise": "DNA Isolation from Whole Blood: Using magplate (plate, slot 2), res (reservoir, slot 2), tempplate (plate, slot 5), pcrplate (pcr_plate, slot 5). With magnetic module, temperature module. (1) Transfer 130\u00b5L from source A1 to destination A1. (2) Mix 5 times at 200\u00b5L. (3) Transfer 110\u00b5L from source (A1, A1) to destination (A1, A1). (4) Mix 3 times at 200\u00b5L. (5) Mix 5 times at 200\u00b5L. (6) Transfer 110\u00b5L from source (A1, A1) to destination (A1, A1). (7) Mix 3 times at 200\u00b5L. (8) Incubate for 5 minutes. (9) Engage magnets at maghtmm height for bead separation. (10) Incubate for 2 minutes. (11) Transfer 640\u00b5L from source (A1, A1) to destination (A1, A1). (12) Disengage magnets to release beads. (13) Transfer 200\u00b5L from source A1 to destination A1. (14) Mix 3 times at 200\u00b5L. (15) Transfer 200\u00b5L from source A1 to destination A1. (16) Mix 3 times at 200\u00b5L. (17) Engage magnets at maghtmm height for bead separation. (18) Incubate for 3 minutes. (19) Transfer 600\u00b5L from source A1 to destination A1. (20) Disengage magnets to release beads. (21) Pause: Please move deep well plate from mag deck to temp deck.     When ready to continue, click RESUME. (22) Set temperature to 60\u00b0C. (23) Incubate for 10 minutes. (24) Transfer 50\u00b5L from source A1 to destination A1. (25) Incubate for 10 minutes. (26) Pause: Please move deep well palte from temp deck to mag deck.     When ready to continue, click RESUME. (27) Engage magnets at maghtmm height for bead separation. (28) Incubate for 5 minutes. (29) Transfer 50\u00b5L from source A1 to destination A1.",
+  "intent_concise": "Perform magnetic bead separation, temperature control (60\u00b0C). (volumes 50\u00b5L-640\u00b5L, ~36 min total)",
+  "intent": "For this DNA isolation from whole blood protocol, you'll be working with the magnetic plate in slot 2, reservoir in slot 2, and both the temperature plate and PCR plate in slot 5. Start by transferring 130\u00b5L from source A1 to destination A1, then mix 5 times at 200\u00b5L, followed by two rounds of 110\u00b5L transfers with mixing (3 times at 200\u00b5L after each transfer, plus an additional 5-time mix). After a 5-minute incubation, engage the magnets at maghtmm height for 2 minutes, transfer 640\u00b5L, then disengage magnets and perform two sequential 200\u00b5L transfers with 3-time mixing at 200\u00b5L after each. Re-engage magnets for 3 minutes, transfer 600\u00b5L, disengage magnets, then manually move the deep well plate to the temperature deck, set to 60\u00b0C for 10 minutes, add 50\u00b5L and incubate another 10 minutes, move the plate back to the magnetic deck, engage magnets for 5 minutes, and finally transfer 50\u00b5L to complete the isolation.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "DNA Isolation from Whole Blood",
+    "author": "Chaz <chaz@opentrons.com",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "eppendorf_96_wellplate_1000ul",
+        "label": "magplate"
+      },
+      {
+        "slot": "2",
+        "load_name": "nest_12_reservoir_15ml",
+        "label": "res"
+      },
+      {
+        "slot": "5",
+        "load_name": "eppendorf_96_wellplate_1000ul",
+        "label": "tempplate"
+      },
+      {
+        "slot": "5",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "pcrplate"
+      },
+      {
+        "slot": "8",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "waste_res"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount",
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 130,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 5,
+        "volume": 200
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 300,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 110,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 3,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 5,
+        "volume": 200
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 300,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 110,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 3,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Beginning incubation... 5 minute incubation without     magnet; 2 minutes with magnet."
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maght"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 640,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 640,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 3,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount",
+        "repetitions": 3,
+        "volume": 200
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maght"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 600,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please move deep well plate from mag deck to temp deck.     When ready to continue, click RESUME."
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 60
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 10 minutes"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "Incubating for 10 minutes"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 10
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Please move deep well palte from temp deck to mag deck.     When ready to continue, click RESUME."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": "maght"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "mount",
+        "volume": 50,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "magplate": {
+        "load_name": "eppendorf_96_wellplate_1000ul",
+        "slot": "2"
+      },
+      "res": {
+        "load_name": "nest_12_reservoir_15ml",
+        "slot": "2"
+      },
+      "tempplate": {
+        "load_name": "eppendorf_96_wellplate_1000ul",
+        "slot": "5"
+      },
+      "pcrplate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "5"
+      },
+      "waste_res": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "8"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p300_multi",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      }
+    }
+  }
+}

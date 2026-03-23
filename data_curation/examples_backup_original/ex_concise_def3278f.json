@@ -1,0 +1,159 @@
+{
+  "id": "ex_concise_def3278f",
+  "intent": "PCR setup: transfer oligos, add reagent, run 30-cycle thermocycler program",
+  "config": {
+    "labware": {
+      "tc_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "pcr plate"
+      },
+      "reagent plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "4"
+      }
+    },
+    "pipettes": {
+      "mount_m300": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      "mount_p20": {
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "tc": {
+        "module_type": "thermocycler",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "concise",
+  "source_file": "pcr.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "PCR",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "pcr plate",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "tc_plate"
+      },
+      {
+        "slot": "4",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "reagent plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_m300",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      },
+      {
+        "mount": "mount_p20",
+        "model": "p20_single_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "thermocycler",
+        "slot": "1",
+        "label": "tc"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p20",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p20",
+        "volume": "vol"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount_p20",
+        "repetitions": "mix_reps_oligo",
+        "volume": "mix_vol_oligo"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_lid_temperature",
+        "module": "tc",
+        "celsius": 105
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_m300",
+        "volume": "vol_pcr_reagent"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_m300",
+        "volume": "vol_pcr_reagent"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "mount_m300",
+        "repetitions": "mix_reps_pcr_reagent",
+        "volume": "mix_vol_pcr_reagent"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_m300"
+      },
+      {
+        "command_type": "close_lid",
+        "module": "tc"
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 98,
+        "hold_time_seconds": 30
+      },
+      {
+        "command_type": "run_profile",
+        "module": "tc",
+        "steps": "profile_denaturation",
+        "repetitions": 30
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 72,
+        "hold_time_seconds": 120
+      },
+      {
+        "command_type": "set_block_temperature",
+        "module": "tc",
+        "celsius": 4
+      },
+      {
+        "command_type": "open_lid",
+        "module": "tc"
+      }
+    ]
+  }
+}

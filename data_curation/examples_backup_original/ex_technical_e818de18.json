@@ -1,0 +1,74 @@
+{
+  "id": "ex_technical_e818de18",
+  "intent": "Using a P300 multi-channel pipette, aspirate 120\u00b5L from a 195mL reservoir (20\u00b5L from top, 100\u00b5L from 1mm above bottom) and dispense into each well of row A across nine 96-well plates, dispensing 6.5mm from the bottom of each destination well. Execute with single tip usage across all transfers.",
+  "config": {
+    "labware": {
+      "reservoir": {
+        "load_name": "nest_1_reservoir_195ml",
+        "slot": "10"
+      }
+    },
+    "pipettes": {
+      "right": {
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    }
+  },
+  "style": "technical",
+  "source_file": "liquid_transfer.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Liquid Transfer",
+    "author": "Nick Diehl <ndiehl@opentrons.com>",
+    "labware": [
+      {
+        "slot": "10",
+        "load_name": "nest_1_reservoir_195ml",
+        "label": "reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "right",
+        "model": "p300_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "right"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 20
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "right",
+        "volume": 100
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "right",
+        "volume": null
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "right"
+      }
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "id": "ex_casual_27f09af9",
+  "intent": "Set up RT-PCR reactions by first adding mastermix to the reaction plate, then transferring samples from the sample plates - everything stays cold at 4 degrees and the robot tracks liquid levels to avoid going too deep into wells",
+  "config": {
+    "labware": {
+      "mm_plate": {
+        "load_name": "labware_mmplate",
+        "slot": "Mastermix Plate at 4 Degrees"
+      }
+    },
+    "pipettes": {
+      "mount_p20": {
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "temp1": {
+        "module_type": "temperature",
+        "slot": "1"
+      },
+      "temp2": {
+        "module_type": "temperature",
+        "slot": "3"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "1e744e.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "1e744e.ot2.apiv2",
+    "author": "Steve Plonk",
+    "labware": [
+      {
+        "slot": "Mastermix Plate at 4 Degrees",
+        "load_name": "labware_mmplate",
+        "label": "mm_plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "mount_p20",
+        "model": "p20_multi_gen2",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "temperature",
+        "slot": "1",
+        "label": "temp1"
+      },
+      {
+        "module_type": "temperature",
+        "slot": "3",
+        "label": "temp2"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": 10
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp1",
+        "celsius": 4
+      },
+      {
+        "command_type": "set_temperature",
+        "module": "temp2",
+        "celsius": 4
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "left",
+        "volume": "vol"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "seconds": "delay_time"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mount_p20",
+        "seconds": 1
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p20",
+        "volume": "vol_mm"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "mount_p20",
+        "seconds": 1
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "mount_p20"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "mount_p20",
+        "volume": 5
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount_p20",
+        "volume": 2
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "mount_p20",
+        "volume": 7
+      },
+      {
+        "command_type": "air_gap",
+        "pipette": "mount_p20",
+        "volume": 2
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "mount_p20"
+      }
+    ]
+  }
+}

@@ -1,0 +1,380 @@
+{
+  "id": "ex_casual_92323178",
+  "intent": "Clean up NGS libraries using magnetic beads - basically you're moving the cleared supernatant to a fresh plate, adding water and cleanup beads, mixing everything up, then using the magnet to pull down the beads. Do this a couple times with some ethanol washes in between, let it air dry, then add the final buffer to get your clean DNA off the beads and into a new plate.",
+  "config": {
+    "labware": {
+      "mag_plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "new PCR plate": {
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "slot": "2"
+      },
+      "reagent reservoir": {
+        "load_name": "usascientific_12_reservoir_22ml",
+        "slot": "3"
+      }
+    },
+    "pipettes": {
+      "p50_mount": {
+        "model": "p50_type",
+        "tipracks": []
+      },
+      "p300_mount": {
+        "model": "p300_type",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "magdeck": {
+        "module_type": "magnetic",
+        "slot": "1"
+      }
+    }
+  },
+  "style": "casual",
+  "source_file": "nextera_flex_cleanup_libraries.ot2.apiv2.py",
+  "output_schema": {
+    "protocol_name": "Nextera DNA Flex NGS Library Prep: Cleanup Libraries",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "mag_plate"
+      },
+      {
+        "slot": "2",
+        "load_name": "biorad_96_wellplate_200ul_pcr",
+        "label": "new PCR plate"
+      },
+      {
+        "slot": "3",
+        "load_name": "usascientific_12_reservoir_22ml",
+        "label": "reagent reservoir"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p50_mount",
+        "model": "p50_type",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_type",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": "magdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": null
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mount",
+        "volume": 45,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Vortex beads and add to channel 1 of the 12-channel reservoir in slot 3."
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 40,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 45,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Seal PCR plate in slot 2 and incubate at room temperature for 5 minutes. Then discard the original plate on the magnetic stand and place the plate from slot 2 on the engaged magnetic deck. Place a new PCR plate in slot 2, and resume."
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 20,
+        "volume": 200
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mount",
+        "volume": 15,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 3
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 125,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p300_mount",
+        "repetitions": 10,
+        "volume": 100
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "pause",
+        "pipette": "left",
+        "message": "Incubate for 5 minutes at room temperature before placing the PCR plate from slot 2 on the magnetic module in slot 1. Discard the original plate occupying the magnetic module. Place another fresh PCR plate on slot 2 for the final elution."
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 150,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "liquid_waste",
+        "dest_well": "2",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 190,
+        "source_labware": "etoh",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": 200,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "liquid_waste",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p300_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p50_mount",
+        "volume": 20
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 5
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p50_mount",
+        "volume": 32
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p50_mount",
+        "volume": 32
+      },
+      {
+        "command_type": "mix",
+        "pipette": "p50_mount",
+        "repetitions": 10,
+        "volume": 20
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "engage_magnets",
+        "module": "magdeck",
+        "height": 18
+      },
+      {
+        "command_type": "delay",
+        "pipette": "left",
+        "minutes": 2
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p50_mount",
+        "volume": 30,
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "never"
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p50_mount"
+      },
+      {
+        "command_type": "disengage_magnets",
+        "module": "magdeck"
+      },
+      {
+        "command_type": "comment",
+        "pipette": "left",
+        "message": "If you are stopping, seal the plate with Microseal B adhesive or Microseal F foil seal, and store at -25\u00b0C to -15\u00b0C for up to 30 days."
+      }
+    ]
+  }
+}

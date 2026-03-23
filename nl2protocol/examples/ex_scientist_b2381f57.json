@@ -1,0 +1,137 @@
+{
+  "id": "ex_technical_b2381f57",
+  "source_file": "lib_pooling.ot2.apiv2.py",
+  "intent_precise": "NGS Prep Part 3/3: Library Pooling: Using 2ml reagent rack (tuberack, slot 2), tubeblock (labware, slot 4), elution plate (plate, slot 9). With magnetic module, temperature module. (1) Set temperature to 4\u00b0C. (2) Transfer from source A1 to destination A1. (3) Transfer from source to destination.",
+  "intent_concise": "Perform temperature control (4\u00b0C). (using 10\u00b5L)",
+  "intent": "For the final library pooling step of your NGS prep, start by setting up your workspace with the 2ml reagent rack in slot 2, tubeblock in slot 4, and elution plate in slot 9, making sure your magnetic and temperature modules are ready to go. First, cool the temperature module down to 4\u00b0C to keep everything stable during the pooling process. Once you're at temperature, transfer your library from well A1 in the source plate to well A1 in the destination plate, then continue with your remaining source to destination transfers to complete the pooling.",
+  "style": "scientist",
+  "output_schema": {
+    "protocol_name": "NGS Prep Part 3/3: Library Pooling",
+    "author": "Nick <protocols@opentrons.com>",
+    "labware": [
+      {
+        "slot": "2",
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "label": "2ml reagent rack"
+      },
+      {
+        "slot": "4",
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "label": "tubeblock"
+      },
+      {
+        "slot": "9",
+        "load_name": "eppendorftwin.tec_96_wellplate_150ul",
+        "label": "elution plate"
+      }
+    ],
+    "pipettes": [
+      {
+        "mount": "p10_mount",
+        "model": "p10_single",
+        "tipracks": []
+      },
+      {
+        "mount": "p300_mount",
+        "model": "p300_single",
+        "tipracks": []
+      }
+    ],
+    "modules": [
+      {
+        "module_type": "magnetic",
+        "slot": "1",
+        "label": null
+      },
+      {
+        "module_type": "temperature",
+        "slot": "4",
+        "label": "tempdeck"
+      }
+    ],
+    "commands": [
+      {
+        "command_type": "set_temperature",
+        "module": "tempdeck",
+        "celsius": 4
+      },
+      {
+        "command_type": "transfer",
+        "pipette": "p300_mount",
+        "volume": "vol_water",
+        "source_labware": "",
+        "source_well": "A1",
+        "dest_labware": "",
+        "dest_well": "A1",
+        "new_tip": "always"
+      },
+      {
+        "command_type": "pick_up_tip",
+        "pipette": "p10_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p10_mount",
+        "volume": "vol"
+      },
+      {
+        "command_type": "touch_tip",
+        "pipette": "p10_mount"
+      },
+      {
+        "command_type": "aspirate",
+        "pipette": "p10_mount",
+        "volume": "v_asp"
+      },
+      {
+        "command_type": "dispense",
+        "pipette": "p10_mount",
+        "volume": 10
+      },
+      {
+        "command_type": "blow_out",
+        "pipette": "p10_mount"
+      },
+      {
+        "command_type": "drop_tip",
+        "pipette": "p10_mount"
+      }
+    ]
+  },
+  "config": {
+    "labware": {
+      "2ml reagent rack": {
+        "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "slot": "2"
+      },
+      "tubeblock": {
+        "load_name": "opentrons_24_aluminumblock_nest_2ml_snapcap",
+        "slot": "4"
+      },
+      "elution plate": {
+        "load_name": "eppendorftwin.tec_96_wellplate_150ul",
+        "slot": "9"
+      }
+    },
+    "pipettes": {
+      "left": {
+        "model": "p10_single",
+        "tipracks": []
+      },
+      "right": {
+        "model": "p300_single",
+        "tipracks": []
+      }
+    },
+    "modules": {
+      "module_slot_1": {
+        "module_type": "magnetic",
+        "slot": "1"
+      },
+      "tempdeck": {
+        "module_type": "temperature",
+        "slot": "4"
+      }
+    }
+  }
+}
