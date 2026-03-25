@@ -29,3 +29,12 @@ llm_failed_output*.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Cloned GitHub dir for data extraction
+protocols_repo/
+
+# Utility scripts (local only)
+scripts/
+
+# ChromaDB vector store (regenerated from examples/)
+nl2protocol/.chroma_db/

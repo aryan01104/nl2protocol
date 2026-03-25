@@ -10,7 +10,7 @@ Natural Language ─┬─> ProtocolSchema ───> Python Script ───> O
   Lab Config      │          └───────────────────────────────────────┘
                   │                    (retry loop)
                   ▼
-             Gemini LLM
+            Claude LLM
 ```
 
 ## Files by Pipeline Stage
@@ -19,9 +19,9 @@ Natural Language ─┬─> ProtocolSchema ───> Python Script ───> O
 
 | File | What It Does |
 |------|--------------|
-| `nl2protocol/parser.py` | The "reasoning engine". Sends prompt + config to Gemini LLM, parses response into `ProtocolSchema`. Contains few-shot examples and system prompts. |
+| `nl2protocol/parser.py` | The "reasoning engine". Sends prompt + config to Claude LLM, parses response into `ProtocolSchema`. Contains few-shot examples and system prompts. |
 | `nl2protocol/models.py` | Pydantic models that define the `ProtocolSchema` structure. All commands (transfer, aspirate, mix, etc.) are defined here with validation. |
-| `nl2protocol/validation.py` | Validates `lab_config.json` before sending to LLM. Checks labware names exist, no slot conflicts, tipracks reference valid labware. |
+| `nl2protocol/validate_config.py` | Validates `lab_config.json` before sending to LLM. Checks labware names exist, no slot conflicts, tipracks reference valid labware. |
 
 ### Layer 2: Code Generation (Schema → Script)
 
@@ -53,7 +53,7 @@ User: "Transfer 50uL from reservoir A1 to plate B1"
 │ parser.py: ProtocolParser.parse_intent()                │
 │   - Loads lab_config.json                               │
 │   - Enriches config with well info                      │
-│   - Sends to Gemini with schema + examples              │
+│   - Sends to Claude with schema + examples              │
 │   - Parses JSON response into ProtocolSchema            │
 └─────────────────────────────────────────────────────────┘
                     │
@@ -114,7 +114,11 @@ nl2protocol/
 ├── app.py               # Core: generate script, verify, ProtocolAgent
 ├── cli.py               # Command-line interface
 ├── models.py            # Pydantic schemas (ProtocolSchema, Command types)
-├── parser.py            # LLM integration (Gemini), prompt engineering
+├── parser.py            # LLM integration (Claude), prompt engineering
 ├── robot.py             # OT-2 HTTP API client
-└── validation.py        # Config file validation
+├── validate_config.py   # Config file validation
+├── config_generator.py  # Auto-generate config from NL
+├── input_validator.py   # Input classification
+├── example_store.py     # RAG with ChromaDB
+└── errors.py            # Custom exceptions
 ```
