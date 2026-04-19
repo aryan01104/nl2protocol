@@ -205,7 +205,7 @@ class ProtocolParser:
             snippet = raw_output[:500] + "..." if len(raw_output) > 500 else raw_output
             print(f"Debug: Raw LLM output snippet:\n{snippet}")
 
-    def parse_intent(self, prompt: str, csv_path: Optional[str] = None, error_log: Optional[str] = None, failed_json: Optional[str] = None) -> Optional[ProtocolSchema]:
+    def parse_intent(self, prompt: str, csv_path: Optional[str] = None, error_log: Optional[str] = None, failed_json: Optional[str] = None, spec=None) -> Optional[ProtocolSchema]:
 
         # 1. Prepare Inputs
         print("  [1/5] Preparing inputs...")
@@ -360,6 +360,29 @@ class ProtocolParser:
             {rag_examples}
         """
 
+        # Add spec constraint block if reasoning step produced a spec
+        if spec is not None:
+            spec_section = f"""
+
+            ============================================================
+            PROTOCOL SPECIFICATION (from reasoning step — MUST follow)
+            ============================================================
+
+            {spec.model_dump_json(indent=2)}
+
+            CRITICAL RULES:
+            - Every volume in the spec MUST appear exactly in your output commands
+            - Every step in the spec MUST map to one or more commands
+            - DO NOT change any volume values from the spec
+            - DO NOT add or remove steps beyond what the spec describes
+            - The spec tells you WHAT to do; you decide HOW:
+              * Which pipette mount to assign (based on volume fitting the pipette range)
+              * Which Opentrons labware API name to use (map spec descriptions to config labels)
+              * Tip rack assignments
+              * Command-level details (new_tip, mix parameters, etc.)
+            """
+            user_message += spec_section
+
         # Add fix mode section if we have a failed JSON to correct
         if failed_json:
             # Format error history
@@ -385,7 +408,9 @@ class ProtocolParser:
             - Do NOT regenerate from scratch - keep all working parts unchanged
             - Pay attention to the error history to avoid repeating past mistakes
             - Common fixes:
-              * Volume outside pipette range: Adjust volume or use correct pipette
+              * Volume outside pipette range: NEVER change the user's specified volume.
+                Instead, change the pipette assignment to one that supports the volume.
+                The error message will tell you which pipettes can handle the volume.
               * Undefined labware: Use only labels from the LAB CONFIG
               * JSON truncation: Complete any cut-off structures properly
 

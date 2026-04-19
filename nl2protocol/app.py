@@ -494,19 +494,25 @@ class ProtocolAgent:
     def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
-        Args:
-            prompt: Natural language protocol instruction
-            csv_path: Optional path to CSV with experiment parameters
-            max_retries: Maximum LLM retry attempts
-            skip_validation: Skip input validation (for testing)
+        New architecture (v2):
+          Stage 0: Input validation
+          Stage 1: LLM reasons through instruction → ProtocolSpec (one LLM call)
+          Stage 2: Hallucination guard + sufficiency check + gap filling
+          Stage 3: User confirms the spec
+          Stage 4: Deterministic: spec + config → ProtocolSchema (no LLM)
+          Stage 5: Deterministic: ProtocolSchema → Python script (no LLM)
+          Stage 6: Opentrons simulation
+          Stage 7: Intent verification (LLM, optional safety net)
 
-        Returns:
-            On success: PipelineResult with script, logs, schema, runlog, and config
-            On failure: None
+        Only Stage 1 uses an LLM for generation. Stages 4-5 are deterministic,
+        so user-specified volumes can never be corrupted.
+
+        Falls back to the old LLM-based generation if the deterministic path fails.
         """
+        from .extractor import SemanticExtractor
 
-        # Step 0: Validate input is a protocol instruction
-        print("\n[Stage 0/4] Validating input instruction...")
+        # Stage 0: Validate input is a protocol instruction
+        print("\n[Stage 0/7] Validating input instruction...")
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
@@ -525,116 +531,156 @@ class ProtocolAgent:
         else:
             print("  Skipping input validation.")
 
-        attempt = 0
-        error_log = None
-        failed_json = None
+        # Stage 1: Reason through the instruction → ProtocolSpec
+        print("\n[Stage 1/7] Reasoning through protocol instruction...")
+        extractor = SemanticExtractor(
+            client=self.parser.client,
+            model_name=self.parser.model_name
+        )
+        spec = extractor.extract(prompt, self.parser.config)
 
-        # Reset retry state for this run
-        self.parser.reset_retry_state()
+        if spec is None:
+            print("  Failed to understand instruction. Cannot proceed.")
+            return None
 
-        while attempt < max_retries:
-            attempt += 1
-            print(f"\n{'='*50}")
-            print(f"Attempt {attempt}/{max_retries}")
-            print('='*50)
+        print(f"  Protocol type: {spec.protocol_type or 'ad-hoc'}")
+        print(f"  Steps identified: {len(spec.steps)}")
+        if spec.reasoning:
+            # Show first 200 chars of reasoning
+            preview = spec.reasoning[:200].replace('\n', ' ')
+            print(f"  Reasoning: {preview}...")
 
-            # 1. Reasoning: Parser translates Intent -> Pydantic Schema
-            print("\n[Stage 1/4] Generating protocol schema from instruction...")
-            if failed_json:
-                print("  Mode: Spot-fix (correcting previous output)")
-            else:
-                print("  Mode: Fresh generation")
+        # Stage 2: Validate extraction + check sufficiency + fill gaps
+        print("\n[Stage 2/7] Validating and completing specification...")
 
-            protocol_schema = self.parser.parse_intent(prompt, csv_path, error_log, failed_json)
+        # Hallucination guard
+        warnings = extractor.validate_against_text(spec, prompt)
+        if warnings:
+            for w in warnings:
+                print(f"  Warning: {w}")
 
-            if protocol_schema is None:
-                # Capture failed output for next attempt's spot-fix
-                failed_json = self.parser.last_failed_output
-                error_log = "Output did not match expected schema structure."
-                self.parser.add_error(error_log, failed_json)
-                if attempt < max_retries:
-                    print(f"  -> Will feed error back for correction in next attempt")
-                continue
-
-            print("  Schema generated and validated successfully.")
-
-            # 2. Generation: Schema -> Python
-            print("\n[Stage 2/4] Converting schema to Python script...")
-            try:
-                script = generate_python_script(protocol_schema)
-                print("  Python script generated successfully.")
-            except ValueError as e:
-                error_log = f"Script generation issue: {e}"
-                print(f"  Script generation issue: {e}")
-                self.parser.add_error(error_log)
-                if attempt < max_retries:
-                    print(f"  -> Will feed error back for correction in next attempt")
-                continue
-
-            # 3. Verification: Simulation
-            print("\n[Stage 3/4] Running Opentrons simulation...")
-            success, simulation_log, runlog = simulate_script(script)
-
-            if not success:
-                error_log = simulation_log
-                # Extract key error info for display
-                if "errorType=" in simulation_log:
-                    import re
-                    error_match = re.search(r"errorType='([^']+)'", simulation_log)
-                    error_info_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
-                    error_type = error_match.group(1) if error_match else "Unknown"
-                    error_detail = error_info_match.group(1) if error_info_match else simulation_log[:300]
-                    print(f"  Simulation issue: {error_type}")
-                    print(f"    Detail: {error_detail[:200]}...")
+        # Sufficiency check
+        gaps = extractor.check_sufficiency(spec)
+        if gaps:
+            print(f"  Gaps found: {len(gaps)}")
+            for g in gaps:
+                print(f"    - {g}")
+            spec = extractor.fill_gaps(spec, self.parser.config)
+            # Re-check after filling
+            remaining_gaps = extractor.check_sufficiency(spec)
+            if remaining_gaps:
+                print(f"  Could not fill all gaps after config lookup:")
+                for g in remaining_gaps:
+                    print(f"    - {g}")
+                # Self-refinement: feed gaps back to LLM for one retry
+                print("  Attempting self-refinement (re-reasoning with gap feedback)...")
+                refined = extractor.refine(spec, remaining_gaps, prompt, self.parser.config)
+                if refined:
+                    spec = refined
+                    final_gaps = extractor.check_sufficiency(spec)
+                    if final_gaps:
+                        print(f"  Refinement did not resolve all gaps:")
+                        for g in final_gaps:
+                            print(f"    - {g}")
+                        print("  Cannot proceed with incomplete specification.")
+                        return None
+                    print("  Refinement resolved all gaps.")
                 else:
-                    print(f"  Simulation issue detected: {simulation_log[:300]}...")
-                self.parser.add_error(error_log)
-                if attempt < max_retries:
-                    print(f"  -> Will feed simulation feedback back for correction in next attempt")
-                continue
-
-            print("  Simulation passed.")
-
-            # 4. Verification: Intent Match (LLM check)
-            print("\n[Stage 4/4] Verifying protocol matches original intent...")
-            verification = verify_intent_match(prompt, protocol_schema)
-
-            # Check if verification passes
-            if verification.matches and verification.confidence >= 0.7:
-                print(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
-                print("\n" + "="*50)
-                print("SUCCESS: Protocol generated and verified.")
-                print("="*50)
-                return PipelineResult(
-                    script=script,
-                    simulation_log=simulation_log,
-                    protocol_schema=protocol_schema,
-                    runlog=runlog,
-                    config=self.parser.config
-                )
+                    print("  Refinement failed. Cannot proceed.")
+                    return None
             else:
-                # Build feedback for retry
-                feedback_parts = ["Intent verification failed."]
-                if not verification.matches:
-                    feedback_parts.append("The generated protocol does NOT match the original intent.")
-                if verification.confidence < 0.7:
-                    feedback_parts.append(f"Low confidence ({verification.confidence:.0%}) in protocol correctness.")
-                if verification.issues:
-                    feedback_parts.append(f"Issues found: {'; '.join(verification.issues)}")
-                feedback_parts.append(f"What the protocol actually does: {verification.summary}")
-                feedback_parts.append("Please regenerate the protocol to better match the original intent.")
+                print("  Gaps filled from config.")
+        else:
+            print("  Specification is complete.")
 
-                error_log = " ".join(feedback_parts)
-                print(f"  Intent mismatch detected (confidence: {verification.confidence:.0%})")
-                if verification.issues:
-                    print(f"  Issues: {'; '.join(verification.issues)}")
-                if attempt < max_retries:
-                    print(f"  -> Will feed verification feedback back for correction in next attempt")
+        if spec.explicit_volumes:
+            print(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
 
-        print(f"\n{'='*50}")
-        print(f"Reached max attempts ({max_retries}). Could not generate valid protocol.")
-        print("="*50)
-        return None
+        # Stage 3: Confirm with user
+        print(extractor.format_for_confirmation(spec))
+        # In non-interactive mode (e.g., testing), skip confirmation
+        if sys.stdin.isatty():
+            from .cli import prompt_yes_no
+            if not prompt_yes_no("Proceed with this specification?", default=True):
+                print("Aborted by user.")
+                return None
+
+        # Stage 4: Deterministic spec → ProtocolSchema
+        print("\n[Stage 4/7] Converting specification to protocol schema...")
+        try:
+            protocol_schema = extractor.spec_to_schema(spec, self.parser.config)
+            print("  Schema generated deterministically.")
+        except Exception as e:
+            print(f"  Deterministic conversion failed: {e}")
+            print("  Falling back to LLM-based generation...")
+            # Fallback: use old LLM-based generation with spec as constraint
+            self.parser.reset_retry_state()
+            protocol_schema = self.parser.parse_intent(prompt, csv_path, spec=spec)
+            if protocol_schema is None:
+                print("  Fallback generation also failed.")
+                return None
+
+        # Validate spec volumes are preserved in schema
+        mismatches = extractor.validate_schema_against_spec(spec, protocol_schema)
+        if mismatches:
+            print("  Volume validation issues:")
+            for m in mismatches:
+                print(f"    - {m}")
+            return None
+
+        # Stage 5: Deterministic schema → Python script
+        print("\n[Stage 5/7] Converting schema to Python script...")
+        try:
+            script = generate_python_script(protocol_schema)
+            print("  Python script generated.")
+        except ValueError as e:
+            print(f"  Script generation failed: {e}")
+            return None
+
+        # Stage 6: Opentrons simulation
+        print("\n[Stage 6/7] Running Opentrons simulation...")
+        success, simulation_log, runlog = simulate_script(script)
+
+        if not success:
+            if "errorType=" in simulation_log:
+                import re
+                error_match = re.search(r"errorType='([^']+)'", simulation_log)
+                error_detail_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
+                error_type = error_match.group(1) if error_match else "Unknown"
+                error_detail = error_detail_match.group(1) if error_detail_match else simulation_log[:300]
+                print(f"  Simulation failed: {error_type}")
+                print(f"    Detail: {error_detail[:200]}")
+            else:
+                print(f"  Simulation failed: {simulation_log[:300]}")
+
+            # TODO: future iteration — feed simulation errors back to reasoning
+            # step for re-extraction, rather than retrying LLM generation
+            return None
+
+        print("  Simulation passed.")
+
+        # Stage 7: Intent verification (safety net)
+        print("\n[Stage 7/7] Verifying protocol matches original intent...")
+        verification = verify_intent_match(prompt, protocol_schema)
+
+        if verification.matches and verification.confidence >= 0.7:
+            print(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
+            print("\n" + "="*50)
+            print("SUCCESS: Protocol generated and verified.")
+            print("="*50)
+            return PipelineResult(
+                script=script,
+                simulation_log=simulation_log,
+                protocol_schema=protocol_schema,
+                runlog=runlog,
+                config=self.parser.config
+            )
+        else:
+            print(f"  Intent mismatch (confidence: {verification.confidence:.0%})")
+            if verification.issues:
+                print(f"  Issues: {'; '.join(verification.issues)}")
+            print(f"  Summary: {verification.summary}")
+            return None
 
 
 if __name__ == "__main__":

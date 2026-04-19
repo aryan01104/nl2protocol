@@ -1,3 +1,6 @@
+import re
+from dataclasses import dataclass, field
+
 from pydantic import BaseModel, Field, model_validator, field_validator, ValidationInfo
 from typing import List, Optional, Literal, Union, Annotated, Dict, Any
 
@@ -22,6 +25,47 @@ takes: json input
 returns: protocol schema object, which if it exist succesful is heavily validated by (atomic) liquid, and actual config/setup
     constraints
 """
+
+
+# ============================================================================
+# INSTRUCTION CONSTRAINTS (deterministic, no LLM)
+# ============================================================================
+
+@dataclass
+class InstructionConstraints:
+    """Deterministic regex extraction of hard facts from user instruction.
+    No LLM involved -- pure pattern matching.
+
+    Volumes that are hedged (e.g. 'about 100uL', '~25uL') are excluded
+    from hard constraints since the user indicated flexibility.
+    """
+    volumes: List[float] = field(default_factory=list)
+
+    # Matches hedged volumes: "about 100uL", "approximately 50uL", "~25uL", "around 10uL"
+    _HEDGE_PATTERN = re.compile(
+        r'(?:about|approximately|approx\.?|around|~|roughly)\s+(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])',
+        re.IGNORECASE
+    )
+    # Matches all volumes: 10.5uL, 10.5µL, 10.5 uL, etc.
+    _VOLUME_PATTERN = re.compile(
+        r'(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])',
+    )
+
+    @classmethod
+    def from_instruction(cls, instruction: str) -> 'InstructionConstraints':
+        # First, find hedged volumes to exclude them
+        hedged_volumes = set()
+        for m in cls._HEDGE_PATTERN.finditer(instruction):
+            hedged_volumes.add(float(m.group(1)))
+
+        # Then find all volumes, excluding hedged ones
+        volumes = []
+        for m in cls._VOLUME_PATTERN.finditer(instruction):
+            vol = float(m.group(1))
+            if vol not in hedged_volumes:
+                volumes.append(vol)
+
+        return cls(volumes=volumes)
 
 
 # ============================================================================
@@ -546,8 +590,28 @@ class ProtocolSchema(BaseModel):
                 # Check main volume field
                 if hasattr(cmd, 'volume') and cmd.volume is not None:
                     if cmd.volume < min_vol or cmd.volume > max_vol:
+                        # Find which pipettes CAN handle this volume
+                        suitable = []
+                        for mount, cap in mount_to_capacity.items():
+                            if cap[0] <= cmd.volume <= cap[1]:
+                                suitable.append(f"{mount} ({pipette_lookup[mount].model}, {cap[0]}-{cap[1]}µL)")
+
+                        suggestion = ""
+                        if suitable:
+                            suggestion = (
+                                f" Available pipettes that CAN handle {cmd.volume}µL: "
+                                f"{', '.join(suitable)}. "
+                                f"DO NOT change the volume — change the pipette assignment to one of these instead."
+                            )
+                        else:
+                            suggestion = (
+                                f" No available pipette can handle {cmd.volume}µL. "
+                                f"Available: {', '.join(f'{m} ({p.model})' for m, p in pipette_lookup.items())}."
+                            )
+
                         raise ValueError(
-                            f"Command {i}: volume {cmd.volume}µL outside pipette range ({min_vol}-{max_vol}µL)"
+                            f"Command {i}: volume {cmd.volume}µL outside pipette '{cmd.pipette}' range "
+                            f"({min_vol}-{max_vol}µL).{suggestion}"
                         )
 
                 # Check mix_before volume [reps, volume]
