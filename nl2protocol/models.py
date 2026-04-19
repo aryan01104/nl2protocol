@@ -1,71 +1,25 @@
-import re
-from dataclasses import dataclass, field
-
 from pydantic import BaseModel, Field, model_validator, field_validator, ValidationInfo
 from typing import List, Optional, Literal, Union, Annotated, Dict, Any
 
 """
-crucial file for STEP 2
+models.py — ProtocolSchema and hardware-level validation.
 
-main artifact: Protocol Schema, and its validation capabilities
-- at a high level, using the defined pydantic class to verify the outputted json to see if:
-    - each labware item defined exaclty as in config and not otherwise (1)
-    - each pipette item defined exactly as in config and not otherwise (2)
-    - for cmds
-        - (1), (2) for all its labware and pipette field
-        - voulume related cmds are within its pipette bounds
+This is the "hardware language" of the system. ProtocolSchema describes what
+the robot physically does: load this labware on slot 2, pick up a tip, aspirate
+50uL from well A1, etc. It gets converted to Python code by generate_python_script()
+in app.py.
 
-can we also
-- look at starting volumes and capacities so we:
-    - dont overdispense into well #NOTE
-    - overexpect from reservoirs #NOTE
+The LLM never produces this directly. Instead:
+  1. The LLM produces a ProtocolSpec (in extractor.py) — the "science language"
+  2. spec_to_schema() deterministically converts ProtocolSpec → ProtocolSchema
+  3. generate_python_script() converts ProtocolSchema → Python
 
-at a high level, protocol schema model validation does this;
-takes: json input
-returns: protocol schema object, which if it exist succesful is heavily validated by (atomic) liquid, and actual config/setup
-    constraints
+Validation here checks hardware constraints:
+  - Labware, pipettes, modules match the physical lab config
+  - Volumes are within pipette capacity ranges
+  - All command references (labware, pipette, module) actually exist
+  - Temperature and RPM values are within module limits
 """
-
-
-# ============================================================================
-# INSTRUCTION CONSTRAINTS (deterministic, no LLM)
-# ============================================================================
-
-@dataclass
-class InstructionConstraints:
-    """Deterministic regex extraction of hard facts from user instruction.
-    No LLM involved -- pure pattern matching.
-
-    Volumes that are hedged (e.g. 'about 100uL', '~25uL') are excluded
-    from hard constraints since the user indicated flexibility.
-    """
-    volumes: List[float] = field(default_factory=list)
-
-    # Matches hedged volumes: "about 100uL", "approximately 50uL", "~25uL", "around 10uL"
-    _HEDGE_PATTERN = re.compile(
-        r'(?:about|approximately|approx\.?|around|~|roughly)\s+(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])',
-        re.IGNORECASE
-    )
-    # Matches all volumes: 10.5uL, 10.5µL, 10.5 uL, etc.
-    _VOLUME_PATTERN = re.compile(
-        r'(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])',
-    )
-
-    @classmethod
-    def from_instruction(cls, instruction: str) -> 'InstructionConstraints':
-        # First, find hedged volumes to exclude them
-        hedged_volumes = set()
-        for m in cls._HEDGE_PATTERN.finditer(instruction):
-            hedged_volumes.add(float(m.group(1)))
-
-        # Then find all volumes, excluding hedged ones
-        volumes = []
-        for m in cls._VOLUME_PATTERN.finditer(instruction):
-            vol = float(m.group(1))
-            if vol not in hedged_volumes:
-                volumes.append(vol)
-
-        return cls(volumes=volumes)
 
 
 # ============================================================================
