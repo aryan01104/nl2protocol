@@ -612,13 +612,7 @@ class ProtocolAgent:
             print("  Schema generated deterministically.")
         except Exception as e:
             print(f"  Deterministic conversion failed: {e}")
-            print("  Falling back to LLM-based generation...")
-            # Fallback: use old LLM-based generation with spec as constraint
-            self.parser.reset_retry_state()
-            protocol_schema = self.parser.parse_intent(prompt, csv_path, spec=spec)
-            if protocol_schema is None:
-                print("  Fallback generation also failed.")
-                return None
+            return None
 
         # Validate spec volumes are preserved in schema
         mismatches = extractor.validate_schema_against_spec(spec, protocol_schema)
@@ -637,6 +631,13 @@ class ProtocolAgent:
             print(f"  Script generation failed: {e}")
             return None
 
+        # Save script for debugging regardless of simulation outcome
+        from datetime import datetime
+        debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
+        with open(debug_script, 'w') as f:
+            f.write(script)
+        print(f"  Debug: script saved to {debug_script}")
+
         # Stage 6: Opentrons simulation
         print("\n[Stage 6/7] Running Opentrons simulation...")
         success, simulation_log, runlog = simulate_script(script)
@@ -651,7 +652,7 @@ class ProtocolAgent:
                 print(f"  Simulation failed: {error_type}")
                 print(f"    Detail: {error_detail[:200]}")
             else:
-                print(f"  Simulation failed: {simulation_log[:300]}")
+                print(f"  Simulation failed: {simulation_log[:500]}")
 
             # TODO: future iteration — feed simulation errors back to reasoning
             # step for re-extraction, rather than retrying LLM generation

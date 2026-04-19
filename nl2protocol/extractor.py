@@ -77,6 +77,7 @@ class ExtractedStep(BaseModel):
     source: Optional[LocationRef] = None
     destination: Optional[LocationRef] = None
     post_actions: Optional[List[PostAction]] = None
+    replicates: Optional[int] = Field(None, ge=2, description="Number of replicates per source well (e.g., 3 for triplicate). Each source well maps to N destination wells across consecutive columns.")
     tip_strategy: Optional[Literal["new_tip_each", "same_tip", "unspecified"]] = None
     pipette_hint: Optional[str] = Field(None, description="If user specified a pipette: 'p20', 'p300'")
     note: Optional[str] = Field(None, description="Additional context from instruction")
@@ -135,6 +136,28 @@ RULES:
 - Leave the "reasoning" field empty in your JSON — it will be filled from your <reasoning> block
 - Leave "explicit_volumes" empty — it will be populated automatically
 
+COMPRESSION — KEEP STEPS COMPACT:
+- NEVER create separate steps for repetitive operations that differ only in wells.
+  Instead, use ONE step with well lists on source and/or destination.
+- For replicate patterns (triplicate, duplicate), use the "replicates" field:
+  Example: 8 standards each plated in triplicate across columns 1-3:
+    {{
+      "action": "transfer",
+      "source": {{"description": "dilution strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
+      "destination": {{"description": "qPCR plate", "well": "A1"}},
+      "replicates": 3
+    }}
+  This means: A1→[A1,A2,A3], B1→[B1,B2,B3], ..., H1→[H1,H2,H3].
+  Each source well maps to N consecutive columns starting at the destination well's column.
+- For paired well lists (source[0]→dest[0], source[1]→dest[1], ...):
+    {{
+      "action": "transfer",
+      "source": {{"description": "plate A", "wells": ["A1","A2","A3"]}},
+      "destination": {{"description": "plate B", "wells": ["B1","B2","B3"]}}
+    }}
+- A protocol with 12 samples in triplicate should be 1 step, NOT 12 steps.
+- Aim for under 10 steps total. If your spec has more than 15 steps, you are probably not compressing enough.
+
 FORMAT YOUR RESPONSE EXACTLY AS:
 <reasoning>
 your step-by-step thinking here
@@ -189,12 +212,16 @@ class SemanticExtractor:
         try:
             response = self.client.messages.create(
                 model=self.model_name,
-                max_tokens=4096,
+                max_tokens=8192,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}]
             )
 
             full_response = response.content[0].text.strip()
+
+            # Check for truncation (stop_reason != "end_turn")
+            if response.stop_reason != "end_turn":
+                print(f"  Warning: LLM response truncated (stop_reason={response.stop_reason})")
 
             # Parse reasoning and spec from tagged response
             reasoning, spec_json = self._parse_response(full_response)
@@ -213,7 +240,37 @@ class SemanticExtractor:
 
         except Exception as e:
             print(f"  Reasoning failed: {e}")
+            self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
+
+    def _save_debug_output(self, full_response: Optional[str], spec_json: Optional[str], error: Exception):
+        """Save failed LLM output for debugging."""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        debug_file = f"extractor_debug_{timestamp}.txt"
+
+        try:
+            with open(debug_file, 'w') as f:
+                f.write(f"ERROR: {error}\n")
+                f.write("=" * 60 + "\n\n")
+                if spec_json:
+                    f.write("EXTRACTED SPEC JSON:\n")
+                    f.write("=" * 60 + "\n")
+                    f.write(spec_json)
+                    f.write("\n\n")
+                if full_response:
+                    f.write("FULL LLM RESPONSE:\n")
+                    f.write("=" * 60 + "\n")
+                    f.write(full_response)
+            print(f"  Debug output saved to: {debug_file}")
+        except Exception:
+            # Last resort: print a snippet
+            if spec_json:
+                snippet = spec_json[:1000] + "..." if len(spec_json) > 1000 else spec_json
+                print(f"  Spec JSON snippet:\n{snippet}")
+            elif full_response:
+                snippet = full_response[:1000] + "..." if len(full_response) > 1000 else full_response
+                print(f"  Raw response snippet:\n{snippet}")
 
     def _parse_response(self, response: str) -> tuple[str, str]:
         """Parse <reasoning> and <spec> blocks from LLM response."""
@@ -540,9 +597,13 @@ Output the corrected specification.
           well_range → expanded well list
         """
         from .models import (
-            ProtocolSchema, Labware, Pipette,
+            ProtocolSchema, Labware, Pipette, Module,
             Transfer, Distribute, Consolidate, Mix,
-            Comment, Pause, Delay
+            Aspirate, Dispense, BlowOut, TouchTip,
+            PickUpTip, DropTip,
+            Comment, Pause, Delay,
+            SetTemperature, WaitForTemperature, DeactivateModule,
+            EngageMagnets, DisengageMagnets,
         )
 
         # ---- helpers ----
@@ -592,7 +653,12 @@ Output the corrected specification.
             scored = [(label, score_label(label)) for label in cfg["labware"]]
             scored.sort(key=lambda x: -x[1])
             if scored and scored[0][1] > 0:
-                return scored[0][0]
+                # Require a minimum score to avoid false matches
+                # (e.g., "sample plate" matching "qpcr_plate" just on "plate")
+                if scored[0][1] >= 10:
+                    return scored[0][0]
+                # Low-confidence match — warn
+                print(f"  Warning: weak labware match '{desc}' → '{scored[0][0]}' (score={scored[0][1]}), skipping")
 
             return None
 
@@ -776,33 +842,107 @@ Output the corrected specification.
             dst_wells = wells_from_ref(step.destination)
 
             # Tip strategy
-            new_tip = "always"
-            if step.tip_strategy == "same_tip":
-                new_tip = "never"
+            # For compound commands (transfer), "same_tip" means we pick up one tip
+            # before the batch and drop after. We use new_tip='never' on each individual
+            # Transfer and wrap with PickUpTip/DropTip.
+            # For "new_tip_each", each Transfer uses new_tip='always' (handles its own tips).
+            use_same_tip = (step.tip_strategy == "same_tip")
+            new_tip = "never" if use_same_tip else "always"
 
             # Mix from post_actions
             mix_after = None
             if step.post_actions:
                 for pa in step.post_actions:
-                    if pa.action == "mix" and pa.repetitions and pa.volume:
-                        pa_v = pa.volume.value
-                        if pa.volume.unit == "mL":
-                            pa_v *= 1000
-                        mix_after = (pa.repetitions, pa_v)
+                    if pa.action == "mix":
+                        reps = pa.repetitions or 3
+                        if pa.volume:
+                            pa_v = pa.volume.value
+                            if pa.volume.unit == "mL":
+                                pa_v *= 1000
+                        else:
+                            # Default: use the step's transfer volume
+                            pa_v = v if v else 50.0
+                        # Clamp mix volume to pipette capacity
+                        if mount in config.get("pipettes", {}):
+                            model = config["pipettes"][mount]["model"].lower()
+                            cap = None
+                            for key, lo, hi in [('p1000', 100, 1000), ('p300', 20, 300),
+                                                 ('p50', 5, 50), ('p20', 1, 20), ('p10', 1, 10)]:
+                                if key in model:
+                                    cap = hi
+                                    break
+                            if cap and pa_v > cap:
+                                pa_v = v if v and v <= cap else cap
+                        mix_after = (reps, pa_v)
 
             # ---- map action → commands ----
 
             if step.action == "transfer":
-                pairs = list(zip(src_wells, dst_wells)) if src_wells and dst_wells else [
-                    (step.source.well if step.source and step.source.well else "A1",
-                     step.destination.well if step.destination and step.destination.well else "A1")
-                ]
-                for sw, dw in pairs:
+                # For same_tip: pick up one tip before all transfers, drop after
+                if use_same_tip:
+                    commands.append(PickUpTip(pipette=mount))
+
+                if step.replicates and src_wells:
+                    # Replicate expansion: each source well → N dest wells
+                    # across consecutive columns starting at dest's column
+                    dest_start_col = 1
+                    if dst_wells:
+                        m = re.match(r'[A-P](\d+)', dst_wells[0])
+                        if m:
+                            dest_start_col = int(m.group(1))
+                    elif step.destination and step.destination.well:
+                        m = re.match(r'[A-P](\d+)', step.destination.well)
+                        if m:
+                            dest_start_col = int(m.group(1))
+
+                    for sw in src_wells:
+                        row = sw[0]
+                        for rep in range(step.replicates):
+                            dw = f"{row}{dest_start_col + rep}"
+                            commands.append(Transfer(
+                                pipette=mount, source_labware=src_label, source_well=sw,
+                                dest_labware=dst_label, dest_well=dw, volume=v,
+                                new_tip=new_tip, mix_after=mix_after
+                            ))
+                elif src_wells and dst_wells:
+                    if len(src_wells) == 1 and len(dst_wells) > 1:
+                        # 1 source → N destinations: transfer to each dest
+                        for dw in dst_wells:
+                            commands.append(Transfer(
+                                pipette=mount, source_labware=src_label, source_well=src_wells[0],
+                                dest_labware=dst_label, dest_well=dw, volume=v,
+                                new_tip=new_tip, mix_after=mix_after
+                            ))
+                    elif len(dst_wells) == 1 and len(src_wells) > 1:
+                        # N sources → 1 destination: transfer from each source
+                        for sw in src_wells:
+                            commands.append(Transfer(
+                                pipette=mount, source_labware=src_label, source_well=sw,
+                                dest_labware=dst_label, dest_well=dst_wells[0], volume=v,
+                                new_tip=new_tip, mix_after=mix_after
+                            ))
+                    else:
+                        # Paired well lists: zip source[i] → dest[i]
+                        pairs = list(zip(src_wells, dst_wells))
+                        for sw, dw in pairs:
+                            commands.append(Transfer(
+                                pipette=mount, source_labware=src_label, source_well=sw,
+                                dest_labware=dst_label, dest_well=dw, volume=v,
+                                new_tip=new_tip, mix_after=mix_after
+                            ))
+                else:
+                    # Single well fallback
+                    sw = step.source.well if step.source and step.source.well else "A1"
+                    dw = step.destination.well if step.destination and step.destination.well else "A1"
                     commands.append(Transfer(
                         pipette=mount, source_labware=src_label, source_well=sw,
                         dest_labware=dst_label, dest_well=dw, volume=v,
                         new_tip=new_tip, mix_after=mix_after
                     ))
+
+                # Drop tip after same_tip transfer batch
+                if use_same_tip:
+                    commands.append(DropTip(pipette=mount))
 
             elif step.action == "distribute":
                 commands.append(Distribute(
@@ -829,6 +969,9 @@ Output the corrected specification.
                         dest_labware=dst_label, dest_wells=dst_wells[1:],
                         volume=v, new_tip="once"
                     ))
+                    # Serial dilution transfers — pick up tip before batch if same_tip
+                    if use_same_tip:
+                        commands.append(PickUpTip(pipette=mount))
                     for i in range(len(dst_wells) - 1):
                         commands.append(Transfer(
                             pipette=mount, source_labware=dst_label,
@@ -836,6 +979,8 @@ Output the corrected specification.
                             dest_well=dst_wells[i + 1], volume=v,
                             new_tip=new_tip, mix_after=mix_after or (3, v)
                         ))
+                    if use_same_tip:
+                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "mix":
                 target = dst_label or src_label
@@ -844,11 +989,25 @@ Output the corrected specification.
                     for pa in step.post_actions:
                         if pa.action == "mix" and pa.repetitions:
                             reps = pa.repetitions
-                for well in (dst_wells or src_wells or ["A1"]):
-                    commands.append(Mix(
-                        pipette=mount, labware=target, well=well,
-                        volume=v, repetitions=reps
-                    ))
+                wells = dst_wells or src_wells or ["A1"]
+                if new_tip == "never":
+                    # Same tip for all wells: pick up once, mix all, drop once
+                    commands.append(PickUpTip(pipette=mount))
+                    for well in wells:
+                        commands.append(Mix(
+                            pipette=mount, labware=target, well=well,
+                            volume=v, repetitions=reps
+                        ))
+                    commands.append(DropTip(pipette=mount))
+                else:
+                    # New tip per well
+                    for well in wells:
+                        commands.append(PickUpTip(pipette=mount))
+                        commands.append(Mix(
+                            pipette=mount, labware=target, well=well,
+                            volume=v, repetitions=reps
+                        ))
+                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "delay":
                 minutes, seconds = None, None
@@ -879,10 +1038,165 @@ Output the corrected specification.
                     message=step.note or step.substance or "Pausing protocol"
                 ))
 
+            elif step.action == "comment":
+                commands.append(Comment(
+                    pipette=mount,
+                    message=step.note or step.substance or ""
+                ))
+
+            elif step.action == "aspirate":
+                target = src_label or dst_label
+                wells = src_wells or dst_wells or ["A1"]
+                if new_tip == "never":
+                    # Same tip: pick up once, aspirate+blowout all wells, drop once
+                    commands.append(PickUpTip(pipette=mount))
+                    for well in wells:
+                        commands.append(Aspirate(
+                            pipette=mount, labware=target, well=well, volume=v
+                        ))
+                        # Blow out to trash after each aspirate (waste removal)
+                        commands.append(BlowOut(pipette=mount))
+                    commands.append(DropTip(pipette=mount))
+                else:
+                    # New tip per well
+                    for well in wells:
+                        commands.append(PickUpTip(pipette=mount))
+                        commands.append(Aspirate(
+                            pipette=mount, labware=target, well=well, volume=v
+                        ))
+                        commands.append(DropTip(pipette=mount))
+
+            elif step.action == "dispense":
+                target = dst_label or src_label
+                wells = dst_wells or src_wells or ["A1"]
+                if new_tip == "never":
+                    commands.append(PickUpTip(pipette=mount))
+                    for well in wells:
+                        commands.append(Dispense(
+                            pipette=mount, labware=target, well=well, volume=v
+                        ))
+                    commands.append(DropTip(pipette=mount))
+                else:
+                    for well in wells:
+                        commands.append(PickUpTip(pipette=mount))
+                        commands.append(Dispense(
+                            pipette=mount, labware=target, well=well, volume=v
+                        ))
+                        commands.append(DropTip(pipette=mount))
+
+            elif step.action == "blow_out":
+                target = dst_label or src_label
+                wells = dst_wells or src_wells
+                if target and wells:
+                    for well in wells:
+                        commands.append(BlowOut(
+                            pipette=mount, labware=target, well=well
+                        ))
+                else:
+                    commands.append(BlowOut(pipette=mount))
+
+            elif step.action == "touch_tip":
+                target = dst_label or src_label
+                wells = dst_wells or src_wells or ["A1"]
+                for well in wells:
+                    commands.append(TouchTip(
+                        pipette=mount, labware=target, well=well
+                    ))
+
+            # --- Module commands ---
+
+            elif step.action == "set_temperature":
+                # Extract celsius from note
+                celsius = None
+                if step.note:
+                    m = re.search(r'(\d+(?:\.\d+)?)\s*°?\s*C', step.note)
+                    if m:
+                        celsius = float(m.group(1))
+                if celsius is not None:
+                    # Find the module label
+                    mod_label = None
+                    if "modules" in config:
+                        for label, mod in config["modules"].items():
+                            if mod.get("module_type") == "temperature":
+                                mod_label = label
+                                break
+                        if mod_label is None:
+                            # Use first module as fallback
+                            mod_label = next(iter(config["modules"]))
+                    if mod_label:
+                        commands.append(SetTemperature(
+                            pipette=mount, module=mod_label, celsius=celsius
+                        ))
+
+            elif step.action == "wait_for_temperature":
+                mod_label = None
+                if "modules" in config:
+                    for label, mod in config["modules"].items():
+                        if mod.get("module_type") == "temperature":
+                            mod_label = label
+                            break
+                if mod_label:
+                    commands.append(WaitForTemperature(
+                        pipette=mount, module=mod_label
+                    ))
+
+            elif step.action == "engage_magnets":
+                mod_label = None
+                if "modules" in config:
+                    for label, mod in config["modules"].items():
+                        if mod.get("module_type") == "magnetic":
+                            mod_label = label
+                            break
+                if mod_label:
+                    commands.append(EngageMagnets(
+                        pipette=mount, module=mod_label
+                    ))
+
+            elif step.action == "disengage_magnets":
+                mod_label = None
+                if "modules" in config:
+                    for label, mod in config["modules"].items():
+                        if mod.get("module_type") == "magnetic":
+                            mod_label = label
+                            break
+                if mod_label:
+                    commands.append(DisengageMagnets(
+                        pipette=mount, module=mod_label
+                    ))
+
+            elif step.action == "deactivate":
+                mod_label = None
+                if "modules" in config:
+                    mod_label = next(iter(config["modules"]))
+                if mod_label:
+                    commands.append(DeactivateModule(
+                        pipette=mount, module=mod_label
+                    ))
+
+            else:
+                print(f"  Warning: unhandled action '{step.action}' in step {step.order}, skipping")
+
+        # Build Module objects from config
+        module_list = []
+        if "modules" in config:
+            # Include modules that are referenced by commands
+            used_module_labels = set()
+            for cmd in commands:
+                if hasattr(cmd, 'module'):
+                    used_module_labels.add(cmd.module)
+            for label, mod in config["modules"].items():
+                if label in used_module_labels:
+                    module_list.append(Module(
+                        module_type=mod["module_type"],
+                        slot=mod["slot"],
+                        label=label
+                    ))
+
         return ProtocolSchema(
             protocol_name=spec.protocol_type or "AI Generated Protocol",
             author="Biolab AI",
             labware=labware_list,
             pipettes=pipette_list,
+            modules=module_list if module_list else None,
             commands=commands
         )
