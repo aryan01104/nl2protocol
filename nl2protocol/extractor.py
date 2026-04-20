@@ -199,6 +199,11 @@ class SemanticExtractor:
 
         Returns ProtocolSpec on success, None on failure (fail-fast).
         """
+        # Enrich config with well info so the LLM knows which wells are valid
+        # for each labware (e.g., a 12-well reservoir only has A1-A12, no row B)
+        from .parser import enrich_config_with_wells
+        enriched_config = enrich_config_with_wells(config)
+
         schema = ProtocolSpec.model_json_schema()
 
         system_prompt = REASONING_SYSTEM_PROMPT.format(
@@ -206,7 +211,7 @@ class SemanticExtractor:
         )
         user_prompt = REASONING_USER_PROMPT.format(
             instruction=instruction,
-            config=json.dumps(config, indent=2)
+            config=json.dumps(enriched_config, indent=2)
         )
 
         try:
