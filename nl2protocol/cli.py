@@ -146,7 +146,7 @@ Files:
     parser.add_argument(
         '--generate-config',
         action='store_true',
-        help='Infer lab config from instruction instead of using existing config file'
+        help='[Deprecated] Infer lab config from instruction. Use -c with a config file instead.'
     )
 
     parser.add_argument(
@@ -497,9 +497,13 @@ def main(argv: list = None) -> int:
     from .app import ProtocolAgent
     from .errors import NL2ProtocolError, APIKeyError, ConfigFileError
 
-    # Handle --generate-config mode
+    # Handle --generate-config mode (deprecated)
     config_path = args.config
     if args.generate_config:
+        from .colors import warning as cwarn
+        print(f"\n  {cwarn('Note:')} --generate-config is deprecated and may produce unreliable configs.", file=sys.stderr)
+        print(f"  Recommended: create a config.json describing your actual equipment,", file=sys.stderr)
+        print(f"  then use -c config.json. See .env.example and config_examples/.\n", file=sys.stderr)
         from .config_generator import ConfigGenerator, format_config_for_display
         import tempfile
 
@@ -604,13 +608,15 @@ def main(argv: list = None) -> int:
     slots = sorted(set(lw.slot for lw in result.protocol_schema.labware))
     pipettes = ", ".join(f"{p.model} ({p.mount})" for p in result.protocol_schema.pipettes)
 
+    from .colors import success, label as clabel, dim as cdim
+
     print(f"\n{'─' * 48}", file=sys.stderr)
-    print(f"  Protocol generated successfully.", file=sys.stderr)
+    print(f"  {success('Protocol generated successfully.')}", file=sys.stderr)
     print(f"", file=sys.stderr)
-    print(f"  Commands:   {len(result.protocol_schema.commands)} ({cmd_summary})", file=sys.stderr)
-    print(f"  Labware:    {len(result.protocol_schema.labware)} items (slots {', '.join(slots)})", file=sys.stderr)
-    print(f"  Pipettes:   {pipettes}", file=sys.stderr)
-    print(f"  Simulation: passed", file=sys.stderr)
+    print(f"  {clabel('Commands:')}   {len(result.protocol_schema.commands)} ({cmd_summary})", file=sys.stderr)
+    print(f"  {clabel('Labware:')}    {len(result.protocol_schema.labware)} items (slots {', '.join(slots)})", file=sys.stderr)
+    print(f"  {clabel('Pipettes:')}   {pipettes}", file=sys.stderr)
+    print(f"  {clabel('Simulation:')} {success('passed')}", file=sys.stderr)
     print(f"  Output:     {output_path}", file=sys.stderr)
     print(f"  Log:        {log_path}", file=sys.stderr)
     print(f"{'─' * 48}", file=sys.stderr)

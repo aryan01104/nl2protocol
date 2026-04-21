@@ -21,6 +21,8 @@ warnings.filterwarnings("ignore", module="opentrons")
 
 LINE_WIDTH = 60  # Same as the ===== separator
 
+from . import colors as C
+
 def _log(msg: str = ""):
     """Print progress/status to stderr (keeps stdout clean for data output)."""
     print(msg, file=sys.stderr)
@@ -570,6 +572,128 @@ class ProtocolAgent:
 
         return results
 
+    def _resolve_missing_labware(self, missing: list, instruction: str, extractor) -> dict:
+        """Interactively resolve missing labware by suggesting additions.
+
+        Uses the LLM to infer what Opentrons labware type is needed based on
+        the instruction context, then asks the scientist to confirm.
+
+        Returns dict of {label: {"load_name": ..., "slot": ...}} to add,
+        or None if user aborts.
+        """
+        from .cli import prompt_yes_no
+
+        # Find used slots so we can suggest available ones
+        used_slots = set()
+        for lw in self.parser.config.get("labware", {}).values():
+            used_slots.add(str(lw.get("slot", "")))
+        for mod in self.parser.config.get("modules", {}).values():
+            used_slots.add(str(mod.get("slot", "")))
+        available_slots = [str(s) for s in range(1, 12) if str(s) not in used_slots]
+
+        if not available_slots:
+            _log("  No deck slots available. Remove unused labware from your config first.")
+            return None
+
+        _log(f"\n  I can suggest what to add. Available deck slots: {', '.join(available_slots)}")
+
+        # Ask LLM to suggest load_names for each missing labware
+        try:
+            from .spinner import Spinner
+            suggest_prompt = (
+                f"The following labware are referenced in a protocol instruction but missing from the lab config.\n"
+                f"For each one, suggest the most likely Opentrons load_name and explain WHY you think "
+                f"this labware is needed (based on what the instruction says about it).\n\n"
+                f"Instruction:\n{instruction}\n\n"
+                f"Missing labware:\n{', '.join(missing)}\n\n"
+                f"Respond with ONLY a JSON object. For each missing labware, provide:\n"
+                f'  - "load_name": the Opentrons labware load_name\n'
+                f'  - "reason": one sentence explaining why this labware is needed\n\n'
+                f"Example:\n"
+                f'{{"sample_plate": {{"load_name": "corning_96_wellplate_360ul_flat", '
+                f'"reason": "Instruction says to transfer samples from a 96-well plate with wells A1-H1"}}, '
+                f'"waste_reservoir": {{"load_name": "nest_12_reservoir_15ml", '
+                f'"reason": "Instruction says to discard supernatant to a waste container"}}}}\n'
+                f"Use real Opentrons load_names from the standard labware library."
+            )
+
+            import json as json_mod
+            with Spinner("Inferring labware types..."):
+                response = extractor.client.messages.create(
+                    model=extractor.model_name,
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": suggest_prompt}]
+                )
+
+            text = response.content[0].text.strip()
+            # Parse JSON from response
+            if "```" in text:
+                text = text.split("```")[1].split("```")[0]
+                if text.startswith("json"):
+                    text = text[4:]
+            raw_suggestions = json_mod.loads(text.strip())
+            # Normalize: handle both {"name": "load_name"} and {"name": {"load_name": ..., "reason": ...}}
+            suggestions = {}
+            reasons = {}
+            for key, val in raw_suggestions.items():
+                if isinstance(val, dict):
+                    suggestions[key] = val.get("load_name", "UNKNOWN")
+                    reasons[key] = val.get("reason", "")
+                else:
+                    suggestions[key] = val
+                    reasons[key] = ""
+        except Exception as e:
+            _log(f"  Could not infer labware types automatically: {e}")
+            suggestions = {lw: "UNKNOWN" for lw in missing}
+            reasons = {lw: "" for lw in missing}
+
+        # Present each suggestion to the user
+        resolved = {}
+        slot_idx = 0
+        for lw_desc in missing:
+            suggested_load = suggestions.get(lw_desc, "UNKNOWN")
+            reason = reasons.get(lw_desc, "")
+            label = lw_desc.replace(" ", "_").replace("-", "_").lower()
+            slot = available_slots[slot_idx] if slot_idx < len(available_slots) else "?"
+
+            _log(f"\n  Missing: '{lw_desc}'")
+            if reason:
+                import textwrap
+                _log(textwrap.fill(f"  Why: {reason}", width=LINE_WIDTH,
+                                   initial_indent="  ", subsequent_indent="    "))
+            _log(f"  Suggested: load_name = {suggested_load}")
+            _log(f"             slot = {slot}")
+            _log(f"             label = {label}")
+
+            response = input("  Accept [Y], edit load_name [e], or skip [n]? ").strip().lower()
+            if response in ('', 'y', 'yes'):
+                resolved[label] = {"load_name": suggested_load, "slot": slot}
+                slot_idx += 1
+            elif response in ('e', 'edit'):
+                custom_load = input("  Enter Opentrons load_name: ").strip()
+                if custom_load:
+                    resolved[label] = {"load_name": custom_load, "slot": slot}
+                    slot_idx += 1
+                else:
+                    _log("  Skipped.")
+            elif response in ('n', 'no', 'skip'):
+                _log("  Skipped.")
+            else:
+                _log("  Skipped.")
+
+        if not resolved:
+            _log("  No labware added. Cannot proceed without the missing equipment.")
+            return None
+
+        _log(f"\n  Adding {len(resolved)} labware to config:")
+        for label, entry in resolved.items():
+            _log(f"    {label}: {entry['load_name']} on slot {entry['slot']}")
+
+        if not prompt_yes_no("  Write to config file?", default=True):
+            return None
+
+        return resolved
+
     def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
@@ -591,7 +715,7 @@ class ProtocolAgent:
         from .extractor import SemanticExtractor
 
         # Stage 1: Validate input is a protocol instruction
-        _log("\n[Stage 1/8] Validating input instruction...")
+        _log(f"\n{C.header('[Stage 1/8]')} Validating input instruction...")
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
@@ -610,12 +734,12 @@ class ProtocolAgent:
                 if validation.suggestion:
                     _log(f"  Suggestion: {validation.suggestion}")
                 return None
-            _log("  Input validated as protocol instruction.")
+            _log(f"  {C.success('Input validated as protocol instruction.')}")
         else:
             _log("  Skipping input validation.")
 
         # Stage 2: Reason through the instruction → ProtocolSpec
-        _log("\n[Stage 2/8] Reasoning through protocol instruction...")
+        _log(f"\n{C.header('[Stage 2/8]')} Reasoning through protocol instruction...")
         extractor = SemanticExtractor(
             client=self.parser.client,
             model_name=self.parser.model_name
@@ -631,41 +755,67 @@ class ProtocolAgent:
             _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
             return None
 
-        _log(f"  Protocol type: {spec.protocol_type or 'ad-hoc'}")
-        _log(f"  Steps identified: {len(spec.steps)}")
+        _log(f"  {C.label('Protocol type:')} {spec.protocol_type or 'ad-hoc'}")
+        _log(f"  {C.label('Steps:')} {len(spec.steps)}")
         if spec.reasoning:
-            _log("  Reasoning:")
-            # Split on numbered bullets (1., 2., etc.) for readability
+            _log(f"  {C.label('Reasoning:')}")
             import re
             reasoning = spec.reasoning.strip()
-            # Split into numbered sections
+            # Split into numbered sections (1., 2., etc.)
             parts = re.split(r'(?=\d+\.\s)', reasoning)
             for part in parts:
                 part = part.strip()
                 if not part:
                     continue
-                _log(_wrap(part, indent="    ", width=LINE_WIDTH))
+                # Split sub-bullets (lines starting with -) within each numbered section
+                sub_parts = re.split(r'(?=\s*-\s)', part, maxsplit=0)
+                for i, sub in enumerate(sub_parts):
+                    sub = sub.strip()
+                    if not sub:
+                        continue
+                    if i == 0:
+                        # Main numbered bullet
+                        _log(_wrap(sub, indent="    ", width=LINE_WIDTH))
+                    else:
+                        # Sub-bullet
+                        _log(_wrap(f"- {sub.lstrip('- ')}", indent="      ", width=LINE_WIDTH))
 
-        # Check for missing labware immediately (fail fast)
+        # Check for missing labware — offer to add it interactively
         if spec.missing_labware:
-            _log(f"\n  MISSING LABWARE — your instruction references equipment not in your config:")
+            _log(f"\n  {C.error('MISSING LABWARE')} — your instruction references equipment not in your config:")
             for lw in spec.missing_labware:
                 _log(f"    - '{lw}'")
-            _log(f"\n  To fix: add these to your config.json with the correct Opentrons")
-            _log(f"  load_name and deck slot, then re-run.")
-            return None
+
+            if sys.stdin.isatty():
+                resolved = self._resolve_missing_labware(spec.missing_labware, prompt, extractor)
+                if resolved is None:
+                    return None  # User aborted
+                # Write resolved labware to config and reload
+                if resolved:
+                    import json
+                    for label, entry in resolved.items():
+                        self.parser.config["labware"][label] = entry
+                    with open(self.config_path, 'w') as f:
+                        json.dump(self.parser.config, f, indent=4)
+                    _log(f"  Config updated: {self.config_path}")
+                    # Remove from missing_labware since we just added them
+                    spec.missing_labware = []
+            else:
+                _log(f"\n  To fix: add these to your config.json with the correct Opentrons")
+                _log(f"  load_name and deck slot, then re-run.")
+                return None
 
         if spec.initial_contents:
             _log(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
 
         # Stage 3: Validate extraction + check sufficiency + fill gaps
-        _log("\n[Stage 3/8] Validating and completing specification...")
+        _log(f"\n{C.header('[Stage 3/8]')} Validating and completing specification...")
 
         # Hallucination guard
         warnings = extractor.validate_against_text(spec, prompt)
         if warnings:
             for w in warnings:
-                _log(f"  Warning: {w}")
+                _log(f"  {C.warning('Warning:')} {w}")
 
         # Sufficiency check
         gaps = extractor.check_sufficiency(spec)
@@ -729,7 +879,7 @@ class ProtocolAgent:
                     )
 
         # Stage 4: Constraint checking (deterministic, no LLM)
-        _log("\n[Stage 4/8] Checking hardware constraints...")
+        _log(f"\n{C.header('[Stage 4/8]')} Checking hardware constraints...")
         from .constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
@@ -739,7 +889,7 @@ class ProtocolAgent:
                 _log(f"  {w}")
 
         if constraint_result.has_errors:
-            _log(f"\n  HARDWARE CONFLICTS DETECTED ({len(constraint_result.errors)}):")
+            _log(f"\n  {C.error('HARDWARE CONFLICTS DETECTED')} ({len(constraint_result.errors)}):")
             _log("  " + "-" * 56)
             for v in constraint_result.errors:
                 _log(f"  {v}")
@@ -756,7 +906,7 @@ class ProtocolAgent:
                 _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
                 return None
         else:
-            _log("  All constraints satisfied.")
+            _log(f"  {C.success('All constraints satisfied.')}")
 
         # Confirm with user
         _log(extractor.format_for_confirmation(spec))
@@ -767,7 +917,7 @@ class ProtocolAgent:
                 return None
 
         # Stage 5: Deterministic spec → ProtocolSchema
-        _log("\n[Stage 5/8] Converting specification to protocol schema...")
+        _log(f"\n{C.header('[Stage 5/8]')} Converting specification to protocol schema...")
         try:
             protocol_schema = extractor.spec_to_schema(spec, self.parser.config)
             _log("  Schema generated deterministically.")
@@ -791,7 +941,7 @@ class ProtocolAgent:
             return None
 
         # Stage 6: Deterministic schema → Python script
-        _log("\n[Stage 6/8] Generating Python script...")
+        _log(f"\n{C.header('[Stage 6/8]')} Generating Python script...")
         try:
             script = generate_python_script(protocol_schema)
             _log("  Python script generated.")
@@ -807,10 +957,10 @@ class ProtocolAgent:
         debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
         with open(debug_script, 'w') as f:
             f.write(script)
-        _log(f"  Debug: script saved to {debug_script}")
+        _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
 
         # Stage 7: Opentrons simulation
-        _log("\n[Stage 7/8] Running Opentrons simulation...")
+        _log(f"\n{C.header('[Stage 7/8]')} Running Opentrons simulation...")
         success, simulation_log, runlog = simulate_script(script)
 
         if not success:
@@ -828,16 +978,16 @@ class ProtocolAgent:
             _log(f"  Check {debug_script} to see the generated code.")
             return None
 
-        _log("  Simulation passed.")
+        _log(f"  {C.success('Simulation passed.')}")
 
         # Stage 8: Intent verification (safety net)
-        _log("\n[Stage 8/8] Verifying protocol matches original intent...")
+        _log(f"\n{C.header('[Stage 8/8]')} Verifying protocol matches original intent...")
         from .spinner import Spinner
         with Spinner("Verifying intent match..."):
             verification = verify_intent_match(prompt, protocol_schema)
 
         if verification.matches and verification.confidence >= 0.7:
-            _log(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
+            _log(f"  {C.success(f'Intent verification passed (confidence: {verification.confidence:.0%})')}")
             return PipelineResult(
                 script=script,
                 simulation_log=simulation_log,
