@@ -19,8 +19,11 @@ dist/
 .vscode/
 .idea/
 
-# Generated protocols
-generated_protocol.py
+# Generated protocols and debug output
+generated_protocol*.py
+generated_protocol*_simulation.log
+debug_script_*.py
+extractor_debug_*.txt
 
 # Test results
 test_results/
