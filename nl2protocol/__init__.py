@@ -13,7 +13,7 @@ Or programmatically:
     print(result.script)
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from nl2protocol.app import ProtocolAgent, generate_python_script, simulate_script
 from nl2protocol.parser import ProtocolParser

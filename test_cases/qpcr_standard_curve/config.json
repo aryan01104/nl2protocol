@@ -23,6 +23,10 @@
         "qpcr_plate": {
             "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
             "slot": "3"
+        },
+        "sample_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "8"
         }
     },
     "pipettes": {

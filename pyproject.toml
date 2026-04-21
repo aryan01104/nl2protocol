@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nl2protocol"
-version = "0.2.0"
+version = "0.3.0"
 description = "Convert natural language to Opentrons robot protocols using Claude LLM"
 readme = "README.md"
 license = "MIT"
@@ -44,8 +44,8 @@ dev = [
 nl2protocol = "nl2protocol.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/nl2protocol"
-Repository = "https://github.com/yourusername/nl2protocol"
+Homepage = "https://github.com/aryan01104/nl2protocol"
+Repository = "https://github.com/aryan01104/nl2protocol"
 
 [tool.hatch.build.targets.wheel]
 packages = ["nl2protocol"]
