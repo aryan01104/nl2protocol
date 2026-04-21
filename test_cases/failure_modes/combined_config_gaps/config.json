@@ -1,0 +1,18 @@
+{
+    "labware": {
+        "tiprack_300": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "deep_well_plate": {
+            "load_name": "nest_96_wellplate_2ml_deep",
+            "slot": "2"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300"]
+        }
+    }
+}

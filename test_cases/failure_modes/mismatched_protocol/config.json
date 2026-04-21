@@ -1,0 +1,28 @@
+{
+    "labware": {
+        "tiprack_20": {
+            "load_name": "opentrons_96_tiprack_20ul",
+            "slot": "1"
+        },
+        "pcr_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "2"
+        },
+        "thermocycler_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "7"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p20_single_gen2",
+            "tipracks": ["tiprack_20"]
+        }
+    },
+    "modules": {
+        "thermocycler": {
+            "module_type": "thermocycler",
+            "slot": "7"
+        }
+    }
+}

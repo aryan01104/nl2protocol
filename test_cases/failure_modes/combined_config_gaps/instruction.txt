@@ -1,0 +1,11 @@
+Run a magnetic bead cleanup:
+1. Set temperature module to 4°C
+2. Engage magnetic module for 5 minutes to pellet beads
+3. Aspirate 150uL of supernatant from the deep well plate and discard to waste reservoir
+4. Add 200uL of 80% ethanol from the ethanol reservoir to the deep well plate
+5. Wait 30 seconds, then remove ethanol
+6. Repeat ethanol wash once more
+7. Air dry beads for 5 minutes with magnets engaged
+8. Disengage magnets, add 50uL of elution buffer from tube rack, mix 10 times at 40uL
+9. Engage magnets for 2 minutes
+10. Transfer 45uL of eluate to a fresh PCR plate

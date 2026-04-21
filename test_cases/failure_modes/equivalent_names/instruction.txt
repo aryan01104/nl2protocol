@@ -1,0 +1,1 @@
+Pipette 25uL of the protein standard from the Eppendorf tubes into the flat-bottom microplate wells A1 through A8. Then add 200uL of Bradford dye from the trough to the same wells. Mix 3 times at 150uL.

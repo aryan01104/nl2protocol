@@ -550,6 +550,17 @@ class ProtocolAgent:
             preview = spec.reasoning[:200].replace('\n', ' ')
             print(f"  Reasoning: {preview}...")
 
+        # Check for missing labware immediately (fail fast)
+        if spec.missing_labware:
+            print(f"\n  MISSING LABWARE — instruction references equipment not in your config:")
+            for lw in spec.missing_labware:
+                print(f"    - '{lw}'")
+            print(f"  Add these to your config.json before running. Cannot proceed.")
+            return None
+
+        if spec.initial_contents:
+            print(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
+
         # Stage 2: Validate extraction + check sufficiency + fill gaps
         print("\n[Stage 2/7] Validating and completing specification...")
 
@@ -595,6 +606,39 @@ class ProtocolAgent:
 
         if spec.explicit_volumes:
             print(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
+
+        # Stage 2b: Constraint checking (deterministic, no LLM)
+        # Surfaces hardware conflicts BEFORE the scientist confirms.
+        print("\n[Stage 2b/7] Checking hardware constraints...")
+        from .constraints import ConstraintChecker
+        checker = ConstraintChecker(self.parser.config)
+        constraint_result = checker.check_all(spec)
+
+        if constraint_result.warnings:
+            for w in constraint_result.warnings:
+                print(f"  {w}")
+
+        if constraint_result.has_errors:
+            print(f"\n  HARDWARE CONFLICTS DETECTED ({len(constraint_result.errors)}):")
+            print("  " + "-" * 56)
+            for v in constraint_result.errors:
+                print(f"  {v}")
+                print()
+
+            # In interactive mode, ask if scientist wants to proceed anyway
+            if sys.stdin.isatty():
+                from .cli import prompt_yes_no
+                print("  These conflicts mean the protocol may not execute correctly.")
+                if not prompt_yes_no("  Proceed anyway (constraints will be reduced to fit)?", default=False):
+                    print("Aborted. Fix your config or instruction and retry.")
+                    return None
+                print("  Proceeding with constraint adjustments.")
+            else:
+                # Non-interactive: fail on errors
+                print("  Cannot proceed with hardware conflicts in non-interactive mode.")
+                return None
+        else:
+            print("  All constraints satisfied.")
 
         # Stage 3: Confirm with user
         print(extractor.format_for_confirmation(spec))

@@ -1,0 +1,1 @@
+Centrifuge the 96-well plate at 3000 RPM for 10 minutes, then measure the absorbance at 450nm using the plate reader. Export the results as a CSV and email them to the lab manager.

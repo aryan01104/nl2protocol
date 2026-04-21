@@ -83,6 +83,14 @@ class ExtractedStep(BaseModel):
     note: Optional[str] = Field(None, description="Additional context from instruction")
 
 
+class WellContents(BaseModel):
+    """Initial contents of a well/tube before the protocol starts."""
+    labware: str = Field(..., description="Config labware label (must match exactly)")
+    well: str = Field(..., description="Well position: A1, B2, etc.")
+    substance: str = Field(..., description="What's in there: 'concentrated DNA standard', 'master mix'")
+    volume_ul: Optional[float] = Field(None, description="Volume if known, in uL")
+
+
 class ProtocolSpec(BaseModel):
     """The structured intermediate representation of the user's intent.
 
@@ -94,6 +102,8 @@ class ProtocolSpec(BaseModel):
     reasoning: str = Field("", description="The LLM's chain-of-thought reasoning")
     steps: List[ExtractedStep] = Field(..., min_length=1)
     explicit_volumes: List[float] = Field(default_factory=list, description="All volumes found in instruction text via regex")
+    initial_contents: List[WellContents] = Field(default_factory=list, description="What's in wells/tubes before the protocol starts")
+    missing_labware: List[str] = Field(default_factory=list, description="Labware referenced in instruction but NOT in config")
 
     @model_validator(mode='after')
     def validate_step_ordering(self) -> 'ProtocolSpec':
@@ -118,6 +128,8 @@ THINK FIRST (inside <reasoning> tags):
 4. What parameters are missing? What are standard/typical defaults for this protocol?
 5. What are the individual steps, in order?
 6. For each step: what is the action, what substance, what volume, from where, to where?
+7. LABWARE MAPPING: For each piece of labware mentioned in the instruction, which config label does it map to? If something is mentioned but has NO match in config, flag it.
+8. INITIAL STATE: What substances are in which wells/tubes BEFORE the protocol starts?
 
 THEN produce structured JSON (inside <spec> tags) matching this schema:
 {schema}
@@ -131,10 +143,25 @@ RULES:
 - For time durations (delays, pauses, incubations), use the "duration" field with unit "seconds", "minutes", or "hours" — NEVER put time values in the "volume" field
 - For well ranges, prefer the format "A1-H12" or provide explicit well lists like ["A1", "B1", "C1"]. Avoid natural language well descriptions like "columns 2-8, rows A-H" — instead write "A2-H8"
 - Every liquid-handling step (transfer, distribute, mix, etc.) MUST have a volume
-- DO NOT choose Opentrons API labware names — use the user's descriptions
 - DO NOT choose pipette mounts — only record hints if the user mentioned a pipette
 - Leave the "reasoning" field empty in your JSON — it will be filled from your <reasoning> block
 - Leave "explicit_volumes" empty — it will be populated automatically
+
+LABWARE MAPPING (CRITICAL):
+- The "description" field in LocationRef MUST use a label from the lab config.
+- Look at the config's labware keys (e.g., "reagent_tube_rack", "dilution_strip", "qpcr_plate").
+- Map each piece of labware in the instruction to its config label.
+  Example: instruction says "tube rack" → config has "reagent_tube_rack" → use "reagent_tube_rack"
+  Example: instruction says "PCR plate" → config has "qpcr_plate" → use "qpcr_plate"
+- If the instruction references labware that does NOT exist in the config, add it to "missing_labware".
+  Example: instruction mentions "sample plate" but config has no matching labware → add "sample plate" to missing_labware.
+- NEVER invent labware or guess a match. If unsure, add to missing_labware.
+
+INITIAL CONTENTS:
+- Extract what's already in wells/tubes BEFORE the protocol starts.
+- Use config labware labels for the "labware" field.
+- Example: "Tube rack A1 contains DNA standard" → {{"labware": "reagent_tube_rack", "well": "A1", "substance": "concentrated DNA standard"}}
+- Only include what the instruction explicitly states. Don't infer contents.
 
 COMPRESSION — KEEP STEPS COMPACT:
 - NEVER create separate steps for repetitive operations that differ only in wells.
@@ -143,8 +170,8 @@ COMPRESSION — KEEP STEPS COMPACT:
   Example: 8 standards each plated in triplicate across columns 1-3:
     {{
       "action": "transfer",
-      "source": {{"description": "dilution strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
-      "destination": {{"description": "qPCR plate", "well": "A1"}},
+      "source": {{"description": "dilution_strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
+      "destination": {{"description": "qpcr_plate", "well": "A1"}},
       "replicates": 3
     }}
   This means: A1→[A1,A2,A3], B1→[B1,B2,B3], ..., H1→[H1,H2,H3].
@@ -152,8 +179,8 @@ COMPRESSION — KEEP STEPS COMPACT:
 - For paired well lists (source[0]→dest[0], source[1]→dest[1], ...):
     {{
       "action": "transfer",
-      "source": {{"description": "plate A", "wells": ["A1","A2","A3"]}},
-      "destination": {{"description": "plate B", "wells": ["B1","B2","B3"]}}
+      "source": {{"description": "reagent_tube_rack", "wells": ["A1","A2","A3"]}},
+      "destination": {{"description": "qpcr_plate", "wells": ["B1","B2","B3"]}}
     }}
 - A protocol with 12 samples in triplicate should be 1 step, NOT 12 steps.
 - Aim for under 10 steps total. If your spec has more than 15 steps, you are probably not compressing enough.
@@ -453,7 +480,13 @@ Output the corrected specification.
 
     @staticmethod
     def format_for_confirmation(spec: ProtocolSpec) -> str:
-        """Format spec as human-readable summary for user confirmation."""
+        """Format spec as human-readable summary for user confirmation.
+
+        Shows provenance for every parameter:
+          - No tag = explicitly stated in instruction
+          - (inferred) = filled from domain knowledge
+          - (approximate) = user hedged with ~, about, etc.
+        """
         lines = [
             "",
             "=" * 60,
@@ -496,23 +529,36 @@ Output the corrected specification.
             vol = ""
             if step.volume:
                 if step.volume.inferred:
-                    tag = " (inferred)"
+                    tag = " [INFERRED]"
                 elif step.volume.approximate:
-                    tag = " (approximate)"
+                    tag = " [APPROX]"
                 else:
                     tag = ""
                 vol = f" {step.volume.value}{step.volume.unit}{tag}"
 
+            # Duration
+            dur = ""
+            if step.duration:
+                dur = f" for {step.duration.value} {step.duration.unit}"
+
             substance = f" of {step.substance}" if step.substance else ""
-            line = f"    {step.order}. {step.action.upper()}{vol}{substance}{src}{dst}"
+            line = f"    {step.order}. {step.action.upper()}{vol}{substance}{src}{dst}{dur}"
             lines.append(line)
 
-            # Post-actions
+            # Post-actions with provenance
             if step.post_actions:
                 for pa in step.post_actions:
-                    pa_vol = f" at {pa.volume.value}{pa.volume.unit}" if pa.volume else ""
-                    pa_reps = f" {pa.repetitions}x" if pa.repetitions else ""
-                    lines.append(f"       -> {pa.action}{pa_reps}{pa_vol}")
+                    pa_parts = []
+                    if pa.repetitions:
+                        pa_parts.append(f"{pa.repetitions}x")
+                    if pa.volume:
+                        tag = ""
+                        if pa.volume.inferred:
+                            tag = " [INFERRED]"
+                        elif pa.volume.value not in spec.explicit_volumes:
+                            tag = " [INFERRED]"
+                        pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}{tag}")
+                    lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
 
             if step.tip_strategy and step.tip_strategy != "unspecified":
                 lines.append(f"       -> tip strategy: {step.tip_strategy}")
@@ -520,9 +566,15 @@ Output the corrected specification.
             if step.pipette_hint:
                 lines.append(f"       -> pipette hint: {step.pipette_hint}")
 
+        # Legend
+        lines.append("")
+        lines.append("  PROVENANCE:")
+        lines.append("    (no tag) = from your instruction")
+        lines.append("    [INFERRED] = domain knowledge / default")
+        lines.append("    [APPROX] = approximate value from instruction")
         lines.append("")
         if spec.explicit_volumes:
-            lines.append(f"  Volumes from instruction (locked): {spec.explicit_volumes}")
+            lines.append(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
         lines.append("=" * 60)
 
         return "\n".join(lines)
@@ -536,30 +588,17 @@ Output the corrected specification.
         """Check that generated ProtocolSchema honors the spec constraints.
         Returns list of mismatches (empty = OK).
 
-        This is the deterministic gate: volumes the user specified must appear
-        in the generated schema. If the LLM changed them during generation,
-        this catches it.
+        Only checks volumes that were ACTUALLY in the instruction text
+        (spec.explicit_volumes). Post-action volumes that the LLM inferred
+        (e.g., mix at 50uL) are NOT hard constraints — they may be legitimately
+        adjusted by the constraint checker or pipette selection logic.
         """
         mismatches = []
 
-        # Collect all hard-constraint volumes from spec
-        # (non-approximate, non-inferred = user explicitly stated these)
-        spec_volumes = []
-        for step in spec.steps:
-            if step.volume and not step.volume.approximate and not step.volume.inferred:
-                vol = step.volume.value
-                if step.volume.unit == "mL":
-                    vol *= 1000
-                spec_volumes.append(vol)
-            if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.volume and not pa.volume.approximate and not pa.volume.inferred:
-                        vol = pa.volume.value
-                        if pa.volume.unit == "mL":
-                            vol *= 1000
-                        spec_volumes.append(vol)
-
-        if not spec_volumes:
+        # Only validate volumes the user actually wrote in their instruction.
+        # These are extracted via regex from the instruction text — ground truth.
+        locked_volumes = spec.explicit_volumes
+        if not locked_volumes:
             return mismatches
 
         # Collect all volumes from schema commands
@@ -571,12 +610,14 @@ Output the corrected specification.
                 schema_volumes.add(cmd.mix_after[1])
             if hasattr(cmd, 'mix_before') and cmd.mix_before is not None:
                 schema_volumes.add(cmd.mix_before[1])
+            if hasattr(cmd, 'repetitions') and hasattr(cmd, 'volume') and cmd.volume is not None:
+                schema_volumes.add(cmd.volume)
 
-        # Every spec volume must appear in schema
-        for vol in spec_volumes:
+        # Every user-stated volume must appear in schema
+        for vol in locked_volumes:
             if not any(abs(sv - vol) < 0.01 for sv in schema_volumes):
                 mismatches.append(
-                    f"Volume {vol}uL from spec not found in schema commands. "
+                    f"Volume {vol}uL from instruction text not found in schema commands. "
                     f"Schema has: {sorted(schema_volumes)}. "
                     f"User-specified volumes must not be changed."
                 )
@@ -610,6 +651,29 @@ Output the corrected specification.
             SetTemperature, WaitForTemperature, DeactivateModule,
             EngageMagnets, DisengageMagnets,
         )
+        from .constraints import WellStateTracker
+
+        # Initialize well state tracker with initial contents from spec
+        well_tracker = WellStateTracker(config, spec)
+
+        def track_command(cmd):
+            """Update well state tracker for a generated command."""
+            if isinstance(cmd, Transfer):
+                substance = "liquid"
+                well_tracker.aspirate(cmd.source_labware, cmd.source_well, cmd.volume)
+                well_tracker.dispense(cmd.dest_labware, cmd.dest_well, cmd.volume, substance)
+            elif isinstance(cmd, Distribute):
+                for dw in cmd.dest_wells:
+                    well_tracker.aspirate(cmd.source_labware, cmd.source_well, cmd.volume)
+                    well_tracker.dispense(cmd.dest_labware, dw, cmd.volume, "liquid")
+            elif isinstance(cmd, Consolidate):
+                for sw in cmd.source_wells:
+                    well_tracker.aspirate(cmd.source_labware, sw, cmd.volume)
+                well_tracker.dispense(cmd.dest_labware, cmd.dest_well, cmd.volume * len(cmd.source_wells), "liquid")
+            elif isinstance(cmd, (Aspirate,)):
+                well_tracker.aspirate(cmd.labware, cmd.well, cmd.volume)
+            elif isinstance(cmd, (Dispense,)):
+                well_tracker.dispense(cmd.labware, cmd.well, cmd.volume, "liquid")
 
         # ---- helpers ----
 
@@ -780,15 +844,59 @@ Output the corrected specification.
             return v
 
         def pick_mount(step, cfg) -> Optional[str]:
-            """Determine pipette mount for a step."""
+            """Determine pipette mount for a step.
+
+            Considers ALL volumes in the step (transfer + post-actions like mix)
+            and picks a pipette that satisfies all constraints. If no single
+            pipette works, picks the one for the transfer volume — the constraint
+            checker will have already surfaced this conflict to the scientist.
+            """
             if step.pipette_hint:
                 m = pipette_by_hint(step.pipette_hint, cfg)
                 if m:
                     return m
+
+            # Collect all volumes this step needs the pipette to handle
+            volumes_needed = []
             v = vol_in_ul(step)
             if v:
+                volumes_needed.append(v)
+
+            if step.post_actions:
+                for pa in step.post_actions:
+                    if pa.volume:
+                        pa_v = pa.volume.value
+                        if pa.volume.unit == "mL":
+                            pa_v *= 1000
+                        volumes_needed.append(pa_v)
+
+            if not volumes_needed:
+                return None
+
+            # Try to find a pipette that covers ALL volumes (min to max)
+            min_vol = min(volumes_needed)
+            max_vol = max(volumes_needed)
+
+            if "pipettes" not in cfg:
+                return None
+
+            # Check each pipette: does its range cover [min_vol, max_vol]?
+            ranges = [('p1000', 100, 1000), ('p300', 20, 300),
+                      ('p50', 5, 50), ('p20', 1, 20), ('p10', 1, 10)]
+            for mount, pip in cfg["pipettes"].items():
+                model = pip["model"].lower()
+                for key, lo, hi in ranges:
+                    if key in model:
+                        if lo <= min_vol and max_vol <= hi:
+                            return mount  # This pipette covers everything
+                        break
+
+            # No single pipette covers all volumes.
+            # Fall back to the one that handles the transfer volume.
+            # The constraint checker has already flagged this for the scientist.
+            if v:
                 return pipette_for_volume(v, cfg)
-            return None
+            return pipette_for_volume(max_vol, cfg)
 
         # ---- build schema ----
 
@@ -834,8 +942,14 @@ Output the corrected specification.
                     tipracks=pip.get("tipracks", [])
                 ))
 
-        # Build Commands
-        commands = []
+        # Build Commands — using TrackedList to automatically update well state
+        class TrackedList(list):
+            """List that tracks well state whenever a command is appended."""
+            def append(self, cmd):
+                super().append(cmd)
+                track_command(cmd)
+
+        commands = TrackedList()
         default_mount = sorted(used_mounts)[0] if used_mounts else "left"
 
         for step in spec.steps:
@@ -855,6 +969,11 @@ Output the corrected specification.
             new_tip = "never" if use_same_tip else "always"
 
             # Mix from post_actions
+            # NOTE: No silent clamping here. If the mix volume exceeds pipette
+            # capacity, the ConstraintChecker should have caught it upstream and
+            # surfaced it to the scientist. By this point, either:
+            #   (a) the volume is within range, or
+            #   (b) the scientist approved an alternative resolution
             mix_after = None
             if step.post_actions:
                 for pa in step.post_actions:
@@ -867,17 +986,21 @@ Output the corrected specification.
                         else:
                             # Default: use the step's transfer volume
                             pa_v = v if v else 50.0
-                        # Clamp mix volume to pipette capacity
+                        # Constrain to pipette capacity — but transparently.
+                        # If a constraint violation was raised and the scientist chose
+                        # to proceed anyway (e.g., "reduce mix volume"), apply it here.
                         if mount in config.get("pipettes", {}):
-                            model = config["pipettes"][mount]["model"].lower()
+                            model_str = config["pipettes"][mount]["model"].lower()
                             cap = None
                             for key, lo, hi in [('p1000', 100, 1000), ('p300', 20, 300),
                                                  ('p50', 5, 50), ('p20', 1, 20), ('p10', 1, 10)]:
-                                if key in model:
+                                if key in model_str:
                                     cap = hi
                                     break
                             if cap and pa_v > cap:
-                                pa_v = v if v and v <= cap else cap
+                                # Reduce to pipette max — this path is only reached
+                                # when the scientist has been informed and chose to proceed
+                                pa_v = cap
                         mix_after = (reps, pa_v)
 
             # ---- map action → commands ----
@@ -966,22 +1089,30 @@ Output the corrected specification.
                 ))
 
             elif step.action == "serial_dilution":
-                # Decompose: distribute diluent + sequential transfers with mix
-                if dst_wells and len(dst_wells) > 1:
-                    commands.append(Distribute(
-                        pipette=mount, source_labware=src_label,
-                        source_well=src_wells[0] if src_wells else "A1",
-                        dest_labware=dst_label, dest_wells=dst_wells[1:],
-                        volume=v, new_tip="once"
-                    ))
-                    # Serial dilution transfers — pick up tip before batch if same_tip
+                # Serial dilution: sequential transfers from source through destination wells.
+                # Each transfer moves liquid from one well to the next, with mixing.
+                #
+                # Pattern: source → dest[0] → dest[1] → ... → dest[N]
+                #
+                # NOTE: We do NOT distribute diluent here. If diluent is needed,
+                # the scientist's instruction should have it as a separate step
+                # (e.g., "add 90uL water to all wells"). The serial_dilution action
+                # ONLY handles the sequential transfers with mixing.
+                if dst_wells:
+                    # Build the full chain: [source_well, dest[0], dest[1], ...]
+                    source_well = src_wells[0] if src_wells else "A1"
+                    chain = [source_well] + dst_wells
+
+                    # Serial dilution transfers — new tip each to prevent carryover
                     if use_same_tip:
                         commands.append(PickUpTip(pipette=mount))
-                    for i in range(len(dst_wells) - 1):
+                    for i in range(len(chain) - 1):
+                        # First transfer is from source labware, rest are within dest labware
+                        from_label = src_label if i == 0 else dst_label
                         commands.append(Transfer(
-                            pipette=mount, source_labware=dst_label,
-                            source_well=dst_wells[i], dest_labware=dst_label,
-                            dest_well=dst_wells[i + 1], volume=v,
+                            pipette=mount, source_labware=from_label,
+                            source_well=chain[i], dest_labware=dst_label,
+                            dest_well=chain[i + 1], volume=v,
                             new_tip=new_tip, mix_after=mix_after or (3, v)
                         ))
                     if use_same_tip:
@@ -1197,11 +1328,16 @@ Output the corrected specification.
                         label=label
                     ))
 
+        # Report well state tracker warnings
+        if well_tracker.warnings:
+            for w in well_tracker.warnings:
+                print(f"  Well state warning: {w}")
+
         return ProtocolSchema(
             protocol_name=spec.protocol_type or "AI Generated Protocol",
             author="Biolab AI",
             labware=labware_list,
             pipettes=pipette_list,
             modules=module_list if module_list else None,
-            commands=commands
+            commands=list(commands)
         )

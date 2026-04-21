@@ -1,0 +1,6 @@
+The destination plate already has 80uL of cell suspension in wells A1-H6.
+
+Add 20uL of Drug A (from tube rack A1) to wells A1-H1, A2-H2, and A3-H3 (triplicate).
+Add 20uL of Drug B (from tube rack A2) to wells A4-H4, A5-H5, and A6-H6 (triplicate).
+
+Mix each well 5 times at 50uL after adding drug. Use new tips for each drug to prevent cross-contamination.

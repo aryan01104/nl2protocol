@@ -1,0 +1,1 @@
+Set the temperature module to 37°C and wait for it to stabilize. Then transfer 200uL of cell culture media from the reservoir to each well of the 96-well plate. Incubate at 37°C for 30 minutes.

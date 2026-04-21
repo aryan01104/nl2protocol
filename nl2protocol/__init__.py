@@ -23,6 +23,7 @@ from nl2protocol.robot import RobotClient
 from nl2protocol.input_validator import InputValidator, validate_input
 from nl2protocol.example_store import ExampleStore
 from nl2protocol.extractor import SemanticExtractor, ProtocolSpec
+from nl2protocol.constraints import ConstraintChecker, ConstraintViolation, ConstraintCheckResult
 
 __all__ = [
     # Version
@@ -32,6 +33,7 @@ __all__ = [
     "ProtocolParser",
     "ProtocolSchema",
     "ConfigValidator",
+    "ConstraintChecker",
     "RobotClient",
     "InputValidator",
     "ExampleStore",
@@ -50,4 +52,6 @@ __all__ = [
     "Pause",
     "Delay",
     "Comment",
+    "ConstraintViolation",
+    "ConstraintCheckResult",
 ]

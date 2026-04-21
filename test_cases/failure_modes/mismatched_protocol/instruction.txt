@@ -1,0 +1,1 @@
+Perform a serial dilution of the drug compound across row A of the 96-well plate, starting at 10mM in A1 with 2-fold dilutions through A12. Use 100uL transfers with mixing.

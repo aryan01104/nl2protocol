@@ -1,0 +1,1 @@
+Transfer 5uL of DNA sample from the source plate well A1 to the destination plate well B1. Then transfer 500uL of wash buffer from the reservoir well A1 to the destination plate well B1.

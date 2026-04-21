@@ -1,0 +1,1 @@
+Transfer 100uL from the source plate well A1 to the destination plate well A1. Use a new tip.

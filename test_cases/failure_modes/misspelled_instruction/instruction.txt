@@ -1,0 +1,1 @@
+Trasfer 50uL of mastermix from the resevoir to the destintion plate wells A1 thorugh A12. Use same tipp for all dispenses. Then add 5uL of templete DNA from the sorce plate to each well, useing new tips for each.

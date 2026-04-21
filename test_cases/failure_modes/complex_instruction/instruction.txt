@@ -1,0 +1,20 @@
+Set up an ELISA plate:
+
+1. Coat the ELISA plate: add 100uL of capture antibody (1:1000 dilution in coating buffer) from tube rack A1 to all wells of columns 1-10. Leave columns 11-12 empty as blanks. Incubate at 4°C overnight — use a pause with a message to the operator.
+
+2. After incubation (operator resumes), wash 3 times: fill each well with 300uL of wash buffer from the reservoir, wait 30 seconds, then aspirate all wash buffer. Repeat this cycle 3 times total.
+
+3. Block: add 200uL of blocking buffer (tube rack A2) to all wells columns 1-12. Pause for 1 hour incubation at room temperature.
+
+4. After blocking, wash 3 times again (same as step 2).
+
+5. Add samples: add 100uL of each sample to the ELISA plate in duplicate:
+   - Samples are in the sample plate, wells A1 through D6 (24 samples)
+   - Sample 1 (A1) goes to ELISA plate A1 and A2
+   - Sample 2 (B1) goes to ELISA plate B1 and B2
+   - Continue this pattern: each sample plate well maps to 2 adjacent ELISA columns
+   - Use new tips for each sample
+
+6. Add 100uL of detection antibody (tube rack A3) to all sample wells, columns 1-10. Same tip is fine.
+
+7. Mix all wells with samples 3 times at 100uL, new tip per well.

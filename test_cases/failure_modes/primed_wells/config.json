@@ -1,0 +1,22 @@
+{
+    "labware": {
+        "tiprack": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "tube_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+            "slot": "2"
+        },
+        "destination_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "3"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack"]
+        }
+    }
+}

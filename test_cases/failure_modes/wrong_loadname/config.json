@@ -1,0 +1,22 @@
+{
+    "labware": {
+        "tiprack": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "source_plate": {
+            "load_name": "corning_96_flat_wellplate",
+            "slot": "2"
+        },
+        "dest_plate": {
+            "load_name": "nest_96_pcr_wellplate_100ul",
+            "slot": "3"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack"]
+        }
+    }
+}
