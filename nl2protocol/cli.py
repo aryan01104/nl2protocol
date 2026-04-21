@@ -523,7 +523,10 @@ def main(argv: list = None) -> int:
                 return 1
 
         if generated_config is None:
-            print("Error: Could not infer configuration from instruction.", file=sys.stderr)
+            print("Error: Could not infer lab configuration from your instruction.", file=sys.stderr)
+            print("  The LLM could not determine what labware, pipettes, or modules you need.", file=sys.stderr)
+            print("  Try: include specific equipment or volumes in your instruction.", file=sys.stderr)
+            print("  Or: provide a config file with -c instead of using --generate-config.", file=sys.stderr)
             return 1
 
         # Display config to user
@@ -577,19 +580,44 @@ def main(argv: list = None) -> int:
         return 1
 
     if result is None:
-        print(f"\nFailed to generate valid protocol after {args.retries} attempts.", file=sys.stderr)
+        print(f"\nProtocol generation did not succeed.", file=sys.stderr)
+        print(f"  Check the stage-by-stage output above for the specific failure.", file=sys.stderr)
+        print(f"  Common fixes:", file=sys.stderr)
+        print(f"    - Add more detail (volumes, well positions, labware names)", file=sys.stderr)
+        print(f"    - Check your config.json matches your actual equipment", file=sys.stderr)
+        print(f"    - Try a simpler instruction first to verify your setup", file=sys.stderr)
         return 1
 
     # Save protocol
     with open(output_path, 'w') as f:
         f.write(result.script)
-    print(f"\nProtocol saved to: {output_path}")
 
     # Save simulation log alongside protocol
     log_path = get_simulation_log_path(output_path)
     with open(log_path, 'w') as f:
         f.write(result.simulation_log)
-    print(f"Simulation log saved to: {log_path}")
+
+    # End-of-run summary
+    from collections import Counter
+    cmd_counts = Counter(c.command_type for c in result.protocol_schema.commands)
+    cmd_summary = ", ".join(f"{v}x {k}" for k, v in cmd_counts.most_common())
+    slots = sorted(set(lw.slot for lw in result.protocol_schema.labware))
+    pipettes = ", ".join(f"{p.model} ({p.mount})" for p in result.protocol_schema.pipettes)
+
+    print(f"\n{'─' * 48}", file=sys.stderr)
+    print(f"  Protocol generated successfully.", file=sys.stderr)
+    print(f"", file=sys.stderr)
+    print(f"  Commands:   {len(result.protocol_schema.commands)} ({cmd_summary})", file=sys.stderr)
+    print(f"  Labware:    {len(result.protocol_schema.labware)} items (slots {', '.join(slots)})", file=sys.stderr)
+    print(f"  Pipettes:   {pipettes}", file=sys.stderr)
+    print(f"  Simulation: passed", file=sys.stderr)
+    print(f"  Output:     {output_path}", file=sys.stderr)
+    print(f"  Log:        {log_path}", file=sys.stderr)
+    print(f"{'─' * 48}", file=sys.stderr)
+
+    # Also print paths to stdout (machine-parseable)
+    print(output_path)
+    print(log_path)
 
     # Robot upload flow (if --robot flag is set)
     if args.robot:

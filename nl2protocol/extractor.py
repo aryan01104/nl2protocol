@@ -28,6 +28,7 @@ values (the 10.5→20.0 bug).
 import copy
 import json
 import re
+import sys
 from typing import List, Optional, Literal, Dict
 
 from anthropic import Anthropic
@@ -242,12 +243,14 @@ class SemanticExtractor:
         )
 
         try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=8192,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}]
-            )
+            from .spinner import Spinner
+            with Spinner("Reasoning through protocol..."):
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=8192,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}]
+                )
 
             full_response = response.content[0].text.strip()
 
@@ -271,7 +274,12 @@ class SemanticExtractor:
             return spec
 
         except Exception as e:
-            print(f"  Reasoning failed: {e}")
+            from .errors import format_api_error
+            import anthropic
+            if isinstance(e, (anthropic.APIError, anthropic.APIConnectionError, anthropic.APITimeoutError)):
+                print(f"  Reasoning failed: {format_api_error(e)}", file=sys.stderr)
+            else:
+                print(f"  Reasoning failed: {e}", file=sys.stderr)
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
 
@@ -374,12 +382,14 @@ Output the corrected specification.
 """
 
         try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=4096,
-                system=system_prompt,
-                messages=[{"role": "user", "content": refinement_prompt}]
-            )
+            from .spinner import Spinner
+            with Spinner("Refining specification..."):
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=4096,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": refinement_prompt}]
+                )
 
             full_response = response.content[0].text.strip()
             reasoning, spec_json = self._parse_response(full_response)
@@ -1330,8 +1340,11 @@ Output the corrected specification.
 
         # Report well state tracker warnings
         if well_tracker.warnings:
+            import textwrap
             for w in well_tracker.warnings:
-                print(f"  Well state warning: {w}")
+                wrapped = textwrap.fill(f"Well state: {w}", width=60,
+                                        initial_indent="  ", subsequent_indent="    ")
+                print(wrapped, file=sys.stderr)
 
         return ProtocolSchema(
             protocol_name=spec.protocol_type or "AI Generated Protocol",

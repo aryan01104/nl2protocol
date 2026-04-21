@@ -13,6 +13,7 @@ Classifications:
 
 import json
 import os
+import sys
 from dataclasses import dataclass
 from typing import Literal, Optional
 from anthropic import Anthropic
@@ -111,14 +112,16 @@ class InputValidator:
             )
 
         try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=256,
-                messages=[{
-                    "role": "user",
-                    "content": f"{CLASSIFY_PROMPT}{user_input}"
-                }]
-            )
+            from .spinner import Spinner
+            with Spinner("Classifying input..."):
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=256,
+                    messages=[{
+                        "role": "user",
+                        "content": f"{CLASSIFY_PROMPT}{user_input}"
+                    }]
+                )
 
             result_text = response.content[0].text
 
@@ -140,7 +143,8 @@ class InputValidator:
         except Exception as e:
             # On error, default to allowing the input through
             # Better to try protocol generation than block valid input
-            print(f"Input validation error: {e}")
+            from .errors import format_api_error
+            print(f"  Input validation skipped ({format_api_error(e)})", file=sys.stderr)
             return InputValidationResult(
                 classification="PROTOCOL",
                 reason="Classification skipped due to error",

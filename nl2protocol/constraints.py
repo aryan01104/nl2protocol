@@ -543,9 +543,7 @@ class WellStateTracker:
         # {labware_label: {well: WellState}}
         self.state: Dict[str, Dict[str, WellState]] = {}
         self.warnings: List[str] = []
-        # Wells with known contents but unknown volume (reagent tubes, stock solutions)
-        # These are treated as having sufficient stock — don't warn on aspirate.
-        self._stock_wells: set = set()
+        self._warned_wells: set = set()  # Deduplicate: one warning per well
 
         # Initialize from spec's initial_contents
         for ic in spec.initial_contents:
@@ -553,10 +551,8 @@ class WellStateTracker:
             if ic.volume_ul:
                 self.state[ic.labware][ic.well].add(ic.volume_ul, ic.substance)
             else:
-                # Stock/reagent tube — has liquid but unknown volume.
-                # Mark as "stock" so we don't warn about aspirating from it.
-                self.state[ic.labware][ic.well].add(100000.0, ic.substance)  # effectively infinite
-                self._stock_wells.add((ic.labware, ic.well))
+                # Stock/reagent — has liquid but unknown volume. Treat as infinite.
+                self.state[ic.labware][ic.well].add(100000.0, ic.substance)
 
     def _ensure_well(self, labware: str, well: str):
         """Ensure the labware/well exists in state."""
@@ -586,18 +582,23 @@ class WellStateTracker:
         if not labware:
             return True  # Can't check without labware
         self._ensure_well(labware, well)
+        key = (labware, well)
         current = self.state[labware][well].volume_ul
         if current < 0.01 and volume > 0:
-            self.warnings.append(
-                f"Aspirating {volume}uL from '{labware}' well {well} "
-                f"which appears to be empty (no prior dispense tracked)"
-            )
+            if key not in self._warned_wells:
+                self._warned_wells.add(key)
+                self.warnings.append(
+                    f"Aspirating from '{labware}' well {well} "
+                    f"which appears to be empty (no prior dispense tracked)"
+                )
             return False
         if volume > current + 0.01:
-            self.warnings.append(
-                f"Aspirating {volume}uL from '{labware}' well {well} "
-                f"which only has ~{current:.1f}uL"
-            )
+            if key not in self._warned_wells:
+                self._warned_wells.add(key)
+                self.warnings.append(
+                    f"Aspirating {volume}uL from '{labware}' well {well} "
+                    f"which only has ~{current:.1f}uL"
+                )
             return False
         self.state[labware][well].remove(volume)
         return True

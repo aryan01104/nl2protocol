@@ -18,6 +18,20 @@ from .parser import ProtocolParser
 logging.getLogger("opentrons").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", module="opentrons")
 
+
+LINE_WIDTH = 60  # Same as the ===== separator
+
+def _log(msg: str = ""):
+    """Print progress/status to stderr (keeps stdout clean for data output)."""
+    print(msg, file=sys.stderr)
+
+
+def _wrap(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> str:
+    """Wrap text to fit within LINE_WIDTH, preserving the indent."""
+    import textwrap
+    return textwrap.fill(text, width=width, initial_indent=indent,
+                         subsequent_indent=indent)
+
 from opentrons import simulate
 
 
@@ -139,7 +153,7 @@ def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResu
 
     except Exception as e:
         # On error, assume match to avoid blocking valid protocols
-        print(f"Verification error: {e}")
+        _log(f"  Verification skipped ({type(e).__name__})")
         return VerificationResult(
             matches=True,
             confidence=0.5,
@@ -491,6 +505,71 @@ class ProtocolAgent:
         self.config_path = config_path
         self.parser = ProtocolParser(config_path=config_path)
 
+    @staticmethod
+    def _infer_source_containers(spec) -> list:
+        """Identify labware wells that are only aspirated from, never dispensed into.
+
+        These are source containers (reservoirs, tube racks) that the scientist
+        fills before running the protocol. Returns list of (labware, well, substance).
+        """
+        # Track which wells are sources vs destinations
+        source_wells = {}   # (labware, well) → substance
+        dest_wells = set()  # (labware, well)
+
+        liquid_actions = {"transfer", "distribute", "consolidate",
+                          "serial_dilution", "aspirate"}
+
+        for step in spec.steps:
+            if step.action not in liquid_actions:
+                continue
+
+            # Source side
+            if step.source:
+                desc = step.source.description
+                wells = []
+                if step.source.well:
+                    wells = [step.source.well]
+                elif step.source.wells:
+                    wells = step.source.wells
+                for w in wells:
+                    key = (desc, w)
+                    if key not in source_wells:
+                        source_wells[key] = step.substance
+
+            # Destination side
+            if step.destination:
+                desc = step.destination.description
+                wells = []
+                if step.destination.well:
+                    wells = [step.destination.well]
+                elif step.destination.wells:
+                    wells = step.destination.wells
+                # For well ranges, just mark the description as having destinations
+                if step.destination.well_range:
+                    dest_wells.add((desc, "__range__"))
+                for w in wells:
+                    dest_wells.add((desc, w))
+
+        # Source-only wells: aspirated from but never dispensed into
+        # Also exclude wells whose labware appears as a destination anywhere
+        #  (e.g., serial dilution where the same plate is both source and dest)
+        dest_labware = {lw for lw, _ in dest_wells}
+        already_tracked = {(ic.labware, ic.well) for ic in spec.initial_contents}
+
+        results = []
+        seen = set()
+        for (labware, well), substance in source_wells.items():
+            if labware in dest_labware:
+                continue  # Same labware used as dest elsewhere — not a pure source
+            if (labware, well) in already_tracked:
+                continue  # Already in initial_contents from LLM extraction
+            if (labware, well) in seen:
+                continue
+            seen.add((labware, well))
+            results.append((labware, well, substance))
+
+        return results
+
     def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
@@ -511,28 +590,32 @@ class ProtocolAgent:
         """
         from .extractor import SemanticExtractor
 
-        # Stage 0: Validate input is a protocol instruction
-        print("\n[Stage 0/7] Validating input instruction...")
+        # Stage 1: Validate input is a protocol instruction
+        _log("\n[Stage 1/8] Validating input instruction...")
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
             validation = validator.classify(prompt)
 
             if not validation.is_valid_protocol:
-                print(f"  Input validation result: {validation}")
                 if validation.classification == "QUESTION":
-                    print("  This appears to be a question. Please rephrase as a protocol instruction.")
+                    _log("  This looks like a question, not a protocol instruction.")
+                    _log("  Try rephrasing as an action: 'Transfer 100uL from A1 to B1'")
                 elif validation.classification == "AMBIGUOUS":
-                    print("  This instruction is too vague. Please provide more details.")
+                    _log("  This instruction is too vague to generate a protocol.")
+                    _log("  Try adding specific volumes, wells, and labware names.")
                 elif validation.classification == "INVALID":
-                    print("  This doesn't appear to be a lab protocol instruction.")
+                    _log("  This doesn't appear to be a liquid-handling protocol.")
+                    _log("  The OT-2 can only pipette — it can't centrifuge, read absorbance, etc.")
+                if validation.suggestion:
+                    _log(f"  Suggestion: {validation.suggestion}")
                 return None
-            print("  Input validated as protocol instruction.")
+            _log("  Input validated as protocol instruction.")
         else:
-            print("  Skipping input validation.")
+            _log("  Skipping input validation.")
 
-        # Stage 1: Reason through the instruction → ProtocolSpec
-        print("\n[Stage 1/7] Reasoning through protocol instruction...")
+        # Stage 2: Reason through the instruction → ProtocolSpec
+        _log("\n[Stage 2/8] Reasoning through protocol instruction...")
         extractor = SemanticExtractor(
             client=self.parser.client,
             model_name=self.parser.model_name
@@ -540,139 +623,183 @@ class ProtocolAgent:
         spec = extractor.extract(prompt, self.parser.config)
 
         if spec is None:
-            print("  Failed to understand instruction. Cannot proceed.")
+            _log("\n  Could not extract a protocol from your instruction.")
+            _log("  This can happen if:")
+            _log("    - The instruction is too vague (add volumes, wells, labware names)")
+            _log("    - The API key is invalid or out of credits")
+            _log("    - The instruction isn't about liquid handling")
+            _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
             return None
 
-        print(f"  Protocol type: {spec.protocol_type or 'ad-hoc'}")
-        print(f"  Steps identified: {len(spec.steps)}")
+        _log(f"  Protocol type: {spec.protocol_type or 'ad-hoc'}")
+        _log(f"  Steps identified: {len(spec.steps)}")
         if spec.reasoning:
-            # Show first 200 chars of reasoning
-            preview = spec.reasoning[:200].replace('\n', ' ')
-            print(f"  Reasoning: {preview}...")
+            _log("  Reasoning:")
+            # Split on numbered bullets (1., 2., etc.) for readability
+            import re
+            reasoning = spec.reasoning.strip()
+            # Split into numbered sections
+            parts = re.split(r'(?=\d+\.\s)', reasoning)
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                _log(_wrap(part, indent="    ", width=LINE_WIDTH))
 
         # Check for missing labware immediately (fail fast)
         if spec.missing_labware:
-            print(f"\n  MISSING LABWARE — instruction references equipment not in your config:")
+            _log(f"\n  MISSING LABWARE — your instruction references equipment not in your config:")
             for lw in spec.missing_labware:
-                print(f"    - '{lw}'")
-            print(f"  Add these to your config.json before running. Cannot proceed.")
+                _log(f"    - '{lw}'")
+            _log(f"\n  To fix: add these to your config.json with the correct Opentrons")
+            _log(f"  load_name and deck slot, then re-run.")
             return None
 
         if spec.initial_contents:
-            print(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
+            _log(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
 
-        # Stage 2: Validate extraction + check sufficiency + fill gaps
-        print("\n[Stage 2/7] Validating and completing specification...")
+        # Stage 3: Validate extraction + check sufficiency + fill gaps
+        _log("\n[Stage 3/8] Validating and completing specification...")
 
         # Hallucination guard
         warnings = extractor.validate_against_text(spec, prompt)
         if warnings:
             for w in warnings:
-                print(f"  Warning: {w}")
+                _log(f"  Warning: {w}")
 
         # Sufficiency check
         gaps = extractor.check_sufficiency(spec)
         if gaps:
-            print(f"  Gaps found: {len(gaps)}")
+            _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
-                print(f"    - {g}")
+                _log(f"    - {g}")
             spec = extractor.fill_gaps(spec, self.parser.config)
-            # Re-check after filling
             remaining_gaps = extractor.check_sufficiency(spec)
             if remaining_gaps:
-                print(f"  Could not fill all gaps after config lookup:")
+                _log(f"  Could not fill all gaps from config:")
                 for g in remaining_gaps:
-                    print(f"    - {g}")
-                # Self-refinement: feed gaps back to LLM for one retry
-                print("  Attempting self-refinement (re-reasoning with gap feedback)...")
+                    _log(f"    - {g}")
+                _log("  Attempting self-refinement (re-reasoning with gap feedback)...")
                 refined = extractor.refine(spec, remaining_gaps, prompt, self.parser.config)
                 if refined:
                     spec = refined
                     final_gaps = extractor.check_sufficiency(spec)
                     if final_gaps:
-                        print(f"  Refinement did not resolve all gaps:")
+                        _log(f"  Refinement could not resolve all gaps:")
                         for g in final_gaps:
-                            print(f"    - {g}")
-                        print("  Cannot proceed with incomplete specification.")
+                            _log(f"    - {g}")
+                        _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
                         return None
-                    print("  Refinement resolved all gaps.")
+                    _log("  Refinement resolved all gaps.")
                 else:
-                    print("  Refinement failed. Cannot proceed.")
+                    _log("  Self-refinement did not produce a valid specification.")
+                    _log("  The LLM could not fill the gaps listed above even after retrying.")
+                    _log("  Try: add more detail to your instruction, or simplify the protocol.")
                     return None
             else:
-                print("  Gaps filled from config.")
+                _log("  Gaps filled from config.")
         else:
-            print("  Specification is complete.")
+            _log("  Specification is complete.")
 
         if spec.explicit_volumes:
-            print(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
+            _log(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
 
-        # Stage 2b: Constraint checking (deterministic, no LLM)
-        # Surfaces hardware conflicts BEFORE the scientist confirms.
-        print("\n[Stage 2b/7] Checking hardware constraints...")
+        # Infer source containers: labware that is aspirated from but never
+        # dispensed into must be pre-filled by the scientist.
+        source_only = self._infer_source_containers(spec)
+        if source_only:
+            _log("\n  Inferred source containers (pre-filled by you before running):")
+            for labware, well, substance in source_only:
+                sub = f" ({substance})" if substance else ""
+                _log(f"    - {labware} well {well}{sub}")
+            if sys.stdin.isatty():
+                from .cli import prompt_yes_no
+                if not prompt_yes_no("  Is this correct?", default=True):
+                    _log("  Aborted. Adjust your instruction to clarify source containers.")
+                    return None
+            # Add confirmed sources to initial_contents so well tracker doesn't warn
+            from .extractor import WellContents
+            for labware, well, substance in source_only:
+                already = any(ic.labware == labware and ic.well == well
+                              for ic in spec.initial_contents)
+                if not already:
+                    spec.initial_contents.append(
+                        WellContents(labware=labware, well=well,
+                                     substance=substance or "reagent")
+                    )
+
+        # Stage 4: Constraint checking (deterministic, no LLM)
+        _log("\n[Stage 4/8] Checking hardware constraints...")
         from .constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
 
         if constraint_result.warnings:
             for w in constraint_result.warnings:
-                print(f"  {w}")
+                _log(f"  {w}")
 
         if constraint_result.has_errors:
-            print(f"\n  HARDWARE CONFLICTS DETECTED ({len(constraint_result.errors)}):")
-            print("  " + "-" * 56)
+            _log(f"\n  HARDWARE CONFLICTS DETECTED ({len(constraint_result.errors)}):")
+            _log("  " + "-" * 56)
             for v in constraint_result.errors:
-                print(f"  {v}")
-                print()
+                _log(f"  {v}")
+                _log()
 
-            # In interactive mode, ask if scientist wants to proceed anyway
             if sys.stdin.isatty():
                 from .cli import prompt_yes_no
-                print("  These conflicts mean the protocol may not execute correctly.")
+                _log("  These conflicts mean the protocol may not execute correctly.")
                 if not prompt_yes_no("  Proceed anyway (constraints will be reduced to fit)?", default=False):
-                    print("Aborted. Fix your config or instruction and retry.")
+                    _log("  Aborted. Fix your config or instruction and retry.")
                     return None
-                print("  Proceeding with constraint adjustments.")
+                _log("  Proceeding with constraint adjustments.")
             else:
-                # Non-interactive: fail on errors
-                print("  Cannot proceed with hardware conflicts in non-interactive mode.")
+                _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
                 return None
         else:
-            print("  All constraints satisfied.")
+            _log("  All constraints satisfied.")
 
-        # Stage 3: Confirm with user
-        print(extractor.format_for_confirmation(spec))
-        # In non-interactive mode (e.g., testing), skip confirmation
+        # Confirm with user
+        _log(extractor.format_for_confirmation(spec))
         if sys.stdin.isatty():
             from .cli import prompt_yes_no
             if not prompt_yes_no("Proceed with this specification?", default=True):
-                print("Aborted by user.")
+                _log("  Aborted by user.")
                 return None
 
-        # Stage 4: Deterministic spec → ProtocolSchema
-        print("\n[Stage 4/7] Converting specification to protocol schema...")
+        # Stage 5: Deterministic spec → ProtocolSchema
+        _log("\n[Stage 5/8] Converting specification to protocol schema...")
         try:
             protocol_schema = extractor.spec_to_schema(spec, self.parser.config)
-            print("  Schema generated deterministically.")
+            _log("  Schema generated deterministically.")
         except Exception as e:
-            print(f"  Deterministic conversion failed: {e}")
+            err = str(e)
+            _log(f"  Schema conversion failed.")
+            if "not found" in err.lower():
+                _log(f"    A labware or module reference could not be resolved: {err}")
+                _log(f"    Check that your config labels match the specification above.")
+            else:
+                _log(f"    Detail: {err}")
+            _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
             return None
 
         # Validate spec volumes are preserved in schema
         mismatches = extractor.validate_schema_against_spec(spec, protocol_schema)
         if mismatches:
-            print("  Volume validation issues:")
+            _log("  Volume validation issues:")
             for m in mismatches:
-                print(f"    - {m}")
+                _log(f"    - {m}")
             return None
 
-        # Stage 5: Deterministic schema → Python script
-        print("\n[Stage 5/7] Converting schema to Python script...")
+        # Stage 6: Deterministic schema → Python script
+        _log("\n[Stage 6/8] Generating Python script...")
         try:
             script = generate_python_script(protocol_schema)
-            print("  Python script generated.")
+            _log("  Python script generated.")
         except ValueError as e:
-            print(f"  Script generation failed: {e}")
+            err = str(e)
+            _log(f"  Script generation failed.")
+            _log(f"    Detail: {err}")
+            _log(f"    Try: simplify your instruction or check config slot assignments.")
             return None
 
         # Save script for debugging regardless of simulation outcome
@@ -680,10 +807,10 @@ class ProtocolAgent:
         debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
         with open(debug_script, 'w') as f:
             f.write(script)
-        print(f"  Debug: script saved to {debug_script}")
+        _log(f"  Debug: script saved to {debug_script}")
 
-        # Stage 6: Opentrons simulation
-        print("\n[Stage 6/7] Running Opentrons simulation...")
+        # Stage 7: Opentrons simulation
+        _log("\n[Stage 7/8] Running Opentrons simulation...")
         success, simulation_log, runlog = simulate_script(script)
 
         if not success:
@@ -693,26 +820,24 @@ class ProtocolAgent:
                 error_detail_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
                 error_type = error_match.group(1) if error_match else "Unknown"
                 error_detail = error_detail_match.group(1) if error_detail_match else simulation_log[:300]
-                print(f"  Simulation failed: {error_type}")
-                print(f"    Detail: {error_detail[:200]}")
+                _log(f"  Simulation failed: {error_type}")
+                _log(f"    Detail: {error_detail[:200]}")
             else:
-                print(f"  Simulation failed: {simulation_log[:500]}")
-
-            # TODO: future iteration — feed simulation errors back to reasoning
-            # step for re-extraction, rather than retrying LLM generation
+                _log(f"  Simulation failed: {simulation_log[:500]}")
+            _log(f"  The generated Python script did not pass the Opentrons simulator.")
+            _log(f"  Check {debug_script} to see the generated code.")
             return None
 
-        print("  Simulation passed.")
+        _log("  Simulation passed.")
 
-        # Stage 7: Intent verification (safety net)
-        print("\n[Stage 7/7] Verifying protocol matches original intent...")
-        verification = verify_intent_match(prompt, protocol_schema)
+        # Stage 8: Intent verification (safety net)
+        _log("\n[Stage 8/8] Verifying protocol matches original intent...")
+        from .spinner import Spinner
+        with Spinner("Verifying intent match..."):
+            verification = verify_intent_match(prompt, protocol_schema)
 
         if verification.matches and verification.confidence >= 0.7:
-            print(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
-            print("\n" + "="*50)
-            print("SUCCESS: Protocol generated and verified.")
-            print("="*50)
+            _log(f"  Intent verification passed (confidence: {verification.confidence:.0%})")
             return PipelineResult(
                 script=script,
                 simulation_log=simulation_log,
@@ -721,10 +846,11 @@ class ProtocolAgent:
                 config=self.parser.config
             )
         else:
-            print(f"  Intent mismatch (confidence: {verification.confidence:.0%})")
+            _log(f"  Intent mismatch (confidence: {verification.confidence:.0%})")
             if verification.issues:
-                print(f"  Issues: {'; '.join(verification.issues)}")
-            print(f"  Summary: {verification.summary}")
+                _log(f"  Issues: {'; '.join(verification.issues)}")
+            _log(f"  Summary: {verification.summary}")
+            _log(f"  The generated protocol may not match what you asked for.")
             return None
 
 

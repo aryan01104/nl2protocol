@@ -171,3 +171,30 @@ def format_error_for_cli(error: Exception) -> str:
         return f"Error: {str(error)}"
     else:
         return f"Unexpected error: {type(error).__name__}: {str(error)}"
+
+
+def format_api_error(e: Exception) -> str:
+    """Convert raw Anthropic API errors into user-friendly messages.
+
+    Instead of dumping 'Error code: 400 - {"type": "error", ...}',
+    returns a one-liner the scientist can act on.
+    """
+    import anthropic
+
+    if isinstance(e, anthropic.AuthenticationError):
+        return "API authentication failed. Check your ANTHROPIC_API_KEY is valid and not expired."
+    elif isinstance(e, anthropic.RateLimitError):
+        return "Rate limited by the API. Wait 30-60 seconds and try again."
+    elif isinstance(e, anthropic.APIStatusError):
+        msg = str(e).lower()
+        if "credit" in msg or "balance" in msg:
+            return "Anthropic API credit balance is too low. Add credits at console.anthropic.com"
+        elif "overloaded" in msg:
+            return "The API is temporarily overloaded. Try again in a few minutes."
+        return f"API error (status {e.status_code}). This is usually transient — retry in a moment."
+    elif isinstance(e, anthropic.APITimeoutError):
+        return "API request timed out. Check your network connection and try again."
+    elif isinstance(e, anthropic.APIConnectionError):
+        return "Could not connect to the Anthropic API. Check your internet connection."
+    else:
+        return f"Unexpected error: {type(e).__name__}"
