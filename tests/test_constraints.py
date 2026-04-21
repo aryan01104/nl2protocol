@@ -26,21 +26,21 @@ from nl2protocol.extractor import (
 
 @pytest.fixture
 def qpcr_config():
-    config_path = Path(__file__).parent.parent / "test_cases" / "qpcr_standard_curve" / "config.json"
+    config_path = Path(__file__).parent.parent / "test_cases" / "examples" / "qpcr_standard_curve" / "config.json"
     with open(config_path) as f:
         return json.load(f)
 
 
 @pytest.fixture
 def simple_config():
-    config_path = Path(__file__).parent.parent / "test_cases" / "simple_transfer" / "config.json"
+    config_path = Path(__file__).parent.parent / "test_cases" / "examples" / "simple_transfer" / "config.json"
     with open(config_path) as f:
         return json.load(f)
 
 
 @pytest.fixture
 def serial_dilution_config():
-    config_path = Path(__file__).parent.parent / "test_cases" / "serial_dilution" / "config.json"
+    config_path = Path(__file__).parent.parent / "test_cases" / "examples" / "serial_dilution" / "config.json"
     with open(config_path) as f:
         return json.load(f)
 

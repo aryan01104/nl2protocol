@@ -2,9 +2,11 @@
 
 Convert natural language instructions into executable [Opentrons](https://opentrons.com/) OT-2 robot protocols using Claude LLM.
 
-Describe your lab procedure in plain English, and nl2protocol generates validated, simulator-tested Python code ready to run on Opentrons OT-2 liquid-handling robots. The system uses a domain-specific reasoning pipeline: the LLM reasons through your protocol (chain-of-thought), produces a structured specification, and deterministic code handles all hardware mapping — so user-specified values like volumes are never silently changed.
+Describe your lab procedure in plain English, and nl2protocol generates validated, simulator-tested Python code ready to run on Opentrons OT-2 liquid-handling robots.
 
-> **Status**: Alpha (v0.3.0). 7/8 test cases passing across protocols of varying complexity. See [Roadmap](#roadmap) for planned improvements.
+The system uses a neuro-symbolic architecture: the LLM reasons through your protocol (chain-of-thought), a deterministic constraint checker validates against your hardware, and deterministic code handles all hardware mapping. User-specified values are never silently changed, hardware conflicts are surfaced with explanations (not silently resolved), and every inferred parameter is tagged with its provenance.
+
+> **Status**: Alpha (v0.3.0). 8 protocol test cases + 12 failure mode test cases + 32 automated pytest tests. See [Roadmap](#roadmap) for planned improvements.
 
 ---
 
@@ -163,14 +165,18 @@ Every value in the generated protocol has one of three origins:
 
 - **Natural Language Input** — Describe experiments in plain English, or pass a `.txt` / `.pdf` file.
 - **Chain-of-Thought Reasoning** — The LLM thinks through your protocol step by step before producing structured output, handling both simple instructions and named protocols (e.g., "do the Bradford assay").
-- **User Confirmation** — Shows you exactly what it understood before generating code. Every value is tagged as explicit (from your text), inferred (from domain knowledge), or from config.
+- **Hardware Constraint Checker** — Deterministic validation catches pipette capacity conflicts, missing labware, invalid wells, and module availability *before* code generation. Conflicts are surfaced with explanations and suggested fixes — never silently resolved.
+- **Provenance Tracking** — Every parameter is tagged: explicit (from your instruction), `[INFERRED]` (domain knowledge), or `[APPROX]` (hedged values like "~100uL"). The scientist sees exactly what came from where.
+- **Well State Tracking** — Tracks volume in every well during schema generation. Catches aspirating from empty wells, well overflow, and wrong source labware.
+- **Source Container Inference** — Automatically identifies pre-filled source containers (reservoirs, tube racks) and asks the scientist to confirm before proceeding.
+- **Interactive Missing Labware Resolution** — When instruction references equipment not in your config, the system suggests the Opentrons load_name with reasoning and offers to add it.
 - **Deterministic Hardware Mapping** — Pipette selection, labware resolution, and well expansion are all deterministic code. User-specified volumes are never re-interpreted by an LLM.
 - **Hallucination Guard** — Regex-extracted volumes from your instruction are cross-checked against the spec. Invented values get flagged.
 - **Hardware Module Support** — Temperature, magnetic, heater-shaker, and thermocycler modules.
 - **Simulator-Validated** — Every protocol passes the Opentrons simulation before output.
 - **Intent Verification** — A second LLM pass confirms the generated protocol matches what you asked for.
-- **Auto-Config Generation** — `--generate-config` infers labware, pipettes, and modules from your instruction.
 - **Robot Upload** — Push protocols directly to your OT-2 via HTTP API, or use demo mode.
+- **Terminal UX** — Colored output, animated spinners during LLM calls, text wrapping, end-of-run summary. Respects `NO_COLOR`.
 
 ---
 
@@ -181,24 +187,31 @@ Every value in the generated protocol has one of three origins:
 - Python 3.10+
 - An [Anthropic API key](https://console.anthropic.com/) (Claude)
 
-### Setup
+### Install and Set Up
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/nl2protocol.git
+pip install git+https://github.com/aryan01104/nl2protocol.git
+nl2protocol --init
+```
+
+This creates two files in your current directory:
+- **`lab_config.json`** — starter deck layout (edit to match your equipment)
+- **`.env`** — put your [Anthropic API key](https://console.anthropic.com/) here
+
+Then run:
+```bash
+nl2protocol -i "Transfer 100uL from source_plate A1 to dest_plate B1" -c lab_config.json
+```
+
+### Developer Setup
+
+```bash
+git clone https://github.com/aryan01104/nl2protocol.git
 cd nl2protocol
-
-# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install package (editable)
-pip install -e .
-
-# Set up API key (pick one)
-export ANTHROPIC_API_KEY="your_api_key_here"
-# — or —
-echo "ANTHROPIC_API_KEY=your_api_key_here" > .env
+source .venv/bin/activate
+pip install -e ".[dev]"
+nl2protocol --init
 ```
 
 ---
@@ -384,20 +397,24 @@ nl2protocol/
 ├── nl2protocol/
 │   ├── extractor.py          # ProtocolSpec + reasoning + spec_to_schema()
 │   ├── app.py                # Pipeline orchestration + code generation + simulation
+│   ├── constraints.py        # Hardware constraint checker + well state tracker
 │   ├── models.py             # ProtocolSchema + hardware-level validation
 │   ├── parser.py             # Config loading + well info enrichment
 │   ├── cli.py                # Command-line interface
+│   ├── colors.py             # ANSI terminal colors (respects NO_COLOR)
+│   ├── spinner.py            # Zero-dependency animated spinner
 │   ├── robot.py              # OT-2 HTTP API client
-│   ├── config_generator.py   # Auto-generate lab config from instruction
 │   ├── input_validator.py    # Classify input (protocol / question / invalid)
 │   ├── example_store.py      # RAG vector store (ChromaDB + sentence-transformers)
 │   ├── validate_config.py    # Lab config JSON validation
-│   ├── errors.py             # Custom exceptions
+│   ├── errors.py             # Custom exceptions + API error formatting
 │   ├── examples/             # 238 RAG training examples
 │   └── config_examples/      # Sample lab configs
 │
-├── test_cases/               # 8 test protocols (instruction.txt + config.json)
-├── demo_protocols/           # 5 demo protocols ready to run
+├── tests/                    # 32 automated pytest tests (no API key needed)
+├── test_cases/
+│   ├── examples/             # 13 working protocols to try (start here)
+│   └── failure_modes/        # 12 cases designed to trigger specific errors
 ├── notes/                    # Architecture notes and design docs
 ├── pyproject.toml            # Package metadata and dependencies
 └── requirements.txt          # Python dependencies
@@ -415,27 +432,28 @@ nl2protocol/
 
 ---
 
-## Demo Protocols
+## Examples
 
-Five common biology lab protocols are included for demonstration:
-
-| Protocol | Key Feature |
-|----------|-------------|
-| Bradford Assay | Protein quantification with BSA standard curve |
-| Bacterial Transformation | Heat shock with temperature module |
-| Plasmid Miniprep | Magnetic bead DNA extraction |
-| Cell Seeding | Auto-config generation demo |
-| Western Blot Prep | Temperature-controlled sample preparation |
+13 working protocols and 12 failure mode cases in `test_cases/`. Start here:
 
 ```bash
-# Example: run the Bradford Assay demo
-nl2protocol \
-  -i demo_protocols/bradford_assay/instruction.txt \
-  -c demo_protocols/bradford_assay/config.json \
-  -o bradford_protocol.py
+# Simplest example
+python -m nl2protocol \
+  -i test_cases/examples/simple_transfer/instruction.txt \
+  -c test_cases/examples/simple_transfer/config.json
+
+# More complex: qPCR with standard curve + temperature module
+python -m nl2protocol \
+  -i test_cases/examples/qpcr_standard_curve/instruction.txt \
+  -c test_cases/examples/qpcr_standard_curve/config.json
+
+# See a failure mode: pipette too small for requested volume
+python -m nl2protocol \
+  -i test_cases/failure_modes/pipette_insufficient/instruction.txt \
+  -c test_cases/failure_modes/pipette_insufficient/config.json
 ```
 
-See [demo_protocols/README.md](./demo_protocols/README.md) for all 5 demos and robot configuration details.
+See [test_cases/README.md](./test_cases/README.md) for the full list.
 
 ---
 

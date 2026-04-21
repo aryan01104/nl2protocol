@@ -161,6 +161,12 @@ Files:
         help='Interactive setup to configure your Anthropic API key'
     )
 
+    parser.add_argument(
+        '--init',
+        action='store_true',
+        help='Copy starter lab config and .env to current directory'
+    )
+
     return parser
 
 
@@ -237,6 +243,51 @@ def resolve_intent(intent: str) -> str:
 
     # Otherwise treat as literal text
     return intent
+
+
+def handle_init() -> int:
+    """Copy starter config files to the current directory."""
+    import shutil
+
+    pkg_dir = Path(__file__).parent
+    config_src = pkg_dir / "config_examples" / "lab_config.example.json"
+    config_dst = Path.cwd() / "lab_config.json"
+    env_dst = Path.cwd() / ".env"
+
+    print("\nnl2protocol project setup")
+    print("=" * 40)
+
+    files_created = []
+
+    # Copy lab config
+    if config_dst.exists():
+        print(f"\n  lab_config.json already exists, skipping.")
+    else:
+        shutil.copy(config_src, config_dst)
+        print(f"\n  Created: lab_config.json")
+        print(f"  Edit this to match your actual deck layout.")
+        files_created.append("lab_config.json")
+
+    # Create .env if missing
+    if env_dst.exists():
+        print(f"  .env already exists, skipping.")
+    else:
+        env_dst.write_text("ANTHROPIC_API_KEY=your-api-key-here\n")
+        print(f"  Created: .env")
+        print(f"  Replace 'your-api-key-here' with your key from console.anthropic.com")
+        files_created.append(".env")
+
+    if not files_created:
+        print("\n  Nothing to do — config files already exist.")
+    else:
+        print(f"\nNext steps:")
+        if ".env" in files_created:
+            print(f"  1. Edit .env with your Anthropic API key")
+        print(f"  {'2' if '.env' in files_created else '1'}. Edit lab_config.json to match your deck")
+        print(f"  Then run:")
+        print(f'    nl2protocol -i "Transfer 100uL from source_plate A1 to dest_plate B1" -c lab_config.json')
+
+    return 0
 
 
 def prompt_yes_no(question: str, default: bool = True) -> bool:
@@ -459,6 +510,10 @@ def main(argv: list = None) -> int:
     # Handle --setup
     if args.setup:
         return handle_setup()
+
+    # Handle --init
+    if args.init:
+        return handle_init()
 
     # Handle --validate-only
     if args.validate_only:
