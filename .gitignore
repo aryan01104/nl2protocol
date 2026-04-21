@@ -39,5 +39,11 @@ protocols_repo/
 # Utility scripts (local only)
 scripts/
 
-# ChromaDB vector store (regenerated from examples/)
+# Internal notes
+notes/
+
+# Legacy RAG pipeline (deprecated — not used in current architecture)
+data_curation/
+nl2protocol/examples/
+nl2protocol/example_store.py
 nl2protocol/.chroma_db/

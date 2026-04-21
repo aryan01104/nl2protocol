@@ -218,24 +218,13 @@ nl2protocol --init
 
 ## Quick Start
 
-### Option 1: Auto-generate config (easiest)
+### CLI
 
 ```bash
-nl2protocol -i "Transfer 100uL from source plate A1 to dest plate B1" --generate-config
+nl2protocol -i "Transfer 100uL from source_plate A1 to dest_plate B1" -c lab_config.json
 ```
 
-The system infers required equipment and asks you to confirm before proceeding.
-
-### Option 2: Use an existing lab config
-
-```bash
-# Copy the example config and edit to match your deck
-cp nl2protocol/config_examples/lab_config.example.json lab_config.json
-
-nl2protocol -i "Transfer 100uL from plate A1 to B1" -c lab_config.json
-```
-
-### Option 3: Python API
+### Python API
 
 ```python
 from nl2protocol import ProtocolAgent
@@ -405,10 +394,8 @@ nl2protocol/
 │   ├── spinner.py            # Zero-dependency animated spinner
 │   ├── robot.py              # OT-2 HTTP API client
 │   ├── input_validator.py    # Classify input (protocol / question / invalid)
-│   ├── example_store.py      # RAG vector store (ChromaDB + sentence-transformers)
 │   ├── validate_config.py    # Lab config JSON validation
 │   ├── errors.py             # Custom exceptions + API error formatting
-│   ├── examples/             # 238 RAG training examples
 │   └── config_examples/      # Sample lab configs
 │
 ├── tests/                    # 32 automated pytest tests (no API key needed)
@@ -457,73 +444,33 @@ See [test_cases/README.md](./test_cases/README.md) for the full list.
 
 ---
 
-## Data Curation (RAG)
-
-The `data_curation/` directory contains scripts that reverse-engineer existing Opentrons protocol scripts into (intent, schema) training pairs for the RAG system:
-
-1. **`script_parser.py`** — AST-based parser extracts labware, pipettes, and commands from Python scripts.
-2. **`intent_generator.py`** — LLM generates 3 natural-language descriptions per script (technical, casual, concise).
-3. **`run_pipeline.py`** — Orchestrates the full curation pipeline.
-
-Each script produces 3 examples, stored as JSON in `nl2protocol/examples/`.
-
-See [data_curation/README.md](./data_curation/README.md) for usage instructions.
-
----
-
 ## Testing
 
-### Test Cases
+### Automated Tests
 
-10 protocols of varying complexity in `test_cases/`, each with `instruction.txt` and `config.json`:
+32 deterministic pytest tests — no API key needed:
 
-- `simple_transfer` — Basic A1→B1 transfer
-- `distribute` — One source to multiple destinations
-- `serial_dilution` — 2x serial dilution across row A
-- `pcr_mastermix` — PCR master mix setup
-- `magnetic_bead_cleanup` — Magnetic module bead extraction
-- `cell_viability_assay` — Cell viability testing
-- `qpcr_standard_curve` — qPCR standard curve setup
-- `elisa_sample_addition` — ELISA sample addition
+```bash
+python -m pytest tests/ -v
+```
 
-### Current Results (7/8 passing)
+Covers: constraint checker, well state tracker, serial dilution correctness, volume validation, provenance display, and 12 failure mode scenarios.
 
-| Test | Result | Notes |
-|------|--------|-------|
-| simple_transfer | PASS | Basic 3-well transfer |
-| pcr_mastermix | PASS | The bug case: 10.5uL preserved, p20 correctly assigned |
-| distribute | PASS | Single-channel correctly selected |
-| serial_dilution | PASS | 11 sequential transfers with mixing |
-| elisa_sample_addition | PASS | Serial dilution + duplicate plating |
-| magnetic_bead_cleanup | PASS | Magnetic module + multi-step wash |
-| qpcr_standard_curve | PASS | Temperature module + serial dilution + triplicates |
-| cell_viability_assay | FAIL | OutOfTipsError — protocol needs more tipracks than config provides (real physical constraint, not a code bug) |
+### Example Protocols
+
+13 working protocols in `test_cases/examples/` and 12 failure mode cases in `test_cases/failure_modes/`. See [test_cases/README.md](./test_cases/README.md) for the full list.
 
 ---
 
 ## Roadmap
 
-### Next: Interactive parameter filling
-
-When you say "do a serial dilution" without specifying a volume, the system currently infers a default (100uL) and tags it as `(inferred)`. Better: it should ask you, with a reasoned suggestion:
-
-> "You didn't specify a transfer volume. For a 2-fold serial dilution in a 360uL plate, 100uL is standard because it gives a 1:2 ratio and stays well under plate capacity. Press enter to accept, or type a different value:"
-
-The architecture already supports this — the sufficiency check identifies gaps, the LLM has domain knowledge for suggestions, and the confirmation step already pauses for input. The missing piece is turning auto-fill into a question.
-
 ### Planned
 
-- [ ] **Self-consistency sampling** — Generate 2-3 ProtocolSpecs, compare them, pick the consensus. Catches reasoning errors through majority voting ([Raschka, Ch. 4](https://www.manning.com/books/build-a-reasoning-model-from-scratch)).
-
-- [ ] **Simulation error feedback** — When the simulator fails, feed the error back to the reasoning step for re-extraction instead of just stopping (self-refinement, [Raschka, Ch. 5](https://www.manning.com/books/build-a-reasoning-model-from-scratch)).
-
-- [ ] **GUI** — Web UI showing the spec as an editable form: volumes in input fields, wells on a plate diagram, pipette as a dropdown. ProtocolSpec is just JSON, so this is a frontend problem.
-
-- [ ] **Protocol template library** — Pre-built ProtocolSpec templates for common protocols (PCR, serial dilution, ELISA) with standard parameters. Reduces LLM dependence for well-known procedures.
-
-- [ ] **Tip budget awareness** — Before generating, count expected tip usage and warn if it exceeds available tipracks. Would have caught the cell_viability_assay failure before simulation.
-
-- [ ] **Opentrons Flex support** — Extend beyond OT-2 to support the newer Opentrons Flex platform.
+- [ ] **Interactive parameter filling** — When a volume is inferred, ask the scientist with a reasoned suggestion instead of silently filling it
+- [ ] **Lab inventory import** — Import equipment list from Opentrons App or CSV, replacing the manual config.json
+- [ ] **Simulation error feedback** — Feed simulator errors back to the reasoning step for re-extraction
+- [ ] **API mode** — Return structured JSON responses instead of interactive prompts, for agent-to-agent use
+- [ ] **Opentrons Flex support** — Extend beyond OT-2 to support the newer Opentrons Flex platform
 
 ---
 
