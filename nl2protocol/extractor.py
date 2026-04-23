@@ -42,13 +42,98 @@ from pydantic import BaseModel, Field, model_validator
 WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 
 
-class VolumeSpec(BaseModel):
-    """A volume associated with a protocol step."""
-    value: float = Field(..., gt=0)
-    unit: Literal["uL", "mL"] = "uL"
-    approximate: bool = Field(False, description="True ONLY if the user hedged: 'about 100uL', '~50uL'. False if they stated an exact number.")
-    inferred: bool = Field(False, description="True ONLY if the user did NOT state this volume and you inferred it from domain knowledge. False if the user wrote the number.")
+# ============================================================================
+# PROVENANCE
+# ============================================================================
 
+class Provenance(BaseModel):
+    """Tracks where a single extracted value came from.
+
+    source is the primary signal (categorical, verifiable by grounding checks).
+    confidence is secondary (rank-usable for UX routing, not absolute-calibrated).
+    """
+    source: Literal["instruction", "config", "domain_default", "inferred"] = Field(..., description=(
+        "Where this value came from. "
+        "'instruction' = user literally wrote it. "
+        "'config' = read from the lab config. "
+        "'domain_default' = standard practice for a named protocol. "
+        "'inferred' = reasoning or guess with no direct support."
+    ))
+    reason: str = Field(..., description=(
+        "One sentence explaining why this value. "
+        "For 'instruction': cite the phrase from the text. "
+        "For 'config': cite the config key. "
+        "For 'domain_default': cite the protocol and standard practice. "
+        "For 'inferred': state the reasoning chain."
+    ))
+    confidence: float = Field(..., ge=0.0, le=1.0, description=(
+        "How confident this value is correct. "
+        "1.0 = user literally wrote it. "
+        "0.8 = standard protocol default, clearly that protocol. "
+        "0.6 = reasonable inference from context. "
+        "0.4 = plausible guess with weak support. "
+        "Below 0.4 = not sure."
+    ))
+
+
+class CompositionProvenance(BaseModel):
+    """Tracks why a step exists — what reasoning justifies linking its parameters together.
+
+    Unlike Provenance (single source for a single value), a step's existence
+    is a synthesis: the user said 'Bradford assay' (instruction) + Bradford
+    requires incubation (domain_default) + config has a temp module (config).
+    Multiple sources combine through first-principle reasoning.
+    """
+    justification: str = Field(..., description=(
+        "What reasoning connects these parameters into one step? "
+        "Cite the instruction phrase, domain knowledge, and/or config constraints "
+        "that justify this step's existence as a distinct action."
+    ))
+    grounding: List[Literal["instruction", "config", "domain_default"]] = Field(..., description=(
+        "Which sources contributed to this step's existence. A step can be grounded "
+        "in multiple sources simultaneously. "
+        "Example: ['instruction', 'domain_default'] for a step the user implied via a named protocol."
+    ))
+    confidence: float = Field(..., ge=0.0, le=1.0, description=(
+        "How confident this step should exist. "
+        "1.0 = user explicitly described this exact step. "
+        "0.8 = standard part of a named protocol the user invoked. "
+        "0.5 = seems necessary but user didn't mention it."
+    ))
+
+
+# ============================================================================
+# PROVENANCED TYPES
+# ============================================================================
+
+class ProvenancedVolume(BaseModel):
+    """A volume with provenance tracking."""
+    value: float = Field(..., gt=0, description="Numeric volume. Copy the user's number exactly — never round or adjust.")
+    unit: Literal["uL", "mL"] = "uL"
+    exact: bool = Field(True, description=(
+        "True if the user stated this exact number ('100uL'). "
+        "False if the user hedged ('about 100uL', '~50uL') or if this value was inferred. "
+        "This is independent of provenance — a value can come from the instruction but still not be exact."
+    ))
+    provenance: Provenance
+
+
+class ProvenancedDuration(BaseModel):
+    """A time duration with provenance tracking."""
+    value: float = Field(..., gt=0, description="Copy the user's number exactly.")
+    unit: Literal["seconds", "minutes", "hours"]
+    provenance: Provenance
+
+
+class ProvenancedString(BaseModel):
+    """A string value with provenance tracking."""
+    value: str
+    provenance: Provenance
+
+
+# ============================================================================
+# LOCATION AND ACTION TYPES
+# ============================================================================
 
 class LocationRef(BaseModel):
     """A reference to a labware location, as the user described it."""
@@ -75,14 +160,9 @@ class LocationRef(BaseModel):
     resolved_label: Optional[str] = Field(None, description=(
         "Config labware key. Filled automatically by the labware resolver — leave null during extraction."
     ))
-
-
-class DurationSpec(BaseModel):
-    """A time duration for delays, incubations, pauses."""
-    value: float = Field(..., gt=0, description=(
-        "Copy the user's number exactly. Do not round, convert units, or infer if not stated — leave the step without a duration."
+    provenance: Optional[Provenance] = Field(None, description=(
+        "How this location reference was determined. Covers the labware + well(s) as a unit."
     ))
-    unit: Literal["seconds", "minutes", "hours"]
 
 
 class PostAction(BaseModel):
@@ -91,7 +171,7 @@ class PostAction(BaseModel):
     repetitions: Optional[int] = Field(None, description=(
         "Number of mix cycles. Set only if the user specified a count. Do not infer a default — leave null."
     ))
-    volume: Optional[VolumeSpec] = Field(None, description=(
+    volume: Optional[ProvenancedVolume] = Field(None, description=(
         "Volume per mix cycle. Set only if the user specified a mix volume. Do not infer a default — leave null."
     ))
 
@@ -111,12 +191,17 @@ class ExtractedStep(BaseModel):
     action: ActionType = Field(..., description=(
         "The protocol action. Must be one of the allowed values. Do not invent new action names."
     ))
-    substance: Optional[str] = Field(None, description=(
-        "Copy the substance name as the user wrote it. "
+    composition_provenance: CompositionProvenance = Field(..., description=(
+        "What justifies this step's existence? What reasoning links these parameters "
+        "into one distinct action? Cite instruction text, domain knowledge, and/or "
+        "config constraints. Be conservative: if in doubt, lower confidence."
+    ))
+    substance: Optional[ProvenancedString] = Field(None, description=(
+        "What is being moved or acted on. Copy the substance name as the user wrote it. "
         "Do not normalize, translate, or infer if unspecified — leave null."
     ))
-    volume: Optional[VolumeSpec] = None
-    duration: Optional[DurationSpec] = Field(None, description=(
+    volume: Optional[ProvenancedVolume] = None
+    duration: Optional[ProvenancedDuration] = Field(None, description=(
         "For delay, pause, or incubation steps only. Do not put time values in the volume field."
     ))
     source: Optional[LocationRef] = None
@@ -132,6 +217,7 @@ class ExtractedStep(BaseModel):
     note: Optional[str] = Field(None, description=(
         "Additional context from the instruction, verbatim. Do not summarize or paraphrase."
     ))
+
 
 
 class WellContents(BaseModel):
@@ -304,7 +390,7 @@ class LabwareResolver:
                     wells = ref.well or ref.wells or ref.well_range or "unspecified"
                     desc_context[ref.description].append(
                         f"Step {step.order}: {step.action}, role={role}, "
-                        f"wells={wells}, substance={step.substance or 'unspecified'}"
+                        f"wells={wells}, substance={step.substance.value if step.substance else 'unspecified'}"
                     )
 
         # Build config summary
@@ -388,8 +474,6 @@ THEN produce structured JSON (inside <spec> tags) matching this schema:
 
 RULES:
 - Preserve exact volumes the user stated (10.5uL stays 10.5, never round or adjust)
-- If a volume is approximate ("about 100uL", "~50uL"), mark approximate: true
-- If you infer a volume from domain knowledge (user didn't state it), mark inferred: true
 - If the user mentioned a pipette ("use the p20"), record it as pipette_hint
 - If the user mentioned tip strategy ("new tip for each"), record as tip_strategy
 - For time durations (delays, pauses, incubations), use the "duration" field with unit "seconds", "minutes", or "hours" — NEVER put time values in the "volume" field
@@ -398,6 +482,41 @@ RULES:
 - DO NOT choose pipette mounts — only record hints if the user mentioned a pipette
 - Leave the "reasoning" field empty in your JSON — it will be filled from your <reasoning> block
 - Leave "explicit_volumes" empty — it will be populated automatically
+
+PROVENANCE — every value you extract MUST have a provenance object:
+  provenance: {{source, reason, confidence}}
+  source: "instruction" (user wrote it), "config" (from lab config), "domain_default" (standard practice), "inferred" (guess)
+  reason: one sentence citing WHERE the value came from
+  confidence: 0.0-1.0
+
+  For volumes, also set "exact":
+    exact: true if the user stated this exact number ("100uL")
+    exact: false if hedged ("about 100uL", "~50uL") or if inferred from domain knowledge
+
+  Calibration examples:
+    User says "Transfer 100uL from A1 to B1":
+      volume: {{value: 100, unit: "uL", exact: true,
+               provenance: {{source: "instruction", reason: "'100uL' in text", confidence: 1.0}}}}
+    User says "about 50uL":
+      volume: {{value: 50, unit: "uL", exact: false,
+               provenance: {{source: "instruction", reason: "'about 50uL' in text", confidence: 0.9}}}}
+    User says "do a Bradford assay" (you infer 50uL working volume):
+      volume: {{value: 50, unit: "uL", exact: false,
+               provenance: {{source: "domain_default", reason: "Bradford assay standard working volume", confidence: 0.7}}}}
+
+COMPOSITION PROVENANCE — every step MUST have a composition_provenance object:
+  composition_provenance: {{justification, grounding, confidence}}
+  justification: what reasoning links these parameters into this step
+  grounding: list of sources that contribute — ["instruction"], ["instruction", "domain_default"], etc.
+  confidence: how confident this step should exist
+
+  Calibration examples:
+    User says "transfer 100uL from A1 to B1":
+      composition_provenance: {{justification: "User explicitly described this transfer",
+                                grounding: ["instruction"], confidence: 1.0}}
+    User says "do a Bradford assay" and you add a 5-min incubation step:
+      composition_provenance: {{justification: "Bradford assay requires incubation after mixing reagent",
+                                grounding: ["instruction", "domain_default"], confidence: 0.8}}
 
 LABWARE REFERENCES:
 - The "description" field in LocationRef should contain the user's EXACT wording for the labware.
@@ -655,14 +774,15 @@ Output the corrected specification.
     # HALLUCINATION GUARD
     # ========================================================================
 
-    def validate_against_text(self, spec: ProtocolSpec, instruction: str) -> List[str]:
-        """Check that non-approximate, non-inferred volumes actually appear in instruction.
+    def validate_exact_values_against_text(self, spec: ProtocolSpec, instruction: str) -> List[str]:
+        """Check that exact, instruction-sourced volumes actually appear in the instruction.
+        Catches fabrications where the LLM claims a value came from the text but it didn't.
         Returns list of warnings for potentially hallucinated values."""
         warnings = []
         text_volumes = self._extract_volumes_from_text(instruction)
 
         for step in spec.steps:
-            if step.volume and not step.volume.approximate and not step.volume.inferred:
+            if step.volume and step.volume.exact and step.volume.provenance.source == "instruction":
                 if step.volume.value not in text_volumes:
                     warnings.append(
                         f"Step {step.order}: volume {step.volume.value}{step.volume.unit} "
@@ -670,7 +790,7 @@ Output the corrected specification.
                     )
             if step.post_actions:
                 for pa in step.post_actions:
-                    if pa.volume and not pa.volume.approximate and not pa.volume.inferred:
+                    if pa.volume and pa.volume.exact and pa.volume.provenance.source == "instruction":
                         if pa.volume.value not in text_volumes:
                             warnings.append(
                                 f"Step {step.order} {pa.action}: volume "
@@ -718,10 +838,11 @@ Output the corrected specification.
         for step in filled.steps:
             # Try to resolve source from config labware contents
             if step.source is None and step.substance and "labware" in config:
+                substance_val = step.substance.value
                 for label, lw in config["labware"].items():
                     contents = lw.get("contents", {})
                     for well, content_desc in contents.items():
-                        if isinstance(content_desc, str) and step.substance.lower() in content_desc.lower():
+                        if isinstance(content_desc, str) and substance_val.lower() in content_desc.lower():
                             step.source = LocationRef(
                                 description=f"{label} (inferred from config)",
                                 well=well
@@ -786,12 +907,12 @@ Output the corrected specification.
             # Volume with provenance tag
             vol = ""
             if step.volume:
-                if step.volume.inferred:
-                    tag = " [INFERRED]"
-                elif step.volume.approximate:
-                    tag = " [APPROX]"
+                src = step.volume.provenance.source
+                if src == "instruction":
+                    exactness = "EXACT" if step.volume.exact else "APPROX"
+                    tag = f" [INSTRUCTION, {exactness}]"
                 else:
-                    tag = ""
+                    tag = f" [{src.upper()}]"
                 vol = f" {step.volume.value}{step.volume.unit}{tag}"
 
             # Duration
@@ -799,7 +920,7 @@ Output the corrected specification.
             if step.duration:
                 dur = f" for {step.duration.value} {step.duration.unit}"
 
-            substance = f" of {step.substance}" if step.substance else ""
+            substance = f" of {step.substance.value}" if step.substance else ""
             line = f"    {step.order}. {step.action.upper()}{vol}{substance}{src}{dst}{dur}"
             lines.append(line)
 
@@ -810,11 +931,12 @@ Output the corrected specification.
                     if pa.repetitions:
                         pa_parts.append(f"{pa.repetitions}x")
                     if pa.volume:
-                        tag = ""
-                        if pa.volume.inferred:
-                            tag = " [INFERRED]"
-                        elif pa.volume.value not in spec.explicit_volumes:
-                            tag = " [INFERRED]"
+                        src = pa.volume.provenance.source
+                        if src == "instruction":
+                            exactness = "EXACT" if pa.volume.exact else "APPROX"
+                            tag = f" [INSTRUCTION, {exactness}]"
+                        else:
+                            tag = f" [{src.upper()}]"
                         pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}{tag}")
                     lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
 
@@ -895,7 +1017,7 @@ Output the corrected specification.
 
         Mapping:
           LocationRef.resolved_label → config labware label → slot, load_name
-          VolumeSpec.value → command volume (direct copy, never modified)
+          ProvenancedVolume.value → command volume (direct copy, never modified)
           action → command_type
           pipette_hint / volume range → pipette mount
           well_range → expanded well list
@@ -1366,7 +1488,7 @@ Output the corrected specification.
 
             elif step.action == "delay":
                 minutes, seconds = None, None
-                # Use DurationSpec if available
+                # Use ProvenancedDuration if available
                 if step.duration:
                     if step.duration.unit == "minutes":
                         minutes = step.duration.value
@@ -1390,13 +1512,13 @@ Output the corrected specification.
             elif step.action == "pause":
                 commands.append(Pause(
                     pipette=mount,
-                    message=step.note or step.substance or "Pausing protocol"
+                    message=step.note or (step.substance.value if step.substance else None) or "Pausing protocol"
                 ))
 
             elif step.action == "comment":
                 commands.append(Comment(
                     pipette=mount,
-                    message=step.note or step.substance or ""
+                    message=step.note or (step.substance.value if step.substance else None) or ""
                 ))
 
             elif step.action == "aspirate":

@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 
-from .extractor import ProtocolSpec, ExtractedStep, VolumeSpec
+from .extractor import ProtocolSpec, ExtractedStep, ProvenancedVolume
 
 
 # ============================================================================
@@ -200,7 +200,7 @@ class ConstraintChecker:
         """Check that every volume in this step can be handled by available pipettes."""
 
         # Check step volume
-        if step.volume and not step.volume.inferred:
+        if step.volume:
             vol = step.volume.value
             if step.volume.unit == "mL":
                 vol *= 1000

@@ -15,8 +15,9 @@ from nl2protocol.constraints import (
     Severity, ViolationType
 )
 from nl2protocol.extractor import (
-    ProtocolSpec, ExtractedStep, VolumeSpec, LocationRef,
-    PostAction, DurationSpec, WellContents
+    ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
+    Provenance, CompositionProvenance, LocationRef,
+    PostAction, WellContents
 )
 
 
@@ -45,6 +46,30 @@ def serial_dilution_config():
         return json.load(f)
 
 
+def _prov(source="instruction", reason="test", confidence=1.0):
+    """Shorthand for test provenance."""
+    return Provenance(source=source, reason=reason, confidence=confidence)
+
+
+def _comp(grounding=None, justification="test step", confidence=1.0):
+    """Shorthand for test composition provenance."""
+    return CompositionProvenance(
+        justification=justification,
+        grounding=grounding or ["instruction"],
+        confidence=confidence,
+    )
+
+
+def _vol(value, unit="uL", exact=True, source="instruction"):
+    """Shorthand for test volume."""
+    return ProvenancedVolume(value=value, unit=unit, exact=exact, provenance=_prov(source=source))
+
+
+def _dur(value, unit="seconds"):
+    """Shorthand for test duration."""
+    return ProvenancedDuration(value=value, unit=unit, provenance=_prov())
+
+
 def make_spec(steps, **kwargs):
     """Helper to create a ProtocolSpec with minimal boilerplate."""
     defaults = {
@@ -71,12 +96,13 @@ class TestPipetteCapacity:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=10.0, unit="uL"),
+                volume=_vol(10.0),
                 source=LocationRef(description="reagent_tube_rack", well="A1"),
                 destination=LocationRef(description="dilution_strip", well="A1"),
                 post_actions=[PostAction(action="mix", repetitions=5,
-                                         volume=VolumeSpec(value=50.0, unit="uL"))],
-                tip_strategy="new_tip_each"
+                                         volume=_vol(50.0))],
+                tip_strategy="new_tip_each",
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(qpcr_config)
@@ -94,9 +120,10 @@ class TestPipetteCapacity:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=100.0, unit="uL"),
+                volume=_vol(100.0),
                 source=LocationRef(description="source_plate", well="A1"),
                 destination=LocationRef(description="dest_plate", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(simple_config)
@@ -109,9 +136,10 @@ class TestPipetteCapacity:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=1500.0, unit="uL"),
+                volume=_vol(1500.0),
                 source=LocationRef(description="reagent_tube_rack", well="A1"),
                 destination=LocationRef(description="dilution_strip", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(qpcr_config)
@@ -120,21 +148,22 @@ class TestPipetteCapacity:
         assert result.has_errors
         assert any("1500" in v.what for v in result.errors)
 
-    def test_inferred_volume_not_checked(self, qpcr_config):
-        """Inferred volumes (marked as such) are not hard constraints."""
+    def test_inferred_volume_still_checked(self, qpcr_config):
+        """Inferred volumes are still checked — the robot physically can't handle 1500uL."""
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=1500.0, unit="uL", inferred=True),
+                volume=_vol(1500.0, source="inferred"),
                 source=LocationRef(description="reagent_tube_rack", well="A1"),
                 destination=LocationRef(description="dilution_strip", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(qpcr_config)
         result = checker.check_all(spec)
 
-        # Inferred volumes are skipped in the check
-        assert not result.has_errors
+        # Physical constraints apply regardless of provenance
+        assert result.has_errors
 
 
 # ============================================================================
@@ -147,7 +176,7 @@ class TestMissingLabware:
     def test_missing_labware_flagged(self, qpcr_config):
         """If LLM reports missing labware, constraint checker surfaces it."""
         spec = make_spec(
-            [ExtractedStep(order=1, action="delay", duration=DurationSpec(value=1, unit="minutes"))],
+            [ExtractedStep(order=1, action="delay", duration=_dur(1, unit="minutes"), composition_provenance=_comp())],
             missing_labware=["sample_plate", "waste_reservoir"]
         )
         checker = ConstraintChecker(qpcr_config)
@@ -160,7 +189,7 @@ class TestMissingLabware:
     def test_no_missing_labware_passes(self, qpcr_config):
         """Empty missing_labware list means no errors from this check."""
         spec = make_spec(
-            [ExtractedStep(order=1, action="delay", duration=DurationSpec(value=1, unit="minutes"))],
+            [ExtractedStep(order=1, action="delay", duration=_dur(1, unit="minutes"), composition_provenance=_comp())],
             missing_labware=[]
         )
         checker = ConstraintChecker(qpcr_config)
@@ -182,9 +211,10 @@ class TestLabwareResolution:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=10.0, unit="uL"),
+                volume=_vol(10.0),
                 source=LocationRef(description="centrifuge_vial", well="A1"),
                 destination=LocationRef(description="dilution_strip", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(qpcr_config)
@@ -199,9 +229,10 @@ class TestLabwareResolution:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=100.0, unit="uL"),
+                volume=_vol(100.0),
                 source=LocationRef(description="source_plate", well="A1"),
                 destination=LocationRef(description="dest_plate", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(simple_config)
@@ -221,7 +252,7 @@ class TestModuleAvailability:
     def test_temperature_command_without_module(self, simple_config):
         """set_temperature without a temperature module in config is an error."""
         spec = make_spec([
-            ExtractedStep(order=1, action="set_temperature", note="37°C")
+            ExtractedStep(order=1, action="set_temperature", note="37°C", composition_provenance=_comp())
         ])
         checker = ConstraintChecker(simple_config)
         result = checker.check_all(spec)
@@ -233,7 +264,7 @@ class TestModuleAvailability:
     def test_temperature_command_with_module(self, qpcr_config):
         """set_temperature with a temperature module in config passes."""
         spec = make_spec([
-            ExtractedStep(order=1, action="set_temperature", note="4°C")
+            ExtractedStep(order=1, action="set_temperature", note="4°C", composition_provenance=_comp())
         ])
         checker = ConstraintChecker(qpcr_config)
         result = checker.check_all(spec)
@@ -255,11 +286,12 @@ class TestTipSufficiency:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=100.0, unit="uL"),
+                volume=_vol(100.0),
                 source=LocationRef(description="source_plate", wells=[f"A{i}" for i in range(1, 13)]),
                 destination=LocationRef(description="dest_plate", wells=[f"A{i}" for i in range(1, 13)]),
                 replicates=9,
-                tip_strategy="new_tip_each"
+                tip_strategy="new_tip_each",
+                composition_provenance=_comp(),
             )
         ])
         checker = ConstraintChecker(simple_config)
@@ -277,7 +309,7 @@ class TestWellStateTracker:
     """Tests that the well state tracker detects logical errors."""
 
     def _dummy_step(self):
-        return ExtractedStep(order=1, action="delay", duration=DurationSpec(value=1, unit="seconds"))
+        return ExtractedStep(order=1, action="delay", duration=_dur(1, unit="seconds"), composition_provenance=_comp())
 
     def test_aspirate_from_empty_well_warns(self, simple_config):
         """Aspirating from a well that was never dispensed into produces a warning."""
@@ -358,9 +390,10 @@ class TestVolumeValidation:
             [
                 ExtractedStep(
                     order=1, action="transfer",
-                    volume=VolumeSpec(value=100.0, unit="uL"),
+                    volume=_vol(100.0),
                     source=LocationRef(description="reservoir", well="A1"),
                     destination=LocationRef(description="plate", well="A1"),
+                    composition_provenance=_comp(),
                 )
             ],
             explicit_volumes=[100.0]
@@ -381,11 +414,12 @@ class TestVolumeValidation:
             [
                 ExtractedStep(
                     order=1, action="transfer",
-                    volume=VolumeSpec(value=10.0, unit="uL"),
+                    volume=_vol(10.0),
                     source=LocationRef(description="reagent_tube_rack", well="A1"),
                     destination=LocationRef(description="dilution_strip", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
-                                             volume=VolumeSpec(value=50.0, unit="uL"))],
+                                             volume=_vol(50.0))],
+                    composition_provenance=_comp(),
                 )
             ],
             explicit_volumes=[10.0],  # 50.0 is NOT here — it was inferred
@@ -419,10 +453,11 @@ class TestSerialDilution:
             [
                 ExtractedStep(
                     order=1, action="serial_dilution",
-                    volume=VolumeSpec(value=100.0, unit="uL"),
+                    volume=_vol(100.0),
                     source=LocationRef(description="reservoir", well="A1"),
                     destination=LocationRef(description="plate", well_range="A1-A6"),
-                    tip_strategy="new_tip_each"
+                    tip_strategy="new_tip_each",
+                    composition_provenance=_comp(),
                 )
             ],
             initial_contents=[
@@ -459,10 +494,11 @@ class TestSerialDilution:
             [
                 ExtractedStep(
                     order=1, action="serial_dilution",
-                    volume=VolumeSpec(value=100.0, unit="uL"),
+                    volume=_vol(100.0),
                     source=LocationRef(description="reservoir", well="A1"),
                     destination=LocationRef(description="plate", well_range="A1-A6"),
-                    tip_strategy="new_tip_each"
+                    tip_strategy="new_tip_each",
+                    composition_provenance=_comp(),
                 )
             ],
             initial_contents=[
@@ -491,9 +527,10 @@ class TestProvenance:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=100.0, unit="uL", inferred=True),
+                volume=_vol(100.0, source="inferred"),
                 source=LocationRef(description="plate_a", well="A1"),
                 destination=LocationRef(description="plate_b", well="A1"),
+                composition_provenance=_comp(),
             )
         ])
 
@@ -508,9 +545,10 @@ class TestProvenance:
             [
                 ExtractedStep(
                     order=1, action="transfer",
-                    volume=VolumeSpec(value=100.0, unit="uL"),
+                    volume=_vol(100.0),
                     source=LocationRef(description="plate_a", well="A1"),
                     destination=LocationRef(description="plate_b", well="A1"),
+                    composition_provenance=_comp(),
                 )
             ],
             explicit_volumes=[100.0]
@@ -520,24 +558,24 @@ class TestProvenance:
         assert "100.0uL" in output
         assert "[INFERRED]" not in output.split("100.0uL")[0].split("\n")[-1]
 
-    def test_post_action_volume_not_in_explicit_tagged_inferred(self):
-        """Post-action volumes not in explicit_volumes get [INFERRED] tag."""
+    def test_post_action_volume_provenance_tagged(self):
+        """Post-action volumes show their provenance source in the tag."""
         from nl2protocol.extractor import SemanticExtractor
 
         spec = make_spec(
             [
                 ExtractedStep(
                     order=1, action="transfer",
-                    volume=VolumeSpec(value=10.0, unit="uL"),
+                    volume=_vol(10.0),
                     source=LocationRef(description="plate_a", well="A1"),
                     destination=LocationRef(description="plate_b", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
-                                             volume=VolumeSpec(value=50.0, unit="uL"))]
+                                             volume=_vol(50.0, source="domain_default", exact=False))],
+                    composition_provenance=_comp(),
                 )
             ],
             explicit_volumes=[10.0]
         )
 
         output = SemanticExtractor.format_for_confirmation(spec)
-        # The 50uL mix should be tagged as inferred since it's not in explicit_volumes
-        assert "50.0uL [INFERRED]" in output
+        assert "50.0uL [DOMAIN_DEFAULT]" in output

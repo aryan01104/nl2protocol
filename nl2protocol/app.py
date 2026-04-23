@@ -536,7 +536,7 @@ class ProtocolAgent:
                 for w in wells:
                     key = (desc, w)
                     if key not in source_wells:
-                        source_wells[key] = step.substance
+                        source_wells[key] = step.substance.value if step.substance else None
 
             # Destination side
             if step.destination:
@@ -909,7 +909,7 @@ class ProtocolAgent:
         _log(f"\n{C.header('[Stage 3/8]')} Validating and completing specification...")
 
         # Hallucination guard
-        warnings = extractor.validate_against_text(spec, prompt)
+        warnings = extractor.validate_exact_values_against_text(spec, prompt)
         if warnings:
             for w in warnings:
                 _log(f"  {C.warning('Warning:')} {w}")

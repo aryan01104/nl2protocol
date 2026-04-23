@@ -21,8 +21,9 @@ from nl2protocol.constraints import (
     ConstraintChecker, ViolationType, Severity, WellStateTracker
 )
 from nl2protocol.extractor import (
-    ProtocolSpec, ExtractedStep, VolumeSpec, LocationRef,
-    PostAction, DurationSpec, WellContents, SemanticExtractor
+    ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
+    Provenance, CompositionProvenance, LocationRef,
+    PostAction, WellContents, SemanticExtractor
 )
 from nl2protocol.validate_config import validate_config
 
@@ -57,8 +58,32 @@ def make_spec(steps, **kwargs):
     return ProtocolSpec(steps=steps, **defaults)
 
 
+def _prov(source="instruction", reason="test", confidence=1.0):
+    """Shorthand for test provenance."""
+    return Provenance(source=source, reason=reason, confidence=confidence)
+
+
+def _comp(grounding=None, justification="test step", confidence=1.0):
+    """Shorthand for test composition provenance."""
+    return CompositionProvenance(
+        justification=justification,
+        grounding=grounding or ["instruction"],
+        confidence=confidence,
+    )
+
+
+def _vol(value, unit="uL", exact=True, source="instruction"):
+    """Shorthand for test volume."""
+    return ProvenancedVolume(value=value, unit=unit, exact=exact, provenance=_prov(source=source))
+
+
+def _dur(value, unit="seconds"):
+    """Shorthand for test duration."""
+    return ProvenancedDuration(value=value, unit=unit, provenance=_prov())
+
+
 def _dummy():
-    return ExtractedStep(order=1, action="delay", duration=DurationSpec(value=1, unit="seconds"))
+    return ExtractedStep(order=1, action="delay", duration=_dur(1, unit="seconds"), composition_provenance=_comp())
 
 
 # Mark for tests that need LLM
@@ -80,15 +105,17 @@ class TestPipetteInsufficient:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=5.0, unit="uL"),
+                volume=_vol(5.0),
                 source=LocationRef(description="source_plate", well="A1"),
                 destination=LocationRef(description="dest_plate", well="B1"),
+                composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer",
-                volume=VolumeSpec(value=500.0, unit="uL"),
+                volume=_vol(500.0),
                 source=LocationRef(description="reservoir", well="A1"),
                 destination=LocationRef(description="dest_plate", well="B1"),
+                composition_provenance=_comp(),
             ),
         ])
         result = ConstraintChecker(config).check_all(spec)
@@ -112,9 +139,10 @@ class TestLabwareMissing:
             [
                 ExtractedStep(
                     order=1, action="distribute",
-                    volume=VolumeSpec(value=50.0, unit="uL"),
+                    volume=_vol(50.0),
                     source=LocationRef(description="reagent_reservoir", well="A1"),
                     destination=LocationRef(description="assay_plate_384", well_range="A1-P24"),
+                    composition_provenance=_comp(),
                 )
             ],
             missing_labware=["384-well assay plate"]
@@ -136,12 +164,13 @@ class TestModuleMissing:
     def test_temp_module_missing(self):
         config = load_config("module_missing")
         spec = make_spec([
-            ExtractedStep(order=1, action="set_temperature", note="37°C"),
+            ExtractedStep(order=1, action="set_temperature", note="37°C", composition_provenance=_comp()),
             ExtractedStep(
                 order=2, action="distribute",
-                volume=VolumeSpec(value=200.0, unit="uL"),
+                volume=_vol(200.0),
                 source=LocationRef(description="reservoir", well="A1"),
                 destination=LocationRef(description="culture_plate", well_range="A1-H12"),
+                composition_provenance=_comp(),
             ),
         ])
         result = ConstraintChecker(config).check_all(spec)
@@ -163,12 +192,13 @@ class TestCombinedConfigGaps:
         config = load_config("combined_config_gaps")
         spec = make_spec(
             [
-                ExtractedStep(order=1, action="set_temperature", note="4°C"),
-                ExtractedStep(order=2, action="engage_magnets"),
+                ExtractedStep(order=1, action="set_temperature", note="4°C", composition_provenance=_comp()),
+                ExtractedStep(order=2, action="engage_magnets", composition_provenance=_comp()),
                 ExtractedStep(
                     order=3, action="aspirate",
-                    volume=VolumeSpec(value=150.0, unit="uL"),
+                    volume=_vol(150.0),
                     source=LocationRef(description="deep_well_plate", well_range="A1-H1"),
+                    composition_provenance=_comp(),
                 ),
             ],
             missing_labware=["waste reservoir", "ethanol reservoir", "tube rack", "PCR plate"]
@@ -256,11 +286,12 @@ class TestMismatchedProtocol:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="serial_dilution",
-                volume=VolumeSpec(value=100.0, unit="uL"),
+                volume=_vol(100.0),
                 source=LocationRef(description="drug_stock"),
                 destination=LocationRef(description="96_well_plate", well_range="A1-A12"),
                 post_actions=[PostAction(action="mix", repetitions=5,
-                                         volume=VolumeSpec(value=100.0, unit="uL"))],
+                                         volume=_vol(100.0))],
+                composition_provenance=_comp(),
             )
         ], missing_labware=["drug_stock", "96-well plate"])
 
