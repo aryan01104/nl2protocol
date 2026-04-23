@@ -435,7 +435,7 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
-    def check_sufficiency(spec: ProtocolSpec) -> List[str]:
+    def missing_fields(spec: ProtocolSpec) -> List[str]:
         """Check if the spec has enough information to generate a protocol.
         Returns list of gaps (empty = sufficient)."""
         gaps = []

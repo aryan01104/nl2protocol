@@ -719,7 +719,11 @@ class ProtocolAgent:
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
-            validation = validator.classify(prompt)
+            try:
+                validation = validator.classify(prompt)
+            except Exception as e:
+                _log(f"  {C.error(str(e))}")
+                return None
 
             if not validation.is_valid_protocol:
                 if validation.classification == "QUESTION":
@@ -818,13 +822,13 @@ class ProtocolAgent:
                 _log(f"  {C.warning('Warning:')} {w}")
 
         # Sufficiency check
-        gaps = extractor.check_sufficiency(spec)
+        gaps = extractor.missing_fields(spec)
         if gaps:
             _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
                 _log(f"    - {g}")
             spec = extractor.fill_gaps(spec, self.parser.config)
-            remaining_gaps = extractor.check_sufficiency(spec)
+            remaining_gaps = extractor.missing_fields(spec)
             if remaining_gaps:
                 _log(f"  Could not fill all gaps from config:")
                 for g in remaining_gaps:
@@ -833,7 +837,7 @@ class ProtocolAgent:
                 refined = extractor.refine(spec, remaining_gaps, prompt, self.parser.config)
                 if refined:
                     spec = refined
-                    final_gaps = extractor.check_sufficiency(spec)
+                    final_gaps = extractor.missing_fields(spec)
                     if final_gaps:
                         _log(f"  Refinement could not resolve all gaps:")
                         for g in final_gaps:

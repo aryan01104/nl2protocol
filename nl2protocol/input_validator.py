@@ -141,15 +141,8 @@ class InputValidator:
             )
 
         except Exception as e:
-            # On error, default to allowing the input through
-            # Better to try protocol generation than block valid input
             from .errors import format_api_error
-            print(f"  Input validation skipped ({format_api_error(e)})", file=sys.stderr)
-            return InputValidationResult(
-                classification="PROTOCOL",
-                reason="Classification skipped due to error",
-                suggestion=None
-            )
+            raise RuntimeError(f"Input validation failed: {format_api_error(e)}") from e
 
 
 def validate_input(user_input: str) -> InputValidationResult:
