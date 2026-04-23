@@ -15,7 +15,6 @@ Options:
     -c, --config        Lab configuration JSON file (default: lab_config.json)
     -d, --data          CSV data file with experiment parameters
     -o, --output        Output protocol filename (timestamp auto-appended)
-    -r, --retries       Max retry attempts (default: 3)
     --generate-config   Infer lab config from instruction (no config file needed)
     --robot             After success, prompt to upload to OT-2 robot
     --validate-only     Only validate config file, don't generate protocol
@@ -125,13 +124,6 @@ Files:
     )
 
     parser.add_argument(
-        '-r', '--retries',
-        type=int,
-        default=3,
-        help='Maximum retry attempts for protocol generation (default: 3)'
-    )
-
-    parser.add_argument(
         '--robot',
         action='store_true',
         help='After successful simulation, prompt to upload protocol to robot'
@@ -178,9 +170,6 @@ def validate_args(args: argparse.Namespace) -> None:
 
     if args.data and not os.path.isfile(args.data):
         raise FileNotFoundError(f"Data file not found: {args.data}")
-
-    if args.retries < 1:
-        raise ValueError("--retries must be at least 1")
 
     # Ensure output directory exists
     output_dir = Path(args.output).parent
@@ -632,7 +621,6 @@ def main(argv: list = None) -> int:
         result = agent.run_pipeline(
             prompt=intent,
             csv_path=args.data,
-            max_retries=args.retries
         )
     except NL2ProtocolError as e:
         print(f"\nError: {e}", file=sys.stderr)

@@ -317,7 +317,7 @@ class ConstraintChecker:
             ))
 
     def _check_labware_resolution(self, step: ExtractedStep, result: ConstraintCheckResult):
-        """Check that source/destination descriptions can map to config labware."""
+        """Check that source/destination have been resolved to config labware."""
         config_labels = set(self.config.get("labware", {}).keys())
         if not config_labels:
             return
@@ -325,28 +325,9 @@ class ConstraintChecker:
         for ref, role in [(step.source, "source"), (step.destination, "destination")]:
             if not ref:
                 continue
-            desc = ref.description.lower().replace("(inferred from config)", "").strip()
-            desc_words = set(re.split(r'[\s_\-]+', desc))
-
-            # Try to match — same logic as resolve_labware but just checking existence
-            matched = False
-            for label in config_labels:
-                label_lower = label.lower()
-                label_words = set(re.split(r'[\s_\-]+', label_lower))
-                # Exact match
-                if label_lower == desc:
-                    matched = True
-                    break
-                # Word overlap
-                if desc_words & label_words:
-                    matched = True
-                    break
-                # Substring
-                if any(lw in desc or desc in lw for lw in [label_lower]):
-                    matched = True
-                    break
-
-            if not matched:
+            # Check resolved_label, fall back to description for legacy specs
+            label = ref.resolved_label or ref.description
+            if label not in config_labels:
                 result.violations.append(ConstraintViolation(
                     violation_type=ViolationType.LABWARE_NOT_FOUND,
                     severity=Severity.ERROR,
@@ -366,7 +347,7 @@ class ConstraintChecker:
                 continue
 
             # Resolve labware to get well info
-            label = self._resolve_label(ref)
+            label = self._resolve_ref_to_label(ref)
             if not label:
                 continue  # Already caught by labware resolution check
 
@@ -487,17 +468,14 @@ class ConstraintChecker:
     # HELPERS
     # ========================================================================
 
-    def _resolve_label(self, ref) -> Optional[str]:
-        """Quick labware resolution for constraint checking."""
+    def _resolve_ref_to_label(self, ref) -> Optional[str]:
+        """Read pre-resolved config label from a LocationRef."""
         if not ref or "labware" not in self.config:
             return None
-        desc = ref.description.lower().replace("(inferred from config)", "").strip()
-        desc_words = set(re.split(r'[\s_\-]+', desc))
-
-        for label in self.config["labware"]:
-            label_words = set(re.split(r'[\s_\-]+', label.lower()))
-            if label.lower() == desc or (desc_words & label_words):
-                return label
+        # Use resolved_label if available, fall back to description for legacy specs
+        label = ref.resolved_label or ref.description
+        if label in self.config["labware"]:
+            return label
         return None
 
 

@@ -572,6 +572,103 @@ class ProtocolAgent:
 
         return results
 
+    def _confirm_labware_assignments(self, spec) -> Optional[dict]:
+        """Interactive confirmation of labware description → config label assignments.
+
+        Shows each assignment one by one. User can:
+          - Accept (Enter/y)
+          - Pick a different config label (number)
+          - Go back to re-do a previous assignment (b)
+          - Abort (q)
+
+        Returns dict of {description: confirmed_label} or None if aborted.
+        """
+        from .cli import prompt_yes_no
+
+        # Collect unique (description, resolved_label) pairs
+        assignments = []
+        seen = set()
+        for step in spec.steps:
+            for ref in [step.source, step.destination]:
+                if ref and ref.description not in seen:
+                    seen.add(ref.description)
+                    assignments.append({
+                        "description": ref.description,
+                        "resolved_label": ref.resolved_label,
+                    })
+
+        if not assignments:
+            return {}
+
+        available_labels = list(self.parser.config.get("labware", {}).keys())
+        confirmed = {}
+        i = 0
+
+        _log(f"\n  {C.label('Labware assignments')} ({len(assignments)} references):")
+        _log(f"  Review each mapping. Press Enter to accept, or pick a different label.\n")
+
+        while i < len(assignments):
+            a = assignments[i]
+            desc = a["description"]
+            suggested = a["resolved_label"]
+
+            # Show the assignment
+            if suggested:
+                _log(f"  [{i+1}/{len(assignments)}] \"{desc}\" → {C.success(suggested)}")
+            else:
+                _log(f"  [{i+1}/{len(assignments)}] \"{desc}\" → {C.warning('no match found')}")
+
+            # Show available options
+            _log(f"    Available labels:")
+            remaining = [l for l in available_labels if l not in confirmed.values() or l == suggested]
+            for j, label in enumerate(remaining):
+                load_name = self.parser.config["labware"][label].get("load_name", "")
+                marker = " ←" if label == suggested else ""
+                _log(f"      {j+1}. {label} ({C.dim(load_name)}){marker}")
+
+            # Get user input
+            prompt_str = f"    Accept{' [Enter]' if suggested else ''}, pick # , (b)ack, (q)uit: "
+            response = input(prompt_str).strip().lower()
+
+            if response == 'q':
+                _log("  Aborted.")
+                return None
+            elif response == 'b':
+                if i > 0:
+                    # Undo previous assignment
+                    prev_desc = assignments[i-1]["description"]
+                    confirmed.pop(prev_desc, None)
+                    i -= 1
+                else:
+                    _log("    Already at the first assignment.")
+                continue
+            elif response == '' and suggested:
+                # Accept suggested
+                confirmed[desc] = suggested
+                i += 1
+            elif response.isdigit():
+                idx = int(response) - 1
+                if 0 <= idx < len(remaining):
+                    confirmed[desc] = remaining[idx]
+                    i += 1
+                else:
+                    _log(f"    Invalid number. Pick 1-{len(remaining)}.")
+            elif not suggested and response == '':
+                _log(f"    No suggestion — pick a number or (q)uit.")
+            else:
+                _log(f"    Invalid input. Enter a number, (b)ack, or (q)uit.")
+
+        # Final confirmation
+        _log(f"\n  {C.label('Final assignments:')}")
+        for desc, label in confirmed.items():
+            _log(f"    \"{desc}\" → {label}")
+
+        if not prompt_yes_no("\n  Confirm all?", default=True):
+            _log("  Aborted.")
+            return None
+
+        return confirmed
+
     def _resolve_missing_labware(self, missing: list, instruction: str, extractor) -> dict:
         """Interactively resolve missing labware by suggesting additions.
 
@@ -636,12 +733,8 @@ class ProtocolAgent:
             suggestions = {}
             reasons = {}
             for key, val in raw_suggestions.items():
-                if isinstance(val, dict):
-                    suggestions[key] = val.get("load_name", "UNKNOWN")
-                    reasons[key] = val.get("reason", "")
-                else:
-                    suggestions[key] = val
-                    reasons[key] = ""
+                suggestions[key] = val.get("load_name")
+                reasons[key] = val.get("reason", "")
         except Exception as e:
             _log(f"  Could not infer labware types automatically: {e}")
             suggestions = {lw: "UNKNOWN" for lw in missing}
@@ -694,7 +787,7 @@ class ProtocolAgent:
 
         return resolved
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
+    def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
         New architecture (v2):
@@ -881,6 +974,50 @@ class ProtocolAgent:
                         WellContents(labware=labware, well=well,
                                      substance=substance or "reagent")
                     )
+
+        # Stage 3.5: Resolve labware references (description → config label)
+        _log(f"\n{C.header('[Stage 3.5/8]')} Resolving labware references...")
+        from .extractor import LabwareResolver
+        resolver = LabwareResolver(
+            config=self.parser.config,
+            client=extractor.client,
+            model_name=extractor.model_name,
+        )
+        spec = resolver.resolve(spec)
+
+        # Interactive confirmation of assignments
+        if sys.stdin.isatty():
+            confirmed = self._confirm_labware_assignments(spec)
+            if confirmed is None:
+                return None
+            # Apply confirmed assignments back to spec
+            for step in spec.steps:
+                for ref in [step.source, step.destination]:
+                    if ref and ref.description in confirmed:
+                        ref.resolved_label = confirmed[ref.description]
+
+        # Any still-unresolved refs ended up in missing_labware via the resolver
+        if spec.missing_labware:
+            _log(f"\n  {C.warning('Unresolved labware:')} {spec.missing_labware}")
+            if sys.stdin.isatty():
+                resolved = self._resolve_missing_labware(spec.missing_labware, prompt, extractor)
+                if resolved is None:
+                    return None
+                if resolved:
+                    for label, entry in resolved.items():
+                        self.parser.config["labware"][label] = entry
+                    with open(self.config_path, 'w') as f:
+                        json.dump(self.parser.config, f, indent=4)
+                    _log(f"  Config updated: {self.config_path}")
+                    spec.missing_labware = []
+                    # Re-resolve with new config entries
+                    resolver = LabwareResolver(config=self.parser.config)
+                    spec = resolver.resolve(spec)
+            else:
+                _log("  Cannot proceed with unresolved labware in non-interactive mode.")
+                return None
+
+        _log(f"  {C.success('All labware resolved.')}")
 
         # Stage 4: Constraint checking (deterministic, no LLM)
         _log(f"\n{C.header('[Stage 4/8]')} Checking hardware constraints...")

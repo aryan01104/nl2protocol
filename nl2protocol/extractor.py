@@ -29,7 +29,7 @@ import copy
 import json
 import re
 import sys
-from typing import List, Optional, Literal, Dict
+from typing import Annotated, List, Optional, Literal, Dict
 
 from anthropic import Anthropic
 from pydantic import BaseModel, Field, model_validator
@@ -39,57 +39,116 @@ from pydantic import BaseModel, Field, model_validator
 # INTERMEDIATE REPRESENTATION
 # ============================================================================
 
+WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
+
+
 class VolumeSpec(BaseModel):
     """A volume associated with a protocol step."""
     value: float = Field(..., gt=0)
     unit: Literal["uL", "mL"] = "uL"
-    approximate: bool = Field(False, description="True if hedged: 'about 100uL', '~50uL'")
-    inferred: bool = Field(False, description="True if inferred from domain knowledge, not stated by user")
+    approximate: bool = Field(False, description="True ONLY if the user hedged: 'about 100uL', '~50uL'. False if they stated an exact number.")
+    inferred: bool = Field(False, description="True ONLY if the user did NOT state this volume and you inferred it from domain knowledge. False if the user wrote the number.")
 
 
 class LocationRef(BaseModel):
     """A reference to a labware location, as the user described it."""
-    description: str = Field(..., description="How the user referred to it: 'reservoir', 'PCR plate', 'tube rack'")
-    well: Optional[str] = Field(None, description="Single well: 'A1'")
-    wells: Optional[List[str]] = Field(None, description="Explicit well list")
-    well_range: Optional[str] = Field(None, description="Range as stated: 'A1-A12', 'column 1'")
+    description: str = Field(..., description=(
+        "How the user referred to this labware. Copy their wording exactly — "
+        "'reservoir', 'PCR plate', 'the tube rack'. Do not translate to config labels or load names. "
+        "Examples: 'reservoir', 'PCR plate', 'tube rack'."
+    ))
+    well: Optional[WellName] = Field(None, description=(
+        "Use for a single well position matching pattern [A-P][1-24]. "
+        "Do not use alongside wells or well_range — pick exactly one. "
+        "Examples: 'A1', 'B6', 'H12'."
+    ))
+    wells: Optional[List[WellName]] = Field(None, description=(
+        "Use for an explicit list of individual wells, each matching pattern [A-P][1-24]. "
+        "Do not use alongside well or well_range — pick exactly one. "
+        "Examples: ['A1', 'B1', 'C1'], ['A1', 'A2', 'A3'], ['D4', 'E5', 'F6']."
+    ))
+    well_range: Optional[str] = Field(None, description=(
+        "Use for contiguous ranges or natural-language region descriptions. "
+        "Do not use alongside well or wells — pick exactly one. "
+        "Examples: 'A1-A12', 'column 1', 'columns 2-8'."
+    ))
+    resolved_label: Optional[str] = Field(None, description=(
+        "Config labware key. Filled automatically by the labware resolver — leave null during extraction."
+    ))
 
 
 class DurationSpec(BaseModel):
     """A time duration for delays, incubations, pauses."""
-    value: float = Field(..., gt=0)
+    value: float = Field(..., gt=0, description=(
+        "Copy the user's number exactly. Do not round, convert units, or infer if not stated — leave the step without a duration."
+    ))
     unit: Literal["seconds", "minutes", "hours"]
 
 
 class PostAction(BaseModel):
     """Post-transfer action like mixing."""
     action: Literal["mix", "blow_out", "touch_tip"]
-    repetitions: Optional[int] = None
-    volume: Optional[VolumeSpec] = None
+    repetitions: Optional[int] = Field(None, description=(
+        "Number of mix cycles. Set only if the user specified a count. Do not infer a default — leave null."
+    ))
+    volume: Optional[VolumeSpec] = Field(None, description=(
+        "Volume per mix cycle. Set only if the user specified a mix volume. Do not infer a default — leave null."
+    ))
+
+
+ActionType = Literal[
+    "transfer", "distribute", "consolidate", "serial_dilution",
+    "mix", "delay", "pause", "comment",
+    "aspirate", "dispense", "blow_out", "touch_tip",
+    "set_temperature", "wait_for_temperature",
+    "engage_magnets", "disengage_magnets", "deactivate",
+]
 
 
 class ExtractedStep(BaseModel):
     """One logical step in the protocol."""
     order: int = Field(..., ge=1)
-    action: str = Field(..., description="transfer, distribute, consolidate, mix, serial_dilution, delay, pause, set_temperature, aspirate, dispense, engage_magnets, disengage_magnets, comment, etc.")
-    substance: Optional[str] = Field(None, description="What is being moved: 'master mix', 'DNA template', 'diluent'")
+    action: ActionType = Field(..., description=(
+        "The protocol action. Must be one of the allowed values. Do not invent new action names."
+    ))
+    substance: Optional[str] = Field(None, description=(
+        "Copy the substance name as the user wrote it. "
+        "Do not normalize, translate, or infer if unspecified — leave null."
+    ))
     volume: Optional[VolumeSpec] = None
-    duration: Optional[DurationSpec] = Field(None, description="For delay/pause/incubation steps: how long to wait")
+    duration: Optional[DurationSpec] = Field(None, description=(
+        "For delay, pause, or incubation steps only. Do not put time values in the volume field."
+    ))
     source: Optional[LocationRef] = None
     destination: Optional[LocationRef] = None
     post_actions: Optional[List[PostAction]] = None
-    replicates: Optional[int] = Field(None, ge=2, description="Number of replicates per source well (e.g., 3 for triplicate). Each source well maps to N destination wells across consecutive columns.")
+    replicates: Optional[int] = Field(None, ge=2, description=(
+        "Number of replicates per source well. Set only if the user specified replicates. Do not infer."
+    ))
     tip_strategy: Optional[Literal["new_tip_each", "same_tip", "unspecified"]] = None
-    pipette_hint: Optional[str] = Field(None, description="If user specified a pipette: 'p20', 'p300'")
-    note: Optional[str] = Field(None, description="Additional context from instruction")
+    pipette_hint: Optional[Literal["p20", "p300", "p1000"]] = Field(None, description=(
+        "Set only if the user explicitly named a pipette. Do not infer from volumes or context."
+    ))
+    note: Optional[str] = Field(None, description=(
+        "Additional context from the instruction, verbatim. Do not summarize or paraphrase."
+    ))
 
 
 class WellContents(BaseModel):
     """Initial contents of a well/tube before the protocol starts."""
-    labware: str = Field(..., description="Config labware label (must match exactly)")
-    well: str = Field(..., description="Well position: A1, B2, etc.")
-    substance: str = Field(..., description="What's in there: 'concentrated DNA standard', 'master mix'")
-    volume_ul: Optional[float] = Field(None, description="Volume if known, in uL")
+    labware: str = Field(..., description=(
+        "How the user referred to this labware. Copy their wording exactly. "
+        "Do not translate to config labels or load names."
+    ))
+    well: WellName = Field(..., description=(
+        "Well position matching pattern [A-P][1-24]. Examples: 'A1', 'B2', 'H12'."
+    ))
+    substance: str = Field(..., description=(
+        "Copy the substance name as the user wrote it. Do not normalize or abbreviate."
+    ))
+    volume_ul: Optional[float] = Field(None, description=(
+        "Volume in uL if the user stated it. Do not infer — leave null if not stated."
+    ))
 
 
 class ProtocolSpec(BaseModel):
@@ -115,6 +174,198 @@ class ProtocolSpec(BaseModel):
 
 
 # ============================================================================
+# LABWARE RESOLVER
+# ============================================================================
+
+class LabwareResolver:
+    """Resolves user-language labware descriptions to config labels.
+
+    Three tiers:
+      1. Deterministic — exact, case-insensitive, word-overlap, load_name keyword
+      2. LLM batch — one call with all unresolved refs + step context + config labels
+      3. Unresolvable — added to spec.missing_labware for interactive resolution
+    """
+
+    def __init__(self, config: dict, client=None, model_name: str = "claude-sonnet-4-20250514"):
+        self.config = config
+        self.labware_labels = list(config.get("labware", {}).keys())
+        self.client = client
+        self.model_name = model_name
+
+    def resolve(self, spec: ProtocolSpec) -> ProtocolSpec:
+        """Walk all LocationRefs in spec and fill resolved_label."""
+        spec = spec.model_copy(deep=True)
+
+        # Collect all unique descriptions
+        all_refs = self._collect_refs(spec)
+        unique_descs = {ref.description for ref in all_refs}
+
+        # Tier 1: deterministic
+        resolved = {}
+        unresolved = set()
+        for desc in unique_descs:
+            label = self._deterministic_resolve(desc)
+            if label:
+                resolved[desc] = label
+            else:
+                unresolved.add(desc)
+
+        # Tier 2: LLM batch for unresolved
+        if unresolved and self.client:
+            llm_resolved = self._llm_resolve(unresolved, spec)
+            resolved.update(llm_resolved)
+            unresolved -= set(llm_resolved.keys())
+
+        # Apply resolutions to all LocationRefs
+        for ref in all_refs:
+            if ref.description in resolved:
+                ref.resolved_label = resolved[ref.description]
+
+        # Also resolve initial_contents labware references
+        for wc in spec.initial_contents:
+            if wc.labware in resolved:
+                wc.labware = resolved[wc.labware]
+
+        # Tier 3: unresolvable → missing_labware
+        for desc in unresolved:
+            if desc not in spec.missing_labware:
+                spec.missing_labware.append(desc)
+
+        return spec
+
+    def _collect_refs(self, spec: ProtocolSpec) -> List[LocationRef]:
+        """Gather all LocationRef objects from spec steps."""
+        refs = []
+        for step in spec.steps:
+            if step.source:
+                refs.append(step.source)
+            if step.destination:
+                refs.append(step.destination)
+        return refs
+
+    def _deterministic_resolve(self, desc: str) -> Optional[str]:
+        """Try to resolve description to config label without LLM.
+
+        Matching strategies (in order):
+          1. Exact match (case-insensitive)
+          2. Score-based: word overlap (10pts), substring bonus (5pts), load_name keyword (3pts)
+          Requires score >= 10 to accept (at least one full word overlap).
+        """
+        if not self.labware_labels:
+            return None
+        desc_lower = desc.lower().strip()
+        desc_words = set(re.split(r'[\s_\-]+', desc_lower))
+
+        # 1. Exact match
+        for label in self.labware_labels:
+            if label.lower() == desc_lower:
+                return label
+
+        # 2. Score-based matching
+        def score_label(label: str) -> int:
+            s = 0
+            label_words = set(re.split(r'[\s_\-]+', label.lower()))
+            # Word overlap
+            s += len(desc_words & label_words) * 10
+            # Substring bonus
+            for lw in label_words:
+                for dw in desc_words:
+                    if len(lw) > 2 and len(dw) > 2 and lw != dw:
+                        if lw in dw or dw in lw:
+                            s += 5
+            # Load_name keyword match
+            load = self.config["labware"][label].get("load_name", "").lower()
+            for dw in desc_words:
+                if len(dw) > 2 and dw in load:
+                    s += 3
+            return s
+
+        scored = [(label, score_label(label)) for label in self.labware_labels]
+        scored.sort(key=lambda x: -x[1])
+        if scored and scored[0][1] >= 10:
+            return scored[0][0]
+
+        return None
+
+    def _llm_resolve(self, unresolved: set, spec: ProtocolSpec) -> dict:
+        """Batch LLM call to resolve remaining descriptions.
+
+        Passes all unresolved refs with their step context (action, wells, volume)
+        and the full config labware list so the LLM can reason about which
+        description maps to which config label.
+        """
+        # Build context: for each unresolved description, gather the steps that use it
+        desc_context = {}
+        for step in spec.steps:
+            for ref, role in [(step.source, "source"), (step.destination, "destination")]:
+                if ref and ref.description in unresolved:
+                    if ref.description not in desc_context:
+                        desc_context[ref.description] = []
+                    wells = ref.well or ref.wells or ref.well_range or "unspecified"
+                    desc_context[ref.description].append(
+                        f"Step {step.order}: {step.action}, role={role}, "
+                        f"wells={wells}, substance={step.substance or 'unspecified'}"
+                    )
+
+        # Build config summary
+        config_summary = {}
+        for label, lw in self.config.get("labware", {}).items():
+            config_summary[label] = {
+                "load_name": lw.get("load_name", "unknown"),
+                "slot": lw.get("slot", "unknown"),
+            }
+
+        prompt = (
+            "You are resolving labware references in a lab protocol.\n\n"
+            "The user described labware using natural language. Match each description "
+            "to a config label based on context (what action, what wells, what substance).\n\n"
+            f"CONFIG LABWARE:\n{json.dumps(config_summary, indent=2)}\n\n"
+            "UNRESOLVED REFERENCES:\n"
+        )
+        for desc, contexts in desc_context.items():
+            prompt += f'\n  "{desc}":\n'
+            for ctx in contexts:
+                prompt += f"    - {ctx}\n"
+
+        prompt += (
+            "\nFor each description, respond with JSON only:\n"
+            '{"assignments": {"<description>": "<config_label or null>", ...}}\n\n'
+            "Rules:\n"
+            "- Only assign to a config label if you are confident it's the right match.\n"
+            "- Use null if no config label is a reasonable match.\n"
+            "- Consider the action context: sources are typically racks/reservoirs, "
+            "destinations are typically plates.\n"
+        )
+
+        try:
+            from .spinner import Spinner
+            with Spinner("Resolving labware references..."):
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=512,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+            result_text = response.content[0].text
+            if "```json" in result_text:
+                result_text = result_text.split("```json")[1].split("```")[0]
+            elif "```" in result_text:
+                result_text = result_text.split("```")[1].split("```")[0]
+
+            result = json.loads(result_text.strip())
+            assignments = result.get("assignments", {})
+
+            # Only keep non-null assignments that reference valid config labels
+            return {
+                desc: label
+                for desc, label in assignments.items()
+                if label is not None and label in self.config.get("labware", {})
+            }
+        except Exception:
+            return {}
+
+
+# ============================================================================
 # REASONING PROMPT
 # ============================================================================
 
@@ -129,7 +380,7 @@ THINK FIRST (inside <reasoning> tags):
 4. What parameters are missing? What are standard/typical defaults for this protocol?
 5. What are the individual steps, in order?
 6. For each step: what is the action, what substance, what volume, from where, to where?
-7. LABWARE MAPPING: For each piece of labware mentioned in the instruction, which config label does it map to? If something is mentioned but has NO match in config, flag it.
+7. LABWARE: What pieces of labware does the instruction mention? Record the user's exact wording for each.
 8. INITIAL STATE: What substances are in which wells/tubes BEFORE the protocol starts?
 
 THEN produce structured JSON (inside <spec> tags) matching this schema:
@@ -148,40 +399,37 @@ RULES:
 - Leave the "reasoning" field empty in your JSON — it will be filled from your <reasoning> block
 - Leave "explicit_volumes" empty — it will be populated automatically
 
-LABWARE MAPPING (CRITICAL):
-- The "description" field in LocationRef MUST use a label from the lab config.
-- Look at the config's labware keys (e.g., "reagent_tube_rack", "dilution_strip", "qpcr_plate").
-- Map each piece of labware in the instruction to its config label.
-  Example: instruction says "tube rack" → config has "reagent_tube_rack" → use "reagent_tube_rack"
-  Example: instruction says "PCR plate" → config has "qpcr_plate" → use "qpcr_plate"
-- If the instruction references labware that does NOT exist in the config, add it to "missing_labware".
-  Example: instruction mentions "sample plate" but config has no matching labware → add "sample plate" to missing_labware.
-- NEVER invent labware or guess a match. If unsure, add to missing_labware.
+LABWARE REFERENCES:
+- The "description" field in LocationRef should contain the user's EXACT wording for the labware.
+  Example: instruction says "tube rack" → description: "tube rack"
+  Example: instruction says "the PCR plate" → description: "PCR plate"
+  Example: instruction says "reservoir" → description: "reservoir"
+- Do NOT translate to config labels or load names — that happens in a later stage.
+- Leave "resolved_label" as null — it will be filled automatically.
+- If the instruction references labware that clearly does not exist in the config, add the user's wording to "missing_labware".
 
 INITIAL CONTENTS:
 - Extract what's already in wells/tubes BEFORE the protocol starts.
-- Use config labware labels for the "labware" field.
-- Example: "Tube rack A1 contains DNA standard" → {{"labware": "reagent_tube_rack", "well": "A1", "substance": "concentrated DNA standard"}}
+- Use the user's exact wording for the "labware" field (same as LocationRef.description).
+- Example: "Tube rack A1 contains DNA standard" → {{"labware": "tube rack", "well": "A1", "substance": "DNA standard"}}
 - Only include what the instruction explicitly states. Don't infer contents.
 
 COMPRESSION — KEEP STEPS COMPACT:
 - NEVER create separate steps for repetitive operations that differ only in wells.
   Instead, use ONE step with well lists on source and/or destination.
-- For replicate patterns (triplicate, duplicate), use the "replicates" field:
-  Example: 8 standards each plated in triplicate across columns 1-3:
+- GENERAL PRINCIPLE: If multiple operations differ only in which wells they target,
+  represent them as ONE step with well lists, well ranges, or the replicates field.
+  The downstream code expands them into individual operations.
+- Use "wells" lists for paired mappings: source[0]→dest[0], source[1]→dest[1], etc.
+- Use "well_range" for contiguous regions: "A1-A12", "column 3", "rows A-D".
+- Use "replicates" when each source well maps to N consecutive destination columns.
+  The destination "well" is the starting corner; each source row fans out across N columns.
+  Example — 8 standards in triplicate:
     {{
       "action": "transfer",
-      "source": {{"description": "dilution_strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
-      "destination": {{"description": "qpcr_plate", "well": "A1"}},
+      "source": {{"description": "dilution strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
+      "destination": {{"description": "plate", "well": "A1"}},
       "replicates": 3
-    }}
-  This means: A1→[A1,A2,A3], B1→[B1,B2,B3], ..., H1→[H1,H2,H3].
-  Each source well maps to N consecutive columns starting at the destination well's column.
-- For paired well lists (source[0]→dest[0], source[1]→dest[1], ...):
-    {{
-      "action": "transfer",
-      "source": {{"description": "reagent_tube_rack", "wells": ["A1","A2","A3"]}},
-      "destination": {{"description": "qpcr_plate", "wells": ["B1","B2","B3"]}}
     }}
 - A protocol with 12 samples in triplicate should be 1 step, NOT 12 steps.
 - Aim for under 10 steps total. If your spec has more than 15 steps, you are probably not compressing enough.
@@ -646,7 +894,7 @@ Output the corrected specification.
         to HOW (hardware). Can't corrupt volumes because it copies them directly.
 
         Mapping:
-          LocationRef.description → config labware label → slot, load_name
+          LocationRef.resolved_label → config labware label → slot, load_name
           VolumeSpec.value → command volume (direct copy, never modified)
           action → command_type
           pipette_hint / volume range → pipette mount
@@ -688,57 +936,18 @@ Output the corrected specification.
         # ---- helpers ----
 
         def resolve_labware(ref, cfg: dict) -> Optional[str]:
-            """Map a LocationRef description to a config labware label.
+            """Read the pre-resolved config label from a LocationRef.
 
-            Tries multiple matching strategies:
-              1. Exact match (desc == label)
-              2. Substring match (desc in label or label in desc)
-              3. Word overlap (any word in desc matches any word in label)
-              4. Load_name keyword match
-              5. Normalized word match (strip separators, compare word sets)
+            Resolution is done upstream by LabwareResolver. This just reads
+            the result, with a fallback to description for backwards compatibility.
             """
-            if not ref or "labware" not in cfg:
+            if not ref:
                 return None
-            desc = ref.description.lower().replace("(inferred from config)", "").strip()
-            desc_words = set(re.split(r'[\s_\-]+', desc))
-
-            # 1. Exact match
-            for label in cfg["labware"]:
-                if label.lower() == desc:
-                    return label
-
-            # 2. Score-based matching — score each label, pick highest
-            #    This avoids the problem where "destination plate" matches
-            #    "source_plate" and "dest_plate" equally on word overlap,
-            #    by adding substring bonus ("dest" is in "destination")
-            def score_label(label: str) -> int:
-                s = 0
-                label_words = set(re.split(r'[\s_\-]+', label.lower()))
-                # Word overlap
-                s += len(desc_words & label_words) * 10
-                # Substring bonus: label word is substring of a desc word or vice versa
-                for lw in label_words:
-                    for dw in desc_words:
-                        if len(lw) > 2 and len(dw) > 2 and lw != dw:
-                            if lw in dw or dw in lw:
-                                s += 5
-                # Load_name keyword match
-                load = cfg["labware"][label].get("load_name", "").lower()
-                for dw in desc_words:
-                    if len(dw) > 2 and dw in load:
-                        s += 3
-                return s
-
-            scored = [(label, score_label(label)) for label in cfg["labware"]]
-            scored.sort(key=lambda x: -x[1])
-            if scored and scored[0][1] > 0:
-                # Require a minimum score to avoid false matches
-                # (e.g., "sample plate" matching "qpcr_plate" just on "plate")
-                if scored[0][1] >= 10:
-                    return scored[0][0]
-                # Low-confidence match — warn
-                print(f"  Warning: weak labware match '{desc}' → '{scored[0][0]}' (score={scored[0][1]}), skipping")
-
+            if ref.resolved_label and ref.resolved_label in cfg.get("labware", {}):
+                return ref.resolved_label
+            # Fallback: description might already be a config label (legacy specs)
+            if ref.description in cfg.get("labware", {}):
+                return ref.description
             return None
 
         def pipette_for_volume(volume: float, cfg: dict) -> Optional[str]:
