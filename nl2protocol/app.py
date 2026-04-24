@@ -401,7 +401,7 @@ def generate_python_script(protocol: ProtocolSchema) -> str:
             mod = module_map.get(cmd.module)
             if not mod:
                 raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.await_temperature({cmd.celsius if hasattr(cmd, 'celsius') else ''})")
+            lines.append(f"    {mod}.await_temperature({cmd.celsius})")
 
         elif cmd.command_type == "deactivate":
             mod = module_map.get(cmd.module)

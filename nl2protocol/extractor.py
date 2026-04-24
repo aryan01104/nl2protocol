@@ -2126,6 +2126,23 @@ Output the corrected specification.
                         ))
 
             elif step.action == "wait_for_temperature":
+                # Get temperature from step field, or from the preceding set_temperature
+                celsius = None
+                if step.temperature:
+                    celsius = step.temperature.value
+                elif step.note:
+                    m = re.search(r'(\d+(?:\.\d+)?)\s*°?\s*C', step.note)
+                    if m:
+                        celsius = float(m.group(1))
+                # Fallback: find the most recent SetTemperature command's celsius
+                if celsius is None:
+                    for prev_cmd in reversed(commands):
+                        if hasattr(prev_cmd, 'celsius') and hasattr(prev_cmd, 'command_type') and prev_cmd.command_type == "set_temperature":
+                            celsius = prev_cmd.celsius
+                            break
+                if celsius is None:
+                    celsius = 4.0  # safe fallback
+
                 mod_label = None
                 if "modules" in config:
                     for label, mod in config["modules"].items():
@@ -2134,7 +2151,7 @@ Output the corrected specification.
                             break
                 if mod_label:
                     commands.append(WaitForTemperature(
-                        pipette=mount, module=mod_label
+                        pipette=mount, module=mod_label, celsius=celsius
                     ))
 
             elif step.action == "engage_magnets":

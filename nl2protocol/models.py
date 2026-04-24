@@ -220,6 +220,7 @@ class WaitForTemperature(BaseModel):
     command_type: Literal["wait_for_temperature"] = "wait_for_temperature"
     pipette: Literal["left", "right"] = Field(..., description="Pipette context")
     module: str = Field(..., description="Module label or slot")
+    celsius: float = Field(..., description="Target temperature to wait for in Celsius")
 
 
 class DeactivateModule(BaseModel):
