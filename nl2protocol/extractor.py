@@ -535,6 +535,11 @@ PROVENANCE — every value you extract MUST have a provenance object:
     exact: true if the user stated this exact number ("100uL")
     exact: false if hedged ("about 100uL", "~50uL") or if inferred from domain knowledge
 
+  CRITICAL: source="instruction" means the EXACT value appears VERBATIM in the instruction text.
+  If you computed or derived a value from instruction numbers (arithmetic, doubling, summing,
+  calculating dead volume, etc.), that is source="inferred", NOT source="instruction".
+  The test is simple: can you point to the exact string in the instruction? If not, it's not "instruction".
+
   Calibration examples:
     User says "Transfer 100uL from A1 to B1":
       volume: {{value: 100, unit: "uL", exact: true,
@@ -545,6 +550,14 @@ PROVENANCE — every value you extract MUST have a provenance object:
     User says "do a Bradford assay" (you infer 50uL working volume):
       volume: {{value: 50, unit: "uL", exact: false,
                provenance: {{source: "domain_default", reason: "Bradford assay standard working volume", confidence: 0.7}}}}
+
+  ANTI-PATTERNS (do NOT do these):
+    User says "add 2uL to each of 4 tubes" and you compute total = 8uL:
+      WRONG: {{source: "instruction", reason: "2uL x 4 = 8uL"}}
+      RIGHT: {{source: "inferred", reason: "Computed: 2uL per tube x 4 tubes", confidence: 0.9}}
+    User says "mix at half the total volume" where total is 100uL:
+      WRONG: {{source: "instruction", reason: "half of 100uL"}}
+      RIGHT: {{source: "inferred", reason: "Half of 100uL total volume", confidence: 0.8}}}}
 
 COMPOSITION PROVENANCE — every step MUST have a composition_provenance object:
   composition_provenance: {{justification, grounding, confidence}}
@@ -848,10 +861,88 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
+    def _expand_well_range(start: str, end: str) -> set:
+        """Expand a well range like A1-A12 or A1-H1 to a full set."""
+        start_row, start_col = start[0], int(start[1:])
+        end_row, end_col = end[0], int(end[1:])
+
+        wells = set()
+        if start_row == end_row:
+            # Same row, column range: A1-A12
+            lo, hi = min(start_col, end_col), max(start_col, end_col)
+            for c in range(lo, hi + 1):
+                wells.add(f"{start_row}{c}")
+        elif start_col == end_col:
+            # Same column, row range: A1-H1
+            lo, hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
+            for r in range(lo, hi + 1):
+                wells.add(f"{chr(r)}{start_col}")
+        else:
+            # Diagonal or block — just return endpoints
+            wells.add(start)
+            wells.add(end)
+        return wells
+
+    @staticmethod
     def _extract_wells_from_text(instruction: str) -> set:
-        """Extract all well positions mentioned in instruction text."""
-        pattern = re.compile(r'\b([A-H](?:1[0-2]|[1-9]))\b')
-        return set(pattern.findall(instruction))
+        """Extract all well positions mentioned in instruction text.
+
+        Handles:
+          - Literal wells: A1, B6, H12
+          - Ranges with dash: A1-A12, A1-H1
+          - Ranges with 'to'/'through': A1 to H1, A1 through A12
+          - Column references: column 1, columns 2-8
+          - Row references: row A, rows A-H
+        """
+        wells = set()
+
+        # 1. Explicit ranges: A1-H1, A1 to A12, A1 through H1
+        range_pattern = re.compile(
+            r'\b([A-H](?:1[0-2]|[1-9]))\s*(?:-|to|through)\s*([A-H](?:1[0-2]|[1-9]))\b',
+            re.IGNORECASE
+        )
+        for m in range_pattern.finditer(instruction):
+            wells |= SemanticExtractor._expand_well_range(m.group(1).upper(), m.group(2).upper())
+
+        # 2. Column references: "column 1", "columns 2-8", "columns 2 through 8"
+        col_single = re.compile(r'\bcolumns?\s+(1[0-2]|[1-9])\b', re.IGNORECASE)
+        for m in col_single.finditer(instruction):
+            col = int(m.group(1))
+            for row in "ABCDEFGH":
+                wells.add(f"{row}{col}")
+
+        col_range = re.compile(
+            r'\bcolumns?\s+(1[0-2]|[1-9])\s*(?:-|to|through)\s*(1[0-2]|[1-9])\b',
+            re.IGNORECASE
+        )
+        for m in col_range.finditer(instruction):
+            lo, hi = int(m.group(1)), int(m.group(2))
+            for col in range(min(lo, hi), max(lo, hi) + 1):
+                for row in "ABCDEFGH":
+                    wells.add(f"{row}{col}")
+
+        # 3. Row references: "row A", "rows A-H"
+        row_single = re.compile(r'\brows?\s+([A-H])\b', re.IGNORECASE)
+        for m in row_single.finditer(instruction):
+            row = m.group(1).upper()
+            for col in range(1, 13):
+                wells.add(f"{row}{col}")
+
+        row_range = re.compile(
+            r'\brows?\s+([A-H])\s*(?:-|to|through)\s*([A-H])\b',
+            re.IGNORECASE
+        )
+        for m in row_range.finditer(instruction):
+            lo, hi = ord(m.group(1).upper()), ord(m.group(2).upper())
+            for r in range(min(lo, hi), max(lo, hi) + 1):
+                for col in range(1, 13):
+                    wells.add(f"{chr(r)}{col}")
+
+        # 4. Literal wells (also catches range endpoints already added above)
+        literal = re.compile(r'\b([A-H](?:1[0-2]|[1-9]))\b')
+        wells |= set(literal.findall(instruction))
+
+        return wells
 
     @staticmethod
     def _extract_durations_from_text(instruction: str) -> List[tuple]:
