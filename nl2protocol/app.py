@@ -669,6 +669,107 @@ class ProtocolAgent:
 
         return confirmed
 
+    def _confirm_provenance_items(self, spec, confirmable: list) -> Optional[bool]:
+        """Interactive per-item confirmation for uncertain provenance claims.
+
+        For each item in the confirmation queue, the user can:
+          - Accept (Enter/y) — keep the value as-is
+          - Reject (n) — abort the pipeline
+          - Edit (e) — type a replacement value
+
+        Returns True if all items accepted/edited, None if aborted.
+        """
+        from .extractor import _find_provenance_reason
+
+        _log(f"\n  {C.label('Confirm uncertain values:')}")
+        _log(f"  For each item: (Enter) accept, (e) edit, (s) skip all and accept, (q) quit\n")
+
+        edits = []
+        for i, w in enumerate(confirmable, 1):
+            step_obj = next((s for s in spec.steps if s.order == w['step']), None)
+            reason = _find_provenance_reason(step_obj, w['field']) if step_obj else None
+
+            _log(f"  [{i}/{len(confirmable)}] Step {w['step']}, {w['field']}: "
+                 f"{C.warning(w['value'])}")
+            _log(f"    source: {w['claimed_source']}, severity: {w['severity']}")
+            if reason:
+                _log(f"    reason: \"{reason}\"")
+
+            response = input("    (Enter=accept, e=edit, s=accept all, q=quit): ").strip().lower()
+
+            if response == 'q':
+                return None
+            elif response == 's':
+                _log("  Accepting all remaining items.")
+                break
+            elif response == 'e':
+                new_val = input(f"    New value for {w['field']}: ").strip()
+                if new_val:
+                    edits.append((w, new_val))
+                    _log(f"    → {C.success(new_val)}")
+                else:
+                    _log(f"    Empty input, keeping original.")
+            elif response in ('', 'y', 'yes'):
+                pass  # accepted
+            else:
+                _log(f"    Unknown input, treating as accept.")
+
+        # Apply edits to spec
+        if edits:
+            spec = self._apply_provenance_edits(spec, edits)
+            _log(f"\n  {len(edits)} value(s) edited.")
+
+        return True
+
+    def _apply_provenance_edits(self, spec, edits: list):
+        """Apply user edits from the provenance confirmation flow.
+
+        Each edit is (warning_dict, new_value_str). Modifies spec in place.
+        """
+        for w, new_val in edits:
+            step = next((s for s in spec.steps if s.order == w['step']), None)
+            if not step:
+                continue
+
+            field = w['field']
+            if field == "volume" and step.volume:
+                try:
+                    step.volume.value = float(new_val)
+                    step.volume.provenance.source = "instruction"
+                    step.volume.provenance.confidence = 1.0
+                    step.volume.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "substance" and step.substance:
+                step.substance.value = new_val
+                step.substance.provenance.source = "instruction"
+                step.substance.provenance.confidence = 1.0
+                step.substance.provenance.reason = "User-edited during confirmation"
+            elif field == "duration" and step.duration:
+                try:
+                    step.duration.value = float(new_val)
+                    step.duration.provenance.source = "instruction"
+                    step.duration.provenance.confidence = 1.0
+                    step.duration.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "composition":
+                # Can't meaningfully edit composition — skip
+                pass
+            # Post-action fields
+            elif step.post_actions:
+                for pa in step.post_actions:
+                    if field.startswith(pa.action) and "volume" in field and pa.volume:
+                        try:
+                            pa.volume.value = float(new_val)
+                            pa.volume.provenance.source = "instruction"
+                            pa.volume.provenance.confidence = 1.0
+                            pa.volume.provenance.reason = "User-edited during confirmation"
+                        except ValueError:
+                            pass
+
+        return spec
+
     def _resolve_missing_labware(self, missing: list, instruction: str, extractor) -> dict:
         """Interactively resolve missing labware by suggesting additions.
 
@@ -787,7 +888,8 @@ class ProtocolAgent:
 
         return resolved
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False) -> Optional[PipelineResult]:
+    def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False,
+                     full_confirmation: bool = False, confirmation_threshold: float = 0.7) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
         New architecture (v2):
@@ -1051,12 +1153,32 @@ class ProtocolAgent:
             _log(f"  {C.success('All constraints satisfied.')}")
 
         # Confirm with user
-        _log(extractor.format_for_confirmation(spec))
+        _log(extractor.format_for_confirmation(
+            spec, provenance_warnings,
+            threshold=confirmation_threshold,
+            full=full_confirmation,
+        ))
+
+        fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
+        if fabrications:
+            _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s)')}: "
+                 f"the LLM misattributed where values came from.")
+            _log("  These must be fixed before proceeding. Re-run with a more explicit instruction.")
+            return None
+
+        confirmable = [w for w in provenance_warnings if w["severity"] in ("unverified", "low_confidence")]
         if sys.stdin.isatty():
             from .cli import prompt_yes_no
-            if not prompt_yes_no("Proceed with this specification?", default=True):
-                _log("  Aborted by user.")
-                return None
+            if confirmable and not full_confirmation:
+                _log(f"\n  {len(confirmable)} item(s) need confirmation.")
+                accepted = self._confirm_provenance_items(spec, confirmable)
+                if accepted is None:
+                    _log("  Aborted by user.")
+                    return None
+            else:
+                if not prompt_yes_no("Proceed with this specification?", default=True):
+                    _log("  Aborted by user.")
+                    return None
 
         # Stage 5: Deterministic spec → ProtocolSchema
         _log(f"\n{C.header('[Stage 5/8]')} Converting specification to protocol schema...")

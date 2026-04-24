@@ -159,6 +159,19 @@ Files:
         help='Copy starter lab config and .env to current directory'
     )
 
+    parser.add_argument(
+        '--full-confirmation',
+        action='store_true',
+        help='Show all parameters for confirmation, bypassing auto-accept'
+    )
+
+    parser.add_argument(
+        '--confirmation-threshold',
+        type=float,
+        default=0.7,
+        help='Auto-accept instruction/config values with confidence >= threshold (default: 0.7)'
+    )
+
     return parser
 
 
@@ -621,6 +634,8 @@ def main(argv: list = None) -> int:
         result = agent.run_pipeline(
             prompt=intent,
             csv_path=args.data,
+            full_confirmation=args.full_confirmation,
+            confirmation_threshold=args.confirmation_threshold,
         )
     except NL2ProtocolError as e:
         print(f"\nError: {e}", file=sys.stderr)

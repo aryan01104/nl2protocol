@@ -572,6 +572,37 @@ Think through this protocol, then produce the structured specification.
 """
 
 
+def _find_provenance_reason(step, field_name: str) -> Optional[str]:
+    """Look up the provenance reason string for a given field on a step."""
+    field_map = {
+        "volume": step.volume,
+        "substance": step.substance,
+        "duration": step.duration,
+        "composition": None,
+    }
+    # Direct field match
+    if field_name in field_map:
+        val = field_map[field_name]
+        if val and hasattr(val, 'provenance') and val.provenance:
+            return val.provenance.reason
+        if field_name == "composition":
+            return step.composition_provenance.justification
+        return None
+
+    # Location refs: "source location", "source labware", "source wells", etc.
+    for prefix, ref in [("source", step.source), ("destination", step.destination), ("dest", step.destination)]:
+        if field_name.startswith(prefix) and ref and ref.provenance:
+            return ref.provenance.reason
+
+    # Post-action fields: "mix volume", "blow_out volume", etc.
+    if step.post_actions:
+        for pa in step.post_actions:
+            if field_name.startswith(pa.action) and pa.volume and pa.volume.provenance:
+                return pa.volume.provenance.reason
+
+    return None
+
+
 # ============================================================================
 # SEMANTIC EXTRACTOR
 # ============================================================================
@@ -1124,14 +1155,54 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
-    def format_for_confirmation(spec: ProtocolSpec) -> str:
-        """Format spec as human-readable summary for user confirmation.
+    def _format_step_line(step) -> str:
+        """Format a single step as a one-line summary."""
+        # Source
+        src = ""
+        if step.source:
+            src = f" from {step.source.description}"
+            if step.source.well:
+                src += f" well {step.source.well}"
+            elif step.source.well_range:
+                src += f" wells {step.source.well_range}"
 
-        Shows provenance for every parameter:
-          - No tag = explicitly stated in instruction
-          - (inferred) = filled from domain knowledge
-          - (approximate) = user hedged with ~, about, etc.
+        # Destination
+        dst = ""
+        if step.destination:
+            dst = f" to {step.destination.description}"
+            if step.destination.well:
+                dst += f" well {step.destination.well}"
+            elif step.destination.well_range:
+                dst += f" wells {step.destination.well_range}"
+            elif step.destination.wells:
+                wells = step.destination.wells
+                if len(wells) > 2:
+                    dst += f" wells {wells[0]}-{wells[-1]}"
+                else:
+                    dst += f" wells {', '.join(wells)}"
+
+        vol = f" {step.volume.value}{step.volume.unit}" if step.volume else ""
+        dur = f" for {step.duration.value} {step.duration.unit}" if step.duration else ""
+        substance = f" of {step.substance.value}" if step.substance else ""
+
+        return f"{step.order}. {step.action.upper()}{vol}{substance}{src}{dst}{dur}"
+
+    @staticmethod
+    def format_for_confirmation(spec: ProtocolSpec, provenance_warnings: List[dict] = None,
+                                threshold: float = 0.7, full: bool = False) -> str:
+        """Format spec for user confirmation, grouped by provenance bucket.
+
+        Three sections:
+          1. Auto-accepted: instruction/config values above threshold (count only)
+          2. Confirmation queue: domain_default below threshold + all inferred
+          3. Fabrication errors: provenance claims that failed verification
+
+        If full=True, shows all parameters regardless of provenance (legacy behavior).
         """
+        warnings = provenance_warnings or []
+        fabrications = [w for w in warnings if w["severity"] == "fabrication"]
+        confirmable = [w for w in warnings if w["severity"] in ("unverified", "low_confidence")]
+
         lines = [
             "",
             "=" * 60,
@@ -1143,82 +1214,123 @@ Output the corrected specification.
             lines.append(f"  Type: {spec.protocol_type}")
         lines.append(f"  Summary: {spec.summary}")
         lines.append("")
-        lines.append("  STEPS:")
 
-        for step in spec.steps:
-            # Source
-            src = ""
-            if step.source:
-                src = f" from {step.source.description}"
-                if step.source.well:
-                    src += f" well {step.source.well}"
-                elif step.source.well_range:
-                    src += f" wells {step.source.well_range}"
+        # --- Fabrication errors (always shown) ---
+        if fabrications:
+            lines.append(f"  ERRORS ({len(fabrications)}):")
+            for w in fabrications:
+                lines.append(f"    ! Step {w['step']}, {w['field']}: {w['message']}")
+            lines.append("")
 
-            # Destination
-            dst = ""
-            if step.destination:
-                dst = f" to {step.destination.description}"
-                if step.destination.well:
-                    dst += f" well {step.destination.well}"
-                elif step.destination.well_range:
-                    dst += f" wells {step.destination.well_range}"
-                elif step.destination.wells:
-                    wells = step.destination.wells
-                    if len(wells) > 2:
-                        dst += f" wells {wells[0]}-{wells[-1]}"
-                    else:
-                        dst += f" wells {', '.join(wells)}"
+        if full:
+            # Full mode: show every step with provenance tags (legacy behavior)
+            lines.append("  ALL STEPS (full confirmation mode):")
+            for step in spec.steps:
+                step_line = SemanticExtractor._format_step_line(step)
+                # Composition provenance
+                comp = step.composition_provenance
+                grounding = ",".join(comp.grounding) if comp.grounding else "inferred"
+                lines.append(f"    {step_line}")
+                lines.append(f"       composition: [{grounding.upper()}, {comp.confidence}]")
+                lines.append(f"         \"{comp.justification}\"")
 
-            # Volume with provenance tag
-            vol = ""
-            if step.volume:
-                src = step.volume.provenance.source
-                if src == "instruction":
-                    exactness = "EXACT" if step.volume.exact else "APPROX"
-                    tag = f" [INSTRUCTION, {exactness}]"
-                else:
-                    tag = f" [{src.upper()}]"
-                vol = f" {step.volume.value}{step.volume.unit}{tag}"
+                # Per-field provenance
+                fields = []
+                if step.volume:
+                    p = step.volume.provenance
+                    exactness = ", exact" if step.volume.exact else ", approx"
+                    fields.append(f"volume: {step.volume.value}{step.volume.unit} "
+                                  f"[{p.source}, {p.confidence}{exactness}]")
+                if step.substance:
+                    p = step.substance.provenance
+                    fields.append(f"substance: {step.substance.value} [{p.source}, {p.confidence}]")
+                if step.duration:
+                    p = step.duration.provenance
+                    fields.append(f"duration: {step.duration.value} {step.duration.unit} "
+                                  f"[{p.source}, {p.confidence}]")
+                for ref, role in [(step.source, "source"), (step.destination, "dest")]:
+                    if ref and ref.provenance:
+                        p = ref.provenance
+                        fields.append(f"{role}: {ref.description} [{p.source}, {p.confidence}]")
+                for f in fields:
+                    lines.append(f"       {f}")
 
-            # Duration
-            dur = ""
-            if step.duration:
-                dur = f" for {step.duration.value} {step.duration.unit}"
+                if step.post_actions:
+                    for pa in step.post_actions:
+                        pa_parts = [pa.action]
+                        if pa.repetitions:
+                            pa_parts.append(f"{pa.repetitions}x")
+                        if pa.volume:
+                            p = pa.volume.provenance
+                            pa_parts.append(f"{pa.volume.value}{pa.volume.unit} "
+                                            f"[{p.source}, {p.confidence}]")
+                        lines.append(f"       -> {' '.join(pa_parts)}")
 
-            substance = f" of {step.substance.value}" if step.substance else ""
-            line = f"    {step.order}. {step.action.upper()}{vol}{substance}{src}{dst}{dur}"
-            lines.append(line)
+                if step.tip_strategy and step.tip_strategy != "unspecified":
+                    lines.append(f"       -> tip: {step.tip_strategy}")
+                if step.pipette_hint:
+                    lines.append(f"       -> pipette: {step.pipette_hint}")
 
-            # Post-actions with provenance
-            if step.post_actions:
-                for pa in step.post_actions:
-                    pa_parts = []
-                    if pa.repetitions:
-                        pa_parts.append(f"{pa.repetitions}x")
-                    if pa.volume:
-                        src = pa.volume.provenance.source
-                        if src == "instruction":
-                            exactness = "EXACT" if pa.volume.exact else "APPROX"
-                            tag = f" [INSTRUCTION, {exactness}]"
-                        else:
-                            tag = f" [{src.upper()}]"
-                        pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}{tag}")
-                    lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
+        else:
+            # Threshold mode: show auto-accepted count, then confirmation queue
 
-            if step.tip_strategy and step.tip_strategy != "unspecified":
-                lines.append(f"       -> tip strategy: {step.tip_strategy}")
+            # Count auto-accepted parameters
+            auto_accepted = 0
+            for step in spec.steps:
+                for field_val in [step.volume, step.substance, step.duration]:
+                    if field_val and hasattr(field_val, 'provenance') and field_val.provenance:
+                        p = field_val.provenance
+                        if p.source in ("instruction", "config") and p.confidence >= threshold:
+                            auto_accepted += 1
+                for ref in [step.source, step.destination]:
+                    if ref and ref.provenance:
+                        p = ref.provenance
+                        if p.source in ("instruction", "config") and p.confidence >= threshold:
+                            auto_accepted += 1
+                if step.composition_provenance:
+                    comp = step.composition_provenance
+                    if "instruction" in comp.grounding and comp.confidence >= threshold:
+                        auto_accepted += 1
 
-            if step.pipette_hint:
-                lines.append(f"       -> pipette hint: {step.pipette_hint}")
+            # Step overview (always shown for context)
+            lines.append("  STEPS:")
+            for step in spec.steps:
+                step_line = SemanticExtractor._format_step_line(step)
+                lines.append(f"    {step_line}")
+                if step.post_actions:
+                    for pa in step.post_actions:
+                        pa_parts = []
+                        if pa.repetitions:
+                            pa_parts.append(f"{pa.repetitions}x")
+                        if pa.volume:
+                            pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}")
+                        lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
+                if step.tip_strategy and step.tip_strategy != "unspecified":
+                    lines.append(f"       -> tip: {step.tip_strategy}")
+            lines.append("")
 
-        # Legend
-        lines.append("")
-        lines.append("  PROVENANCE:")
-        lines.append("    (no tag) = from your instruction")
-        lines.append("    [INFERRED] = domain knowledge / default")
-        lines.append("    [APPROX] = approximate value from instruction")
-        lines.append("")
+            if auto_accepted:
+                lines.append(f"  {auto_accepted} parameter(s) auto-accepted "
+                             f"(instruction/config, confidence >= {threshold})")
+                lines.append("")
+
+            # Confirmation queue
+            if confirmable:
+                lines.append(f"  NEEDS CONFIRMATION ({len(confirmable)}):")
+                for i, w in enumerate(confirmable, 1):
+                    lines.append(f"    [{i}] Step {w['step']}, {w['field']}: "
+                                 f"{w['value']} ({w['claimed_source']}, {w['severity']})")
+                    # Find the provenance reason for this field
+                    step = next((s for s in spec.steps if s.order == w['step']), None)
+                    if step:
+                        reason = _find_provenance_reason(step, w['field'])
+                        if reason:
+                            lines.append(f"        reason: \"{reason}\"")
+                lines.append("")
+            else:
+                lines.append("  All parameters verified — no confirmation needed.")
+                lines.append("")
+
         if spec.explicit_volumes:
             lines.append(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
         lines.append("=" * 60)
