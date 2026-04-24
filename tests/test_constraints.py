@@ -78,7 +78,6 @@ def make_spec(steps, **kwargs):
         "reasoning": "",
         "explicit_volumes": [],
         "initial_contents": [],
-        "missing_labware": [],
     }
     defaults.update(kwargs)
     return ProtocolSpec(steps=steps, **defaults)
@@ -164,39 +163,6 @@ class TestPipetteCapacity:
 
         # Physical constraints apply regardless of provenance
         assert result.has_errors
-
-
-# ============================================================================
-# CONSTRAINT CHECKER: MISSING LABWARE
-# ============================================================================
-
-class TestMissingLabware:
-    """Tests that missing labware is caught before pipeline proceeds."""
-
-    def test_missing_labware_flagged(self, qpcr_config):
-        """If LLM reports missing labware, constraint checker surfaces it."""
-        spec = make_spec(
-            [ExtractedStep(order=1, action="delay", duration=_dur(1, unit="minutes"), composition_provenance=_comp())],
-            missing_labware=["sample_plate", "waste_reservoir"]
-        )
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
-
-        assert result.has_errors
-        assert len(result.errors) == 2
-        assert all(v.violation_type == ViolationType.LABWARE_NOT_FOUND for v in result.errors)
-
-    def test_no_missing_labware_passes(self, qpcr_config):
-        """Empty missing_labware list means no errors from this check."""
-        spec = make_spec(
-            [ExtractedStep(order=1, action="delay", duration=_dur(1, unit="minutes"), composition_provenance=_comp())],
-            missing_labware=[]
-        )
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
-
-        labware_errors = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
-        assert len(labware_errors) == 0
 
 
 # ============================================================================

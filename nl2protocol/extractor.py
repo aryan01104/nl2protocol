@@ -29,7 +29,7 @@ import copy
 import json
 import re
 import sys
-from typing import Annotated, List, Optional, Literal, Dict
+from typing import Annotated, List, Optional, Literal, Dict, Tuple
 
 from anthropic import Anthropic
 from pydantic import BaseModel, Field, ValidationError, model_validator
@@ -263,7 +263,6 @@ class ProtocolSpec(BaseModel):
     steps: List[ExtractedStep] = Field(..., min_length=1)
     explicit_volumes: List[float] = Field(default_factory=list, description="All volumes found in instruction text via regex")
     initial_contents: List[WellContents] = Field(default_factory=list, description="What's in wells/tubes before the protocol starts")
-    missing_labware: List[str] = Field(default_factory=list, description="Labware referenced in instruction but NOT in config")
 
     @model_validator(mode='after')
     def validate_step_ordering(self) -> 'ProtocolSpec':
@@ -279,7 +278,6 @@ class CompleteProtocolSpec(ProtocolSpec):
     Enforces that all fields required for code generation are present:
       - Liquid-handling actions must have a volume
       - Transfer-like actions must have source and destination
-      - All labware refs must be resolved (no missing_labware)
 
     Use ProtocolSpec for extraction output (gaps allowed).
     Promote to CompleteProtocolSpec after gap-filling succeeds.
@@ -294,18 +292,16 @@ class CompleteProtocolSpec(ProtocolSpec):
 
         for step in self.steps:
             prefix = f"Step {step.order} ({step.action})"
+            substance_hint = f" for '{step.substance.value}'" if step.substance else ""
 
             if step.action in liquid_actions and step.volume is None:
-                errors.append(f"{prefix}: missing volume")
+                errors.append(f"{prefix}: missing volume{substance_hint}")
 
             if step.action in transfer_actions:
                 if step.source is None:
-                    errors.append(f"{prefix}: missing source location")
+                    errors.append(f"{prefix}: no source for '{step.substance.value}' — add it to your config" if step.substance else f"{prefix}: missing source location")
                 if step.destination is None:
-                    errors.append(f"{prefix}: missing destination location")
-
-        if self.missing_labware:
-            errors.append(f"Unresolved labware: {self.missing_labware}")
+                    errors.append(f"{prefix}: missing destination location{substance_hint}")
 
         if errors:
             raise ValueError(
@@ -324,7 +320,8 @@ class LabwareResolver:
 
     One LLM call maps all descriptions to config labels using domain knowledge
     and step context. Returns tentative assignments for user confirmation.
-    Descriptions with no reasonable config match get null (→ missing_labware).
+    Descriptions with no reasonable config match get null — caught by the
+    unresolved LocationRef check in the pipeline.
     """
 
     def __init__(self, config: dict, client=None, model_name: str = "claude-sonnet-4-20250514"):
@@ -353,11 +350,6 @@ class LabwareResolver:
         for wc in spec.initial_contents:
             if wc.labware in resolved:
                 wc.labware = resolved[wc.labware]
-
-        # Anything not resolved → missing_labware
-        for desc in unique_descs:
-            if desc not in resolved and desc not in spec.missing_labware:
-                spec.missing_labware.append(desc)
 
         return spec
 
@@ -547,7 +539,16 @@ LABWARE REFERENCES:
   Example: instruction says "reservoir" → description: "reservoir"
 - Do NOT translate to config labels or load names — that happens in a later stage.
 - Leave "resolved_label" as null — it will be filled automatically.
-- If the instruction references labware that clearly does not exist in the config, add the user's wording to "missing_labware".
+- Do NOT worry about labware that doesn't exist in the config — that is handled by a later resolution stage.
+
+STEP SOURCE LOCATIONS — only populate the "source" LocationRef when the instruction explicitly names it:
+- The "source" field on a step means where to aspirate from. Only fill it from the instruction text.
+- If the instruction says "Add 5uL water to B12" with no mention of where water is, set the step's source: null.
+  A later stage matches substances to config contents deterministically.
+- If the instruction says "Add 5uL water from reservoir A2 to B12", then the step's source is populated.
+- Example — instruction says "Add 5uL BSA stock + 5uL water":
+    BSA step → source: {{"description": "tube rack", "well": "B1"}} (instruction says "Tube rack B1 contains BSA stock")
+    Water step → source: null (instruction never says where water is)
 
 TEMPERATURE STEPS (set_temperature, wait_for_temperature):
 - Put the temperature value in the "temperature" field, NOT in "volume" or "note".
@@ -564,6 +565,12 @@ INITIAL CONTENTS:
 COMPRESSION — KEEP STEPS COMPACT:
 - NEVER create separate steps for repetitive operations that differ only in wells.
   Instead, use ONE step with well lists on source and/or destination.
+- ONLY compress when the volume is THE SAME for every well. If each well gets a DIFFERENT volume,
+  each must be its own step — a step has exactly one volume field.
+  Example — standard curve with different volumes per well:
+    "A12: 10uL BSA, B12: 5uL BSA, C12: 2.5uL BSA" → THREE separate transfer steps (different volumes).
+  Example — same volume to multiple wells:
+    "Add 10uL sample to A1, A2, A3" → ONE transfer step with wells list (same volume).
 - GENERAL PRINCIPLE: If multiple operations differ only in which wells they target,
   represent them as ONE step with well lists, well ranges, or the replicates field.
   The downstream code expands them into individual operations.
@@ -580,6 +587,10 @@ COMPRESSION — KEEP STEPS COMPACT:
     }}
 - A protocol with 12 samples in triplicate should be 1 step, NOT 12 steps.
 - Aim for under 10 steps total. If your spec has more than 15 steps, you are probably not compressing enough.
+
+FINAL REMINDERS BEFORE OUTPUT:
+- Each step has exactly ONE volume. Different volumes = separate steps.
+- Step source LocationRef = only what the instruction says. Unknown source = null.
 
 FORMAT YOUR RESPONSE EXACTLY AS:
 <reasoning>
@@ -1025,24 +1036,23 @@ Output the corrected specification.
 
             # --- LocationRef: labware + wells ---
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if not ref or not ref.provenance or ref.provenance.source != "instruction":
-                    continue
-                if ref.description.lower() not in instruction_lower:
-                    warnings.append(self._warn(
-                        step.order, f"{role} labware", ref.description,
-                        "instruction", "fabrication",
-                        f"Step {step.order} {role}: claims labware '{ref.description}' "
-                        f"from instruction but not found in text",
-                    ))
-                wells_to_check = [ref.well] if ref.well else (ref.wells or [])
-                missing = [w for w in wells_to_check if w not in text_wells]
-                if missing:
-                    warnings.append(self._warn(
-                        step.order, f"{role} wells", str(missing),
-                        "instruction", "fabrication",
-                        f"Step {step.order} {role}: claims wells {missing} "
-                        f"from instruction but not found in text",
-                    ))
+                if (ref and ref.provenance and ref.provenance.source == "instruction"):
+                    if ref.description.lower() not in instruction_lower:
+                        warnings.append(self._warn(
+                            step.order, f"{role} labware", ref.description,
+                            "instruction", "fabrication",
+                            f"Step {step.order} {role}: claims labware '{ref.description}' "
+                            f"from instruction but not found in text",
+                        ))
+                    wells_to_check = [ref.well] if ref.well else (ref.wells or [])
+                    missing = [w for w in wells_to_check if w not in text_wells]
+                    if missing:
+                        warnings.append(self._warn(
+                            step.order, f"{role} wells", str(missing),
+                            "instruction", "fabrication",
+                            f"Step {step.order} {role}: claims wells {missing} "
+                            f"from instruction but not found in text",
+                        ))
 
             # --- Post-action volumes ---
             if step.post_actions:
@@ -1089,16 +1099,15 @@ Output the corrected specification.
         pipette_mounts = set(config.get("pipettes", {}).keys())
 
         for step in spec.steps:
-            # LocationRef with source='config': resolved_label must be a valid config key
+            # LocationRef with source='config': resolved_label must be a valid config key.
+            # Only check after resolution (Stage 3.5) has filled resolved_label.
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if not ref or not ref.provenance or ref.provenance.source != "config":
-                    continue
-                label = ref.resolved_label or ref.description
-                if label not in labware_labels:
+                if (ref and ref.provenance and ref.provenance.source == "config"
+                        and ref.resolved_label and ref.resolved_label not in labware_labels):
                     warnings.append(self._warn(
-                        step.order, f"{role} labware", label,
+                        step.order, f"{role} labware", ref.resolved_label,
                         "config", "fabrication",
-                        f"Step {step.order} {role}: claims labware '{label}' "
+                        f"Step {step.order} {role}: claims labware '{ref.resolved_label}' "
                         f"from config but no such key in config['labware']",
                     ))
 
@@ -1154,14 +1163,12 @@ Output the corrected specification.
                     fields.append((f"{role} location", ref))
 
             for field_name, field_val in fields:
-                if field_val is None:
-                    continue
-                prov = field_val.provenance if hasattr(field_val, 'provenance') and field_val.provenance else None
+                prov = getattr(field_val, 'provenance', None) if field_val else None
                 if not prov:
                     continue
 
+                val_str = str(field_val.value) if hasattr(field_val, 'value') else str(field_val)
                 if prov.source == "inferred":
-                    val_str = str(field_val.value) if hasattr(field_val, 'value') else str(field_val)
                     warnings.append(self._warn(
                         step.order, field_name, val_str,
                         "inferred", "low_confidence",
@@ -1169,7 +1176,6 @@ Output the corrected specification.
                         f"(confidence {prov.confidence}) — needs confirmation",
                     ))
                 elif prov.source == "domain_default" and prov.confidence < 0.8:
-                    val_str = str(field_val.value) if hasattr(field_val, 'value') else str(field_val)
                     warnings.append(self._warn(
                         step.order, field_name, val_str,
                         "domain_default", "unverified",
@@ -1243,20 +1249,28 @@ Output the corrected specification.
             CompleteProtocolSpec.model_validate(spec.model_dump())
             return []
         except ValidationError as e:
-            return [
-                err["msg"].removeprefix("Value error, ")
-                for err in e.errors()
-            ]
+            gaps = []
+            for err in e.errors():
+                msg = err["msg"].removeprefix("Value error, ")
+                # The validator joins multiple issues with "; " — split them
+                prefix_end = msg.find(": ")
+                if prefix_end != -1:
+                    body = msg[prefix_end + 2:]
+                    gaps.extend(issue.strip() for issue in body.split("; "))
+                else:
+                    gaps.append(msg)
+            return gaps
 
     # ========================================================================
     # GAP FILLER
     # ========================================================================
 
     @staticmethod
-    def fill_gaps(spec: ProtocolSpec, config: dict) -> ProtocolSpec:
+    def fill_gaps(spec: ProtocolSpec, config: dict) -> Tuple[ProtocolSpec, List[str]]:
         """Fill missing parameters with inferred defaults from config.
-        Inferred values are tagged so the user can see what was assumed."""
+        Returns (filled_spec, list of descriptions of what was filled)."""
         filled = copy.deepcopy(spec)
+        fills = []
 
         for step in filled.steps:
             # Try to resolve source from config labware contents
@@ -1270,11 +1284,12 @@ Output the corrected specification.
                                 description=f"{label} (inferred from config)",
                                 well=well
                             )
+                            fills.append(f"Step {step.order}: '{substance_val}' source → {label} well {well}")
                             break
                     if step.source:
                         break
 
-        return filled
+        return filled, fills
 
     # ========================================================================
     # USER CONFIRMATION FORMATTER

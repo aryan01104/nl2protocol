@@ -157,9 +157,6 @@ class ConstraintChecker:
         """Run all constraint checks. Returns structured result."""
         result = ConstraintCheckResult()
 
-        # Check for labware the instruction references but config doesn't have
-        self._check_missing_labware(spec, result)
-
         for step in spec.steps:
             self._check_pipette_capacity(step, result)
             self._check_labware_resolution(step, result)
@@ -174,29 +171,6 @@ class ConstraintChecker:
     # ========================================================================
     # INDIVIDUAL CHECKS
     # ========================================================================
-
-    def _check_missing_labware(self, spec: ProtocolSpec, result: ConstraintCheckResult):
-        """Check if the LLM flagged any labware as missing from config."""
-        if not spec.missing_labware:
-            return
-        for lw_desc in spec.missing_labware:
-            result.violations.append(ConstraintViolation(
-                violation_type=ViolationType.LABWARE_NOT_FOUND,
-                severity=Severity.ERROR,
-                step=0,
-                what=f"Instruction references '{lw_desc}' but it's not in your lab config",
-                why=(
-                    f"The protocol requires this labware but your config.json doesn't define it. "
-                    f"Without it, the robot doesn't know which physical deck slot to use."
-                ),
-                suggestion=(
-                    f"Add '{lw_desc}' to your config.json with the correct Opentrons load_name "
-                    f"and deck slot. Example:\n"
-                    f"         \"{lw_desc.replace(' ', '_')}\": {{"
-                    f"\"load_name\": \"<opentrons_labware_name>\", \"slot\": \"<slot_number>\"}}"
-                ),
-                values={"missing": lw_desc}
-            ))
 
     def _check_pipette_capacity(self, step: ExtractedStep, result: ConstraintCheckResult):
         """Check that every volume in this step can be handled by available pipettes."""

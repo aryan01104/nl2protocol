@@ -807,10 +807,38 @@ class ProtocolAgent:
 
         Falls back to the old LLM-based generation if the deterministic path fails.
         """
+        from datetime import datetime
         from .extractor import SemanticExtractor
 
-        # Stage 1: Validate input is a protocol instruction
-        _stage("[Stage 1/8] Validating input instruction...")
+        # DEV ONLY — remove before public release.
+        # Intermediate state log: accumulates spec snapshots throughout the
+        # pipeline, written to disk on completion or failure for inspection.
+        state_log = {
+            "timestamp": datetime.now().isoformat(),
+            "input": {"instruction": prompt},
+        }
+
+        def _save_state_log(failed_at: str = None):
+            if failed_at:
+                state_log["failed_at"] = failed_at
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = f"pipeline_state_{ts}.json"
+            with open(path, 'w') as f:
+                json.dump(state_log, f, indent=2, default=str)
+            _log(f"  {C.dim(f'State log: {path}')}")
+
+        # Stage 1: Validate config and instruction
+        _stage("[Stage 1/8] Validating instruction and config...")
+        try:
+            self.parser.load_config()
+            state_log["input"]["config"] = self.parser.config
+            _log(f"  {C.success('Config validated.')}")
+        except Exception as e:
+            _log(f"  {C.error('Config validation failed:')}")
+            _log(f"    {e}")
+            _save_state_log("stage_1_config")
+            return None
+
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
@@ -852,7 +880,10 @@ class ProtocolAgent:
             _log("    - The API key is invalid or out of credits")
             _log("    - The instruction isn't about liquid handling")
             _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
+            _save_state_log("stage_2_extraction")
             return None
+
+        state_log["stage_2_extraction"] = spec.model_dump()
 
         _log(f"  {C.label('Protocol type:')} {spec.protocol_type or 'ad-hoc'}")
         _log(f"  {C.label('Steps:')} {len(spec.steps)}")
@@ -875,12 +906,6 @@ class ProtocolAgent:
                     else:
                         _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
 
-        # Note missing labware from extraction (informational — actual resolution
-        # happens in Stage 3.5 based on what steps actually reference)
-        if spec.missing_labware:
-            _log(f"  {C.dim(f'Note: instruction mentions labware not in config: {spec.missing_labware}')}")
-            _log(f"  {C.dim('Will check if any steps actually need it during labware resolution.')}")
-
         if spec.initial_contents:
             _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
 
@@ -891,6 +916,8 @@ class ProtocolAgent:
         provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.parser.config)
         fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
 
+        state_log["stage_3_provenance"] = provenance_warnings
+
         if fabrications:
             _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
             for w in fabrications:
@@ -899,6 +926,7 @@ class ProtocolAgent:
             _log(f"  This usually means temperatures ended up in volume fields, or")
             _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
             _log(f"  Re-run, or try a more explicit instruction.")
+            _save_state_log("stage_3_provenance")
             return None
 
         non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
@@ -911,7 +939,11 @@ class ProtocolAgent:
             _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
                 _log(f"    - {g}")
-            spec = extractor.fill_gaps(spec, self.parser.config)
+            spec, fills = extractor.fill_gaps(spec, self.parser.config)
+            if fills:
+                _log(f"  Filled from config:")
+                for f in fills:
+                    _log(f"    - {f}")
             remaining_gaps = extractor.missing_fields(spec)
             if remaining_gaps:
                 _log(f"  Could not fill all gaps from config:")
@@ -927,12 +959,16 @@ class ProtocolAgent:
                         for g in final_gaps:
                             _log(f"    - {g}")
                         _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
+                        state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "after_refine": final_gaps}
+                        _save_state_log("stage_3_gaps")
                         return None
                     _log("  Refinement resolved all gaps.")
                 else:
                     _log("  Self-refinement did not produce a valid specification.")
                     _log("  The LLM could not fill the gaps listed above even after retrying.")
                     _log("  Try: add more detail to your instruction, or simplify the protocol.")
+                    state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "refine_failed": True}
+                    _save_state_log("stage_3_gaps")
                     return None
             else:
                 _log("  Gaps filled from config.")
@@ -954,6 +990,8 @@ class ProtocolAgent:
                 response = _prompt_input("Is this correct? [Y/n]: ").lower()
                 if response in ('n', 'no'):
                     _log("  Aborted. Adjust your instruction to clarify source containers.")
+                    state_log["stage_3_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
+                    _save_state_log("stage_3_sources")
                     return None
             # Add confirmed sources to initial_contents so well tracker doesn't warn
             from .extractor import WellContents
@@ -976,10 +1014,18 @@ class ProtocolAgent:
         )
         spec = resolver.resolve(spec)
 
+        state_log["stage_3.5_resolution"] = {
+            ref.description: ref.resolved_label
+            for step in spec.steps
+            for ref in [step.source, step.destination]
+            if ref
+        }
+
         # Confirm tentative assignments with user (includes unresolved refs)
         if sys.stdin.isatty():
             confirmed = self._confirm_labware_assignments(spec)
             if confirmed is None:
+                _save_state_log("stage_3.5_resolution")
                 return None
             for step in spec.steps:
                 for ref in [step.source, step.destination]:
@@ -987,8 +1033,6 @@ class ProtocolAgent:
                         ref.resolved_label = confirmed[ref.description]
 
         # Check if any step LocationRef is still unresolved — that's a hard error.
-        # (missing_labware from extraction may include things no step references,
-        # like "agar plates" mentioned for manual use — those don't matter.)
         unresolved_refs = []
         for step in spec.steps:
             for ref in [step.source, step.destination]:
@@ -998,6 +1042,7 @@ class ProtocolAgent:
         if unresolved_refs:
             _log(f"\n  {C.error('No config match for:')} {unresolved_refs}")
             _log(f"  Add appropriate labware to your config.json for these, then re-run.")
+            _save_state_log("stage_3.5_unresolved")
             return None
 
         _log(f"  {C.success('All labware resolved.')}")
@@ -1007,6 +1052,11 @@ class ProtocolAgent:
         from .constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
+
+        state_log["stage_4_constraints"] = {
+            "errors": [str(v) for v in constraint_result.errors],
+            "warnings": [str(w) for w in constraint_result.warnings],
+        }
 
         if constraint_result.warnings:
             for w in constraint_result.warnings:
@@ -1024,10 +1074,12 @@ class ProtocolAgent:
                 response = _prompt_input("Proceed anyway? [y/N]: ").lower()
                 if response not in ('y', 'yes'):
                     _log("  Aborted. Fix your config or instruction and retry.")
+                    _save_state_log("stage_4_constraints")
                     return None
                 _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
             else:
                 _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
+                _save_state_log("stage_4_constraints")
                 return None
         else:
             _log(f"  {C.success('All constraints satisfied.')}")
@@ -1056,6 +1108,9 @@ class ProtocolAgent:
 
         # Stage 5: Deterministic spec → ProtocolSchema
         _stage("[Stage 5/8] Converting specification to protocol schema...")
+
+        state_log["stage_5_spec"] = spec.model_dump()
+
         try:
             from .extractor import CompleteProtocolSpec
             complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
@@ -1070,6 +1125,7 @@ class ProtocolAgent:
             else:
                 _log(f"    Detail: {err}")
             _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
+            _save_state_log("stage_5_schema")
             return None
 
         # Stage 6: Deterministic schema → Python script
@@ -1082,10 +1138,10 @@ class ProtocolAgent:
             _log(f"  Script generation failed.")
             _log(f"    Detail: {err}")
             _log(f"    Try: simplify your instruction or check config slot assignments.")
+            _save_state_log("stage_6_script")
             return None
 
         # Save script for debugging regardless of simulation outcome
-        from datetime import datetime
         debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
         with open(debug_script, 'w') as f:
             f.write(script)
@@ -1108,6 +1164,7 @@ class ProtocolAgent:
                 _log(f"  Simulation failed: {simulation_log[:500]}")
             _log(f"  The generated Python script did not pass the Opentrons simulator.")
             _log(f"  Check {debug_script} to see the generated code.")
+            _save_state_log("stage_7_simulation")
             return None
 
         _log(f"  {C.success('Simulation passed.')}")
@@ -1118,8 +1175,16 @@ class ProtocolAgent:
         with Spinner("Verifying intent match..."):
             verification = verify_intent_match(prompt, protocol_schema)
 
+        state_log["stage_8_verification"] = {
+            "matches": verification.matches,
+            "confidence": verification.confidence,
+            "issues": verification.issues,
+            "summary": verification.summary,
+        }
+
         if verification.matches and verification.confidence >= 0.7:
             _log(f"  {C.success(f'Intent verification passed (confidence: {verification.confidence:.0%})')}")
+            _save_state_log()
             return PipelineResult(
                 script=script,
                 simulation_log=simulation_log,
@@ -1133,6 +1198,7 @@ class ProtocolAgent:
                 _log(f"  Issues: {'; '.join(verification.issues)}")
             _log(f"  Summary: {verification.summary}")
             _log(f"  The generated protocol may not match what you asked for.")
+            _save_state_log("stage_8_verification")
             return None
 
 

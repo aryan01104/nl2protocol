@@ -46,7 +46,10 @@ def get_well_info(load_name: str) -> Dict[str, Any]:
             "valid_wells": wells
         }
     except Exception:
-        pass
+        import logging
+        logging.getLogger(__name__).warning(
+            f"Could not load Opentrons definition for '{load_name}' — using heuristic well layout"
+        )
 
     # Fallback: heuristic pattern matching for unknown/custom labware
     ln = load_name.lower()
@@ -127,10 +130,10 @@ class ProtocolParser:
         load_dotenv()
         self.model_name = model_name
         self.config_path = config_path
-        self.config = self._load_config()
+        self.config = None
         self._setup_claude()
 
-    def _load_config(self) -> Dict:
+    def load_config(self) -> Dict:
         from .validate_config import validate_config_file
 
         # Check if config file exists
@@ -149,7 +152,8 @@ class ProtocolParser:
         except json.JSONDecodeError as e:
             raise ConfigFileError(self.config_path, f"Invalid JSON: {e}")
 
-        return normalize_config(raw_config)
+        self.config = normalize_config(raw_config)
+        return self.config
 
     def _setup_claude(self):
         api_key = os.getenv("ANTHROPIC_API_KEY")

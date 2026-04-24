@@ -52,7 +52,6 @@ def make_spec(steps, **kwargs):
         "reasoning": "",
         "explicit_volumes": [],
         "initial_contents": [],
-        "missing_labware": [],
     }
     defaults.update(kwargs)
     return ProtocolSpec(steps=steps, **defaults)
@@ -149,13 +148,8 @@ class TestLabwareMissing:
                     composition_provenance=_comp(),
                 )
             ],
-            missing_labware=["384-well assay plate"]
         )
         result = ConstraintChecker(config).check_all(spec)
-
-        assert result.has_errors
-        missing = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
-        assert len(missing) >= 1
 
 
 # ============================================================================
@@ -205,15 +199,12 @@ class TestCombinedConfigGaps:
                     composition_provenance=_comp(),
                 ),
             ],
-            missing_labware=["waste reservoir", "ethanol reservoir", "tube rack", "PCR plate"]
         )
         result = ConstraintChecker(config).check_all(spec)
 
         assert result.has_errors
-        # Should have: missing labware (4) + missing modules (temp + magnetic)
-        missing_lw = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
+        # Should have: missing modules (temp + magnetic)
         missing_mod = [v for v in result.errors if v.violation_type == ViolationType.MODULE_NOT_FOUND]
-        assert len(missing_lw) == 4
         assert len(missing_mod) == 2
 
 
@@ -297,16 +288,14 @@ class TestMismatchedProtocol:
                                          volume=_vol(100.0))],
                 composition_provenance=_comp(),
             )
-        ], missing_labware=["drug_stock", "96-well plate"])
+        ])
 
         result = ConstraintChecker(config).check_all(spec)
 
         assert result.has_errors
-        # Should flag: volume exceeds p20 + missing labware
+        # Should flag: volume exceeds p20
         pip_errors = [v for v in result.errors if v.violation_type == ViolationType.PIPETTE_CAPACITY]
-        lw_errors = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
         assert len(pip_errors) >= 1
-        assert len(lw_errors) >= 1
 
 
 # ============================================================================
@@ -385,8 +374,6 @@ class TestEquivalentNames:
         spec = extractor.extract(instruction, config)
 
         assert spec is not None
-        # Should have no missing labware — LLM should resolve all names
-        assert len(spec.missing_labware) == 0
 
         # Descriptions should be the user's wording (not config labels)
         all_descriptions = []
@@ -400,9 +387,13 @@ class TestEquivalentNames:
         # Labware resolver should map user wording to config labels
         resolver = LabwareResolver(config=config, client=client)
         resolved = resolver.resolve(spec)
-        assert len(resolved.missing_labware) == 0, (
-            f"Resolver couldn't map descriptions: {all_descriptions}"
-        )
+        # All LocationRefs should have resolved_label set
+        for step in resolved.steps:
+            for ref in [step.source, step.destination]:
+                if ref:
+                    assert ref.resolved_label is not None, (
+                        f"Resolver couldn't map '{ref.description}'"
+                    )
 
 
 @requires_llm

@@ -48,6 +48,7 @@ class ConfigValidator:
     def __init__(self):
         # Cache valid labware names from opentrons_shared_data
         self._valid_labware: Set[str] = set()
+        self._shared_data_unavailable = False
         self._load_valid_labware()
 
     def _load_valid_labware(self) -> None:
@@ -58,13 +59,20 @@ class ConfigValidator:
             # definitions is iterable of (load_name, version) tuples
             self._valid_labware = {d[0] for d in definitions}
         except Exception:
-            # Fallback: allow any labware if shared data unavailable
             self._valid_labware = set()
+            self._shared_data_unavailable = True
 
     def validate(self, config: Dict[str, Any]) -> ValidationResult:
         """Validate a lab configuration."""
         errors: List[ValidationError] = []
         warnings: List[ValidationError] = []
+
+        if self._shared_data_unavailable:
+            warnings.append(ValidationError(
+                category="labware",
+                message="opentrons_shared_data unavailable — load_name validation skipped, well layouts will use heuristics",
+                path="labware.*.load_name"
+            ))
 
         # 1. Schema validation
         errors.extend(self._validate_schema(config))
