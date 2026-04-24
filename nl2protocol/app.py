@@ -631,7 +631,9 @@ class ProtocolAgent:
             if all_resolved:
                 response = _prompt_input("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
             else:
-                response = _prompt_input("Pick a number to assign unresolved items (q=quit): ").lower()
+                _log(f"  {C.dim('Assign all ??? items before confirming. If your config is missing')}")
+                _log(f"  {C.dim('labware, quit (q) and add it to your config.json, then re-run.')}")
+                response = _prompt_input("Pick a number to assign (q=quit): ").lower()
 
             if response == 'q':
                 _log("  Aborted.")
@@ -983,16 +985,19 @@ class ProtocolAgent:
                 for ref in [step.source, step.destination]:
                     if ref and ref.description in confirmed:
                         ref.resolved_label = confirmed[ref.description]
-            # Clear missing_labware for any that the user manually assigned
-            spec.missing_labware = [
-                desc for desc in spec.missing_labware
-                if desc not in confirmed
-            ]
 
-        # After confirmation, any still-unresolved refs are a hard error
-        if spec.missing_labware:
-            _log(f"\n  {C.error('No config match for:')} {spec.missing_labware}")
-            _log(f"  Add appropriate labware entries to your config.json for these descriptions, then re-run.")
+        # Check if any step LocationRef is still unresolved — that's a hard error.
+        # (missing_labware from extraction may include things no step references,
+        # like "agar plates" mentioned for manual use — those don't matter.)
+        unresolved_refs = []
+        for step in spec.steps:
+            for ref in [step.source, step.destination]:
+                if ref and not ref.resolved_label and ref.description not in unresolved_refs:
+                    unresolved_refs.append(ref.description)
+
+        if unresolved_refs:
+            _log(f"\n  {C.error('No config match for:')} {unresolved_refs}")
+            _log(f"  Add appropriate labware to your config.json for these, then re-run.")
             return None
 
         _log(f"  {C.success('All labware resolved.')}")
