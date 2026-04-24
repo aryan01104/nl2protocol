@@ -86,10 +86,14 @@ def _dummy():
     return ExtractedStep(order=1, action="delay", duration=_dur(1, unit="seconds"), composition_provenance=_comp())
 
 
+# Load .env so API key is available in test environment
+from dotenv import load_dotenv
+load_dotenv()
+
 # Mark for tests that need LLM
-requires_llm = pytest.mark.skipunless(
-    os.environ.get("ANTHROPIC_API_KEY"),
-    "Requires ANTHROPIC_API_KEY"
+requires_llm = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="Requires ANTHROPIC_API_KEY"
 )
 
 
@@ -371,6 +375,7 @@ class TestEquivalentNames:
 
     def test_llm_maps_equivalent_names(self):
         from anthropic import Anthropic
+        from nl2protocol.extractor import LabwareResolver
 
         config = load_config("equivalent_names")
         instruction = load_instruction("equivalent_names")
@@ -383,17 +388,21 @@ class TestEquivalentNames:
         # Should have no missing labware — LLM should resolve all names
         assert len(spec.missing_labware) == 0
 
-        # Check that config labels are used in descriptions
+        # Descriptions should be the user's wording (not config labels)
         all_descriptions = []
         for step in spec.steps:
             if step.source:
                 all_descriptions.append(step.source.description)
             if step.destination:
                 all_descriptions.append(step.destination.description)
+        assert len(all_descriptions) >= 2, f"Expected location refs, got none"
 
-        config_labels = {"tube_rack", "assay_plate", "reagent_reservoir"}
-        matched = sum(1 for d in all_descriptions if d in config_labels)
-        assert matched >= 2, f"Expected config labels in descriptions, got: {all_descriptions}"
+        # Labware resolver should map user wording to config labels
+        resolver = LabwareResolver(config=config, client=client)
+        resolved = resolver.resolve(spec)
+        assert len(resolved.missing_labware) == 0, (
+            f"Resolver couldn't map descriptions: {all_descriptions}"
+        )
 
 
 @requires_llm
