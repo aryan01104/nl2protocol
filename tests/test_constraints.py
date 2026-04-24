@@ -521,7 +521,7 @@ class TestProvenance:
     """Tests that the confirmation formatter shows provenance correctly."""
 
     def test_inferred_volume_tagged(self):
-        """Inferred volumes should display [INFERRED] tag."""
+        """Inferred volumes appear in full mode with [inferred] provenance."""
         from nl2protocol.extractor import SemanticExtractor
 
         spec = make_spec([
@@ -534,8 +534,8 @@ class TestProvenance:
             )
         ])
 
-        output = SemanticExtractor.format_for_confirmation(spec)
-        assert "[INFERRED]" in output
+        output = SemanticExtractor.format_for_confirmation(spec, full=True)
+        assert "inferred" in output
 
     def test_explicit_volume_no_tag(self):
         """Explicit volumes (not inferred, not approximate) get no tag."""
@@ -559,7 +559,7 @@ class TestProvenance:
         assert "[INFERRED]" not in output.split("100.0uL")[0].split("\n")[-1]
 
     def test_post_action_volume_provenance_tagged(self):
-        """Post-action volumes show their provenance source in the tag."""
+        """Post-action volumes show their provenance source in full mode."""
         from nl2protocol.extractor import SemanticExtractor
 
         spec = make_spec(
@@ -577,5 +577,6 @@ class TestProvenance:
             explicit_volumes=[10.0]
         )
 
-        output = SemanticExtractor.format_for_confirmation(spec)
-        assert "50.0uL [DOMAIN_DEFAULT]" in output
+        output = SemanticExtractor.format_for_confirmation(spec, full=True)
+        assert "50.0uL" in output
+        assert "domain_default" in output
