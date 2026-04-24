@@ -575,16 +575,12 @@ class ProtocolAgent:
     def _confirm_labware_assignments(self, spec) -> Optional[dict]:
         """Interactive confirmation of labware description → config label assignments.
 
-        Shows each assignment one by one. User can:
-          - Accept (Enter/y)
-          - Pick a different config label (number)
-          - Go back to re-do a previous assignment (b)
-          - Abort (q)
+        Shows all assignments at once. User picks a number to change any mapping,
+        or presses Enter to confirm all. Unresolved refs show as '???' and must
+        be assigned before confirming.
 
         Returns dict of {description: confirmed_label} or None if aborted.
         """
-        from .cli import prompt_yes_no
-
         # Collect unique (description, resolved_label) pairs
         assignments = []
         seen = set()
@@ -601,73 +597,71 @@ class ProtocolAgent:
             return {}
 
         available_labels = list(self.parser.config.get("labware", {}).keys())
-        confirmed = {}
-        i = 0
+        # Start with LLM suggestions as current assignments
+        current = {a["description"]: a["resolved_label"] for a in assignments}
 
-        _log(f"\n  {C.label('Labware assignments')} ({len(assignments)} references):")
-        _log(f"  Review each mapping. Press Enter to accept, or pick a different label.\n")
+        while True:
+            # Display all assignments
+            _log(f"\n  {C.label('Labware assignments')}:")
+            all_resolved = True
+            for i, a in enumerate(assignments, 1):
+                desc = a["description"]
+                label = current.get(desc)
+                if label:
+                    load_name = self.parser.config["labware"][label].get("load_name", "")
+                    _log(f"    [{i}] \"{desc}\" → {C.success(label)} ({C.dim(load_name)})")
+                else:
+                    _log(f"    [{i}] \"{desc}\" → {C.warning('??? (no match)')}")
+                    all_resolved = False
 
-        while i < len(assignments):
-            a = assignments[i]
-            desc = a["description"]
-            suggested = a["resolved_label"]
-
-            # Show the assignment
-            if suggested:
-                _log(f"  [{i+1}/{len(assignments)}] \"{desc}\" → {C.success(suggested)}")
+            # Prompt
+            if all_resolved:
+                response = input(f"\n  Pick a number to change, or Enter to confirm all (q=quit): ").strip().lower()
             else:
-                _log(f"  [{i+1}/{len(assignments)}] \"{desc}\" → {C.warning('no match found')}")
-
-            # Show available options
-            _log(f"    Available labels:")
-            remaining = [l for l in available_labels if l not in confirmed.values() or l == suggested]
-            for j, label in enumerate(remaining):
-                load_name = self.parser.config["labware"][label].get("load_name", "")
-                marker = " ←" if label == suggested else ""
-                _log(f"      {j+1}. {label} ({C.dim(load_name)}){marker}")
-
-            # Get user input
-            prompt_str = f"    Accept{' [Enter]' if suggested else ''}, pick # , (b)ack, (q)uit: "
-            response = input(prompt_str).strip().lower()
+                response = input(f"\n  Pick a number to assign unresolved items (q=quit): ").strip().lower()
 
             if response == 'q':
                 _log("  Aborted.")
                 return None
-            elif response == 'b':
-                if i > 0:
-                    # Undo previous assignment
-                    prev_desc = assignments[i-1]["description"]
-                    confirmed.pop(prev_desc, None)
-                    i -= 1
+            elif response == '':
+                if all_resolved:
+                    # Warn if multiple descriptions map to the same label
+                    label_counts = {}
+                    for desc, label in current.items():
+                        label_counts.setdefault(label, []).append(desc)
+                    for label, descs in label_counts.items():
+                        if len(descs) > 1:
+                            _log(f"  {C.warning('Note:')} \"{descs[0]}\" and \"{descs[1]}\" "
+                                 f"both map to {label} — is this the same labware?")
+                    return current
                 else:
-                    _log("    Already at the first assignment.")
-                continue
-            elif response == '' and suggested:
-                # Accept suggested
-                confirmed[desc] = suggested
-                i += 1
+                    unresolved = [a["description"] for a in assignments if not current.get(a["description"])]
+                    _log(f"  Cannot confirm — unresolved: {unresolved}")
+                    continue
             elif response.isdigit():
                 idx = int(response) - 1
-                if 0 <= idx < len(remaining):
-                    confirmed[desc] = remaining[idx]
-                    i += 1
+                if 0 <= idx < len(assignments):
+                    desc = assignments[idx]["description"]
+                    _log(f"\n    Reassigning \"{desc}\":")
+                    for j, label in enumerate(available_labels, 1):
+                        load_name = self.parser.config["labware"][label].get("load_name", "")
+                        marker = " ←" if label == current.get(desc) else ""
+                        _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
+                    pick = input(f"    Pick label (1-{len(available_labels)}), or Enter to cancel: ").strip()
+                    if pick.isdigit():
+                        pick_idx = int(pick) - 1
+                        if 0 <= pick_idx < len(available_labels):
+                            current[desc] = available_labels[pick_idx]
+                        else:
+                            _log(f"    Invalid number.")
+                    elif pick == '':
+                        pass  # cancelled
+                    else:
+                        _log(f"    Invalid input.")
                 else:
-                    _log(f"    Invalid number. Pick 1-{len(remaining)}.")
-            elif not suggested and response == '':
-                _log(f"    No suggestion — pick a number or (q)uit.")
+                    _log(f"  Invalid number. Pick 1-{len(assignments)}.")
             else:
-                _log(f"    Invalid input. Enter a number, (b)ack, or (q)uit.")
-
-        # Final confirmation
-        _log(f"\n  {C.label('Final assignments:')}")
-        for desc, label in confirmed.items():
-            _log(f"    \"{desc}\" → {label}")
-
-        if not prompt_yes_no("\n  Confirm all?", default=True):
-            _log("  Aborted.")
-            return None
-
-        return confirmed
+                _log(f"  Invalid input. Pick a number, Enter, or q.")
 
     def _confirm_provenance_items(self, spec, confirmable: list) -> Optional[bool]:
         """Interactive per-item confirmation for uncertain provenance claims.
@@ -1088,37 +1082,26 @@ class ProtocolAgent:
         )
         spec = resolver.resolve(spec)
 
-        # Interactive confirmation of assignments
+        # Confirm tentative assignments with user (includes unresolved refs)
         if sys.stdin.isatty():
             confirmed = self._confirm_labware_assignments(spec)
             if confirmed is None:
                 return None
-            # Apply confirmed assignments back to spec
             for step in spec.steps:
                 for ref in [step.source, step.destination]:
                     if ref and ref.description in confirmed:
                         ref.resolved_label = confirmed[ref.description]
+            # Clear missing_labware for any that the user manually assigned
+            spec.missing_labware = [
+                desc for desc in spec.missing_labware
+                if desc not in confirmed
+            ]
 
-        # Any still-unresolved refs ended up in missing_labware via the resolver
+        # After confirmation, any still-unresolved refs are a hard error
         if spec.missing_labware:
-            _log(f"\n  {C.warning('Unresolved labware:')} {spec.missing_labware}")
-            if sys.stdin.isatty():
-                resolved = self._resolve_missing_labware(spec.missing_labware, prompt, extractor)
-                if resolved is None:
-                    return None
-                if resolved:
-                    for label, entry in resolved.items():
-                        self.parser.config["labware"][label] = entry
-                    with open(self.config_path, 'w') as f:
-                        json.dump(self.parser.config, f, indent=4)
-                    _log(f"  Config updated: {self.config_path}")
-                    spec.missing_labware = []
-                    # Re-resolve with new config entries
-                    resolver = LabwareResolver(config=self.parser.config)
-                    spec = resolver.resolve(spec)
-            else:
-                _log("  Cannot proceed with unresolved labware in non-interactive mode.")
-                return None
+            _log(f"\n  {C.error('No config match for:')} {spec.missing_labware}")
+            _log(f"  Add appropriate labware entries to your config.json for these descriptions, then re-run.")
+            return None
 
         _log(f"  {C.success('All labware resolved.')}")
 
@@ -1196,14 +1179,6 @@ class ProtocolAgent:
             else:
                 _log(f"    Detail: {err}")
             _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
-            return None
-
-        # Validate spec volumes are preserved in schema
-        mismatches = extractor.validate_schema_against_spec(spec, protocol_schema)
-        if mismatches:
-            _log("  Volume validation issues:")
-            for m in mismatches:
-                _log(f"    - {m}")
             return None
 
         # Stage 6: Deterministic schema → Python script

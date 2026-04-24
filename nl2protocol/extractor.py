@@ -308,10 +308,9 @@ class CompleteProtocolSpec(ProtocolSpec):
 class LabwareResolver:
     """Resolves user-language labware descriptions to config labels.
 
-    Three tiers:
-      1. Deterministic — exact, case-insensitive, word-overlap, load_name keyword
-      2. LLM batch — one call with all unresolved refs + step context + config labels
-      3. Unresolvable — added to spec.missing_labware for interactive resolution
+    One LLM call maps all descriptions to config labels using domain knowledge
+    and step context. Returns tentative assignments for user confirmation.
+    Descriptions with no reasonable config match get null (→ missing_labware).
     """
 
     def __init__(self, config: dict, client=None, model_name: str = "claude-sonnet-4-20250514"):
@@ -321,42 +320,29 @@ class LabwareResolver:
         self.model_name = model_name
 
     def resolve(self, spec: ProtocolSpec) -> ProtocolSpec:
-        """Walk all LocationRefs in spec and fill resolved_label."""
+        """Walk all LocationRefs in spec and fill resolved_label via LLM."""
         spec = spec.model_copy(deep=True)
 
-        # Collect all unique descriptions
         all_refs = self._collect_refs(spec)
         unique_descs = {ref.description for ref in all_refs}
 
-        # Tier 1: deterministic
-        resolved = {}
-        unresolved = set()
-        for desc in unique_descs:
-            label = self._deterministic_resolve(desc)
-            if label:
-                resolved[desc] = label
-            else:
-                unresolved.add(desc)
+        if not unique_descs:
+            return spec
 
-        # Tier 2: LLM batch for unresolved
-        if unresolved and self.client:
-            llm_resolved = self._llm_resolve(unresolved, spec)
-            resolved.update(llm_resolved)
-            unresolved -= set(llm_resolved.keys())
+        resolved = self._llm_resolve(unique_descs, spec)
 
-        # Apply resolutions to all LocationRefs
+        # Apply resolutions
         for ref in all_refs:
             if ref.description in resolved:
                 ref.resolved_label = resolved[ref.description]
 
-        # Also resolve initial_contents labware references
         for wc in spec.initial_contents:
             if wc.labware in resolved:
                 wc.labware = resolved[wc.labware]
 
-        # Tier 3: unresolvable → missing_labware
-        for desc in unresolved:
-            if desc not in spec.missing_labware:
+        # Anything not resolved → missing_labware
+        for desc in unique_descs:
+            if desc not in resolved and desc not in spec.missing_labware:
                 spec.missing_labware.append(desc)
 
         return spec
@@ -371,62 +357,21 @@ class LabwareResolver:
                 refs.append(step.destination)
         return refs
 
-    def _deterministic_resolve(self, desc: str) -> Optional[str]:
-        """Try to resolve description to config label without LLM.
+    def _llm_resolve(self, descriptions: set, spec: ProtocolSpec) -> dict:
+        """Single LLM call to resolve all labware descriptions to config labels.
 
-        Matching strategies (in order):
-          1. Exact match (case-insensitive)
-          2. Score-based: word overlap (10pts), substring bonus (5pts), load_name keyword (3pts)
-          Requires score >= 10 to accept (at least one full word overlap).
+        Passes every description with its step context (action, wells, substance)
+        and the full config labware list. The LLM uses domain knowledge to match
+        user wording to config entries. Returns null for no match.
         """
-        if not self.labware_labels:
-            return None
-        desc_lower = desc.lower().strip()
-        desc_words = set(re.split(r'[\s_\-]+', desc_lower))
+        if not self.client:
+            return {}
 
-        # 1. Exact match
-        for label in self.labware_labels:
-            if label.lower() == desc_lower:
-                return label
-
-        # 2. Score-based matching
-        def score_label(label: str) -> int:
-            s = 0
-            label_words = set(re.split(r'[\s_\-]+', label.lower()))
-            # Word overlap
-            s += len(desc_words & label_words) * 10
-            # Substring bonus
-            for lw in label_words:
-                for dw in desc_words:
-                    if len(lw) > 2 and len(dw) > 2 and lw != dw:
-                        if lw in dw or dw in lw:
-                            s += 5
-            # Load_name keyword match
-            load = self.config["labware"][label].get("load_name", "").lower()
-            for dw in desc_words:
-                if len(dw) > 2 and dw in load:
-                    s += 3
-            return s
-
-        scored = [(label, score_label(label)) for label in self.labware_labels]
-        scored.sort(key=lambda x: -x[1])
-        if scored and scored[0][1] >= 10:
-            return scored[0][0]
-
-        return None
-
-    def _llm_resolve(self, unresolved: set, spec: ProtocolSpec) -> dict:
-        """Batch LLM call to resolve remaining descriptions.
-
-        Passes all unresolved refs with their step context (action, wells, volume)
-        and the full config labware list so the LLM can reason about which
-        description maps to which config label.
-        """
-        # Build context: for each unresolved description, gather the steps that use it
+        # Build step context for each description
         desc_context = {}
         for step in spec.steps:
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if ref and ref.description in unresolved:
+                if ref and ref.description in descriptions:
                     if ref.description not in desc_context:
                         desc_context[ref.description] = []
                     wells = ref.well or ref.wells or ref.well_range or "unspecified"
@@ -446,23 +391,31 @@ class LabwareResolver:
         prompt = (
             "You are resolving labware references in a lab protocol.\n\n"
             "The user described labware using natural language. Match each description "
-            "to a config label based on context (what action, what wells, what substance).\n\n"
+            "to a config label based on domain knowledge and context "
+            "(what action, what wells, what substance, what kind of labware it is).\n\n"
             f"CONFIG LABWARE:\n{json.dumps(config_summary, indent=2)}\n\n"
-            "UNRESOLVED REFERENCES:\n"
+            "LABWARE REFERENCES TO RESOLVE:\n"
         )
-        for desc, contexts in desc_context.items():
+        for desc in descriptions:
+            contexts = desc_context.get(desc, [])
             prompt += f'\n  "{desc}":\n'
-            for ctx in contexts:
-                prompt += f"    - {ctx}\n"
+            if contexts:
+                for ctx in contexts:
+                    prompt += f"    - {ctx}\n"
+            else:
+                prompt += "    - (referenced in initial contents)\n"
 
         prompt += (
             "\nFor each description, respond with JSON only:\n"
             '{"assignments": {"<description>": "<config_label or null>", ...}}\n\n'
             "Rules:\n"
-            "- Only assign to a config label if you are confident it's the right match.\n"
-            "- Use null if no config label is a reasonable match.\n"
-            "- Consider the action context: sources are typically racks/reservoirs, "
+            "- Match based on domain knowledge: 'Eppendorf tubes' = tube rack, "
+            "'trough' = reservoir, 'microplate' = wellplate, etc.\n"
+            "- Use the step context to disambiguate: sources are typically racks/reservoirs, "
             "destinations are typically plates.\n"
+            "- Use null if NO config label is a reasonable match — do not force a match.\n"
+            "- Each config label can be assigned to multiple descriptions if appropriate "
+            "(e.g., source and destination on the same plate).\n"
         )
 
         try:
@@ -1469,20 +1422,28 @@ Output the corrected specification.
 
     @staticmethod
     def validate_schema_against_spec(spec: ProtocolSpec, schema) -> List[str]:
-        """Check that generated ProtocolSchema honors the spec constraints.
-        Returns list of mismatches (empty = OK).
+        """Check that spec_to_schema didn't drop any instruction-sourced volumes.
 
-        Only checks volumes that were ACTUALLY in the instruction text
-        (spec.explicit_volumes). Post-action volumes that the LLM inferred
-        (e.g., mix at 50uL) are NOT hard constraints — they may be legitimately
-        adjusted by the constraint checker or pipette selection logic.
+        Collects all volumes from the spec where provenance.source == "instruction",
+        then verifies each appears somewhere in the schema commands. This catches
+        bugs in spec_to_schema (the deterministic converter), not LLM errors.
+
+        Only checks instruction-sourced volumes — inferred/domain_default volumes
+        may be legitimately adjusted by constraint checking or pipette selection.
         """
         mismatches = []
 
-        # Only validate volumes the user actually wrote in their instruction.
-        # These are extracted via regex from the instruction text — ground truth.
-        locked_volumes = spec.explicit_volumes
-        if not locked_volumes:
+        # Collect instruction-sourced volumes from spec
+        spec_instruction_volumes = set()
+        for step in spec.steps:
+            if step.volume and step.volume.provenance.source == "instruction":
+                spec_instruction_volumes.add(step.volume.value)
+            if step.post_actions:
+                for pa in step.post_actions:
+                    if pa.volume and pa.volume.provenance.source == "instruction":
+                        spec_instruction_volumes.add(pa.volume.value)
+
+        if not spec_instruction_volumes:
             return mismatches
 
         # Collect all volumes from schema commands
@@ -1494,16 +1455,14 @@ Output the corrected specification.
                 schema_volumes.add(cmd.mix_after[1])
             if hasattr(cmd, 'mix_before') and cmd.mix_before is not None:
                 schema_volumes.add(cmd.mix_before[1])
-            if hasattr(cmd, 'repetitions') and hasattr(cmd, 'volume') and cmd.volume is not None:
-                schema_volumes.add(cmd.volume)
 
-        # Every user-stated volume must appear in schema
-        for vol in locked_volumes:
+        # Every instruction-sourced spec volume must appear in schema
+        for vol in spec_instruction_volumes:
             if not any(abs(sv - vol) < 0.01 for sv in schema_volumes):
                 mismatches.append(
-                    f"Volume {vol}uL from instruction text not found in schema commands. "
-                    f"Schema has: {sorted(schema_volumes)}. "
-                    f"User-specified volumes must not be changed."
+                    f"Instruction-sourced volume {vol}uL from spec not found in schema "
+                    f"commands. Schema has: {sorted(schema_volumes)}. "
+                    f"spec_to_schema may have dropped this value."
                 )
 
         return mismatches

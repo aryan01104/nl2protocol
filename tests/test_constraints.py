@@ -418,7 +418,7 @@ class TestVolumeValidation:
                     source=LocationRef(description="reagent_tube_rack", well="A1"),
                     destination=LocationRef(description="dilution_strip", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
-                                             volume=_vol(50.0))],
+                                             volume=_vol(50.0, source="inferred"))],
                     composition_provenance=_comp(),
                 )
             ],
