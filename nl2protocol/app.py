@@ -80,6 +80,12 @@ GENERATED PROTOCOL SCHEMA:
 - Number of Commands: {num_commands}
 - Command Summary: {command_summary}
 
+LABWARE MAPPING (how user's wording was resolved to physical labware):
+{labware_mapping}
+The user's informal names (e.g. "tube rack") may map to different Opentrons load names
+(e.g. a deep well plate). This is expected — focus on whether the protocol actions are correct,
+not whether load names match the user's wording.
+
 Questions:
 1. Does this protocol achieve what the user asked for?
 2. Are there any obvious mismatches between intent and actions?
@@ -90,7 +96,7 @@ Respond with JSON only:
 """
 
 
-def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResult:
+def verify_intent_match(intent: str, schema: ProtocolSchema, labware_mapping: dict = None) -> VerificationResult:
     """
     Ask Claude to verify the generated protocol matches the original intent.
 
@@ -132,6 +138,16 @@ def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResu
     if schema.modules:
         module_summary = ", ".join([f"{m.module_type} in slot {m.slot}" for m in schema.modules])
 
+    # Format labware mapping: "tube rack" → sample_rack (usascientific_96_wellplate_2.4ml_deep)
+    if labware_mapping:
+        mapping_lines = [
+            f'  "{desc}" → {info["config_label"]} ({info["load_name"]})'
+            for desc, info in labware_mapping.items()
+        ]
+        mapping_summary = "\n".join(mapping_lines)
+    else:
+        mapping_summary = "  (not available)"
+
     prompt = VERIFICATION_PROMPT.format(
         intent=intent,
         protocol_name=schema.protocol_name,
@@ -139,7 +155,8 @@ def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResu
         pipettes=pipette_summary,
         modules=module_summary,
         num_commands=len(schema.commands),
-        command_summary=command_summary
+        command_summary=command_summary,
+        labware_mapping=mapping_summary
     )
 
     try:
@@ -1172,8 +1189,15 @@ class ProtocolAgent:
         # Stage 8: Intent verification (safety net)
         _stage("[Stage 8/8] Verifying protocol matches original intent...")
         from .spinner import Spinner
+        # Build full labware mapping: description → config label → load name
+        labware_mapping = {}
+        for desc, label in state_log.get("stage_3.5_resolution", {}).items():
+            if label:
+                load_name = self.parser.config.get("labware", {}).get(label, {}).get("load_name", "")
+                labware_mapping[desc] = {"config_label": label, "load_name": load_name}
+
         with Spinner("Verifying intent match..."):
-            verification = verify_intent_match(prompt, protocol_schema)
+            verification = verify_intent_match(prompt, protocol_schema, labware_mapping)
 
         state_log["stage_8_verification"] = {
             "matches": verification.matches,
