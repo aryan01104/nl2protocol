@@ -771,31 +771,297 @@ Output the corrected specification.
             return None
 
     # ========================================================================
-    # HALLUCINATION GUARD
+    # PROVENANCE VERIFICATION (Task 5)
     # ========================================================================
 
-    def validate_exact_values_against_text(self, spec: ProtocolSpec, instruction: str) -> List[str]:
-        """Check that exact, instruction-sourced volumes actually appear in the instruction.
-        Catches fabrications where the LLM claims a value came from the text but it didn't.
-        Returns list of warnings for potentially hallucinated values."""
+    @staticmethod
+    def _extract_wells_from_text(instruction: str) -> set:
+        """Extract all well positions mentioned in instruction text."""
+        pattern = re.compile(r'\b([A-H](?:1[0-2]|[1-9]))\b')
+        return set(pattern.findall(instruction))
+
+    @staticmethod
+    def _extract_durations_from_text(instruction: str) -> List[tuple]:
+        """Extract all durations mentioned in instruction text.
+        Returns list of (value, unit) tuples."""
+        pattern = re.compile(
+            r'(\d+(?:\.\d+)?)\s*'
+            r'(seconds?|minutes?|hours?|secs?|mins?|hrs?)',
+            re.IGNORECASE
+        )
+        unit_map = {
+            'second': 'seconds', 'seconds': 'seconds', 'sec': 'seconds', 'secs': 'seconds',
+            'minute': 'minutes', 'minutes': 'minutes', 'min': 'minutes', 'mins': 'minutes',
+            'hour': 'hours', 'hours': 'hours', 'hr': 'hours', 'hrs': 'hours',
+        }
+        results = []
+        for m in pattern.finditer(instruction):
+            val = float(m.group(1))
+            unit = unit_map.get(m.group(2).lower(), m.group(2).lower())
+            results.append((val, unit))
+        return results
+
+    def _warn(self, step_order: int, field: str, value: str,
+              claimed_source: str, severity: str, message: str) -> dict:
+        """Build a structured provenance warning."""
+        return {
+            "step": step_order,
+            "field": field,
+            "value": value,
+            "claimed_source": claimed_source,
+            "severity": severity,
+            "message": message,
+        }
+
+    def _verify_instruction_claims(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
+        """Verify all source='instruction' claims against the instruction text.
+
+        If the LLM claims a value came from the instruction but the value
+        doesn't appear in the text, that's a fabricated provenance claim.
+        Severity: 'fabrication'.
+        """
         warnings = []
         text_volumes = self._extract_volumes_from_text(instruction)
+        text_wells = self._extract_wells_from_text(instruction)
+        text_durations = self._extract_durations_from_text(instruction)
+        instruction_lower = instruction.lower()
 
         for step in spec.steps:
-            if step.volume and step.volume.exact and step.volume.provenance.source == "instruction":
+            # --- Volume ---
+            if step.volume and step.volume.provenance.source == "instruction" and step.volume.exact:
                 if step.volume.value not in text_volumes:
-                    warnings.append(
-                        f"Step {step.order}: volume {step.volume.value}{step.volume.unit} "
-                        f"not found in instruction text (found: {text_volumes})"
-                    )
+                    warnings.append(self._warn(
+                        step.order, "volume",
+                        f"{step.volume.value}{step.volume.unit}",
+                        "instruction", "fabrication",
+                        f"Step {step.order}: claims {step.volume.value}{step.volume.unit} "
+                        f"from instruction but not found in text (found: {text_volumes})",
+                    ))
+
+            # --- Substance ---
+            if step.substance and step.substance.provenance.source == "instruction":
+                if step.substance.value.lower() not in instruction_lower:
+                    warnings.append(self._warn(
+                        step.order, "substance", step.substance.value,
+                        "instruction", "fabrication",
+                        f"Step {step.order}: claims substance '{step.substance.value}' "
+                        f"from instruction but not found in text",
+                    ))
+
+            # --- Duration ---
+            if step.duration and step.duration.provenance.source == "instruction":
+                if not any(abs(val - step.duration.value) < 0.01 and unit == step.duration.unit
+                           for val, unit in text_durations):
+                    warnings.append(self._warn(
+                        step.order, "duration",
+                        f"{step.duration.value} {step.duration.unit}",
+                        "instruction", "fabrication",
+                        f"Step {step.order}: claims {step.duration.value} {step.duration.unit} "
+                        f"from instruction but not found in text",
+                    ))
+
+            # --- LocationRef: labware + wells ---
+            for ref, role in [(step.source, "source"), (step.destination, "destination")]:
+                if not ref or not ref.provenance or ref.provenance.source != "instruction":
+                    continue
+                if ref.description.lower() not in instruction_lower:
+                    warnings.append(self._warn(
+                        step.order, f"{role} labware", ref.description,
+                        "instruction", "fabrication",
+                        f"Step {step.order} {role}: claims labware '{ref.description}' "
+                        f"from instruction but not found in text",
+                    ))
+                wells_to_check = [ref.well] if ref.well else (ref.wells or [])
+                missing = [w for w in wells_to_check if w not in text_wells]
+                if missing:
+                    warnings.append(self._warn(
+                        step.order, f"{role} wells", str(missing),
+                        "instruction", "fabrication",
+                        f"Step {step.order} {role}: claims wells {missing} "
+                        f"from instruction but not found in text",
+                    ))
+
+            # --- Post-action volumes ---
             if step.post_actions:
                 for pa in step.post_actions:
-                    if pa.volume and pa.volume.exact and pa.volume.provenance.source == "instruction":
+                    if pa.volume and pa.volume.provenance.source == "instruction" and pa.volume.exact:
                         if pa.volume.value not in text_volumes:
-                            warnings.append(
-                                f"Step {step.order} {pa.action}: volume "
-                                f"{pa.volume.value}{pa.volume.unit} not found in instruction text"
-                            )
+                            warnings.append(self._warn(
+                                step.order, f"{pa.action} volume",
+                                f"{pa.volume.value}{pa.volume.unit}",
+                                "instruction", "fabrication",
+                                f"Step {step.order} {pa.action}: claims {pa.volume.value}"
+                                f"{pa.volume.unit} from instruction but not found in text",
+                            ))
+
+        # --- Cross-check invariant: instruction-claimed volumes vs text_extracted_volumes ---
+        instruction_volumes = set()
+        for step in spec.steps:
+            if step.volume and step.volume.provenance.source == "instruction":
+                instruction_volumes.add(step.volume.value)
+            if step.post_actions:
+                for pa in step.post_actions:
+                    if pa.volume and pa.volume.provenance.source == "instruction":
+                        instruction_volumes.add(pa.volume.value)
+        text_extracted = set(spec.explicit_volumes)
+        fabricated = instruction_volumes - text_extracted
+        if fabricated:
+            warnings.append(self._warn(
+                0, "cross-check", str(fabricated),
+                "instruction", "fabrication",
+                f"Volumes claimed as source='instruction' but absent from "
+                f"text_extracted_volumes: {fabricated}",
+            ))
+
+        return warnings
+
+    def _verify_config_claims(self, spec: ProtocolSpec, config: dict) -> List[dict]:
+        """Verify all source='config' claims against the actual config.
+
+        If the LLM says a value came from the config but the referenced key
+        doesn't exist, that's a fabricated provenance claim. Severity: 'fabrication'.
+        """
+        warnings = []
+        labware_labels = set(config.get("labware", {}).keys())
+        pipette_mounts = set(config.get("pipettes", {}).keys())
+
+        for step in spec.steps:
+            # LocationRef with source='config': resolved_label must be a valid config key
+            for ref, role in [(step.source, "source"), (step.destination, "destination")]:
+                if not ref or not ref.provenance or ref.provenance.source != "config":
+                    continue
+                label = ref.resolved_label or ref.description
+                if label not in labware_labels:
+                    warnings.append(self._warn(
+                        step.order, f"{role} labware", label,
+                        "config", "fabrication",
+                        f"Step {step.order} {role}: claims labware '{label}' "
+                        f"from config but no such key in config['labware']",
+                    ))
+
+            # Pipette hint: no provenance field, but we can structurally verify
+            # that a matching pipette exists in the config.
+            if step.pipette_hint:
+                config_models = [
+                    pip.get("model", "").lower()
+                    for pip in config.get("pipettes", {}).values()
+                ]
+                hint = step.pipette_hint.lower()
+                if not any(hint in model for model in config_models):
+                    warnings.append(self._warn(
+                        step.order, "pipette_hint", step.pipette_hint,
+                        "config", "fabrication",
+                        f"Step {step.order}: pipette '{step.pipette_hint}' "
+                        f"not found in config (available: {config_models})",
+                    ))
+
+        return warnings
+
+    def _flag_uncertain_claims(self, spec: ProtocolSpec) -> List[dict]:
+        """Flag domain_default and inferred claims for user confirmation.
+
+        domain_default with confidence < 0.8 → severity 'unverified'.
+        inferred (any confidence) → severity 'low_confidence'.
+        These are routed to Task 6's threshold-based confirmation UX.
+        """
+        warnings = []
+
+        for step in spec.steps:
+            # Composition-level: inferred steps are always flagged
+            if step.composition_provenance.confidence < 0.8:
+                grounding = step.composition_provenance.grounding
+                if "instruction" not in grounding:
+                    warnings.append(self._warn(
+                        step.order, "composition", step.action,
+                        ",".join(grounding) if grounding else "inferred",
+                        "low_confidence",
+                        f"Step {step.order} ({step.action}): composition confidence "
+                        f"{step.composition_provenance.confidence} — may need confirmation",
+                    ))
+
+            # Walk provenanced fields
+            fields = [
+                ("volume", step.volume),
+                ("substance", step.substance),
+                ("duration", step.duration),
+            ]
+            for ref, role in [(step.source, "source"), (step.destination, "destination")]:
+                if ref and ref.provenance:
+                    fields.append((f"{role} location", ref))
+
+            for field_name, field_val in fields:
+                if field_val is None:
+                    continue
+                prov = field_val.provenance if hasattr(field_val, 'provenance') and field_val.provenance else None
+                if not prov:
+                    continue
+
+                if prov.source == "inferred":
+                    val_str = str(field_val.value) if hasattr(field_val, 'value') else str(field_val)
+                    warnings.append(self._warn(
+                        step.order, field_name, val_str,
+                        "inferred", "low_confidence",
+                        f"Step {step.order} {field_name}: inferred value "
+                        f"(confidence {prov.confidence}) — needs confirmation",
+                    ))
+                elif prov.source == "domain_default" and prov.confidence < 0.8:
+                    val_str = str(field_val.value) if hasattr(field_val, 'value') else str(field_val)
+                    warnings.append(self._warn(
+                        step.order, field_name, val_str,
+                        "domain_default", "unverified",
+                        f"Step {step.order} {field_name}: domain default with "
+                        f"confidence {prov.confidence} — may need confirmation",
+                    ))
+
+            # Post-action fields
+            if step.post_actions:
+                for pa in step.post_actions:
+                    if pa.volume and pa.volume.provenance:
+                        prov = pa.volume.provenance
+                        if prov.source == "inferred":
+                            warnings.append(self._warn(
+                                step.order, f"{pa.action} volume",
+                                f"{pa.volume.value}{pa.volume.unit}",
+                                "inferred", "low_confidence",
+                                f"Step {step.order} {pa.action}: inferred volume "
+                                f"(confidence {prov.confidence}) — needs confirmation",
+                            ))
+                        elif prov.source == "domain_default" and prov.confidence < 0.8:
+                            warnings.append(self._warn(
+                                step.order, f"{pa.action} volume",
+                                f"{pa.volume.value}{pa.volume.unit}",
+                                "domain_default", "unverified",
+                                f"Step {step.order} {pa.action}: domain default volume "
+                                f"with confidence {prov.confidence} — may need confirmation",
+                            ))
+
+        return warnings
+
+    def verify_provenance_claims(self, spec: ProtocolSpec, instruction: str, config: dict) -> List[dict]:
+        """Verify provenance claims across all source types.
+
+        Dispatches on provenance.source for each field:
+          - instruction: value must appear in instruction text → 'fabrication' if not
+          - config: referenced key must exist in config → 'fabrication' if not
+          - domain_default: flag if confidence < 0.8 → 'unverified'
+          - inferred: always flag → 'low_confidence'
+
+        Also enforces the cross-check invariant: any source='instruction' volume
+        not in spec.explicit_volumes (regex-extracted from text) is a fabricated
+        provenance claim.
+
+        Returns list of warning dicts:
+          {step, field, value, claimed_source, severity, message}
+
+        Severity levels (for Task 6 routing):
+          'fabrication'    — LLM lied about where a value came from (block/fix)
+          'unverified'     — domain default with low confidence (prompt user)
+          'low_confidence' — inferred value (always prompt user)
+        """
+        warnings = []
+        warnings.extend(self._verify_instruction_claims(spec, instruction))
+        warnings.extend(self._verify_config_claims(spec, config))
+        warnings.extend(self._flag_uncertain_claims(spec))
         return warnings
 
     # ========================================================================

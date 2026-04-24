@@ -908,11 +908,12 @@ class ProtocolAgent:
         # Stage 3: Validate extraction + check sufficiency + fill gaps
         _log(f"\n{C.header('[Stage 3/8]')} Validating and completing specification...")
 
-        # Hallucination guard
-        warnings = extractor.validate_exact_values_against_text(spec, prompt)
-        if warnings:
-            for w in warnings:
-                _log(f"  {C.warning('Warning:')} {w}")
+        # Provenance verification — check instruction/config claims
+        provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.parser.config)
+        if provenance_warnings:
+            _log(f"  {C.warning('Provenance issues found:')}")
+            for w in provenance_warnings:
+                _log(f"    - {w['message']}")
 
         # Sufficiency check
         gaps = extractor.missing_fields(spec)
