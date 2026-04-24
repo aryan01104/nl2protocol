@@ -785,124 +785,6 @@ class ProtocolAgent:
 
         return spec
 
-    def _resolve_missing_labware(self, missing: list, instruction: str, extractor) -> dict:
-        """Interactively resolve missing labware by suggesting additions.
-
-        Uses the LLM to infer what Opentrons labware type is needed based on
-        the instruction context, then asks the scientist to confirm.
-
-        Returns dict of {label: {"load_name": ..., "slot": ...}} to add,
-        or None if user aborts.
-        """
-        from .cli import prompt_yes_no
-
-        # Find used slots so we can suggest available ones
-        used_slots = set()
-        for lw in self.parser.config.get("labware", {}).values():
-            used_slots.add(str(lw.get("slot", "")))
-        for mod in self.parser.config.get("modules", {}).values():
-            used_slots.add(str(mod.get("slot", "")))
-        available_slots = [str(s) for s in range(1, 12) if str(s) not in used_slots]
-
-        if not available_slots:
-            _log("  No deck slots available. Remove unused labware from your config first.")
-            return None
-
-        _log(f"\n  I can suggest what to add. Available deck slots: {', '.join(available_slots)}")
-
-        # Ask LLM to suggest load_names for each missing labware
-        try:
-            from .spinner import Spinner
-            suggest_prompt = (
-                f"The following labware are referenced in a protocol instruction but missing from the lab config.\n"
-                f"For each one, suggest the most likely Opentrons load_name and explain WHY you think "
-                f"this labware is needed (based on what the instruction says about it).\n\n"
-                f"Instruction:\n{instruction}\n\n"
-                f"Missing labware:\n{', '.join(missing)}\n\n"
-                f"Respond with ONLY a JSON object. For each missing labware, provide:\n"
-                f'  - "load_name": the Opentrons labware load_name\n'
-                f'  - "reason": one sentence explaining why this labware is needed\n\n'
-                f"Example:\n"
-                f'{{"sample_plate": {{"load_name": "corning_96_wellplate_360ul_flat", '
-                f'"reason": "Instruction says to transfer samples from a 96-well plate with wells A1-H1"}}, '
-                f'"waste_reservoir": {{"load_name": "nest_12_reservoir_15ml", '
-                f'"reason": "Instruction says to discard supernatant to a waste container"}}}}\n'
-                f"Use real Opentrons load_names from the standard labware library."
-            )
-
-            import json as json_mod
-            with Spinner("Inferring labware types..."):
-                response = extractor.client.messages.create(
-                    model=extractor.model_name,
-                    max_tokens=1024,
-                    messages=[{"role": "user", "content": suggest_prompt}]
-                )
-
-            text = response.content[0].text.strip()
-            # Parse JSON from response
-            if "```" in text:
-                text = text.split("```")[1].split("```")[0]
-                if text.startswith("json"):
-                    text = text[4:]
-            raw_suggestions = json_mod.loads(text.strip())
-            # Normalize: handle both {"name": "load_name"} and {"name": {"load_name": ..., "reason": ...}}
-            suggestions = {}
-            reasons = {}
-            for key, val in raw_suggestions.items():
-                suggestions[key] = val.get("load_name")
-                reasons[key] = val.get("reason", "")
-        except Exception as e:
-            _log(f"  Could not infer labware types automatically: {e}")
-            suggestions = {lw: "UNKNOWN" for lw in missing}
-            reasons = {lw: "" for lw in missing}
-
-        # Present each suggestion to the user
-        resolved = {}
-        slot_idx = 0
-        for lw_desc in missing:
-            suggested_load = suggestions.get(lw_desc, "UNKNOWN")
-            reason = reasons.get(lw_desc, "")
-            label = lw_desc.replace(" ", "_").replace("-", "_").lower()
-            slot = available_slots[slot_idx] if slot_idx < len(available_slots) else "?"
-
-            _log(f"\n  Missing: '{lw_desc}'")
-            if reason:
-                import textwrap
-                _log(textwrap.fill(f"  Why: {reason}", width=LINE_WIDTH,
-                                   initial_indent="  ", subsequent_indent="    "))
-            _log(f"  Suggested: load_name = {suggested_load}")
-            _log(f"             slot = {slot}")
-            _log(f"             label = {label}")
-
-            response = input("  Accept [Y], edit load_name [e], or skip [n]? ").strip().lower()
-            if response in ('', 'y', 'yes'):
-                resolved[label] = {"load_name": suggested_load, "slot": slot}
-                slot_idx += 1
-            elif response in ('e', 'edit'):
-                custom_load = input("  Enter Opentrons load_name: ").strip()
-                if custom_load:
-                    resolved[label] = {"load_name": custom_load, "slot": slot}
-                    slot_idx += 1
-                else:
-                    _log("  Skipped.")
-            elif response in ('n', 'no', 'skip'):
-                _log("  Skipped.")
-            else:
-                _log("  Skipped.")
-
-        if not resolved:
-            _log("  No labware added. Cannot proceed without the missing equipment.")
-            return None
-
-        _log(f"\n  Adding {len(resolved)} labware to config:")
-        for label, entry in resolved.items():
-            _log(f"    {label}: {entry['load_name']} on slot {entry['slot']}")
-
-        if not prompt_yes_no("  Write to config file?", default=True):
-            return None
-
-        return resolved
-
     def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False,
                      full_confirmation: bool = False, confirmation_threshold: float = 0.7,
                      verbose: bool = False) -> Optional[PipelineResult]:
@@ -991,30 +873,11 @@ class ProtocolAgent:
                     else:
                         _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
 
-        # Check for missing labware — offer to add it interactively
+        # Note missing labware from extraction (informational — actual resolution
+        # happens in Stage 3.5 based on what steps actually reference)
         if spec.missing_labware:
-            _log(f"\n  {C.error('MISSING LABWARE')} — your instruction references equipment not in your config:")
-            for lw in spec.missing_labware:
-                _log(f"    - '{lw}'")
-
-            if sys.stdin.isatty():
-                resolved = self._resolve_missing_labware(spec.missing_labware, prompt, extractor)
-                if resolved is None:
-                    return None  # User aborted
-                # Write resolved labware to config and reload
-                if resolved:
-                    import json
-                    for label, entry in resolved.items():
-                        self.parser.config["labware"][label] = entry
-                    with open(self.config_path, 'w') as f:
-                        json.dump(self.parser.config, f, indent=4)
-                    _log(f"  Config updated: {self.config_path}")
-                    # Remove from missing_labware since we just added them
-                    spec.missing_labware = []
-            else:
-                _log(f"\n  To fix: add these to your config.json with the correct Opentrons")
-                _log(f"  load_name and deck slot, then re-run.")
-                return None
+            _log(f"  {C.dim(f'Note: instruction mentions labware not in config: {spec.missing_labware}')}")
+            _log(f"  {C.dim('Will check if any steps actually need it during labware resolution.')}")
 
         if spec.initial_contents:
             _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
