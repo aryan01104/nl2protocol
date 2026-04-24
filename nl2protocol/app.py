@@ -1183,7 +1183,9 @@ class ProtocolAgent:
         # Stage 5: Deterministic spec → ProtocolSchema
         _log(f"\n{C.header('[Stage 5/8]')} Converting specification to protocol schema...")
         try:
-            protocol_schema = extractor.spec_to_schema(spec, self.parser.config)
+            from .extractor import CompleteProtocolSpec
+            complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
+            protocol_schema = extractor.spec_to_schema(complete_spec, self.parser.config)
             _log("  Schema generated deterministically.")
         except Exception as e:
             err = str(e)

@@ -32,7 +32,7 @@ import sys
 from typing import Annotated, List, Optional, Literal, Dict
 
 from anthropic import Anthropic
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 
 # ============================================================================
@@ -256,6 +256,48 @@ class ProtocolSpec(BaseModel):
         orders = [s.order for s in self.steps]
         if sorted(orders) != list(range(1, len(orders) + 1)):
             raise ValueError(f"Step orders must be consecutive 1..N, got {orders}")
+        return self
+
+
+class CompleteProtocolSpec(ProtocolSpec):
+    """A ProtocolSpec that has been validated for completeness.
+
+    Enforces that all fields required for code generation are present:
+      - Liquid-handling actions must have a volume
+      - Transfer-like actions must have source and destination
+      - All labware refs must be resolved (no missing_labware)
+
+    Use ProtocolSpec for extraction output (gaps allowed).
+    Promote to CompleteProtocolSpec after gap-filling succeeds.
+    """
+
+    @model_validator(mode='after')
+    def validate_completeness(self) -> 'CompleteProtocolSpec':
+        errors = []
+        liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
+                          "dispense", "mix", "serial_dilution"}
+        transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
+
+        for step in self.steps:
+            prefix = f"Step {step.order} ({step.action})"
+
+            if step.action in liquid_actions and step.volume is None:
+                errors.append(f"{prefix}: missing volume")
+
+            if step.action in transfer_actions:
+                if step.source is None:
+                    errors.append(f"{prefix}: missing source location")
+                if step.destination is None:
+                    errors.append(f"{prefix}: missing destination location")
+
+        if self.missing_labware:
+            errors.append(f"Unresolved labware: {self.missing_labware}")
+
+        if errors:
+            raise ValueError(
+                f"Spec is incomplete ({len(errors)} issue(s)): " + "; ".join(errors)
+            )
+
         return self
 
 
@@ -1102,25 +1144,18 @@ Output the corrected specification.
     @staticmethod
     def missing_fields(spec: ProtocolSpec) -> List[str]:
         """Check if the spec has enough information to generate a protocol.
-        Returns list of gaps (empty = sufficient)."""
-        gaps = []
 
-        liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
-                          "dispense", "mix", "serial_dilution"}
-
-        for step in spec.steps:
-            prefix = f"Step {step.order} ({step.action})"
-
-            if step.action in liquid_actions and step.volume is None:
-                gaps.append(f"{prefix}: missing volume")
-
-            if step.action in {"transfer", "distribute", "serial_dilution", "consolidate"}:
-                if step.source is None:
-                    gaps.append(f"{prefix}: missing source location")
-                if step.destination is None:
-                    gaps.append(f"{prefix}: missing destination location")
-
-        return gaps
+        Attempts promotion to CompleteProtocolSpec. If validation fails,
+        returns the error messages as a list. Empty list = sufficient.
+        """
+        try:
+            CompleteProtocolSpec.model_validate(spec.model_dump())
+            return []
+        except ValidationError as e:
+            return [
+                err["msg"].removeprefix("Value error, ")
+                for err in e.errors()
+            ]
 
     # ========================================================================
     # GAP FILLER
@@ -1387,11 +1422,14 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
-    def spec_to_schema(spec: ProtocolSpec, config: dict):
-        """Deterministically convert a ProtocolSpec + config into a ProtocolSchema.
+    def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
+        """Deterministically convert a CompleteProtocolSpec + config into a ProtocolSchema.
 
         No LLM involved. The spec says WHAT (science), this function maps it
         to HOW (hardware). Can't corrupt volumes because it copies them directly.
+
+        Takes CompleteProtocolSpec (not ProtocolSpec) — type-level guarantee that
+        all required fields are present before code generation begins.
 
         Mapping:
           LocationRef.resolved_label → config labware label → slot, load_name

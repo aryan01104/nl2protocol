@@ -22,7 +22,7 @@ from nl2protocol.validate_config import validate_config, validate_config_file, C
 from nl2protocol.robot import RobotClient
 from nl2protocol.input_validator import InputValidator, validate_input
 from nl2protocol.example_store import ExampleStore
-from nl2protocol.extractor import SemanticExtractor, ProtocolSpec
+from nl2protocol.extractor import SemanticExtractor, ProtocolSpec, CompleteProtocolSpec
 from nl2protocol.constraints import ConstraintChecker, ConstraintViolation, ConstraintCheckResult
 
 __all__ = [
