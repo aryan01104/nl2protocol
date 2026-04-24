@@ -429,54 +429,82 @@ class ConstraintChecker:
             ))
 
     def _check_tip_sufficiency(self, spec: ProtocolSpec, result: ConstraintCheckResult):
-        """Estimate tip usage and warn if it might exceed available tips."""
-        # Count approximate tip usage
-        tip_count = 0
+        """Estimate tip usage per pipette and warn if any exceeds available tips."""
+        liquid_actions = {"transfer", "distribute", "consolidate", "mix",
+                          "serial_dilution", "aspirate", "dispense"}
+
+        # Count tips per mount
+        tip_usage = {mount: 0 for mount in self.pipette_ranges}
+
         for step in spec.steps:
-            liquid_actions = {"transfer", "distribute", "consolidate", "mix",
-                              "serial_dilution", "aspirate", "dispense"}
             if step.action not in liquid_actions:
                 continue
 
+            # Determine which mount handles this step's volume
+            mount = self._mount_for_volume(step.volume.value if step.volume else 0)
+            if not mount:
+                continue
+
             if step.tip_strategy == "same_tip":
-                tip_count += 1
+                tip_usage[mount] += 1
             else:
-                # Estimate wells involved
-                wells = 1
-                if step.destination:
-                    if step.destination.wells:
-                        wells = len(step.destination.wells)
-                    elif step.destination.well_range:
-                        # Rough estimate from range
-                        wells = max(wells, 8)  # conservative
-                if step.source and step.source.wells:
-                    wells = max(wells, len(step.source.wells))
-                if step.replicates:
-                    wells *= step.replicates
-                tip_count += wells
+                wells = self._estimate_well_count(step)
+                tip_usage[mount] += wells
 
-        # Count available tips
-        available_tips = 0
-        if "pipettes" in self.config:
-            for pip in self.config["pipettes"].values():
-                for tr_label in pip.get("tipracks", []):
-                    tr = self.config.get("labware", {}).get(tr_label, {})
-                    load = tr.get("load_name", "")
-                    if "384" in load:
-                        available_tips += 384
-                    else:
-                        available_tips += 96
+        # Count available tips per mount
+        tips_available = {mount: 0 for mount in self.pipette_ranges}
+        for mount, pip in self.config.get("pipettes", {}).items():
+            for tr_label in pip.get("tipracks", []):
+                tr = self.config.get("labware", {}).get(tr_label, {})
+                load = tr.get("load_name", "")
+                tips_available[mount] += 384 if "384" in load else 96
 
-        if tip_count > available_tips and available_tips > 0:
-            result.violations.append(ConstraintViolation(
-                violation_type=ViolationType.TIP_INSUFFICIENT,
-                severity=Severity.WARNING,
-                step=0,
-                what=f"Protocol may need ~{tip_count} tips but only ~{available_tips} available",
-                why="If tips run out mid-protocol, the robot will halt and require manual intervention.",
-                suggestion="Add more tiprack(s) to your config, or use 'same_tip' strategy where cross-contamination isn't a concern.",
-                values={"estimated_tips": tip_count, "available_tips": available_tips}
-            ))
+        # Check each pipette independently
+        for mount in self.pipette_ranges:
+            used = tip_usage.get(mount, 0)
+            available = tips_available.get(mount, 0)
+            if used > available > 0:
+                model = self.config["pipettes"][mount].get("model", mount)
+                result.violations.append(ConstraintViolation(
+                    violation_type=ViolationType.TIP_INSUFFICIENT,
+                    severity=Severity.WARNING,
+                    step=0,
+                    what=f"{model} ({mount}) may need ~{used} tips but only {available} available",
+                    why="If tips run out mid-protocol, the robot will halt and require manual intervention.",
+                    suggestion=f"Add more tipracks for {model}, or use 'same_tip' strategy where cross-contamination isn't a concern.",
+                    values={"mount": mount, "estimated_tips": used, "available_tips": available}
+                ))
+
+    def _mount_for_volume(self, volume: float) -> Optional[str]:
+        """Determine which pipette mount handles a given volume."""
+        if not volume:
+            return None
+        # Prefer the smallest pipette that can handle the volume
+        best = None
+        best_max = float('inf')
+        for mount, (lo, hi) in self.pipette_ranges.items():
+            if lo <= volume <= hi and hi < best_max:
+                best = mount
+                best_max = hi
+        # Fallback: if no pipette covers it exactly, pick the closest
+        if not best and self.pipette_ranges:
+            best = min(self.pipette_ranges, key=lambda m: abs(volume - sum(self.pipette_ranges[m]) / 2))
+        return best
+
+    @staticmethod
+    def _estimate_well_count(step) -> int:
+        """Estimate number of wells a step touches (for tip counting)."""
+        wells = 1
+        if step.destination:
+            if step.destination.wells:
+                wells = len(step.destination.wells)
+            elif step.destination.well_range:
+                wells = max(wells, 8)
+        if step.source and step.source.wells:
+            wells = max(wells, len(step.source.wells))
+        if step.replicates:
+            wells *= step.replicates
+        return wells
 
     # ========================================================================
     # HELPERS
@@ -537,7 +565,18 @@ class WellStateTracker:
         self.warnings: List[str] = []
         self._warned_wells: set = set()  # Deduplicate: one warning per well
 
-        # Initialize from spec's initial_contents
+        # Initialize from prefilled_labware (uniform fills like "100uL media per well")
+        from .parser import get_well_info
+        for pf in spec.prefilled_labware:
+            lw_config = config.get("labware", {}).get(pf.labware, {})
+            load_name = lw_config.get("load_name", "")
+            if load_name:
+                well_info = get_well_info(load_name)
+                for well in well_info["valid_wells"]:
+                    self._ensure_well(pf.labware, well)
+                    self.state[pf.labware][well].add(pf.volume_ul, pf.substance)
+
+        # Initialize from spec's initial_contents (per-well specifics)
         for ic in spec.initial_contents:
             self._ensure_well(ic.labware, ic.well)
             if ic.volume_ul:

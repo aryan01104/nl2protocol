@@ -221,9 +221,20 @@ class ExtractedStep(BaseModel):
     source: Optional[LocationRef] = None
     destination: Optional[LocationRef] = None
     post_actions: Optional[List[PostAction]] = None
-    replicates: Optional[int] = Field(None, ge=2, description=(
-        "Number of replicates per source well. Set only if the user specified replicates. Do not infer."
+    replicates: Optional[int] = Field(None, description=(
+        "Number of replicate destination columns per source well. Must be >= 2 (1 is not replication). "
+        "Set only when the user explicitly says 'in triplicate' (3), 'in duplicate' (2), etc. "
+        "Leave null if no replication is mentioned. "
+        "Example: 'test each sample in triplicate' → replicates: 3. "
+        "Example: 'transfer to column 11 and 12' → replicates: null (this is just two destinations, not replication)."
     ))
+
+    @model_validator(mode='after')
+    def coerce_replicates(self) -> 'ExtractedStep':
+        """replicates=1 means no replication — treat as null."""
+        if self.replicates is not None and self.replicates < 2:
+            self.replicates = None
+        return self
     tip_strategy: Optional[Literal["new_tip_each", "same_tip", "unspecified"]] = None
     pipette_hint: Optional[Literal["p20", "p300", "p1000"]] = Field(None, description=(
         "Set only if the user explicitly named a pipette. Do not infer from volumes or context."
@@ -251,6 +262,25 @@ class WellContents(BaseModel):
     ))
 
 
+class LabwarePrefill(BaseModel):
+    """Declares that an entire labware starts pre-filled with a uniform substance and volume.
+
+    Use this when the instruction says something like "plate contains 100uL media per well"
+    rather than listing every individual well. The well state tracker expands this into
+    per-well state during initialization.
+    """
+    labware: str = Field(..., description=(
+        "How the user referred to this labware. Copy their wording exactly. "
+        "Example: 'cell plate', 'assay plate'. Same convention as LocationRef.description."
+    ))
+    substance: str = Field(..., description=(
+        "What the labware is pre-filled with. Copy the user's wording."
+    ))
+    volume_ul: float = Field(..., description=(
+        "Volume per well in uL. Must be explicitly stated in the instruction."
+    ))
+
+
 class ProtocolSpec(BaseModel):
     """The structured intermediate representation of the user's intent.
 
@@ -263,6 +293,7 @@ class ProtocolSpec(BaseModel):
     steps: List[ExtractedStep] = Field(..., min_length=1)
     explicit_volumes: List[float] = Field(default_factory=list, description="All volumes found in instruction text via regex")
     initial_contents: List[WellContents] = Field(default_factory=list, description="What's in wells/tubes before the protocol starts")
+    prefilled_labware: List[LabwarePrefill] = Field(default_factory=list, description="Labware that starts uniformly pre-filled (e.g. 'cell plate has 100uL media per well')")
 
     @model_validator(mode='after')
     def validate_step_ordering(self) -> 'ProtocolSpec':
@@ -337,6 +368,10 @@ class LabwareResolver:
         all_refs = self._collect_refs(spec)
         unique_descs = {ref.description for ref in all_refs}
 
+        # Include prefilled_labware descriptions
+        for pf in spec.prefilled_labware:
+            unique_descs.add(pf.labware)
+
         if not unique_descs:
             return spec
 
@@ -350,6 +385,10 @@ class LabwareResolver:
         for wc in spec.initial_contents:
             if wc.labware in resolved:
                 wc.labware = resolved[wc.labware]
+
+        for pf in spec.prefilled_labware:
+            if pf.labware in resolved:
+                pf.labware = resolved[pf.labware]
 
         return spec
 
@@ -539,12 +578,12 @@ LABWARE REFERENCES:
   Example: instruction says "reservoir" → description: "reservoir"
 - Do NOT translate to config labels or load names — that happens in a later stage.
 - Leave "resolved_label" as null — it will be filled automatically.
-- Do NOT worry about labware that doesn't exist in the config — that is handled by a later resolution stage.
+- Do not worry about whether labware exists or is valid — a later resolution stage handles that.
 
 STEP SOURCE LOCATIONS — only populate the "source" LocationRef when the instruction explicitly names it:
 - The "source" field on a step means where to aspirate from. Only fill it from the instruction text.
 - If the instruction says "Add 5uL water to B12" with no mention of where water is, set the step's source: null.
-  A later stage matches substances to config contents deterministically.
+  A later stage resolves unknown sources automatically.
 - If the instruction says "Add 5uL water from reservoir A2 to B12", then the step's source is populated.
 - Example — instruction says "Add 5uL BSA stock + 5uL water":
     BSA step → source: {{"description": "tube rack", "well": "B1"}} (instruction says "Tube rack B1 contains BSA stock")
@@ -556,11 +595,19 @@ TEMPERATURE STEPS (set_temperature, wait_for_temperature):
     {{"action": "set_temperature", "temperature": {{"value": 42, "provenance": {{...}}}}}}
 - The "volume" field is ONLY for liquid volumes (uL/mL). Temperatures are NOT volumes.
 
-INITIAL CONTENTS:
-- Extract what's already in wells/tubes BEFORE the protocol starts.
-- Use the user's exact wording for the "labware" field (same as LocationRef.description).
-- Example: "Tube rack A1 contains DNA standard" → {{"labware": "tube rack", "well": "A1", "substance": "DNA standard"}}
+INITIAL CONTENTS (two fields — use the right one):
+
+"initial_contents" — for SPECIFIC wells with known contents:
+- Use when the instruction names individual wells: "Tube rack A1 contains DNA standard"
+- Example: {{"labware": "tube rack", "well": "A1", "substance": "DNA standard"}}
 - Only include what the instruction explicitly states. Don't infer contents.
+
+"prefilled_labware" — for ENTIRE plates/labware pre-filled uniformly:
+- Use when the instruction says ALL wells have the same contents: "cell plate has 100uL media per well"
+- Do NOT list every well individually — just one entry for the whole labware.
+- Example: "Cell plate contains 100uL media per well" →
+    prefilled_labware: [{{"labware": "cell plate", "substance": "media", "volume_ul": 100.0}}]
+- Only use when a volume is explicitly stated. If the instruction just says "plate has cells" with no volume, skip it.
 
 COMPRESSION — KEEP STEPS COMPACT:
 - NEVER create separate steps for repetitive operations that differ only in wells.
@@ -591,6 +638,7 @@ COMPRESSION — KEEP STEPS COMPACT:
 FINAL REMINDERS BEFORE OUTPUT:
 - Each step has exactly ONE volume. Different volumes = separate steps.
 - Step source LocationRef = only what the instruction says. Unknown source = null.
+- Extract ALL steps the instruction describes. Your job is faithful extraction, nothing else.
 
 FORMAT YOUR RESPONSE EXACTLY AS:
 <reasoning>
@@ -603,9 +651,6 @@ your step-by-step thinking here
 
 REASONING_USER_PROMPT = """INSTRUCTION:
 {instruction}
-
-LAB CONFIG (for context — what equipment is available):
-{config}
 
 Think through this protocol, then produce the structured specification.
 """
@@ -677,7 +722,6 @@ class SemanticExtractor:
         )
         user_prompt = REASONING_USER_PROMPT.format(
             instruction=instruction,
-            config=json.dumps(enriched_config, indent=2)
         )
 
         try:
@@ -1003,7 +1047,12 @@ Output the corrected specification.
 
             # --- Substance ---
             if step.substance and step.substance.provenance.source == "instruction":
-                if step.substance.value.lower() not in instruction_lower:
+                sub = step.substance.value.lower()
+                # Check exact match, singular/plural variants, and individual words
+                found = (sub in instruction_lower
+                         or sub.rstrip('s') in instruction_lower
+                         or (sub + 's') in instruction_lower)
+                if not found:
                     warnings.append(self._warn(
                         step.order, "substance", step.substance.value,
                         "instruction", "fabrication",
