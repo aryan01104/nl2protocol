@@ -172,6 +172,12 @@ Files:
         help='Auto-accept instruction/config values with confidence >= threshold (default: 0.7)'
     )
 
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Show full reasoning, provenance details, and debug information'
+    )
+
     return parser
 
 
@@ -636,6 +642,7 @@ def main(argv: list = None) -> int:
             csv_path=args.data,
             full_confirmation=args.full_confirmation,
             confirmation_threshold=args.confirmation_threshold,
+            verbose=args.verbose,
         )
     except NL2ProtocolError as e:
         print(f"\nError: {e}", file=sys.stderr)

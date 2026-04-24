@@ -125,6 +125,12 @@ class ProvenancedDuration(BaseModel):
     provenance: Provenance
 
 
+class ProvenancedTemperature(BaseModel):
+    """A temperature in Celsius with provenance tracking."""
+    value: float = Field(..., description="Temperature in degrees Celsius.")
+    provenance: Provenance
+
+
 class ProvenancedString(BaseModel):
     """A string value with provenance tracking."""
     value: str
@@ -200,7 +206,15 @@ class ExtractedStep(BaseModel):
         "What is being moved or acted on. Copy the substance name as the user wrote it. "
         "Do not normalize, translate, or infer if unspecified — leave null."
     ))
-    volume: Optional[ProvenancedVolume] = None
+    volume: Optional[ProvenancedVolume] = Field(None, description=(
+        "Liquid volume for pipetting (uL or mL). Only for liquid-handling actions "
+        "(transfer, distribute, mix, etc.). Do NOT put temperature values here — "
+        "use the temperature field for set_temperature/wait_for_temperature steps."
+    ))
+    temperature: Optional[ProvenancedTemperature] = Field(None, description=(
+        "Temperature in Celsius. Only for set_temperature and wait_for_temperature steps. "
+        "Do NOT put this in the volume or note fields."
+    ))
     duration: Optional[ProvenancedDuration] = Field(None, description=(
         "For delay, pause, or incubation steps only. Do not put time values in the volume field."
     ))
@@ -535,6 +549,12 @@ LABWARE REFERENCES:
 - Leave "resolved_label" as null — it will be filled automatically.
 - If the instruction references labware that clearly does not exist in the config, add the user's wording to "missing_labware".
 
+TEMPERATURE STEPS (set_temperature, wait_for_temperature):
+- Put the temperature value in the "temperature" field, NOT in "volume" or "note".
+  Example: "Set temperature module to 42°C" →
+    {{"action": "set_temperature", "temperature": {{"value": 42, "provenance": {{...}}}}}}
+- The "volume" field is ONLY for liquid volumes (uL/mL). Temperatures are NOT volumes.
+
 INITIAL CONTENTS:
 - Extract what's already in wells/tubes BEFORE the protocol starts.
 - Use the user's exact wording for the "labware" field (same as LocationRef.description).
@@ -584,6 +604,7 @@ def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     """Look up the provenance reason string for a given field on a step."""
     field_map = {
         "volume": step.volume,
+        "temperature": step.temperature,
         "substance": step.substance,
         "duration": step.duration,
         "composition": None,
@@ -918,6 +939,19 @@ Output the corrected specification.
             results.append((val, unit))
         return results
 
+    @staticmethod
+    def _extract_non_volume_numbers(instruction: str, volume_set: set) -> set:
+        """Extract all numbers from instruction text that aren't volumes.
+
+        Finds every standalone number, removes those already identified as
+        volumes (uL/mL suffix). The remaining numbers are candidates for
+        temperatures, counts, concentrations, etc.
+        """
+        all_numbers = set()
+        for m in re.finditer(r'\b(\d+(?:\.\d+)?)\b', instruction):
+            all_numbers.add(float(m.group(1)))
+        return all_numbers - volume_set
+
     def _warn(self, step_order: int, field: str, value: str,
               claimed_source: str, severity: str, message: str) -> dict:
         """Build a structured provenance warning."""
@@ -941,6 +975,7 @@ Output the corrected specification.
         text_volumes = self._extract_volumes_from_text(instruction)
         text_wells = self._extract_wells_from_text(instruction)
         text_durations = self._extract_durations_from_text(instruction)
+        non_volume_numbers = self._extract_non_volume_numbers(instruction, set(text_volumes))
         instruction_lower = instruction.lower()
 
         for step in spec.steps:
@@ -974,6 +1009,17 @@ Output the corrected specification.
                         f"{step.duration.value} {step.duration.unit}",
                         "instruction", "fabrication",
                         f"Step {step.order}: claims {step.duration.value} {step.duration.unit} "
+                        f"from instruction but not found in text",
+                    ))
+
+            # --- Temperature ---
+            if step.temperature and step.temperature.provenance.source == "instruction":
+                if step.temperature.value not in non_volume_numbers:
+                    warnings.append(self._warn(
+                        step.order, "temperature",
+                        f"{step.temperature.value}°C",
+                        "instruction", "fabrication",
+                        f"Step {step.order}: claims {step.temperature.value}°C "
                         f"from instruction but not found in text",
                     ))
 
@@ -1099,6 +1145,7 @@ Output the corrected specification.
             # Walk provenanced fields
             fields = [
                 ("volume", step.volume),
+                ("temperature", step.temperature),
                 ("substance", step.substance),
                 ("duration", step.duration),
             ]
@@ -1261,10 +1308,11 @@ Output the corrected specification.
                     dst += f" wells {', '.join(wells)}"
 
         vol = f" {step.volume.value}{step.volume.unit}" if step.volume else ""
+        temp = f" {step.temperature.value}°C" if step.temperature else ""
         dur = f" for {step.duration.value} {step.duration.unit}" if step.duration else ""
         substance = f" of {step.substance.value}" if step.substance else ""
 
-        return f"{step.order}. {step.action.upper()}{vol}{substance}{src}{dst}{dur}"
+        return f"{step.order}. {step.action.upper()}{temp}{vol}{substance}{src}{dst}{dur}"
 
     @staticmethod
     def format_for_confirmation(spec: ProtocolSpec, provenance_warnings: List[dict] = None,
@@ -1320,6 +1368,10 @@ Output the corrected specification.
                     exactness = ", exact" if step.volume.exact else ", approx"
                     fields.append(f"volume: {step.volume.value}{step.volume.unit} "
                                   f"[{p.source}, {p.confidence}{exactness}]")
+                if step.temperature:
+                    p = step.temperature.provenance
+                    fields.append(f"temperature: {step.temperature.value}°C "
+                                  f"[{p.source}, {p.confidence}]")
                 if step.substance:
                     p = step.substance.provenance
                     fields.append(f"substance: {step.substance.value} [{p.source}, {p.confidence}]")
@@ -1356,7 +1408,7 @@ Output the corrected specification.
             # Count auto-accepted parameters
             auto_accepted = 0
             for step in spec.steps:
-                for field_val in [step.volume, step.substance, step.duration]:
+                for field_val in [step.volume, step.temperature, step.substance, step.duration]:
                     if field_val and hasattr(field_val, 'provenance') and field_val.provenance:
                         p = field_val.provenance
                         if p.source in ("instruction", "config") and p.confidence >= threshold:
@@ -2049,9 +2101,11 @@ Output the corrected specification.
             # --- Module commands ---
 
             elif step.action == "set_temperature":
-                # Extract celsius from note
+                # Read celsius from temperature field, fall back to note for backwards compat
                 celsius = None
-                if step.note:
+                if step.temperature:
+                    celsius = step.temperature.value
+                elif step.note:
                     m = re.search(r'(\d+(?:\.\d+)?)\s*°?\s*C', step.note)
                     if m:
                         celsius = float(m.group(1))

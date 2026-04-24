@@ -34,6 +34,19 @@ def _wrap(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> str:
     return textwrap.fill(text, width=width, initial_indent=indent,
                          subsequent_indent=indent)
 
+
+def _stage(label: str):
+    """Print a stage header with visual separation."""
+    _log()
+    _log(C.separator(LINE_WIDTH))
+    _log(C.header(label))
+
+
+def _prompt_input(msg: str) -> str:
+    """Styled input prompt that stands out from surrounding output."""
+    _log()  # breathing room before prompt
+    return input(C.prompt(msg)).strip()
+
 from opentrons import simulate
 
 
@@ -616,9 +629,9 @@ class ProtocolAgent:
 
             # Prompt
             if all_resolved:
-                response = input(f"\n  Pick a number to change, or Enter to confirm all (q=quit): ").strip().lower()
+                response = _prompt_input("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
             else:
-                response = input(f"\n  Pick a number to assign unresolved items (q=quit): ").strip().lower()
+                response = _prompt_input("Pick a number to assign unresolved items (q=quit): ").lower()
 
             if response == 'q':
                 _log("  Aborted.")
@@ -647,7 +660,7 @@ class ProtocolAgent:
                         load_name = self.parser.config["labware"][label].get("load_name", "")
                         marker = " ←" if label == current.get(desc) else ""
                         _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
-                    pick = input(f"    Pick label (1-{len(available_labels)}), or Enter to cancel: ").strip()
+                    pick = _prompt_input(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
                     if pick.isdigit():
                         pick_idx = int(pick) - 1
                         if 0 <= pick_idx < len(available_labels):
@@ -689,15 +702,15 @@ class ProtocolAgent:
             if reason:
                 _log(f"    reason: \"{reason}\"")
 
-            response = input("    (Enter=accept, e=edit, s=accept all, q=quit): ").strip().lower()
+            response = _prompt_input("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
 
             if response == 'q':
                 return None
             elif response == 's':
-                _log("  Accepting all remaining items.")
+                _log(f"  {C.dim('Accepting all remaining items.')}")
                 break
             elif response == 'e':
-                new_val = input(f"    New value for {w['field']}: ").strip()
+                new_val = _prompt_input(f"New value for {w['field']}: ")
                 if new_val:
                     edits.append((w, new_val))
                     _log(f"    → {C.success(new_val)}")
@@ -745,6 +758,14 @@ class ProtocolAgent:
                     step.duration.provenance.source = "instruction"
                     step.duration.provenance.confidence = 1.0
                     step.duration.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "temperature" and step.temperature:
+                try:
+                    step.temperature.value = float(new_val)
+                    step.temperature.provenance.source = "instruction"
+                    step.temperature.provenance.confidence = 1.0
+                    step.temperature.provenance.reason = "User-edited during confirmation"
                 except ValueError:
                     pass
             elif field == "composition":
@@ -883,7 +904,8 @@ class ProtocolAgent:
         return resolved
 
     def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False,
-                     full_confirmation: bool = False, confirmation_threshold: float = 0.7) -> Optional[PipelineResult]:
+                     full_confirmation: bool = False, confirmation_threshold: float = 0.7,
+                     verbose: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
         New architecture (v2):
@@ -904,7 +926,7 @@ class ProtocolAgent:
         from .extractor import SemanticExtractor
 
         # Stage 1: Validate input is a protocol instruction
-        _log(f"\n{C.header('[Stage 1/8]')} Validating input instruction...")
+        _stage("[Stage 1/8] Validating input instruction...")
         if not skip_validation:
             from .input_validator import InputValidator
             validator = InputValidator()
@@ -932,7 +954,7 @@ class ProtocolAgent:
             _log("  Skipping input validation.")
 
         # Stage 2: Reason through the instruction → ProtocolSpec
-        _log(f"\n{C.header('[Stage 2/8]')} Reasoning through protocol instruction...")
+        _stage("[Stage 2/8] Reasoning through protocol instruction...")
         extractor = SemanticExtractor(
             client=self.parser.client,
             model_name=self.parser.model_name
@@ -954,24 +976,20 @@ class ProtocolAgent:
             _log(f"  {C.label('Reasoning:')}")
             import re
             reasoning = spec.reasoning.strip()
-            # Split into numbered sections (1., 2., etc.)
             parts = re.split(r'(?=\d+\.\s)', reasoning)
             for part in parts:
                 part = part.strip()
                 if not part:
                     continue
-                # Split sub-bullets (lines starting with -) within each numbered section
                 sub_parts = re.split(r'(?=\s*-\s)', part, maxsplit=0)
                 for i, sub in enumerate(sub_parts):
                     sub = sub.strip()
                     if not sub:
                         continue
                     if i == 0:
-                        # Main numbered bullet
-                        _log(_wrap(sub, indent="    ", width=LINE_WIDTH))
+                        _log(_wrap(C.info(sub), indent="    ", width=LINE_WIDTH))
                     else:
-                        # Sub-bullet
-                        _log(_wrap(f"- {sub.lstrip('- ')}", indent="      ", width=LINE_WIDTH))
+                        _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
 
         # Check for missing labware — offer to add it interactively
         if spec.missing_labware:
@@ -999,17 +1017,28 @@ class ProtocolAgent:
                 return None
 
         if spec.initial_contents:
-            _log(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
+            _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
 
         # Stage 3: Validate extraction + check sufficiency + fill gaps
-        _log(f"\n{C.header('[Stage 3/8]')} Validating and completing specification...")
+        _stage("[Stage 3/8] Validating and completing specification...")
 
         # Provenance verification — check instruction/config claims
         provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.parser.config)
-        if provenance_warnings:
-            _log(f"  {C.warning('Provenance issues found:')}")
-            for w in provenance_warnings:
-                _log(f"    - {w['message']}")
+        fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
+
+        if fabrications:
+            _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
+            for w in fabrications:
+                _log(f"    {C.error('!')} {w['message']}")
+            _log(f"\n  The LLM put values in wrong fields or misattributed their source.")
+            _log(f"  This usually means temperatures ended up in volume fields, or")
+            _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
+            _log(f"  Re-run, or try a more explicit instruction.")
+            return None
+
+        non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
+        if non_fabrications:
+            _log(f"  {C.dim(f'{len(non_fabrications)} provenance note(s) — will review during confirmation.')}")
 
         # Sufficiency check
         gaps = extractor.missing_fields(spec)
@@ -1043,10 +1072,10 @@ class ProtocolAgent:
             else:
                 _log("  Gaps filled from config.")
         else:
-            _log("  Specification is complete.")
+            _log(f"  {C.dim('Specification is complete.')}")
 
         if spec.explicit_volumes:
-            _log(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
+            _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")
 
         # Infer source containers: labware that is aspirated from but never
         # dispensed into must be pre-filled by the scientist.
@@ -1057,8 +1086,8 @@ class ProtocolAgent:
                 sub = f" ({substance})" if substance else ""
                 _log(f"    - {labware} well {well}{sub}")
             if sys.stdin.isatty():
-                from .cli import prompt_yes_no
-                if not prompt_yes_no("  Is this correct?", default=True):
+                response = _prompt_input("Is this correct? [Y/n]: ").lower()
+                if response in ('n', 'no'):
                     _log("  Aborted. Adjust your instruction to clarify source containers.")
                     return None
             # Add confirmed sources to initial_contents so well tracker doesn't warn
@@ -1073,7 +1102,7 @@ class ProtocolAgent:
                     )
 
         # Stage 3.5: Resolve labware references (description → config label)
-        _log(f"\n{C.header('[Stage 3.5/8]')} Resolving labware references...")
+        _stage("[Stage 3.5/8] Resolving labware references...")
         from .extractor import LabwareResolver
         resolver = LabwareResolver(
             config=self.parser.config,
@@ -1106,7 +1135,7 @@ class ProtocolAgent:
         _log(f"  {C.success('All labware resolved.')}")
 
         # Stage 4: Constraint checking (deterministic, no LLM)
-        _log(f"\n{C.header('[Stage 4/8]')} Checking hardware constraints...")
+        _stage("[Stage 4/8] Checking hardware constraints...")
         from .constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
@@ -1123,12 +1152,12 @@ class ProtocolAgent:
                 _log()
 
             if sys.stdin.isatty():
-                from .cli import prompt_yes_no
                 _log("  These conflicts mean the protocol may not execute correctly.")
-                if not prompt_yes_no("  Proceed anyway (constraints will be reduced to fit)?", default=False):
+                response = _prompt_input("Proceed anyway? [y/N]: ").lower()
+                if response not in ('y', 'yes'):
                     _log("  Aborted. Fix your config or instruction and retry.")
                     return None
-                _log("  Proceeding with constraint adjustments.")
+                _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
             else:
                 _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
                 return None
@@ -1136,22 +1165,15 @@ class ProtocolAgent:
             _log(f"  {C.success('All constraints satisfied.')}")
 
         # Confirm with user
+        # (fabrications already blocked in Stage 3 — only non-fabrication warnings remain)
         _log(extractor.format_for_confirmation(
-            spec, provenance_warnings,
+            spec, non_fabrications,
             threshold=confirmation_threshold,
             full=full_confirmation,
         ))
 
-        fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
-        if fabrications:
-            _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s)')}: "
-                 f"the LLM misattributed where values came from.")
-            _log("  These must be fixed before proceeding. Re-run with a more explicit instruction.")
-            return None
-
-        confirmable = [w for w in provenance_warnings if w["severity"] in ("unverified", "low_confidence")]
+        confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
         if sys.stdin.isatty():
-            from .cli import prompt_yes_no
             if confirmable and not full_confirmation:
                 _log(f"\n  {len(confirmable)} item(s) need confirmation.")
                 accepted = self._confirm_provenance_items(spec, confirmable)
@@ -1159,17 +1181,18 @@ class ProtocolAgent:
                     _log("  Aborted by user.")
                     return None
             else:
-                if not prompt_yes_no("Proceed with this specification?", default=True):
+                response = _prompt_input("Proceed with this specification? [Y/n]: ").lower()
+                if response in ('n', 'no'):
                     _log("  Aborted by user.")
                     return None
 
         # Stage 5: Deterministic spec → ProtocolSchema
-        _log(f"\n{C.header('[Stage 5/8]')} Converting specification to protocol schema...")
+        _stage("[Stage 5/8] Converting specification to protocol schema...")
         try:
             from .extractor import CompleteProtocolSpec
             complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
             protocol_schema = extractor.spec_to_schema(complete_spec, self.parser.config)
-            _log("  Schema generated deterministically.")
+            _log(f"  {C.dim('Schema generated.')}")
         except Exception as e:
             err = str(e)
             _log(f"  Schema conversion failed.")
@@ -1182,10 +1205,10 @@ class ProtocolAgent:
             return None
 
         # Stage 6: Deterministic schema → Python script
-        _log(f"\n{C.header('[Stage 6/8]')} Generating Python script...")
+        _stage("[Stage 6/8] Generating Python script...")
         try:
             script = generate_python_script(protocol_schema)
-            _log("  Python script generated.")
+            _log(f"  {C.dim('Script generated.')}")
         except ValueError as e:
             err = str(e)
             _log(f"  Script generation failed.")
@@ -1201,7 +1224,7 @@ class ProtocolAgent:
         _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
 
         # Stage 7: Opentrons simulation
-        _log(f"\n{C.header('[Stage 7/8]')} Running Opentrons simulation...")
+        _stage("[Stage 7/8] Running Opentrons simulation...")
         success, simulation_log, runlog = simulate_script(script)
 
         if not success:
@@ -1222,7 +1245,7 @@ class ProtocolAgent:
         _log(f"  {C.success('Simulation passed.')}")
 
         # Stage 8: Intent verification (safety net)
-        _log(f"\n{C.header('[Stage 8/8]')} Verifying protocol matches original intent...")
+        _stage("[Stage 8/8] Verifying protocol matches original intent...")
         from .spinner import Spinner
         with Spinner("Verifying intent match..."):
             verification = verify_intent_match(prompt, protocol_schema)
