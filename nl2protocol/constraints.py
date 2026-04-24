@@ -47,6 +47,7 @@ class ViolationType(Enum):
     WELL_INVALID = "well_invalid"
     LABWARE_NOT_FOUND = "labware_not_found"
     MODULE_NOT_FOUND = "module_not_found"
+    MODULE_LABWARE_MISMATCH = "module_labware_mismatch"
     TIP_INSUFFICIENT = "tip_insufficient"
     VOLUME_EXCEEDS_WELL = "volume_exceeds_well"
     SLOT_CONFLICT = "slot_conflict"
@@ -165,6 +166,7 @@ class ConstraintChecker:
             self._check_well_validity(step, result)
 
         self._check_module_availability(spec, result)
+        self._check_labware_on_module(spec, result)
         self._check_tip_sufficiency(spec, result)
 
         return result
@@ -413,6 +415,44 @@ class ConstraintChecker:
                         suggestion=f"Add a {required_type} module to your config JSON.",
                         values={"required_type": required_type, "action": step.action}
                     ))
+
+    def _check_labware_on_module(self, spec: ProtocolSpec, result: ConstraintCheckResult):
+        """Warn if protocol uses temperature commands but no labware sits on the module."""
+        temp_actions = {"set_temperature", "wait_for_temperature"}
+        uses_temp = any(step.action in temp_actions for step in spec.steps)
+        if not uses_temp:
+            return
+
+        config_modules = self.config.get("modules", {})
+        temp_modules = {label for label, mod in config_modules.items()
+                        if mod.get("module_type") == "temperature"}
+        if not temp_modules:
+            return  # _check_module_availability already handles missing modules
+
+        # Check if any labware has on_module pointing to a temperature module
+        config_labware = self.config.get("labware", {})
+        labware_on_temp = any(
+            lw.get("on_module") in temp_modules
+            for lw in config_labware.values()
+        )
+
+        if not labware_on_temp:
+            result.violations.append(ConstraintViolation(
+                violation_type=ViolationType.MODULE_LABWARE_MISMATCH,
+                severity=Severity.WARNING,
+                step=0,
+                what="Protocol uses temperature control but no labware is on the temperature module",
+                why=(
+                    "Temperature commands will heat/cool the module, but labware on a "
+                    "separate slot won't be affected. If your samples need temperature "
+                    "control, the labware must sit on the module."
+                ),
+                suggestion=(
+                    'Add "on_module": "<module_label>" to the labware entry in your '
+                    "config.json, and set its slot to match the module's slot."
+                ),
+                values={"temp_modules": list(temp_modules)}
+            ))
 
     def _check_tip_sufficiency(self, spec: ProtocolSpec, result: ConstraintCheckResult):
         """Estimate tip usage and warn if it might exceed available tips."""

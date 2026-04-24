@@ -1932,12 +1932,28 @@ Output the corrected specification.
                     commands.append(DropTip(pipette=mount))
 
             elif step.action == "distribute":
-                commands.append(Distribute(
-                    pipette=mount, source_labware=src_label,
-                    source_well=src_wells[0] if src_wells else (step.source.well if step.source else "A1"),
-                    dest_labware=dst_label, dest_wells=dst_wells, volume=v,
-                    new_tip="once"
-                ))
+                source_well = src_wells[0] if src_wells else (step.source.well if step.source else "A1")
+                if mix_after:
+                    # Distribute doesn't support mix_after — fall back to
+                    # individual transfers so each destination gets mixed.
+                    if use_same_tip:
+                        commands.append(PickUpTip(pipette=mount))
+                    for dw in dst_wells:
+                        commands.append(Transfer(
+                            pipette=mount, source_labware=src_label, source_well=source_well,
+                            dest_labware=dst_label, dest_well=dw, volume=v,
+                            new_tip="never" if use_same_tip else "always",
+                            mix_after=mix_after,
+                        ))
+                    if use_same_tip:
+                        commands.append(DropTip(pipette=mount))
+                else:
+                    commands.append(Distribute(
+                        pipette=mount, source_labware=src_label,
+                        source_well=source_well,
+                        dest_labware=dst_label, dest_wells=dst_wells, volume=v,
+                        new_tip="once"
+                    ))
 
             elif step.action == "consolidate":
                 commands.append(Consolidate(
