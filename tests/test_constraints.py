@@ -246,9 +246,9 @@ class TestModuleAvailability:
 class TestTipSufficiency:
     """Tests that tip usage estimates generate warnings when exceeding supply."""
 
-    def test_many_transfers_warns_about_tips(self, simple_config):
-        """96+ new-tip transfers with only 1 tiprack should warn."""
-        # 100 individual transfers = 100 tips, but only 96 in the rack
+    def test_many_transfers_errors_about_tips(self, simple_config):
+        """96+ new-tip transfers with only 1 tiprack should error."""
+        # 108 individual transfers = 108 tips, but only 96 in the rack
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
@@ -263,8 +263,8 @@ class TestTipSufficiency:
         checker = ConstraintChecker(simple_config)
         result = checker.check_all(spec)
 
-        tip_warnings = [v for v in result.warnings if v.violation_type == ViolationType.TIP_INSUFFICIENT]
-        assert len(tip_warnings) == 1
+        tip_errors = [v for v in result.errors if v.violation_type == ViolationType.TIP_INSUFFICIENT]
+        assert len(tip_errors) == 1
 
 
 # ============================================================================

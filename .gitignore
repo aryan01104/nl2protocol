@@ -24,6 +24,7 @@ generated_protocol*.py
 generated_protocol*_simulation.log
 debug_script_*.py
 extractor_debug_*.txt
+pipeline_state_*.json
 
 # Test results
 test_results/

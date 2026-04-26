@@ -467,7 +467,7 @@ class ConstraintChecker:
                 model = self.config["pipettes"][mount].get("model", mount)
                 result.violations.append(ConstraintViolation(
                     violation_type=ViolationType.TIP_INSUFFICIENT,
-                    severity=Severity.WARNING,
+                    severity=Severity.ERROR,
                     step=0,
                     what=f"{model} ({mount}) may need ~{used} tips but only {available} available",
                     why="If tips run out mid-protocol, the robot will halt and require manual intervention.",

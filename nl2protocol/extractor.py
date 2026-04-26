@@ -978,7 +978,7 @@ Output the corrected specification.
         """Extract all durations mentioned in instruction text.
         Returns list of (value, unit) tuples."""
         pattern = re.compile(
-            r'(\d+(?:\.\d+)?)\s*'
+            r'(\d+(?:\.\d+)?)\s*[-]?\s*'
             r'(seconds?|minutes?|hours?|secs?|mins?|hrs?)',
             re.IGNORECASE
         )
