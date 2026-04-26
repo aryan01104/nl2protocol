@@ -15,28 +15,26 @@ Or programmatically:
 
 __version__ = "0.3.0"
 
-from nl2protocol.app import ProtocolAgent, generate_python_script, simulate_script
-from nl2protocol.parser import ProtocolParser
+from nl2protocol.pipeline import ProtocolAgent, generate_python_script, simulate_script
+from nl2protocol.config import ConfigLoader
 from nl2protocol.models import ProtocolSchema, Command, Labware, Pipette, Pause, Delay, Comment
-from nl2protocol.validate_config import validate_config, validate_config_file, ConfigValidator
+from nl2protocol.validation.validate_config import validate_config, validate_config_file, ConfigValidator
 from nl2protocol.robot import RobotClient
-from nl2protocol.input_validator import InputValidator, validate_input
-from nl2protocol.example_store import ExampleStore
-from nl2protocol.extractor import SemanticExtractor, ProtocolSpec, CompleteProtocolSpec
-from nl2protocol.constraints import ConstraintChecker, ConstraintViolation, ConstraintCheckResult
+from nl2protocol.validation.input_validator import InputValidator, validate_input
+from nl2protocol.extraction import SemanticExtractor, ProtocolSpec, CompleteProtocolSpec
+from nl2protocol.validation import ConstraintChecker, ConstraintViolation, ConstraintCheckResult
 
 __all__ = [
     # Version
     "__version__",
     # Main classes
     "ProtocolAgent",
-    "ProtocolParser",
+    "ConfigLoader",
     "ProtocolSchema",
     "ConfigValidator",
     "ConstraintChecker",
     "RobotClient",
     "InputValidator",
-    "ExampleStore",
     "SemanticExtractor",
     "ProtocolSpec",
     # Functions

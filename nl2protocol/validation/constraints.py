@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 
-from .extractor import ProtocolSpec, ExtractedStep, ProvenancedVolume
+from nl2protocol.models.spec import ProtocolSpec, ExtractedStep, ProvenancedVolume
 
 
 # ============================================================================
@@ -316,7 +316,7 @@ class ConstraintChecker:
 
     def _check_well_validity(self, step: ExtractedStep, result: ConstraintCheckResult):
         """Check that referenced wells exist on the target labware."""
-        from .parser import get_well_info
+        from nl2protocol.models.labware import get_well_info
 
         for ref, role in [(step.source, "source"), (step.destination, "destination")]:
             if not ref:
@@ -567,7 +567,7 @@ class WellStateTracker:
         self._default_volume_wells: set = set()  # Wells that got a fallback volume
 
         # Initialize from prefilled_labware (uniform fills like "100uL media per well")
-        from .parser import get_well_info
+        from nl2protocol.models.labware import get_well_info
         for pf in spec.prefilled_labware:
             lw_config = config.get("labware", {}).get(pf.labware, {})
             load_name = lw_config.get("load_name", "")

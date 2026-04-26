@@ -10,7 +10,7 @@ import json
 import pytest
 from pathlib import Path
 
-from nl2protocol.extractor import (
+from nl2protocol.extraction import (
     CompleteProtocolSpec, ExtractedStep, ProvenancedVolume,
     Provenance, CompositionProvenance, LocationRef, PostAction,
     SemanticExtractor,
@@ -58,7 +58,8 @@ def _spec(steps, **kwargs):
 def _get_schema(steps, config, **kwargs):
     """Build a CompleteProtocolSpec and convert to schema."""
     spec = _spec(steps, **kwargs)
-    return SemanticExtractor.spec_to_schema(spec, config)
+    schema, _, _ = SemanticExtractor.spec_to_schema(spec, config)
+    return schema
 
 
 def _tip_commands(schema):

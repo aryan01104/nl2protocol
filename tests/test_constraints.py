@@ -10,11 +10,11 @@ import json
 import pytest
 from pathlib import Path
 
-from nl2protocol.constraints import (
+from nl2protocol.validation.constraints import (
     ConstraintChecker, ConstraintCheckResult, WellStateTracker,
     Severity, ViolationType
 )
-from nl2protocol.extractor import (
+from nl2protocol.extraction import (
     ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
     Provenance, CompositionProvenance, LocationRef,
     PostAction, WellContents
@@ -350,8 +350,8 @@ class TestVolumeValidation:
 
     def test_explicit_volumes_must_appear_in_schema(self, serial_dilution_config):
         """Volumes from instruction text (explicit_volumes) must all appear in schema."""
-        from nl2protocol.extractor import SemanticExtractor
-        from nl2protocol.parser import enrich_config_with_wells
+        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
             [
@@ -367,15 +367,15 @@ class TestVolumeValidation:
         )
 
         enriched = enrich_config_with_wells(serial_dilution_config)
-        schema = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
         mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
 
         assert len(mismatches) == 0
 
     def test_inferred_mix_volume_not_treated_as_hard_constraint(self, qpcr_config):
         """50uL mix volume (not in explicit_volumes) should NOT cause validation failure."""
-        from nl2protocol.extractor import SemanticExtractor
-        from nl2protocol.parser import enrich_config_with_wells
+        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
             [
@@ -396,7 +396,7 @@ class TestVolumeValidation:
         )
 
         enriched = enrich_config_with_wells(qpcr_config)
-        schema = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
         mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
 
         # The old code would fail here with "50.0uL not found in schema"
@@ -413,8 +413,8 @@ class TestSerialDilution:
 
     def test_serial_dilution_chain_complete(self, serial_dilution_config):
         """Serial dilution from A1 through B1-H1 should produce 7 sequential transfers."""
-        from nl2protocol.extractor import SemanticExtractor
-        from nl2protocol.parser import enrich_config_with_wells
+        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
             [
@@ -433,7 +433,7 @@ class TestSerialDilution:
         )
 
         enriched = enrich_config_with_wells(serial_dilution_config)
-        schema = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
 
         # Filter to just transfer commands
         transfers = [c for c in schema.commands if c.command_type == "transfer"]
@@ -454,8 +454,8 @@ class TestSerialDilution:
 
     def test_serial_dilution_no_spurious_distribute(self, serial_dilution_config):
         """Serial dilution should NOT generate a distribute command."""
-        from nl2protocol.extractor import SemanticExtractor
-        from nl2protocol.parser import enrich_config_with_wells
+        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
             [
@@ -474,7 +474,7 @@ class TestSerialDilution:
         )
 
         enriched = enrich_config_with_wells(serial_dilution_config)
-        schema = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
 
         distributes = [c for c in schema.commands if c.command_type == "distribute"]
         assert len(distributes) == 0, "Serial dilution should not auto-distribute diluent"
@@ -489,7 +489,7 @@ class TestProvenance:
 
     def test_inferred_volume_tagged(self):
         """Inferred volumes appear in full mode with [inferred] provenance."""
-        from nl2protocol.extractor import SemanticExtractor
+        from nl2protocol.extraction import SemanticExtractor
 
         spec = make_spec([
             ExtractedStep(
@@ -506,7 +506,7 @@ class TestProvenance:
 
     def test_explicit_volume_no_tag(self):
         """Explicit volumes (not inferred, not approximate) get no tag."""
-        from nl2protocol.extractor import SemanticExtractor
+        from nl2protocol.extraction import SemanticExtractor
 
         spec = make_spec(
             [
@@ -527,7 +527,7 @@ class TestProvenance:
 
     def test_post_action_volume_provenance_tagged(self):
         """Post-action volumes show their provenance source in full mode."""
-        from nl2protocol.extractor import SemanticExtractor
+        from nl2protocol.extraction import SemanticExtractor
 
         spec = make_spec(
             [

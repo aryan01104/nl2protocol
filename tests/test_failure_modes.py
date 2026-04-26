@@ -17,15 +17,15 @@ import os
 import pytest
 from pathlib import Path
 
-from nl2protocol.constraints import (
+from nl2protocol.validation.constraints import (
     ConstraintChecker, ViolationType, Severity, WellStateTracker
 )
-from nl2protocol.extractor import (
+from nl2protocol.extraction import (
     ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
     Provenance, CompositionProvenance, LocationRef,
     PostAction, WellContents, SemanticExtractor
 )
-from nl2protocol.validate_config import validate_config
+from nl2protocol.validation.validate_config import validate_config
 
 
 # ============================================================================
@@ -364,7 +364,7 @@ class TestEquivalentNames:
 
     def test_llm_maps_equivalent_names(self):
         from anthropic import Anthropic
-        from nl2protocol.extractor import LabwareResolver
+        from nl2protocol.extraction import LabwareResolver
 
         config = load_config("equivalent_names")
         instruction = load_instruction("equivalent_names")

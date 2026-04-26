@@ -3,8 +3,9 @@
 venv/
 env/
 
-# Environment variables
+# Environment variables and local config
 .env
+robot_config.json
 
 # Python
 __pycache__/
@@ -20,11 +21,7 @@ dist/
 .idea/
 
 # Generated protocols and debug output
-generated_protocol*.py
-generated_protocol*_simulation.log
-debug_script_*.py
-extractor_debug_*.txt
-pipeline_state_*.json
+output/
 
 # Test results
 test_results/
@@ -34,17 +31,8 @@ llm_failed_output*.txt
 .DS_Store
 Thumbs.db
 
-# Cloned GitHub dir for data extraction
-protocols_repo/
-
-# Utility scripts (local only)
+# Local-only directories
 scripts/
-
-# Internal notes
 notes/
-
-# Legacy RAG pipeline (deprecated — not used in current architecture)
-data_curation/
-nl2protocol/examples/
-nl2protocol/example_store.py
-nl2protocol/.chroma_db/
+docs/
+archive/

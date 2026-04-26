@@ -1,18 +1,9 @@
-from pydantic import BaseModel, Field, model_validator, field_validator, ValidationInfo
-from typing import List, Optional, Literal, Union, Annotated, Dict, Any
-
 """
-models.py — ProtocolSchema and hardware-level validation.
+schema.py — ProtocolSchema and hardware-level validation.
 
 This is the "hardware language" of the system. ProtocolSchema describes what
 the robot physically does: load this labware on slot 2, pick up a tip, aspirate
-50uL from well A1, etc. It gets converted to Python code by generate_python_script()
-in app.py.
-
-The LLM never produces this directly. Instead:
-  1. The LLM produces a ProtocolSpec (in extractor.py) — the "science language"
-  2. spec_to_schema() deterministically converts ProtocolSpec → ProtocolSchema
-  3. generate_python_script() converts ProtocolSchema → Python
+50uL from well A1, etc. It gets converted to Python code by generate_python_script().
 
 Validation here checks hardware constraints:
   - Labware, pipettes, modules match the physical lab config
@@ -20,6 +11,9 @@ Validation here checks hardware constraints:
   - All command references (labware, pipette, module) actually exist
   - Temperature and RPM values are within module limits
 """
+
+from pydantic import BaseModel, Field, model_validator, field_validator, ValidationInfo
+from typing import List, Optional, Literal, Union, Annotated, Dict, Any
 
 
 # ============================================================================

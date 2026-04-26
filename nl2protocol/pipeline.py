@@ -12,7 +12,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from .models import ProtocolSchema
-from .parser import ProtocolParser
+from .config import ConfigLoader
 
 # Suppress opentrons simulator warnings
 logging.getLogger("opentrons").setLevel(logging.ERROR)
@@ -48,150 +48,7 @@ def _prompt_input(msg: str) -> str:
     return input(C.prompt(msg)).strip()
 
 from opentrons import simulate
-
-
-@dataclass
-class VerificationResult:
-    """Result from LLM verification of generated protocol."""
-    matches: bool
-    confidence: float
-    issues: list
-    summary: str
-
-    def __str__(self) -> str:
-        status = "MATCH" if self.matches else "MISMATCH"
-        result = f"[{status}] Confidence: {self.confidence:.0%}"
-        if self.issues:
-            result += f"\nIssues: {', '.join(self.issues)}"
-        result += f"\nSummary: {self.summary}"
-        return result
-
-
-VERIFICATION_PROMPT = """You are verifying if a generated Opentrons protocol matches the user's intent.
-
-ORIGINAL INTENT:
-{intent}
-
-GENERATED PROTOCOL SCHEMA:
-- Protocol Name: {protocol_name}
-- Labware: {labware}
-- Pipettes: {pipettes}
-- Modules: {modules}
-- Number of Commands: {num_commands}
-- Command Summary: {command_summary}
-
-LABWARE MAPPING (how user's wording was resolved to physical labware):
-{labware_mapping}
-The user's informal names (e.g. "tube rack") may map to different Opentrons load names
-(e.g. a deep well plate). This is expected — focus on whether the protocol actions are correct,
-not whether load names match the user's wording.
-
-Questions:
-1. Does this protocol achieve what the user asked for?
-2. Are there any obvious mismatches between intent and actions?
-3. Summarize what this protocol actually does in one sentence.
-
-Respond with JSON only:
-{{"matches": true/false, "confidence": 0.0-1.0, "issues": ["issue1", ...], "summary": "..."}}
-"""
-
-
-def verify_intent_match(intent: str, schema: ProtocolSchema, labware_mapping: dict = None) -> VerificationResult:
-    """
-    Ask Claude to verify the generated protocol matches the original intent.
-
-    Args:
-        intent: Original natural language instruction
-        schema: Generated protocol schema
-
-    Returns:
-        VerificationResult with match status, confidence, issues, and summary
-    """
-    load_dotenv()
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        # Skip verification if no API key
-        return VerificationResult(
-            matches=True,
-            confidence=1.0,
-            issues=[],
-            summary="Verification skipped (no API key)"
-        )
-
-    client = Anthropic(api_key=api_key)
-
-    # Build command summary
-    cmd_counts = {}
-    for cmd in schema.commands:
-        cmd_type = cmd.command_type
-        cmd_counts[cmd_type] = cmd_counts.get(cmd_type, 0) + 1
-    command_summary = ", ".join([f"{count}x {cmd_type}" for cmd_type, count in cmd_counts.items()])
-
-    # Build labware summary
-    labware_summary = ", ".join([f"{lw.load_name} in slot {lw.slot}" for lw in schema.labware])
-
-    # Build pipette summary
-    pipette_summary = ", ".join([f"{p.model} on {p.mount}" for p in schema.pipettes])
-
-    # Build module summary
-    module_summary = "None"
-    if schema.modules:
-        module_summary = ", ".join([f"{m.module_type} in slot {m.slot}" for m in schema.modules])
-
-    # Format labware mapping: "tube rack" → sample_rack (usascientific_96_wellplate_2.4ml_deep)
-    if labware_mapping:
-        mapping_lines = [
-            f'  "{desc}" → {info["config_label"]} ({info["load_name"]})'
-            for desc, info in labware_mapping.items()
-        ]
-        mapping_summary = "\n".join(mapping_lines)
-    else:
-        mapping_summary = "  (not available)"
-
-    prompt = VERIFICATION_PROMPT.format(
-        intent=intent,
-        protocol_name=schema.protocol_name,
-        labware=labware_summary,
-        pipettes=pipette_summary,
-        modules=module_summary,
-        num_commands=len(schema.commands),
-        command_summary=command_summary,
-        labware_mapping=mapping_summary
-    )
-
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        result_text = response.content[0].text.strip()
-
-        # Parse JSON response
-        if "```json" in result_text:
-            result_text = result_text.split("```json")[1].split("```")[0]
-        elif "```" in result_text:
-            result_text = result_text.split("```")[1].split("```")[0]
-
-        result = json.loads(result_text.strip())
-
-        return VerificationResult(
-            matches=result.get("matches", True),
-            confidence=result.get("confidence", 1.0),
-            issues=result.get("issues", []),
-            summary=result.get("summary", "")
-        )
-
-    except Exception as e:
-        # On error, assume match to avoid blocking valid protocols
-        _log(f"  Verification skipped ({type(e).__name__})")
-        return VerificationResult(
-            matches=True,
-            confidence=0.5,
-            issues=["Verification failed due to error"],
-            summary="Could not verify protocol"
-        )
+from .validation.validator import ValidationResult, validate_protocol
 
 
 @dataclass
@@ -535,7 +392,7 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json"):
         self.config_path = config_path
-        self.parser = ProtocolParser(config_path=config_path)
+        self.parser = ConfigLoader(config_path=config_path)
 
     @staticmethod
     def _infer_source_containers(spec) -> list:
@@ -705,7 +562,7 @@ class ProtocolAgent:
 
         Returns True if all items accepted/edited, None if aborted.
         """
-        from .extractor import _find_provenance_reason
+        from .extraction import _find_provenance_reason
 
         _log(f"\n  {C.label('Confirm uncertain values:')}")
         _log(f"  For each item: (Enter) accept, (e) edit, (s) skip all and accept, (q) quit\n")
@@ -865,11 +722,14 @@ class ProtocolAgent:
         Falls back to the old LLM-based generation if the deterministic path fails.
         """
         from datetime import datetime
-        from .extractor import SemanticExtractor
+        from .extraction import SemanticExtractor
 
         # DEV ONLY — remove before public release.
         # Intermediate state log: accumulates spec snapshots throughout the
         # pipeline, written to disk on completion or failure for inspection.
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+
         state_log = {
             "timestamp": datetime.now().isoformat(),
             "input": {"instruction": prompt},
@@ -879,7 +739,7 @@ class ProtocolAgent:
             if failed_at:
                 state_log["failed_at"] = failed_at
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            path = f"pipeline_state_{ts}.json"
+            path = os.path.join(output_dir, f"pipeline_state_{ts}.json")
             with open(path, 'w') as f:
                 json.dump(state_log, f, indent=2, default=str)
             _log(f"  {C.dim(f'State log: {path}')}")
@@ -897,7 +757,7 @@ class ProtocolAgent:
             return None
 
         if not skip_validation:
-            from .input_validator import InputValidator
+            from .validation.input_validator import InputValidator
             validator = InputValidator()
             try:
                 validation = validator.classify(prompt)
@@ -1051,7 +911,7 @@ class ProtocolAgent:
                     _save_state_log("stage_3_sources")
                     return None
             # Add confirmed sources to initial_contents so well tracker doesn't warn
-            from .extractor import WellContents
+            from .extraction import WellContents
             for labware, well, substance in source_only:
                 already = any(ic.labware == labware and ic.well == well
                               for ic in spec.initial_contents)
@@ -1063,7 +923,7 @@ class ProtocolAgent:
 
         # Stage 3.5: Resolve labware references (description → config label)
         _stage("[Stage 3.5/8] Resolving labware references...")
-        from .extractor import LabwareResolver
+        from .extraction import LabwareResolver
         resolver = LabwareResolver(
             config=self.parser.config,
             client=extractor.client,
@@ -1106,7 +966,7 @@ class ProtocolAgent:
 
         # Stage 4: Constraint checking (deterministic, no LLM)
         _stage("[Stage 4/8] Checking hardware constraints...")
-        from .constraints import ConstraintChecker
+        from .validation.constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
 
@@ -1144,7 +1004,7 @@ class ProtocolAgent:
         # Build full confirmation queue: provenance warnings + null initial volumes
         confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
 
-        from .constraints import WellStateTracker
+        from .validation.constraints import WellStateTracker
         for ic in spec.initial_contents:
             if ic.volume_ul is None:
                 fallback = WellStateTracker._get_well_capacity_static(
@@ -1185,9 +1045,10 @@ class ProtocolAgent:
         state_log["stage_5_spec"] = spec.model_dump()
 
         try:
-            from .extractor import CompleteProtocolSpec
+            from .extraction import CompleteProtocolSpec
             complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
-            protocol_schema = extractor.spec_to_schema(complete_spec, self.parser.config)
+            protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
+                complete_spec, self.parser.config)
             _log(f"  {C.dim('Schema generated.')}")
         except Exception as e:
             err = str(e)
@@ -1215,7 +1076,7 @@ class ProtocolAgent:
             return None
 
         # Save script for debugging regardless of simulation outcome
-        debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
+        debug_script = os.path.join(output_dir, f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
         with open(debug_script, 'w') as f:
             f.write(script)
         _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
@@ -1242,28 +1103,29 @@ class ProtocolAgent:
 
         _log(f"  {C.success('Simulation passed.')}")
 
-        # Stage 8: Intent verification (safety net)
-        _stage("[Stage 8/8] Verifying protocol matches original intent...")
+        # Stage 8: Protocol validation (safety net)
+        _stage("[Stage 8/8] Validating protocol...")
         from .spinner import Spinner
-        # Build full labware mapping: description → config label → load name
-        labware_mapping = {}
-        for desc, label in state_log.get("stage_3.5_resolution", {}).items():
-            if label:
-                load_name = self.parser.config.get("labware", {}).get(label, {}).get("load_name", "")
-                labware_mapping[desc] = {"config_label": label, "load_name": load_name}
 
-        with Spinner("Verifying intent match..."):
-            verification = verify_intent_match(prompt, protocol_schema, labware_mapping)
+        with Spinner("Validating protocol..."):
+            validation = validate_protocol(
+                intent=prompt,
+                spec=complete_spec,
+                schema=protocol_schema,
+                config=self.parser.config,
+                well_state_warnings=well_state_warnings,
+                step_summaries=step_summaries,
+            )
 
-        state_log["stage_8_verification"] = {
-            "matches": verification.matches,
-            "confidence": verification.confidence,
-            "issues": verification.issues,
-            "summary": verification.summary,
+        state_log["stage_8_validation"] = {
+            "matches": validation.matches,
+            "confidence": validation.confidence,
+            "issues": validation.issues,
+            "summary": validation.summary,
         }
 
-        if verification.matches and verification.confidence >= 0.7:
-            _log(f"  {C.success(f'Intent verification passed (confidence: {verification.confidence:.0%})')}")
+        if validation.matches and validation.confidence >= 0.7:
+            _log(f"  {C.success(f'Validation passed (confidence: {validation.confidence:.0%})')}")
             _save_state_log()
             return PipelineResult(
                 script=script,
@@ -1273,12 +1135,12 @@ class ProtocolAgent:
                 config=self.parser.config
             )
         else:
-            _log(f"  Intent mismatch (confidence: {verification.confidence:.0%})")
-            if verification.issues:
-                _log(f"  Issues: {'; '.join(verification.issues)}")
-            _log(f"  Summary: {verification.summary}")
+            _log(f"  Validation failed (confidence: {validation.confidence:.0%})")
+            if validation.issues:
+                _log(f"  Issues: {'; '.join(validation.issues)}")
+            _log(f"  Summary: {validation.summary}")
             _log(f"  The generated protocol may not match what you asked for.")
-            _save_state_log("stage_8_verification")
+            _save_state_log("stage_8_validation")
             return None
 
 

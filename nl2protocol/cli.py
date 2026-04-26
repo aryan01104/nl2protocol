@@ -119,8 +119,8 @@ Files:
 
     parser.add_argument(
         '-o', '--output',
-        default='generated_protocol.py',
-        help='Output base path - timestamp auto-appended (default: generated_protocol.py)'
+        default='output/generated_protocol.py',
+        help='Output base path - timestamp auto-appended (default: output/generated_protocol.py)'
     )
 
     parser.add_argument(
@@ -525,7 +525,7 @@ def main(argv: list = None) -> int:
 
     # Handle --validate-only
     if args.validate_only:
-        from .validate_config import validate_config_file
+        from .validation.validate_config import validate_config_file
         result = validate_config_file(args.config)
         if result.valid:
             print(f"Config '{args.config}' is valid.")
@@ -557,7 +557,7 @@ def main(argv: list = None) -> int:
     output_path = get_timestamped_output_path(args.output)
 
     # Import here to allow --help to work without dependencies
-    from .app import ProtocolAgent
+    from .pipeline import ProtocolAgent
     from .errors import NL2ProtocolError, APIKeyError, ConfigFileError
 
     # Handle --generate-config mode (deprecated)
@@ -567,7 +567,7 @@ def main(argv: list = None) -> int:
         print(f"\n  {cwarn('Note:')} --generate-config is deprecated and may produce unreliable configs.", file=sys.stderr)
         print(f"  Recommended: create a config.json describing your actual equipment,", file=sys.stderr)
         print(f"  then use -c config.json. See .env.example and config_examples/.\n", file=sys.stderr)
-        from .config_generator import ConfigGenerator, format_config_for_display
+        from ..archive.config_generator import ConfigGenerator, format_config_for_display
         import tempfile
 
         print("Inferring lab configuration from your instruction...")
