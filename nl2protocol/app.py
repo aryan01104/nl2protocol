@@ -712,14 +712,54 @@ class ProtocolAgent:
 
         edits = []
         for i, w in enumerate(confirmable, 1):
+            # --- Initial volume items (null volume_ul in initial_contents) ---
+            if w.get("type") == "initial_volume":
+                default = w["default_volume"]
+                _log(f"  [{i}/{len(confirmable)}] Initial contents: "
+                     f"{w['labware']} {w['well']}, \"{w['substance']}\" — "
+                     f"no volume stated")
+                _log(f"    1) Enter volume")
+                _log(f"    2) Accept default ({default:.0f}uL, well capacity)")
+                _log(f"    3) Exit (edit instruction and run again)")
+
+                response = _prompt_input("Pick 1-3: ").strip()
+                if response == '3':
+                    return None
+                elif response == '1':
+                    new_val = _prompt_input(f"Volume in uL: ").strip()
+                    if new_val:
+                        try:
+                            vol = float(new_val)
+                            # Write back to spec
+                            for ic in spec.initial_contents:
+                                if ic.labware == w['labware'] and ic.well == w['well']:
+                                    ic.volume_ul = vol
+                            _log(f"    → {C.success(f'{vol}uL')}")
+                        except ValueError:
+                            _log(f"    Invalid number, using default ({default:.0f}uL).")
+                    else:
+                        _log(f"    Empty input, using default ({default:.0f}uL).")
+                else:
+                    # '2', Enter, or anything else → accept default
+                    pass
+                continue
+
+            # --- Standard provenance items ---
             step_obj = next((s for s in spec.steps if s.order == w['step']), None)
             reason = _find_provenance_reason(step_obj, w['field']) if step_obj else None
 
-            _log(f"  [{i}/{len(confirmable)}] Step {w['step']}, {w['field']}: "
+            # Describe step by action + substance
+            if step_obj:
+                action = step_obj.action.upper()
+                substance = f" ({step_obj.substance.value})" if step_obj.substance else ""
+                step_desc = f"Step {w['step']} {action}{substance}"
+            else:
+                step_desc = f"Step {w['step']}"
+
+            _log(f"  [{i}/{len(confirmable)}] {step_desc}, {w['field']}: "
                  f"{C.warning(w['value'])}")
-            _log(f"    source: {w['claimed_source']}, severity: {w['severity']}")
             if reason:
-                _log(f"    reason: \"{reason}\"")
+                _log(f"    Inferred: {reason}")
 
             response = _prompt_input("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
 
@@ -1101,15 +1141,31 @@ class ProtocolAgent:
         else:
             _log(f"  {C.success('All constraints satisfied.')}")
 
+        # Build full confirmation queue: provenance warnings + null initial volumes
+        confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
+
+        from .constraints import WellStateTracker
+        for ic in spec.initial_contents:
+            if ic.volume_ul is None:
+                fallback = WellStateTracker._get_well_capacity_static(
+                    ic.labware, self.parser.config) or 15000.0
+                confirmable.append({
+                    "type": "initial_volume",
+                    "labware": ic.labware,
+                    "well": ic.well,
+                    "substance": ic.substance,
+                    "default_volume": fallback,
+                })
+
         # Confirm with user
         # (fabrications already blocked in Stage 3 — only non-fabrication warnings remain)
         _log(extractor.format_for_confirmation(
             spec, non_fabrications,
             threshold=confirmation_threshold,
             full=full_confirmation,
+            extra_confirmable=[w for w in confirmable if w.get("type") == "initial_volume"],
         ))
 
-        confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
         if sys.stdin.isatty():
             if confirmable and not full_confirmation:
                 _log(f"\n  {len(confirmable)} item(s) need confirmation.")

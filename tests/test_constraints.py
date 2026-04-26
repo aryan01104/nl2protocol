@@ -287,14 +287,15 @@ class TestWellStateTracker:
         assert "empty" in tracker.warnings[0]
 
     def test_aspirate_from_stocked_well_no_warning(self, simple_config):
-        """Aspirating from a well with initial contents doesn't warn."""
+        """Aspirating from a well with initial contents doesn't warn about emptiness."""
         spec = make_spec([self._dummy_step()], initial_contents=[
             WellContents(labware="source_plate", well="A1", substance="DNA")
         ])
         tracker = WellStateTracker(simple_config, spec)
 
         tracker.aspirate("source_plate", "A1", 100.0)
-        assert len(tracker.warnings) == 0
+        empty_warnings = [w for w in tracker.warnings if "empty" in w]
+        assert len(empty_warnings) == 0
 
     def test_dispense_then_aspirate_no_warning(self, simple_config):
         """Normal flow: dispense into well, then aspirate from it."""

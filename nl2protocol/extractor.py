@@ -502,7 +502,7 @@ Your job: think through what the user wants step by step, then produce a structu
 THINK FIRST (inside <reasoning> tags):
 1. What protocol is this? Is it a named protocol (e.g., "Bradford assay", "serial dilution") or ad-hoc steps?
 2. If it's a named protocol, what does it typically involve? Expand from your domain knowledge.
-3. What parameters did the user explicitly specify? (volumes, wells, substances, pipettes, tip strategy)
+3. What parameters did the user explicitly specify? (volumes, wells, substances, pipettes)
 4. What parameters are missing? What are standard/typical defaults for this protocol?
 5. What are the individual steps, in order?
 6. For each step: what is the action, what substance, what volume, from where, to where?
@@ -515,7 +515,6 @@ THEN produce structured JSON (inside <spec> tags) matching this schema:
 RULES:
 - Preserve exact volumes the user stated (10.5uL stays 10.5, never round or adjust)
 - If the user mentioned a pipette ("use the p20"), record it as pipette_hint
-- If the user mentioned tip strategy ("new tip for each"), record as tip_strategy
 - For time durations (delays, pauses, incubations), use the "duration" field with unit "seconds", "minutes", or "hours" — NEVER put time values in the "volume" field
 - For well ranges, prefer the format "A1-H12" or provide explicit well lists like ["A1", "B1", "C1"]. Avoid natural language well descriptions like "columns 2-8, rows A-H" — instead write "A2-H8"
 - Every liquid-handling step (transfer, distribute, mix, etc.) MUST have a volume
@@ -600,7 +599,9 @@ INITIAL CONTENTS (two fields — use the right one):
 "initial_contents" — for SPECIFIC wells with known contents:
 - Use when the instruction names individual wells: "Tube rack A1 contains DNA standard"
 - Example: {{"labware": "tube rack", "well": "A1", "substance": "DNA standard"}}
-- Only include what the instruction explicitly states. Don't infer contents.
+- Include every well the instruction says has something in it, even if no volume is given.
+  Set volume_ul to null when the volume isn't stated.
+- Only include what the instruction explicitly states. Don't infer contents for wells not mentioned.
 
 "prefilled_labware" — for ENTIRE plates/labware pre-filled uniformly:
 - Use when the instruction says ALL wells have the same contents: "cell plate has 100uL media per well"
@@ -1380,7 +1381,8 @@ Output the corrected specification.
 
     @staticmethod
     def format_for_confirmation(spec: ProtocolSpec, provenance_warnings: List[dict] = None,
-                                threshold: float = 0.7, full: bool = False) -> str:
+                                threshold: float = 0.7, full: bool = False,
+                                extra_confirmable: List[dict] = None) -> str:
         """Format spec for user confirmation, grouped by provenance bucket.
 
         Three sections:
@@ -1393,6 +1395,8 @@ Output the corrected specification.
         warnings = provenance_warnings or []
         fabrications = [w for w in warnings if w["severity"] == "fabrication"]
         confirmable = [w for w in warnings if w["severity"] in ("unverified", "low_confidence")]
+        if extra_confirmable:
+            confirmable.extend(extra_confirmable)
 
         lines = [
             "",
@@ -1461,8 +1465,6 @@ Output the corrected specification.
                                             f"[{p.source}, {p.confidence}]")
                         lines.append(f"       -> {' '.join(pa_parts)}")
 
-                if step.tip_strategy and step.tip_strategy != "unspecified":
-                    lines.append(f"       -> tip: {step.tip_strategy}")
                 if step.pipette_hint:
                     lines.append(f"       -> pipette: {step.pipette_hint}")
 
@@ -1500,8 +1502,6 @@ Output the corrected specification.
                         if pa.volume:
                             pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}")
                         lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
-                if step.tip_strategy and step.tip_strategy != "unspecified":
-                    lines.append(f"       -> tip: {step.tip_strategy}")
             lines.append("")
 
             if auto_accepted:
@@ -1513,14 +1513,25 @@ Output the corrected specification.
             if confirmable:
                 lines.append(f"  NEEDS CONFIRMATION ({len(confirmable)}):")
                 for i, w in enumerate(confirmable, 1):
-                    lines.append(f"    [{i}] Step {w['step']}, {w['field']}: "
-                                 f"{w['value']} ({w['claimed_source']}, {w['severity']})")
-                    # Find the provenance reason for this field
-                    step = next((s for s in spec.steps if s.order == w['step']), None)
-                    if step:
-                        reason = _find_provenance_reason(step, w['field'])
-                        if reason:
-                            lines.append(f"        reason: \"{reason}\"")
+                    if w.get("type") == "initial_volume":
+                        lines.append(f"    [{i}] Initial contents: "
+                                     f"{w['labware']} {w['well']}, "
+                                     f"\"{w['substance']}\" — no volume stated")
+                        lines.append(f"        Default: {w['default_volume']:.0f}uL "
+                                     f"(well capacity)")
+                    else:
+                        step = next((s for s in spec.steps if s.order == w['step']), None)
+                        if step:
+                            action = step.action.upper()
+                            substance = f" ({step.substance.value})" if step.substance else ""
+                            step_desc = f"Step {w['step']} {action}{substance}"
+                        else:
+                            step_desc = f"Step {w['step']}"
+                        lines.append(f"    [{i}] {step_desc}, {w['field']}: {w['value']}")
+                        if step:
+                            reason = _find_provenance_reason(step, w['field'])
+                            if reason:
+                                lines.append(f"        Inferred: {reason}")
                 lines.append("")
             else:
                 lines.append("  All parameters verified — no confirmation needed.")
@@ -1872,6 +1883,10 @@ Output the corrected specification.
                 super().append(cmd)
                 track_command(cmd)
 
+            def extend(self, cmds):
+                for cmd in cmds:
+                    self.append(cmd)
+
         commands = TrackedList()
         default_mount = sorted(used_mounts)[0] if used_mounts else "left"
 
@@ -1883,13 +1898,10 @@ Output the corrected specification.
             src_wells = wells_from_ref(step.source)
             dst_wells = wells_from_ref(step.destination)
 
-            # Tip strategy
-            # For compound commands (transfer), "same_tip" means we pick up one tip
-            # before the batch and drop after. We use new_tip='never' on each individual
-            # Transfer and wrap with PickUpTip/DropTip.
-            # For "new_tip_each", each Transfer uses new_tip='always' (handles its own tips).
-            use_same_tip = (step.tip_strategy == "same_tip")
-            new_tip = "never" if use_same_tip else "always"
+            # Tip strategy is determined deterministically, not by LLM extraction.
+            # The algorithm: reuse tips while the source well stays the same and
+            # there's no post-dispense mixing (which contaminates the tip with
+            # destination liquid). Applied in the transfer action block below.
 
             # Mix from post_actions
             # NOTE: No silent clamping here. If the mix volume exceeds pipette
@@ -1929,9 +1941,8 @@ Output the corrected specification.
             # ---- map action → commands ----
 
             if step.action == "transfer":
-                # For same_tip: pick up one tip before all transfers, drop after
-                if use_same_tip:
-                    commands.append(PickUpTip(pipette=mount))
+                # Collect all transfers for this step, then apply tip strategy
+                step_transfers = []
 
                 if step.replicates and src_wells:
                     # Replicate expansion: each source well → N dest wells
@@ -1950,67 +1961,84 @@ Output the corrected specification.
                         row = sw[0]
                         for rep in range(step.replicates):
                             dw = f"{row}{dest_start_col + rep}"
-                            commands.append(Transfer(
+                            step_transfers.append(Transfer(
                                 pipette=mount, source_labware=src_label, source_well=sw,
                                 dest_labware=dst_label, dest_well=dw, volume=v,
-                                new_tip=new_tip, mix_after=mix_after
+                                new_tip="always", mix_after=mix_after
                             ))
                 elif src_wells and dst_wells:
                     if len(src_wells) == 1 and len(dst_wells) > 1:
                         # 1 source → N destinations: transfer to each dest
                         for dw in dst_wells:
-                            commands.append(Transfer(
+                            step_transfers.append(Transfer(
                                 pipette=mount, source_labware=src_label, source_well=src_wells[0],
                                 dest_labware=dst_label, dest_well=dw, volume=v,
-                                new_tip=new_tip, mix_after=mix_after
+                                new_tip="always", mix_after=mix_after
                             ))
                     elif len(dst_wells) == 1 and len(src_wells) > 1:
                         # N sources → 1 destination: transfer from each source
                         for sw in src_wells:
-                            commands.append(Transfer(
+                            step_transfers.append(Transfer(
                                 pipette=mount, source_labware=src_label, source_well=sw,
                                 dest_labware=dst_label, dest_well=dst_wells[0], volume=v,
-                                new_tip=new_tip, mix_after=mix_after
+                                new_tip="always", mix_after=mix_after
                             ))
                     else:
                         # Paired well lists: zip source[i] → dest[i]
                         pairs = list(zip(src_wells, dst_wells))
                         for sw, dw in pairs:
-                            commands.append(Transfer(
+                            step_transfers.append(Transfer(
                                 pipette=mount, source_labware=src_label, source_well=sw,
                                 dest_labware=dst_label, dest_well=dw, volume=v,
-                                new_tip=new_tip, mix_after=mix_after
+                                new_tip="always", mix_after=mix_after
                             ))
                 else:
                     # Single well fallback
                     sw = step.source.well if step.source and step.source.well else "A1"
                     dw = step.destination.well if step.destination and step.destination.well else "A1"
-                    commands.append(Transfer(
+                    step_transfers.append(Transfer(
                         pipette=mount, source_labware=src_label, source_well=sw,
                         dest_labware=dst_label, dest_well=dw, volume=v,
-                        new_tip=new_tip, mix_after=mix_after
+                        new_tip="always", mix_after=mix_after
                     ))
 
-                # Drop tip after same_tip transfer batch
-                if use_same_tip:
-                    commands.append(DropTip(pipette=mount))
+                # Apply tip strategy deterministically:
+                # Reuse tip while source well stays the same and no mixing.
+                # Mixing contaminates the tip with destination liquid.
+                if mix_after or len(step_transfers) <= 1:
+                    commands.extend(step_transfers)
+                else:
+                    # Group by source well: reuse tip while source stays the same
+                    has_groups = any(
+                        step_transfers[i].source_well == step_transfers[i + 1].source_well
+                        for i in range(len(step_transfers) - 1)
+                    )
+                    if not has_groups:
+                        # Every transfer has a unique source — no grouping benefit
+                        commands.extend(step_transfers)
+                    else:
+                        commands.append(PickUpTip(pipette=mount))
+                        for i, t in enumerate(step_transfers):
+                            t.new_tip = "never"
+                            commands.append(t)
+                            if i < len(step_transfers) - 1 and step_transfers[i + 1].source_well != t.source_well:
+                                commands.append(DropTip(pipette=mount))
+                                commands.append(PickUpTip(pipette=mount))
+                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "distribute":
                 source_well = src_wells[0] if src_wells else (step.source.well if step.source else "A1")
                 if mix_after:
                     # Distribute doesn't support mix_after — fall back to
                     # individual transfers so each destination gets mixed.
-                    if use_same_tip:
-                        commands.append(PickUpTip(pipette=mount))
+                    # Mixing contaminates tip, so new tip for each.
                     for dw in dst_wells:
                         commands.append(Transfer(
                             pipette=mount, source_labware=src_label, source_well=source_well,
                             dest_labware=dst_label, dest_well=dw, volume=v,
-                            new_tip="never" if use_same_tip else "always",
+                            new_tip="always",
                             mix_after=mix_after,
                         ))
-                    if use_same_tip:
-                        commands.append(DropTip(pipette=mount))
                 else:
                     commands.append(Distribute(
                         pipette=mount, source_labware=src_label,
@@ -2028,34 +2056,53 @@ Output the corrected specification.
                 ))
 
             elif step.action == "serial_dilution":
-                # Serial dilution: sequential transfers from source through destination wells.
-                # Each transfer moves liquid from one well to the next, with mixing.
-                #
-                # Pattern: source → dest[0] → dest[1] → ... → dest[N]
-                #
-                # NOTE: We do NOT distribute diluent here. If diluent is needed,
-                # the scientist's instruction should have it as a separate step
-                # (e.g., "add 90uL water to all wells"). The serial_dilution action
-                # ONLY handles the sequential transfers with mixing.
+                # Serial dilution: sequential transfers with mixing.
+                # Simple case (1 row):  A1 → A2 → A3 → ... → A8
+                # Parallel case (N rows): each row gets its own chain
+                #   Row A: A1→A2→A3→...→A8
+                #   Row B: B1→B2→B3→...→B8  (independent chain)
                 if dst_wells:
-                    # Build the full chain: [source_well, dest[0], dest[1], ...]
-                    source_well = src_wells[0] if src_wells else "A1"
-                    chain = [source_well] + dst_wells
+                    # Group source and dest wells by row letter
+                    src_by_row = {}
+                    for w in (src_wells or []):
+                        src_by_row.setdefault(w[0], []).append(w)
+                    dst_by_row = {}
+                    for w in dst_wells:
+                        dst_by_row.setdefault(w[0], []).append(w)
 
-                    # Serial dilution transfers — new tip each to prevent carryover
-                    if use_same_tip:
-                        commands.append(PickUpTip(pipette=mount))
-                    for i in range(len(chain) - 1):
-                        # First transfer is from source labware, rest are within dest labware
-                        from_label = src_label if i == 0 else dst_label
-                        commands.append(Transfer(
-                            pipette=mount, source_labware=from_label,
-                            source_well=chain[i], dest_labware=dst_label,
-                            dest_well=chain[i + 1], volume=v,
-                            new_tip=new_tip, mix_after=mix_after or (3, v)
-                        ))
-                    if use_same_tip:
-                        commands.append(DropTip(pipette=mount))
+                    # Sort each row's wells by column number
+                    for row in src_by_row:
+                        src_by_row[row].sort(key=lambda w: int(w[1:]))
+                    for row in dst_by_row:
+                        dst_by_row[row].sort(key=lambda w: int(w[1:]))
+
+                    # Rows that have both source and dest wells
+                    common_rows = sorted(set(src_by_row) & set(dst_by_row))
+
+                    if common_rows:
+                        # One chain per row
+                        for row in common_rows:
+                            chain = [src_by_row[row][0]] + dst_by_row[row]
+                            for i in range(len(chain) - 1):
+                                from_label = src_label if i == 0 else dst_label
+                                commands.append(Transfer(
+                                    pipette=mount, source_labware=from_label,
+                                    source_well=chain[i], dest_labware=dst_label,
+                                    dest_well=chain[i + 1], volume=v,
+                                    new_tip="always", mix_after=mix_after or (3, v)
+                                ))
+                    else:
+                        # Fallback: single chain from first source through all dests
+                        source_well = src_wells[0] if src_wells else "A1"
+                        chain = [source_well] + dst_wells
+                        for i in range(len(chain) - 1):
+                            from_label = src_label if i == 0 else dst_label
+                            commands.append(Transfer(
+                                pipette=mount, source_labware=from_label,
+                                source_well=chain[i], dest_labware=dst_label,
+                                dest_well=chain[i + 1], volume=v,
+                                new_tip="always", mix_after=mix_after or (3, v)
+                            ))
 
             elif step.action == "mix":
                 target = dst_label or src_label
@@ -2065,24 +2112,15 @@ Output the corrected specification.
                         if pa.action == "mix" and pa.repetitions:
                             reps = pa.repetitions
                 wells = dst_wells or src_wells or ["A1"]
-                if new_tip == "never":
-                    # Same tip for all wells: pick up once, mix all, drop once
+                # New tip per well — mixing touches well contents,
+                # reusing would cross-contaminate between wells
+                for well in wells:
                     commands.append(PickUpTip(pipette=mount))
-                    for well in wells:
-                        commands.append(Mix(
-                            pipette=mount, labware=target, well=well,
-                            volume=v, repetitions=reps
-                        ))
+                    commands.append(Mix(
+                        pipette=mount, labware=target, well=well,
+                        volume=v, repetitions=reps
+                    ))
                     commands.append(DropTip(pipette=mount))
-                else:
-                    # New tip per well
-                    for well in wells:
-                        commands.append(PickUpTip(pipette=mount))
-                        commands.append(Mix(
-                            pipette=mount, labware=target, well=well,
-                            volume=v, repetitions=reps
-                        ))
-                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "delay":
                 minutes, seconds = None, None
@@ -2122,42 +2160,24 @@ Output the corrected specification.
             elif step.action == "aspirate":
                 target = src_label or dst_label
                 wells = src_wells or dst_wells or ["A1"]
-                if new_tip == "never":
-                    # Same tip: pick up once, aspirate+blowout all wells, drop once
+                # New tip per well — each well has unique contents
+                for well in wells:
                     commands.append(PickUpTip(pipette=mount))
-                    for well in wells:
-                        commands.append(Aspirate(
-                            pipette=mount, labware=target, well=well, volume=v
-                        ))
-                        # Blow out to trash after each aspirate (waste removal)
-                        commands.append(BlowOut(pipette=mount))
+                    commands.append(Aspirate(
+                        pipette=mount, labware=target, well=well, volume=v
+                    ))
                     commands.append(DropTip(pipette=mount))
-                else:
-                    # New tip per well
-                    for well in wells:
-                        commands.append(PickUpTip(pipette=mount))
-                        commands.append(Aspirate(
-                            pipette=mount, labware=target, well=well, volume=v
-                        ))
-                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "dispense":
                 target = dst_label or src_label
                 wells = dst_wells or src_wells or ["A1"]
-                if new_tip == "never":
+                # New tip per well
+                for well in wells:
                     commands.append(PickUpTip(pipette=mount))
-                    for well in wells:
-                        commands.append(Dispense(
-                            pipette=mount, labware=target, well=well, volume=v
-                        ))
+                    commands.append(Dispense(
+                        pipette=mount, labware=target, well=well, volume=v
+                    ))
                     commands.append(DropTip(pipette=mount))
-                else:
-                    for well in wells:
-                        commands.append(PickUpTip(pipette=mount))
-                        commands.append(Dispense(
-                            pipette=mount, labware=target, well=well, volume=v
-                        ))
-                        commands.append(DropTip(pipette=mount))
 
             elif step.action == "blow_out":
                 target = dst_label or src_label
@@ -2269,6 +2289,30 @@ Output the corrected specification.
 
             else:
                 print(f"  Warning: unhandled action '{step.action}' in step {step.order}, skipping")
+
+        # Remove redundant DropTip/PickUpTip pairs between same-source transfers.
+        # If transfer N and transfer N+1 share the same source well, same pipette,
+        # and neither has mix_after, the tip change between them is unnecessary.
+        i = 0
+        while i < len(commands) - 2:
+            cmd = commands[i]
+            if (isinstance(cmd, Transfer) and cmd.new_tip == "never"
+                    and isinstance(commands[i + 1], DropTip)
+                    and isinstance(commands[i + 2], PickUpTip)):
+                # Find the next Transfer after the PickUpTip
+                next_transfer_idx = i + 3
+                if (next_transfer_idx < len(commands)
+                        and isinstance(commands[next_transfer_idx], Transfer)
+                        and commands[next_transfer_idx].new_tip == "never"
+                        and cmd.source_well == commands[next_transfer_idx].source_well
+                        and cmd.pipette == commands[next_transfer_idx].pipette
+                        and not cmd.mix_after
+                        and not commands[next_transfer_idx].mix_after):
+                    # Same source, same pipette, no mixing — remove the DropTip/PickUpTip
+                    del commands[i + 1]  # DropTip
+                    del commands[i + 1]  # PickUpTip (shifted down)
+                    continue
+            i += 1
 
         # Build Module objects from config
         module_list = []

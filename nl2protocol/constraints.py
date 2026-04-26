@@ -564,6 +564,7 @@ class WellStateTracker:
         self.state: Dict[str, Dict[str, WellState]] = {}
         self.warnings: List[str] = []
         self._warned_wells: set = set()  # Deduplicate: one warning per well
+        self._default_volume_wells: set = set()  # Wells that got a fallback volume
 
         # Initialize from prefilled_labware (uniform fills like "100uL media per well")
         from .parser import get_well_info
@@ -582,8 +583,15 @@ class WellStateTracker:
             if ic.volume_ul:
                 self.state[ic.labware][ic.well].add(ic.volume_ul, ic.substance)
             else:
-                # Stock/reagent — has liquid but unknown volume. Treat as infinite.
-                self.state[ic.labware][ic.well].add(100000.0, ic.substance)
+                # Volume not stated — use well capacity as a reasonable upper bound.
+                # This prevents false overflow warnings while still tracking the substance.
+                fallback = self._get_well_capacity(ic.labware) or 15000.0
+                self.state[ic.labware][ic.well].add(fallback, ic.substance)
+                self._default_volume_wells.add((ic.labware, ic.well))
+                self.warnings.append(
+                    f"'{ic.labware}' well {ic.well} has '{ic.substance}' "
+                    f"but no volume stated — assuming {fallback:.0f}uL (well capacity)"
+                )
 
     def _ensure_well(self, labware: str, well: str):
         """Ensure the labware/well exists in state."""
@@ -599,14 +607,16 @@ class WellStateTracker:
         self._ensure_well(labware, well)
         self.state[labware][well].add(volume, substance)
 
-        # Check for well overflow (approximate — use 2000uL as upper bound)
+        # Check for well overflow
         well_capacity = self._get_well_capacity(labware)
         if well_capacity and self.state[labware][well].volume_ul > well_capacity:
-            self.warnings.append(
-                f"Well {well} in '{labware}' would contain "
-                f"{self.state[labware][well].volume_ul:.1f}uL, "
-                f"exceeding estimated capacity ({well_capacity}uL)"
-            )
+            msg = (f"Well {well} in '{labware}' would contain "
+                   f"{self.state[labware][well].volume_ul:.1f}uL, "
+                   f"exceeding estimated capacity ({well_capacity}uL)")
+            if (labware, well) in self._default_volume_wells:
+                msg += (" — NOTE: this well's initial volume was assumed "
+                        "(no volume in instruction), which may cause this overflow")
+            self.warnings.append(msg)
 
     def aspirate(self, labware: str, well: str, volume: float) -> bool:
         """Record an aspiration from a well. Returns False if well is empty/insufficient."""
@@ -650,10 +660,22 @@ class WellStateTracker:
         """Check if a well has any liquid in it."""
         return self.get_volume(labware, well) > 0.01
 
+    @staticmethod
+    def _get_well_capacity_static(labware: str, config: dict) -> Optional[float]:
+        """Estimate well capacity from labware load_name (class-level, no instance needed)."""
+        lw_config = config.get("labware", {}).get(labware, {})
+        load_name = lw_config.get("load_name", "").lower()
+        return WellStateTracker._capacity_from_load_name(load_name)
+
     def _get_well_capacity(self, labware: str) -> Optional[float]:
         """Estimate well capacity from labware load_name."""
         lw_config = self.config.get("labware", {}).get(labware, {})
         load_name = lw_config.get("load_name", "").lower()
+        return self._capacity_from_load_name(load_name)
+
+    @staticmethod
+    def _capacity_from_load_name(load_name: str) -> Optional[float]:
+        """Parse capacity from a load_name string."""
 
         # Common capacity patterns from load names
         if "1.5ml" in load_name or "1500ul" in load_name:
