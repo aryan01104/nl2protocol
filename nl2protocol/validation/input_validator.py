@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 from anthropic import Anthropic
 from dotenv import load_dotenv
-from .errors import APIKeyError
+from nl2protocol.errors import APIKeyError
 
 
 Classification = Literal["PROTOCOL", "QUESTION", "AMBIGUOUS", "INVALID"]
@@ -112,7 +112,7 @@ class InputValidator:
             )
 
         try:
-            from .spinner import Spinner
+            from nl2protocol.spinner import Spinner
             with Spinner("Classifying input..."):
                 response = self.client.messages.create(
                     model=self.model_name,
@@ -141,15 +141,8 @@ class InputValidator:
             )
 
         except Exception as e:
-            # On error, default to allowing the input through
-            # Better to try protocol generation than block valid input
-            from .errors import format_api_error
-            print(f"  Input validation skipped ({format_api_error(e)})", file=sys.stderr)
-            return InputValidationResult(
-                classification="PROTOCOL",
-                reason="Classification skipped due to error",
-                suggestion=None
-            )
+            from nl2protocol.errors import format_api_error
+            raise RuntimeError(f"Input validation failed: {format_api_error(e)}") from e
 
 
 def validate_input(user_input: str) -> InputValidationResult:

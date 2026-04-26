@@ -1,0 +1,38 @@
+{
+    "labware": {
+        "tiprack_10": {
+            "load_name": "opentrons_96_tiprack_10ul",
+            "slot": "1"
+        },
+        "tiprack_300": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "4"
+        },
+        "sample_rack": {
+            "load_name": "usascientific_96_wellplate_2.4ml_deep",
+            "slot": "2"
+        },
+        "assay_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "3"
+        },
+        "reagent_reservoir": {
+            "load_name": "nest_12_reservoir_15ml",
+            "slot": "5",
+            "contents": {
+                "A1": "Bradford reagent",
+                "A2": "water"
+            }
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p10_single",
+            "tipracks": ["tiprack_10"]
+        },
+        "right": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300"]
+        }
+    }
+}

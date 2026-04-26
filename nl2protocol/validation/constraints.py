@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 
-from .extractor import ProtocolSpec, ExtractedStep, VolumeSpec
+from nl2protocol.models.spec import ProtocolSpec, ExtractedStep, ProvenancedVolume
 
 
 # ============================================================================
@@ -47,6 +47,7 @@ class ViolationType(Enum):
     WELL_INVALID = "well_invalid"
     LABWARE_NOT_FOUND = "labware_not_found"
     MODULE_NOT_FOUND = "module_not_found"
+    MODULE_LABWARE_MISMATCH = "module_labware_mismatch"
     TIP_INSUFFICIENT = "tip_insufficient"
     VOLUME_EXCEEDS_WELL = "volume_exceeds_well"
     SLOT_CONFLICT = "slot_conflict"
@@ -156,15 +157,13 @@ class ConstraintChecker:
         """Run all constraint checks. Returns structured result."""
         result = ConstraintCheckResult()
 
-        # Check for labware the instruction references but config doesn't have
-        self._check_missing_labware(spec, result)
-
         for step in spec.steps:
             self._check_pipette_capacity(step, result)
             self._check_labware_resolution(step, result)
             self._check_well_validity(step, result)
 
         self._check_module_availability(spec, result)
+        self._check_labware_on_module(spec, result)
         self._check_tip_sufficiency(spec, result)
 
         return result
@@ -173,34 +172,11 @@ class ConstraintChecker:
     # INDIVIDUAL CHECKS
     # ========================================================================
 
-    def _check_missing_labware(self, spec: ProtocolSpec, result: ConstraintCheckResult):
-        """Check if the LLM flagged any labware as missing from config."""
-        if not spec.missing_labware:
-            return
-        for lw_desc in spec.missing_labware:
-            result.violations.append(ConstraintViolation(
-                violation_type=ViolationType.LABWARE_NOT_FOUND,
-                severity=Severity.ERROR,
-                step=0,
-                what=f"Instruction references '{lw_desc}' but it's not in your lab config",
-                why=(
-                    f"The protocol requires this labware but your config.json doesn't define it. "
-                    f"Without it, the robot doesn't know which physical deck slot to use."
-                ),
-                suggestion=(
-                    f"Add '{lw_desc}' to your config.json with the correct Opentrons load_name "
-                    f"and deck slot. Example:\n"
-                    f"         \"{lw_desc.replace(' ', '_')}\": {{"
-                    f"\"load_name\": \"<opentrons_labware_name>\", \"slot\": \"<slot_number>\"}}"
-                ),
-                values={"missing": lw_desc}
-            ))
-
     def _check_pipette_capacity(self, step: ExtractedStep, result: ConstraintCheckResult):
         """Check that every volume in this step can be handled by available pipettes."""
 
         # Check step volume
-        if step.volume and not step.volume.inferred:
+        if step.volume:
             vol = step.volume.value
             if step.volume.unit == "mL":
                 vol *= 1000
@@ -317,7 +293,7 @@ class ConstraintChecker:
             ))
 
     def _check_labware_resolution(self, step: ExtractedStep, result: ConstraintCheckResult):
-        """Check that source/destination descriptions can map to config labware."""
+        """Check that source/destination have been resolved to config labware."""
         config_labels = set(self.config.get("labware", {}).keys())
         if not config_labels:
             return
@@ -325,28 +301,9 @@ class ConstraintChecker:
         for ref, role in [(step.source, "source"), (step.destination, "destination")]:
             if not ref:
                 continue
-            desc = ref.description.lower().replace("(inferred from config)", "").strip()
-            desc_words = set(re.split(r'[\s_\-]+', desc))
-
-            # Try to match — same logic as resolve_labware but just checking existence
-            matched = False
-            for label in config_labels:
-                label_lower = label.lower()
-                label_words = set(re.split(r'[\s_\-]+', label_lower))
-                # Exact match
-                if label_lower == desc:
-                    matched = True
-                    break
-                # Word overlap
-                if desc_words & label_words:
-                    matched = True
-                    break
-                # Substring
-                if any(lw in desc or desc in lw for lw in [label_lower]):
-                    matched = True
-                    break
-
-            if not matched:
+            # Check resolved_label, fall back to description for legacy specs
+            label = ref.resolved_label or ref.description
+            if label not in config_labels:
                 result.violations.append(ConstraintViolation(
                     violation_type=ViolationType.LABWARE_NOT_FOUND,
                     severity=Severity.ERROR,
@@ -359,14 +316,14 @@ class ConstraintChecker:
 
     def _check_well_validity(self, step: ExtractedStep, result: ConstraintCheckResult):
         """Check that referenced wells exist on the target labware."""
-        from .parser import get_well_info
+        from nl2protocol.models.labware import get_well_info
 
         for ref, role in [(step.source, "source"), (step.destination, "destination")]:
             if not ref:
                 continue
 
             # Resolve labware to get well info
-            label = self._resolve_label(ref)
+            label = self._resolve_ref_to_label(ref)
             if not label:
                 continue  # Already caught by labware resolution check
 
@@ -433,71 +390,134 @@ class ConstraintChecker:
                         values={"required_type": required_type, "action": step.action}
                     ))
 
+    def _check_labware_on_module(self, spec: ProtocolSpec, result: ConstraintCheckResult):
+        """Warn if protocol uses temperature commands but no labware sits on the module."""
+        temp_actions = {"set_temperature", "wait_for_temperature"}
+        uses_temp = any(step.action in temp_actions for step in spec.steps)
+        if not uses_temp:
+            return
+
+        config_modules = self.config.get("modules", {})
+        temp_modules = {label for label, mod in config_modules.items()
+                        if mod.get("module_type") == "temperature"}
+        if not temp_modules:
+            return  # _check_module_availability already handles missing modules
+
+        # Check if any labware has on_module pointing to a temperature module
+        config_labware = self.config.get("labware", {})
+        labware_on_temp = any(
+            lw.get("on_module") in temp_modules
+            for lw in config_labware.values()
+        )
+
+        if not labware_on_temp:
+            result.violations.append(ConstraintViolation(
+                violation_type=ViolationType.MODULE_LABWARE_MISMATCH,
+                severity=Severity.WARNING,
+                step=0,
+                what="Protocol uses temperature control but no labware is on the temperature module",
+                why=(
+                    "Temperature commands will heat/cool the module, but labware on a "
+                    "separate slot won't be affected. If your samples need temperature "
+                    "control, the labware must sit on the module."
+                ),
+                suggestion=(
+                    'Add "on_module": "<module_label>" to the labware entry in your '
+                    "config.json, and set its slot to match the module's slot."
+                ),
+                values={"temp_modules": list(temp_modules)}
+            ))
+
     def _check_tip_sufficiency(self, spec: ProtocolSpec, result: ConstraintCheckResult):
-        """Estimate tip usage and warn if it might exceed available tips."""
-        # Count approximate tip usage
-        tip_count = 0
+        """Estimate tip usage per pipette and warn if any exceeds available tips."""
+        liquid_actions = {"transfer", "distribute", "consolidate", "mix",
+                          "serial_dilution", "aspirate", "dispense"}
+
+        # Count tips per mount
+        tip_usage = {mount: 0 for mount in self.pipette_ranges}
+
         for step in spec.steps:
-            liquid_actions = {"transfer", "distribute", "consolidate", "mix",
-                              "serial_dilution", "aspirate", "dispense"}
             if step.action not in liquid_actions:
                 continue
 
+            # Determine which mount handles this step's volume
+            mount = self._mount_for_volume(step.volume.value if step.volume else 0)
+            if not mount:
+                continue
+
             if step.tip_strategy == "same_tip":
-                tip_count += 1
+                tip_usage[mount] += 1
             else:
-                # Estimate wells involved
-                wells = 1
-                if step.destination:
-                    if step.destination.wells:
-                        wells = len(step.destination.wells)
-                    elif step.destination.well_range:
-                        # Rough estimate from range
-                        wells = max(wells, 8)  # conservative
-                if step.source and step.source.wells:
-                    wells = max(wells, len(step.source.wells))
-                if step.replicates:
-                    wells *= step.replicates
-                tip_count += wells
+                wells = self._estimate_well_count(step)
+                tip_usage[mount] += wells
 
-        # Count available tips
-        available_tips = 0
-        if "pipettes" in self.config:
-            for pip in self.config["pipettes"].values():
-                for tr_label in pip.get("tipracks", []):
-                    tr = self.config.get("labware", {}).get(tr_label, {})
-                    load = tr.get("load_name", "")
-                    if "384" in load:
-                        available_tips += 384
-                    else:
-                        available_tips += 96
+        # Count available tips per mount
+        tips_available = {mount: 0 for mount in self.pipette_ranges}
+        for mount, pip in self.config.get("pipettes", {}).items():
+            for tr_label in pip.get("tipracks", []):
+                tr = self.config.get("labware", {}).get(tr_label, {})
+                load = tr.get("load_name", "")
+                tips_available[mount] += 384 if "384" in load else 96
 
-        if tip_count > available_tips and available_tips > 0:
-            result.violations.append(ConstraintViolation(
-                violation_type=ViolationType.TIP_INSUFFICIENT,
-                severity=Severity.WARNING,
-                step=0,
-                what=f"Protocol may need ~{tip_count} tips but only ~{available_tips} available",
-                why="If tips run out mid-protocol, the robot will halt and require manual intervention.",
-                suggestion="Add more tiprack(s) to your config, or use 'same_tip' strategy where cross-contamination isn't a concern.",
-                values={"estimated_tips": tip_count, "available_tips": available_tips}
-            ))
+        # Check each pipette independently
+        for mount in self.pipette_ranges:
+            used = tip_usage.get(mount, 0)
+            available = tips_available.get(mount, 0)
+            if used > available > 0:
+                model = self.config["pipettes"][mount].get("model", mount)
+                result.violations.append(ConstraintViolation(
+                    violation_type=ViolationType.TIP_INSUFFICIENT,
+                    severity=Severity.ERROR,
+                    step=0,
+                    what=f"{model} ({mount}) may need ~{used} tips but only {available} available",
+                    why="If tips run out mid-protocol, the robot will halt and require manual intervention.",
+                    suggestion=f"Add more tipracks for {model}, or use 'same_tip' strategy where cross-contamination isn't a concern.",
+                    values={"mount": mount, "estimated_tips": used, "available_tips": available}
+                ))
+
+    def _mount_for_volume(self, volume: float) -> Optional[str]:
+        """Determine which pipette mount handles a given volume."""
+        if not volume:
+            return None
+        # Prefer the smallest pipette that can handle the volume
+        best = None
+        best_max = float('inf')
+        for mount, (lo, hi) in self.pipette_ranges.items():
+            if lo <= volume <= hi and hi < best_max:
+                best = mount
+                best_max = hi
+        # Fallback: if no pipette covers it exactly, pick the closest
+        if not best and self.pipette_ranges:
+            best = min(self.pipette_ranges, key=lambda m: abs(volume - sum(self.pipette_ranges[m]) / 2))
+        return best
+
+    @staticmethod
+    def _estimate_well_count(step) -> int:
+        """Estimate number of wells a step touches (for tip counting)."""
+        wells = 1
+        if step.destination:
+            if step.destination.wells:
+                wells = len(step.destination.wells)
+            elif step.destination.well_range:
+                wells = max(wells, 8)
+        if step.source and step.source.wells:
+            wells = max(wells, len(step.source.wells))
+        if step.replicates:
+            wells *= step.replicates
+        return wells
 
     # ========================================================================
     # HELPERS
     # ========================================================================
 
-    def _resolve_label(self, ref) -> Optional[str]:
-        """Quick labware resolution for constraint checking."""
+    def _resolve_ref_to_label(self, ref) -> Optional[str]:
+        """Read pre-resolved config label from a LocationRef."""
         if not ref or "labware" not in self.config:
             return None
-        desc = ref.description.lower().replace("(inferred from config)", "").strip()
-        desc_words = set(re.split(r'[\s_\-]+', desc))
-
-        for label in self.config["labware"]:
-            label_words = set(re.split(r'[\s_\-]+', label.lower()))
-            if label.lower() == desc or (desc_words & label_words):
-                return label
+        # Use resolved_label if available, fall back to description for legacy specs
+        label = ref.resolved_label or ref.description
+        if label in self.config["labware"]:
+            return label
         return None
 
 
@@ -544,15 +564,34 @@ class WellStateTracker:
         self.state: Dict[str, Dict[str, WellState]] = {}
         self.warnings: List[str] = []
         self._warned_wells: set = set()  # Deduplicate: one warning per well
+        self._default_volume_wells: set = set()  # Wells that got a fallback volume
 
-        # Initialize from spec's initial_contents
+        # Initialize from prefilled_labware (uniform fills like "100uL media per well")
+        from nl2protocol.models.labware import get_well_info
+        for pf in spec.prefilled_labware:
+            lw_config = config.get("labware", {}).get(pf.labware, {})
+            load_name = lw_config.get("load_name", "")
+            if load_name:
+                well_info = get_well_info(load_name)
+                for well in well_info["valid_wells"]:
+                    self._ensure_well(pf.labware, well)
+                    self.state[pf.labware][well].add(pf.volume_ul, pf.substance)
+
+        # Initialize from spec's initial_contents (per-well specifics)
         for ic in spec.initial_contents:
             self._ensure_well(ic.labware, ic.well)
             if ic.volume_ul:
                 self.state[ic.labware][ic.well].add(ic.volume_ul, ic.substance)
             else:
-                # Stock/reagent — has liquid but unknown volume. Treat as infinite.
-                self.state[ic.labware][ic.well].add(100000.0, ic.substance)
+                # Volume not stated — use well capacity as a reasonable upper bound.
+                # This prevents false overflow warnings while still tracking the substance.
+                fallback = self._get_well_capacity(ic.labware) or 15000.0
+                self.state[ic.labware][ic.well].add(fallback, ic.substance)
+                self._default_volume_wells.add((ic.labware, ic.well))
+                self.warnings.append(
+                    f"'{ic.labware}' well {ic.well} has '{ic.substance}' "
+                    f"but no volume stated — assuming {fallback:.0f}uL (well capacity)"
+                )
 
     def _ensure_well(self, labware: str, well: str):
         """Ensure the labware/well exists in state."""
@@ -568,14 +607,16 @@ class WellStateTracker:
         self._ensure_well(labware, well)
         self.state[labware][well].add(volume, substance)
 
-        # Check for well overflow (approximate — use 2000uL as upper bound)
+        # Check for well overflow
         well_capacity = self._get_well_capacity(labware)
         if well_capacity and self.state[labware][well].volume_ul > well_capacity:
-            self.warnings.append(
-                f"Well {well} in '{labware}' would contain "
-                f"{self.state[labware][well].volume_ul:.1f}uL, "
-                f"exceeding estimated capacity ({well_capacity}uL)"
-            )
+            msg = (f"Well {well} in '{labware}' would contain "
+                   f"{self.state[labware][well].volume_ul:.1f}uL, "
+                   f"exceeding estimated capacity ({well_capacity}uL)")
+            if (labware, well) in self._default_volume_wells:
+                msg += (" — NOTE: this well's initial volume was assumed "
+                        "(no volume in instruction), which may cause this overflow")
+            self.warnings.append(msg)
 
     def aspirate(self, labware: str, well: str, volume: float) -> bool:
         """Record an aspiration from a well. Returns False if well is empty/insufficient."""
@@ -619,10 +660,22 @@ class WellStateTracker:
         """Check if a well has any liquid in it."""
         return self.get_volume(labware, well) > 0.01
 
+    @staticmethod
+    def _get_well_capacity_static(labware: str, config: dict) -> Optional[float]:
+        """Estimate well capacity from labware load_name (class-level, no instance needed)."""
+        lw_config = config.get("labware", {}).get(labware, {})
+        load_name = lw_config.get("load_name", "").lower()
+        return WellStateTracker._capacity_from_load_name(load_name)
+
     def _get_well_capacity(self, labware: str) -> Optional[float]:
         """Estimate well capacity from labware load_name."""
         lw_config = self.config.get("labware", {}).get(labware, {})
         load_name = lw_config.get("load_name", "").lower()
+        return self._capacity_from_load_name(load_name)
+
+    @staticmethod
+    def _capacity_from_load_name(load_name: str) -> Optional[float]:
+        """Parse capacity from a load_name string."""
 
         # Common capacity patterns from load names
         if "1.5ml" in load_name or "1500ul" in load_name:

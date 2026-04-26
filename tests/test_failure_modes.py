@@ -17,14 +17,15 @@ import os
 import pytest
 from pathlib import Path
 
-from nl2protocol.constraints import (
+from nl2protocol.validation.constraints import (
     ConstraintChecker, ViolationType, Severity, WellStateTracker
 )
-from nl2protocol.extractor import (
-    ProtocolSpec, ExtractedStep, VolumeSpec, LocationRef,
-    PostAction, DurationSpec, WellContents, SemanticExtractor
+from nl2protocol.extraction import (
+    ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
+    Provenance, CompositionProvenance, LocationRef,
+    PostAction, WellContents, SemanticExtractor
 )
-from nl2protocol.validate_config import validate_config
+from nl2protocol.validation.validate_config import validate_config
 
 
 # ============================================================================
@@ -51,20 +52,47 @@ def make_spec(steps, **kwargs):
         "reasoning": "",
         "explicit_volumes": [],
         "initial_contents": [],
-        "missing_labware": [],
     }
     defaults.update(kwargs)
     return ProtocolSpec(steps=steps, **defaults)
 
 
-def _dummy():
-    return ExtractedStep(order=1, action="delay", duration=DurationSpec(value=1, unit="seconds"))
+def _prov(source="instruction", reason="test", confidence=1.0):
+    """Shorthand for test provenance."""
+    return Provenance(source=source, reason=reason, confidence=confidence)
 
+
+def _comp(grounding=None, justification="test step", confidence=1.0):
+    """Shorthand for test composition provenance."""
+    return CompositionProvenance(
+        justification=justification,
+        grounding=grounding or ["instruction"],
+        confidence=confidence,
+    )
+
+
+def _vol(value, unit="uL", exact=True, source="instruction"):
+    """Shorthand for test volume."""
+    return ProvenancedVolume(value=value, unit=unit, exact=exact, provenance=_prov(source=source))
+
+
+def _dur(value, unit="seconds"):
+    """Shorthand for test duration."""
+    return ProvenancedDuration(value=value, unit=unit, provenance=_prov())
+
+
+def _dummy():
+    return ExtractedStep(order=1, action="delay", duration=_dur(1, unit="seconds"), composition_provenance=_comp())
+
+
+# Load .env so API key is available in test environment
+from dotenv import load_dotenv
+load_dotenv()
 
 # Mark for tests that need LLM
-requires_llm = pytest.mark.skipunless(
-    os.environ.get("ANTHROPIC_API_KEY"),
-    "Requires ANTHROPIC_API_KEY"
+requires_llm = pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="Requires ANTHROPIC_API_KEY"
 )
 
 
@@ -80,15 +108,17 @@ class TestPipetteInsufficient:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="transfer",
-                volume=VolumeSpec(value=5.0, unit="uL"),
+                volume=_vol(5.0),
                 source=LocationRef(description="source_plate", well="A1"),
                 destination=LocationRef(description="dest_plate", well="B1"),
+                composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer",
-                volume=VolumeSpec(value=500.0, unit="uL"),
+                volume=_vol(500.0),
                 source=LocationRef(description="reservoir", well="A1"),
                 destination=LocationRef(description="dest_plate", well="B1"),
+                composition_provenance=_comp(),
             ),
         ])
         result = ConstraintChecker(config).check_all(spec)
@@ -112,18 +142,14 @@ class TestLabwareMissing:
             [
                 ExtractedStep(
                     order=1, action="distribute",
-                    volume=VolumeSpec(value=50.0, unit="uL"),
+                    volume=_vol(50.0),
                     source=LocationRef(description="reagent_reservoir", well="A1"),
                     destination=LocationRef(description="assay_plate_384", well_range="A1-P24"),
+                    composition_provenance=_comp(),
                 )
             ],
-            missing_labware=["384-well assay plate"]
         )
         result = ConstraintChecker(config).check_all(spec)
-
-        assert result.has_errors
-        missing = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
-        assert len(missing) >= 1
 
 
 # ============================================================================
@@ -136,12 +162,13 @@ class TestModuleMissing:
     def test_temp_module_missing(self):
         config = load_config("module_missing")
         spec = make_spec([
-            ExtractedStep(order=1, action="set_temperature", note="37°C"),
+            ExtractedStep(order=1, action="set_temperature", note="37°C", composition_provenance=_comp()),
             ExtractedStep(
                 order=2, action="distribute",
-                volume=VolumeSpec(value=200.0, unit="uL"),
+                volume=_vol(200.0),
                 source=LocationRef(description="reservoir", well="A1"),
                 destination=LocationRef(description="culture_plate", well_range="A1-H12"),
+                composition_provenance=_comp(),
             ),
         ])
         result = ConstraintChecker(config).check_all(spec)
@@ -163,23 +190,21 @@ class TestCombinedConfigGaps:
         config = load_config("combined_config_gaps")
         spec = make_spec(
             [
-                ExtractedStep(order=1, action="set_temperature", note="4°C"),
-                ExtractedStep(order=2, action="engage_magnets"),
+                ExtractedStep(order=1, action="set_temperature", note="4°C", composition_provenance=_comp()),
+                ExtractedStep(order=2, action="engage_magnets", composition_provenance=_comp()),
                 ExtractedStep(
                     order=3, action="aspirate",
-                    volume=VolumeSpec(value=150.0, unit="uL"),
+                    volume=_vol(150.0),
                     source=LocationRef(description="deep_well_plate", well_range="A1-H1"),
+                    composition_provenance=_comp(),
                 ),
             ],
-            missing_labware=["waste reservoir", "ethanol reservoir", "tube rack", "PCR plate"]
         )
         result = ConstraintChecker(config).check_all(spec)
 
         assert result.has_errors
-        # Should have: missing labware (4) + missing modules (temp + magnetic)
-        missing_lw = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
+        # Should have: missing modules (temp + magnetic)
         missing_mod = [v for v in result.errors if v.violation_type == ViolationType.MODULE_NOT_FOUND]
-        assert len(missing_lw) == 4
         assert len(missing_mod) == 2
 
 
@@ -256,22 +281,21 @@ class TestMismatchedProtocol:
         spec = make_spec([
             ExtractedStep(
                 order=1, action="serial_dilution",
-                volume=VolumeSpec(value=100.0, unit="uL"),
+                volume=_vol(100.0),
                 source=LocationRef(description="drug_stock"),
                 destination=LocationRef(description="96_well_plate", well_range="A1-A12"),
                 post_actions=[PostAction(action="mix", repetitions=5,
-                                         volume=VolumeSpec(value=100.0, unit="uL"))],
+                                         volume=_vol(100.0))],
+                composition_provenance=_comp(),
             )
-        ], missing_labware=["drug_stock", "96-well plate"])
+        ])
 
         result = ConstraintChecker(config).check_all(spec)
 
         assert result.has_errors
-        # Should flag: volume exceeds p20 + missing labware
+        # Should flag: volume exceeds p20
         pip_errors = [v for v in result.errors if v.violation_type == ViolationType.PIPETTE_CAPACITY]
-        lw_errors = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
         assert len(pip_errors) >= 1
-        assert len(lw_errors) >= 1
 
 
 # ============================================================================
@@ -340,6 +364,7 @@ class TestEquivalentNames:
 
     def test_llm_maps_equivalent_names(self):
         from anthropic import Anthropic
+        from nl2protocol.extraction import LabwareResolver
 
         config = load_config("equivalent_names")
         instruction = load_instruction("equivalent_names")
@@ -349,20 +374,26 @@ class TestEquivalentNames:
         spec = extractor.extract(instruction, config)
 
         assert spec is not None
-        # Should have no missing labware — LLM should resolve all names
-        assert len(spec.missing_labware) == 0
 
-        # Check that config labels are used in descriptions
+        # Descriptions should be the user's wording (not config labels)
         all_descriptions = []
         for step in spec.steps:
             if step.source:
                 all_descriptions.append(step.source.description)
             if step.destination:
                 all_descriptions.append(step.destination.description)
+        assert len(all_descriptions) >= 2, f"Expected location refs, got none"
 
-        config_labels = {"tube_rack", "assay_plate", "reagent_reservoir"}
-        matched = sum(1 for d in all_descriptions if d in config_labels)
-        assert matched >= 2, f"Expected config labels in descriptions, got: {all_descriptions}"
+        # Labware resolver should map user wording to config labels
+        resolver = LabwareResolver(config=config, client=client)
+        resolved = resolver.resolve(spec)
+        # All LocationRefs should have resolved_label set
+        for step in resolved.steps:
+            for ref in [step.source, step.destination]:
+                if ref:
+                    assert ref.resolved_label is not None, (
+                        f"Resolver couldn't map '{ref.description}'"
+                    )
 
 
 @requires_llm

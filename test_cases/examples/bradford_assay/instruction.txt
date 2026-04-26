@@ -11,7 +11,7 @@ Protocol:
    - B12: Add 5uL BSA stock + 5uL water (1000 ug/mL)
    - C12: Add 2.5uL BSA stock + 7.5uL water (500 ug/mL)
    - D12: Add 1.25uL BSA stock + 8.75uL water (250 ug/mL)
-   - E12: Add 0.625uL BSA stock + 9.375uL water (125 ug/mL)
+   - E12: Add 1uL BSA stock + 9uL water (200 ug/mL)
    - F12: Add 10uL water only (blank, 0 ug/mL)
 2. Add 10uL of each unknown sample to wells A1-A8 (use fresh tip for each)
 3. Add 200uL of Bradford reagent to all wells containing samples (A1-A8 and A12-F12)

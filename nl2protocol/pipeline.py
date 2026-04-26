@@ -12,7 +12,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from .models import ProtocolSchema
-from .parser import ProtocolParser
+from .config import ConfigLoader
 
 # Suppress opentrons simulator warnings
 logging.getLogger("opentrons").setLevel(logging.ERROR)
@@ -34,134 +34,21 @@ def _wrap(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> str:
     return textwrap.fill(text, width=width, initial_indent=indent,
                          subsequent_indent=indent)
 
+
+def _stage(label: str):
+    """Print a stage header with visual separation."""
+    _log()
+    _log(C.separator(LINE_WIDTH))
+    _log(C.header(label))
+
+
+def _prompt_input(msg: str) -> str:
+    """Styled input prompt that stands out from surrounding output."""
+    _log()  # breathing room before prompt
+    return input(C.prompt(msg)).strip()
+
 from opentrons import simulate
-
-
-@dataclass
-class VerificationResult:
-    """Result from LLM verification of generated protocol."""
-    matches: bool
-    confidence: float
-    issues: list
-    summary: str
-
-    def __str__(self) -> str:
-        status = "MATCH" if self.matches else "MISMATCH"
-        result = f"[{status}] Confidence: {self.confidence:.0%}"
-        if self.issues:
-            result += f"\nIssues: {', '.join(self.issues)}"
-        result += f"\nSummary: {self.summary}"
-        return result
-
-
-VERIFICATION_PROMPT = """You are verifying if a generated Opentrons protocol matches the user's intent.
-
-ORIGINAL INTENT:
-{intent}
-
-GENERATED PROTOCOL SCHEMA:
-- Protocol Name: {protocol_name}
-- Labware: {labware}
-- Pipettes: {pipettes}
-- Modules: {modules}
-- Number of Commands: {num_commands}
-- Command Summary: {command_summary}
-
-Questions:
-1. Does this protocol achieve what the user asked for?
-2. Are there any obvious mismatches between intent and actions?
-3. Summarize what this protocol actually does in one sentence.
-
-Respond with JSON only:
-{{"matches": true/false, "confidence": 0.0-1.0, "issues": ["issue1", ...], "summary": "..."}}
-"""
-
-
-def verify_intent_match(intent: str, schema: ProtocolSchema) -> VerificationResult:
-    """
-    Ask Claude to verify the generated protocol matches the original intent.
-
-    Args:
-        intent: Original natural language instruction
-        schema: Generated protocol schema
-
-    Returns:
-        VerificationResult with match status, confidence, issues, and summary
-    """
-    load_dotenv()
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        # Skip verification if no API key
-        return VerificationResult(
-            matches=True,
-            confidence=1.0,
-            issues=[],
-            summary="Verification skipped (no API key)"
-        )
-
-    client = Anthropic(api_key=api_key)
-
-    # Build command summary
-    cmd_counts = {}
-    for cmd in schema.commands:
-        cmd_type = cmd.command_type
-        cmd_counts[cmd_type] = cmd_counts.get(cmd_type, 0) + 1
-    command_summary = ", ".join([f"{count}x {cmd_type}" for cmd_type, count in cmd_counts.items()])
-
-    # Build labware summary
-    labware_summary = ", ".join([f"{lw.load_name} in slot {lw.slot}" for lw in schema.labware])
-
-    # Build pipette summary
-    pipette_summary = ", ".join([f"{p.model} on {p.mount}" for p in schema.pipettes])
-
-    # Build module summary
-    module_summary = "None"
-    if schema.modules:
-        module_summary = ", ".join([f"{m.module_type} in slot {m.slot}" for m in schema.modules])
-
-    prompt = VERIFICATION_PROMPT.format(
-        intent=intent,
-        protocol_name=schema.protocol_name,
-        labware=labware_summary,
-        pipettes=pipette_summary,
-        modules=module_summary,
-        num_commands=len(schema.commands),
-        command_summary=command_summary
-    )
-
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=512,
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        result_text = response.content[0].text.strip()
-
-        # Parse JSON response
-        if "```json" in result_text:
-            result_text = result_text.split("```json")[1].split("```")[0]
-        elif "```" in result_text:
-            result_text = result_text.split("```")[1].split("```")[0]
-
-        result = json.loads(result_text.strip())
-
-        return VerificationResult(
-            matches=result.get("matches", True),
-            confidence=result.get("confidence", 1.0),
-            issues=result.get("issues", []),
-            summary=result.get("summary", "")
-        )
-
-    except Exception as e:
-        # On error, assume match to avoid blocking valid protocols
-        _log(f"  Verification skipped ({type(e).__name__})")
-        return VerificationResult(
-            matches=True,
-            confidence=0.5,
-            issues=["Verification failed due to error"],
-            summary="Could not verify protocol"
-        )
+from .validation.validator import ValidationResult, validate_protocol
 
 
 @dataclass
@@ -388,7 +275,7 @@ def generate_python_script(protocol: ProtocolSchema) -> str:
             mod = module_map.get(cmd.module)
             if not mod:
                 raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.await_temperature({cmd.celsius if hasattr(cmd, 'celsius') else ''})")
+            lines.append(f"    {mod}.await_temperature({cmd.celsius})")
 
         elif cmd.command_type == "deactivate":
             mod = module_map.get(cmd.module)
@@ -505,7 +392,7 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json"):
         self.config_path = config_path
-        self.parser = ProtocolParser(config_path=config_path)
+        self.parser = ConfigLoader(config_path=config_path)
 
     @staticmethod
     def _infer_source_containers(spec) -> list:
@@ -536,7 +423,7 @@ class ProtocolAgent:
                 for w in wells:
                     key = (desc, w)
                     if key not in source_wells:
-                        source_wells[key] = step.substance
+                        source_wells[key] = step.substance.value if step.substance else None
 
             # Destination side
             if step.destination:
@@ -572,129 +459,251 @@ class ProtocolAgent:
 
         return results
 
-    def _resolve_missing_labware(self, missing: list, instruction: str, extractor) -> dict:
-        """Interactively resolve missing labware by suggesting additions.
+    def _confirm_labware_assignments(self, spec) -> Optional[dict]:
+        """Interactive confirmation of labware description → config label assignments.
 
-        Uses the LLM to infer what Opentrons labware type is needed based on
-        the instruction context, then asks the scientist to confirm.
+        Shows all assignments at once. User picks a number to change any mapping,
+        or presses Enter to confirm all. Unresolved refs show as '???' and must
+        be assigned before confirming.
 
-        Returns dict of {label: {"load_name": ..., "slot": ...}} to add,
-        or None if user aborts.
+        Returns dict of {description: confirmed_label} or None if aborted.
         """
-        from .cli import prompt_yes_no
+        # Collect unique (description, resolved_label) pairs
+        assignments = []
+        seen = set()
+        for step in spec.steps:
+            for ref in [step.source, step.destination]:
+                if ref and ref.description not in seen:
+                    seen.add(ref.description)
+                    assignments.append({
+                        "description": ref.description,
+                        "resolved_label": ref.resolved_label,
+                    })
 
-        # Find used slots so we can suggest available ones
-        used_slots = set()
-        for lw in self.parser.config.get("labware", {}).values():
-            used_slots.add(str(lw.get("slot", "")))
-        for mod in self.parser.config.get("modules", {}).values():
-            used_slots.add(str(mod.get("slot", "")))
-        available_slots = [str(s) for s in range(1, 12) if str(s) not in used_slots]
+        if not assignments:
+            return {}
 
-        if not available_slots:
-            _log("  No deck slots available. Remove unused labware from your config first.")
-            return None
+        available_labels = list(self.parser.config.get("labware", {}).keys())
+        # Start with LLM suggestions as current assignments
+        current = {a["description"]: a["resolved_label"] for a in assignments}
 
-        _log(f"\n  I can suggest what to add. Available deck slots: {', '.join(available_slots)}")
-
-        # Ask LLM to suggest load_names for each missing labware
-        try:
-            from .spinner import Spinner
-            suggest_prompt = (
-                f"The following labware are referenced in a protocol instruction but missing from the lab config.\n"
-                f"For each one, suggest the most likely Opentrons load_name and explain WHY you think "
-                f"this labware is needed (based on what the instruction says about it).\n\n"
-                f"Instruction:\n{instruction}\n\n"
-                f"Missing labware:\n{', '.join(missing)}\n\n"
-                f"Respond with ONLY a JSON object. For each missing labware, provide:\n"
-                f'  - "load_name": the Opentrons labware load_name\n'
-                f'  - "reason": one sentence explaining why this labware is needed\n\n'
-                f"Example:\n"
-                f'{{"sample_plate": {{"load_name": "corning_96_wellplate_360ul_flat", '
-                f'"reason": "Instruction says to transfer samples from a 96-well plate with wells A1-H1"}}, '
-                f'"waste_reservoir": {{"load_name": "nest_12_reservoir_15ml", '
-                f'"reason": "Instruction says to discard supernatant to a waste container"}}}}\n'
-                f"Use real Opentrons load_names from the standard labware library."
-            )
-
-            import json as json_mod
-            with Spinner("Inferring labware types..."):
-                response = extractor.client.messages.create(
-                    model=extractor.model_name,
-                    max_tokens=1024,
-                    messages=[{"role": "user", "content": suggest_prompt}]
-                )
-
-            text = response.content[0].text.strip()
-            # Parse JSON from response
-            if "```" in text:
-                text = text.split("```")[1].split("```")[0]
-                if text.startswith("json"):
-                    text = text[4:]
-            raw_suggestions = json_mod.loads(text.strip())
-            # Normalize: handle both {"name": "load_name"} and {"name": {"load_name": ..., "reason": ...}}
-            suggestions = {}
-            reasons = {}
-            for key, val in raw_suggestions.items():
-                if isinstance(val, dict):
-                    suggestions[key] = val.get("load_name", "UNKNOWN")
-                    reasons[key] = val.get("reason", "")
+        while True:
+            # Display all assignments
+            _log(f"\n  {C.label('Labware assignments')}:")
+            all_resolved = True
+            for i, a in enumerate(assignments, 1):
+                desc = a["description"]
+                label = current.get(desc)
+                if label:
+                    load_name = self.parser.config["labware"][label].get("load_name", "")
+                    _log(f"    [{i}] \"{desc}\" → {C.success(label)} ({C.dim(load_name)})")
                 else:
-                    suggestions[key] = val
-                    reasons[key] = ""
-        except Exception as e:
-            _log(f"  Could not infer labware types automatically: {e}")
-            suggestions = {lw: "UNKNOWN" for lw in missing}
-            reasons = {lw: "" for lw in missing}
+                    _log(f"    [{i}] \"{desc}\" → {C.warning('??? (no match)')}")
+                    all_resolved = False
 
-        # Present each suggestion to the user
-        resolved = {}
-        slot_idx = 0
-        for lw_desc in missing:
-            suggested_load = suggestions.get(lw_desc, "UNKNOWN")
-            reason = reasons.get(lw_desc, "")
-            label = lw_desc.replace(" ", "_").replace("-", "_").lower()
-            slot = available_slots[slot_idx] if slot_idx < len(available_slots) else "?"
-
-            _log(f"\n  Missing: '{lw_desc}'")
-            if reason:
-                import textwrap
-                _log(textwrap.fill(f"  Why: {reason}", width=LINE_WIDTH,
-                                   initial_indent="  ", subsequent_indent="    "))
-            _log(f"  Suggested: load_name = {suggested_load}")
-            _log(f"             slot = {slot}")
-            _log(f"             label = {label}")
-
-            response = input("  Accept [Y], edit load_name [e], or skip [n]? ").strip().lower()
-            if response in ('', 'y', 'yes'):
-                resolved[label] = {"load_name": suggested_load, "slot": slot}
-                slot_idx += 1
-            elif response in ('e', 'edit'):
-                custom_load = input("  Enter Opentrons load_name: ").strip()
-                if custom_load:
-                    resolved[label] = {"load_name": custom_load, "slot": slot}
-                    slot_idx += 1
-                else:
-                    _log("  Skipped.")
-            elif response in ('n', 'no', 'skip'):
-                _log("  Skipped.")
+            # Prompt
+            if all_resolved:
+                response = _prompt_input("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
             else:
-                _log("  Skipped.")
+                _log(f"  {C.dim('Assign all ??? items before confirming. If your config is missing')}")
+                _log(f"  {C.dim('labware, quit (q) and add it to your config.json, then re-run.')}")
+                response = _prompt_input("Pick a number to assign (q=quit): ").lower()
 
-        if not resolved:
-            _log("  No labware added. Cannot proceed without the missing equipment.")
-            return None
+            if response == 'q':
+                _log("  Aborted.")
+                return None
+            elif response == '':
+                if all_resolved:
+                    # Warn if multiple descriptions map to the same label
+                    label_counts = {}
+                    for desc, label in current.items():
+                        label_counts.setdefault(label, []).append(desc)
+                    for label, descs in label_counts.items():
+                        if len(descs) > 1:
+                            _log(f"  {C.warning('Note:')} \"{descs[0]}\" and \"{descs[1]}\" "
+                                 f"both map to {label} — is this the same labware?")
+                    return current
+                else:
+                    unresolved = [a["description"] for a in assignments if not current.get(a["description"])]
+                    _log(f"  Cannot confirm — unresolved: {unresolved}")
+                    continue
+            elif response.isdigit():
+                idx = int(response) - 1
+                if 0 <= idx < len(assignments):
+                    desc = assignments[idx]["description"]
+                    _log(f"\n    Reassigning \"{desc}\":")
+                    for j, label in enumerate(available_labels, 1):
+                        load_name = self.parser.config["labware"][label].get("load_name", "")
+                        marker = " ←" if label == current.get(desc) else ""
+                        _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
+                    pick = _prompt_input(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
+                    if pick.isdigit():
+                        pick_idx = int(pick) - 1
+                        if 0 <= pick_idx < len(available_labels):
+                            current[desc] = available_labels[pick_idx]
+                        else:
+                            _log(f"    Invalid number.")
+                    elif pick == '':
+                        pass  # cancelled
+                    else:
+                        _log(f"    Invalid input.")
+                else:
+                    _log(f"  Invalid number. Pick 1-{len(assignments)}.")
+            else:
+                _log(f"  Invalid input. Pick a number, Enter, or q.")
 
-        _log(f"\n  Adding {len(resolved)} labware to config:")
-        for label, entry in resolved.items():
-            _log(f"    {label}: {entry['load_name']} on slot {entry['slot']}")
+    def _confirm_provenance_items(self, spec, confirmable: list) -> Optional[bool]:
+        """Interactive per-item confirmation for uncertain provenance claims.
 
-        if not prompt_yes_no("  Write to config file?", default=True):
-            return None
+        For each item in the confirmation queue, the user can:
+          - Accept (Enter/y) — keep the value as-is
+          - Reject (n) — abort the pipeline
+          - Edit (e) — type a replacement value
 
-        return resolved
+        Returns True if all items accepted/edited, None if aborted.
+        """
+        from .extraction import _find_provenance_reason
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, max_retries: int = 4, skip_validation: bool = False) -> Optional[PipelineResult]:
+        _log(f"\n  {C.label('Confirm uncertain values:')}")
+        _log(f"  For each item: (Enter) accept, (e) edit, (s) skip all and accept, (q) quit\n")
+
+        edits = []
+        for i, w in enumerate(confirmable, 1):
+            # --- Initial volume items (null volume_ul in initial_contents) ---
+            if w.get("type") == "initial_volume":
+                default = w["default_volume"]
+                _log(f"  [{i}/{len(confirmable)}] Initial contents: "
+                     f"{w['labware']} {w['well']}, \"{w['substance']}\" — "
+                     f"no volume stated")
+                _log(f"    1) Enter volume")
+                _log(f"    2) Accept default ({default:.0f}uL, well capacity)")
+                _log(f"    3) Exit (edit instruction and run again)")
+
+                response = _prompt_input("Pick 1-3: ").strip()
+                if response == '3':
+                    return None
+                elif response == '1':
+                    new_val = _prompt_input(f"Volume in uL: ").strip()
+                    if new_val:
+                        try:
+                            vol = float(new_val)
+                            # Write back to spec
+                            for ic in spec.initial_contents:
+                                if ic.labware == w['labware'] and ic.well == w['well']:
+                                    ic.volume_ul = vol
+                            _log(f"    → {C.success(f'{vol}uL')}")
+                        except ValueError:
+                            _log(f"    Invalid number, using default ({default:.0f}uL).")
+                    else:
+                        _log(f"    Empty input, using default ({default:.0f}uL).")
+                else:
+                    # '2', Enter, or anything else → accept default
+                    pass
+                continue
+
+            # --- Standard provenance items ---
+            step_obj = next((s for s in spec.steps if s.order == w['step']), None)
+            reason = _find_provenance_reason(step_obj, w['field']) if step_obj else None
+
+            # Describe step by action + substance
+            if step_obj:
+                action = step_obj.action.upper()
+                substance = f" ({step_obj.substance.value})" if step_obj.substance else ""
+                step_desc = f"Step {w['step']} {action}{substance}"
+            else:
+                step_desc = f"Step {w['step']}"
+
+            _log(f"  [{i}/{len(confirmable)}] {step_desc}, {w['field']}: "
+                 f"{C.warning(w['value'])}")
+            if reason:
+                _log(f"    Inferred: {reason}")
+
+            response = _prompt_input("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
+
+            if response == 'q':
+                return None
+            elif response == 's':
+                _log(f"  {C.dim('Accepting all remaining items.')}")
+                break
+            elif response == 'e':
+                new_val = _prompt_input(f"New value for {w['field']}: ")
+                if new_val:
+                    edits.append((w, new_val))
+                    _log(f"    → {C.success(new_val)}")
+                else:
+                    _log(f"    Empty input, keeping original.")
+            elif response in ('', 'y', 'yes'):
+                pass  # accepted
+            else:
+                _log(f"    Unknown input, treating as accept.")
+
+        # Apply edits to spec
+        if edits:
+            spec = self._apply_provenance_edits(spec, edits)
+            _log(f"\n  {len(edits)} value(s) edited.")
+
+        return True
+
+    def _apply_provenance_edits(self, spec, edits: list):
+        """Apply user edits from the provenance confirmation flow.
+
+        Each edit is (warning_dict, new_value_str). Modifies spec in place.
+        """
+        for w, new_val in edits:
+            step = next((s for s in spec.steps if s.order == w['step']), None)
+            if not step:
+                continue
+
+            field = w['field']
+            if field == "volume" and step.volume:
+                try:
+                    step.volume.value = float(new_val)
+                    step.volume.provenance.source = "instruction"
+                    step.volume.provenance.confidence = 1.0
+                    step.volume.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "substance" and step.substance:
+                step.substance.value = new_val
+                step.substance.provenance.source = "instruction"
+                step.substance.provenance.confidence = 1.0
+                step.substance.provenance.reason = "User-edited during confirmation"
+            elif field == "duration" and step.duration:
+                try:
+                    step.duration.value = float(new_val)
+                    step.duration.provenance.source = "instruction"
+                    step.duration.provenance.confidence = 1.0
+                    step.duration.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "temperature" and step.temperature:
+                try:
+                    step.temperature.value = float(new_val)
+                    step.temperature.provenance.source = "instruction"
+                    step.temperature.provenance.confidence = 1.0
+                    step.temperature.provenance.reason = "User-edited during confirmation"
+                except ValueError:
+                    pass
+            elif field == "composition":
+                # Can't meaningfully edit composition — skip
+                pass
+            # Post-action fields
+            elif step.post_actions:
+                for pa in step.post_actions:
+                    if field.startswith(pa.action) and "volume" in field and pa.volume:
+                        try:
+                            pa.volume.value = float(new_val)
+                            pa.volume.provenance.source = "instruction"
+                            pa.volume.provenance.confidence = 1.0
+                            pa.volume.provenance.reason = "User-edited during confirmation"
+                        except ValueError:
+                            pass
+
+        return spec
+
+    def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False,
+                     full_confirmation: bool = False, confirmation_threshold: float = 0.7,
+                     verbose: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
 
         New architecture (v2):
@@ -712,14 +721,49 @@ class ProtocolAgent:
 
         Falls back to the old LLM-based generation if the deterministic path fails.
         """
-        from .extractor import SemanticExtractor
+        from datetime import datetime
+        from .extraction import SemanticExtractor
 
-        # Stage 1: Validate input is a protocol instruction
-        _log(f"\n{C.header('[Stage 1/8]')} Validating input instruction...")
+        # DEV ONLY — remove before public release.
+        # Intermediate state log: accumulates spec snapshots throughout the
+        # pipeline, written to disk on completion or failure for inspection.
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+
+        state_log = {
+            "timestamp": datetime.now().isoformat(),
+            "input": {"instruction": prompt},
+        }
+
+        def _save_state_log(failed_at: str = None):
+            if failed_at:
+                state_log["failed_at"] = failed_at
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            path = os.path.join(output_dir, f"pipeline_state_{ts}.json")
+            with open(path, 'w') as f:
+                json.dump(state_log, f, indent=2, default=str)
+            _log(f"  {C.dim(f'State log: {path}')}")
+
+        # Stage 1: Validate config and instruction
+        _stage("[Stage 1/8] Validating instruction and config...")
+        try:
+            self.parser.load_config()
+            state_log["input"]["config"] = self.parser.config
+            _log(f"  {C.success('Config validated.')}")
+        except Exception as e:
+            _log(f"  {C.error('Config validation failed:')}")
+            _log(f"    {e}")
+            _save_state_log("stage_1_config")
+            return None
+
         if not skip_validation:
-            from .input_validator import InputValidator
+            from .validation.input_validator import InputValidator
             validator = InputValidator()
-            validation = validator.classify(prompt)
+            try:
+                validation = validator.classify(prompt)
+            except Exception as e:
+                _log(f"  {C.error(str(e))}")
+                return None
 
             if not validation.is_valid_protocol:
                 if validation.classification == "QUESTION":
@@ -739,7 +783,7 @@ class ProtocolAgent:
             _log("  Skipping input validation.")
 
         # Stage 2: Reason through the instruction → ProtocolSpec
-        _log(f"\n{C.header('[Stage 2/8]')} Reasoning through protocol instruction...")
+        _stage("[Stage 2/8] Reasoning through protocol instruction...")
         extractor = SemanticExtractor(
             client=self.parser.client,
             model_name=self.parser.model_name
@@ -753,7 +797,10 @@ class ProtocolAgent:
             _log("    - The API key is invalid or out of credits")
             _log("    - The instruction isn't about liquid handling")
             _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
+            _save_state_log("stage_2_extraction")
             return None
+
+        state_log["stage_2_extraction"] = spec.model_dump()
 
         _log(f"  {C.label('Protocol type:')} {spec.protocol_type or 'ad-hoc'}")
         _log(f"  {C.label('Steps:')} {len(spec.steps)}")
@@ -761,70 +808,60 @@ class ProtocolAgent:
             _log(f"  {C.label('Reasoning:')}")
             import re
             reasoning = spec.reasoning.strip()
-            # Split into numbered sections (1., 2., etc.)
             parts = re.split(r'(?=\d+\.\s)', reasoning)
             for part in parts:
                 part = part.strip()
                 if not part:
                     continue
-                # Split sub-bullets (lines starting with -) within each numbered section
                 sub_parts = re.split(r'(?=\s*-\s)', part, maxsplit=0)
                 for i, sub in enumerate(sub_parts):
                     sub = sub.strip()
                     if not sub:
                         continue
                     if i == 0:
-                        # Main numbered bullet
-                        _log(_wrap(sub, indent="    ", width=LINE_WIDTH))
+                        _log(_wrap(C.info(sub), indent="    ", width=LINE_WIDTH))
                     else:
-                        # Sub-bullet
-                        _log(_wrap(f"- {sub.lstrip('- ')}", indent="      ", width=LINE_WIDTH))
-
-        # Check for missing labware — offer to add it interactively
-        if spec.missing_labware:
-            _log(f"\n  {C.error('MISSING LABWARE')} — your instruction references equipment not in your config:")
-            for lw in spec.missing_labware:
-                _log(f"    - '{lw}'")
-
-            if sys.stdin.isatty():
-                resolved = self._resolve_missing_labware(spec.missing_labware, prompt, extractor)
-                if resolved is None:
-                    return None  # User aborted
-                # Write resolved labware to config and reload
-                if resolved:
-                    import json
-                    for label, entry in resolved.items():
-                        self.parser.config["labware"][label] = entry
-                    with open(self.config_path, 'w') as f:
-                        json.dump(self.parser.config, f, indent=4)
-                    _log(f"  Config updated: {self.config_path}")
-                    # Remove from missing_labware since we just added them
-                    spec.missing_labware = []
-            else:
-                _log(f"\n  To fix: add these to your config.json with the correct Opentrons")
-                _log(f"  load_name and deck slot, then re-run.")
-                return None
+                        _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
 
         if spec.initial_contents:
-            _log(f"  Initial state: {len(spec.initial_contents)} wells/tubes have contents")
+            _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
 
         # Stage 3: Validate extraction + check sufficiency + fill gaps
-        _log(f"\n{C.header('[Stage 3/8]')} Validating and completing specification...")
+        _stage("[Stage 3/8] Validating and completing specification...")
 
-        # Hallucination guard
-        warnings = extractor.validate_against_text(spec, prompt)
-        if warnings:
-            for w in warnings:
-                _log(f"  {C.warning('Warning:')} {w}")
+        # Provenance verification — check instruction/config claims
+        provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.parser.config)
+        fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
+
+        state_log["stage_3_provenance"] = provenance_warnings
+
+        if fabrications:
+            _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
+            for w in fabrications:
+                _log(f"    {C.error('!')} {w['message']}")
+            _log(f"\n  The LLM put values in wrong fields or misattributed their source.")
+            _log(f"  This usually means temperatures ended up in volume fields, or")
+            _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
+            _log(f"  Re-run, or try a more explicit instruction.")
+            _save_state_log("stage_3_provenance")
+            return None
+
+        non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
+        if non_fabrications:
+            _log(f"  {C.dim(f'{len(non_fabrications)} provenance note(s) — will review during confirmation.')}")
 
         # Sufficiency check
-        gaps = extractor.check_sufficiency(spec)
+        gaps = extractor.missing_fields(spec)
         if gaps:
             _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
                 _log(f"    - {g}")
-            spec = extractor.fill_gaps(spec, self.parser.config)
-            remaining_gaps = extractor.check_sufficiency(spec)
+            spec, fills = extractor.fill_gaps(spec, self.parser.config)
+            if fills:
+                _log(f"  Filled from config:")
+                for f in fills:
+                    _log(f"    - {f}")
+            remaining_gaps = extractor.missing_fields(spec)
             if remaining_gaps:
                 _log(f"  Could not fill all gaps from config:")
                 for g in remaining_gaps:
@@ -833,26 +870,30 @@ class ProtocolAgent:
                 refined = extractor.refine(spec, remaining_gaps, prompt, self.parser.config)
                 if refined:
                     spec = refined
-                    final_gaps = extractor.check_sufficiency(spec)
+                    final_gaps = extractor.missing_fields(spec)
                     if final_gaps:
                         _log(f"  Refinement could not resolve all gaps:")
                         for g in final_gaps:
                             _log(f"    - {g}")
                         _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
+                        state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "after_refine": final_gaps}
+                        _save_state_log("stage_3_gaps")
                         return None
                     _log("  Refinement resolved all gaps.")
                 else:
                     _log("  Self-refinement did not produce a valid specification.")
                     _log("  The LLM could not fill the gaps listed above even after retrying.")
                     _log("  Try: add more detail to your instruction, or simplify the protocol.")
+                    state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "refine_failed": True}
+                    _save_state_log("stage_3_gaps")
                     return None
             else:
                 _log("  Gaps filled from config.")
         else:
-            _log("  Specification is complete.")
+            _log(f"  {C.dim('Specification is complete.')}")
 
         if spec.explicit_volumes:
-            _log(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
+            _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")
 
         # Infer source containers: labware that is aspirated from but never
         # dispensed into must be pre-filled by the scientist.
@@ -863,12 +904,14 @@ class ProtocolAgent:
                 sub = f" ({substance})" if substance else ""
                 _log(f"    - {labware} well {well}{sub}")
             if sys.stdin.isatty():
-                from .cli import prompt_yes_no
-                if not prompt_yes_no("  Is this correct?", default=True):
+                response = _prompt_input("Is this correct? [Y/n]: ").lower()
+                if response in ('n', 'no'):
                     _log("  Aborted. Adjust your instruction to clarify source containers.")
+                    state_log["stage_3_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
+                    _save_state_log("stage_3_sources")
                     return None
             # Add confirmed sources to initial_contents so well tracker doesn't warn
-            from .extractor import WellContents
+            from .extraction import WellContents
             for labware, well, substance in source_only:
                 already = any(ic.labware == labware and ic.well == well
                               for ic in spec.initial_contents)
@@ -878,11 +921,59 @@ class ProtocolAgent:
                                      substance=substance or "reagent")
                     )
 
+        # Stage 3.5: Resolve labware references (description → config label)
+        _stage("[Stage 3.5/8] Resolving labware references...")
+        from .extraction import LabwareResolver
+        resolver = LabwareResolver(
+            config=self.parser.config,
+            client=extractor.client,
+            model_name=extractor.model_name,
+        )
+        spec = resolver.resolve(spec)
+
+        state_log["stage_3.5_resolution"] = {
+            ref.description: ref.resolved_label
+            for step in spec.steps
+            for ref in [step.source, step.destination]
+            if ref
+        }
+
+        # Confirm tentative assignments with user (includes unresolved refs)
+        if sys.stdin.isatty():
+            confirmed = self._confirm_labware_assignments(spec)
+            if confirmed is None:
+                _save_state_log("stage_3.5_resolution")
+                return None
+            for step in spec.steps:
+                for ref in [step.source, step.destination]:
+                    if ref and ref.description in confirmed:
+                        ref.resolved_label = confirmed[ref.description]
+
+        # Check if any step LocationRef is still unresolved — that's a hard error.
+        unresolved_refs = []
+        for step in spec.steps:
+            for ref in [step.source, step.destination]:
+                if ref and not ref.resolved_label and ref.description not in unresolved_refs:
+                    unresolved_refs.append(ref.description)
+
+        if unresolved_refs:
+            _log(f"\n  {C.error('No config match for:')} {unresolved_refs}")
+            _log(f"  Add appropriate labware to your config.json for these, then re-run.")
+            _save_state_log("stage_3.5_unresolved")
+            return None
+
+        _log(f"  {C.success('All labware resolved.')}")
+
         # Stage 4: Constraint checking (deterministic, no LLM)
-        _log(f"\n{C.header('[Stage 4/8]')} Checking hardware constraints...")
-        from .constraints import ConstraintChecker
+        _stage("[Stage 4/8] Checking hardware constraints...")
+        from .validation.constraints import ConstraintChecker
         checker = ConstraintChecker(self.parser.config)
         constraint_result = checker.check_all(spec)
+
+        state_log["stage_4_constraints"] = {
+            "errors": [str(v) for v in constraint_result.errors],
+            "warnings": [str(w) for w in constraint_result.warnings],
+        }
 
         if constraint_result.warnings:
             for w in constraint_result.warnings:
@@ -896,31 +987,69 @@ class ProtocolAgent:
                 _log()
 
             if sys.stdin.isatty():
-                from .cli import prompt_yes_no
                 _log("  These conflicts mean the protocol may not execute correctly.")
-                if not prompt_yes_no("  Proceed anyway (constraints will be reduced to fit)?", default=False):
+                response = _prompt_input("Proceed anyway? [y/N]: ").lower()
+                if response not in ('y', 'yes'):
                     _log("  Aborted. Fix your config or instruction and retry.")
+                    _save_state_log("stage_4_constraints")
                     return None
-                _log("  Proceeding with constraint adjustments.")
+                _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
             else:
                 _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
+                _save_state_log("stage_4_constraints")
                 return None
         else:
             _log(f"  {C.success('All constraints satisfied.')}")
 
+        # Build full confirmation queue: provenance warnings + null initial volumes
+        confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
+
+        from .validation.constraints import WellStateTracker
+        for ic in spec.initial_contents:
+            if ic.volume_ul is None:
+                fallback = WellStateTracker._get_well_capacity_static(
+                    ic.labware, self.parser.config) or 15000.0
+                confirmable.append({
+                    "type": "initial_volume",
+                    "labware": ic.labware,
+                    "well": ic.well,
+                    "substance": ic.substance,
+                    "default_volume": fallback,
+                })
+
         # Confirm with user
-        _log(extractor.format_for_confirmation(spec))
+        # (fabrications already blocked in Stage 3 — only non-fabrication warnings remain)
+        _log(extractor.format_for_confirmation(
+            spec, non_fabrications,
+            threshold=confirmation_threshold,
+            full=full_confirmation,
+            extra_confirmable=[w for w in confirmable if w.get("type") == "initial_volume"],
+        ))
+
         if sys.stdin.isatty():
-            from .cli import prompt_yes_no
-            if not prompt_yes_no("Proceed with this specification?", default=True):
-                _log("  Aborted by user.")
-                return None
+            if confirmable and not full_confirmation:
+                _log(f"\n  {len(confirmable)} item(s) need confirmation.")
+                accepted = self._confirm_provenance_items(spec, confirmable)
+                if accepted is None:
+                    _log("  Aborted by user.")
+                    return None
+            else:
+                response = _prompt_input("Proceed with this specification? [Y/n]: ").lower()
+                if response in ('n', 'no'):
+                    _log("  Aborted by user.")
+                    return None
 
         # Stage 5: Deterministic spec → ProtocolSchema
-        _log(f"\n{C.header('[Stage 5/8]')} Converting specification to protocol schema...")
+        _stage("[Stage 5/8] Converting specification to protocol schema...")
+
+        state_log["stage_5_spec"] = spec.model_dump()
+
         try:
-            protocol_schema = extractor.spec_to_schema(spec, self.parser.config)
-            _log("  Schema generated deterministically.")
+            from .extraction import CompleteProtocolSpec
+            complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
+            protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
+                complete_spec, self.parser.config)
+            _log(f"  {C.dim('Schema generated.')}")
         except Exception as e:
             err = str(e)
             _log(f"  Schema conversion failed.")
@@ -930,37 +1059,30 @@ class ProtocolAgent:
             else:
                 _log(f"    Detail: {err}")
             _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
-            return None
-
-        # Validate spec volumes are preserved in schema
-        mismatches = extractor.validate_schema_against_spec(spec, protocol_schema)
-        if mismatches:
-            _log("  Volume validation issues:")
-            for m in mismatches:
-                _log(f"    - {m}")
+            _save_state_log("stage_5_schema")
             return None
 
         # Stage 6: Deterministic schema → Python script
-        _log(f"\n{C.header('[Stage 6/8]')} Generating Python script...")
+        _stage("[Stage 6/8] Generating Python script...")
         try:
             script = generate_python_script(protocol_schema)
-            _log("  Python script generated.")
+            _log(f"  {C.dim('Script generated.')}")
         except ValueError as e:
             err = str(e)
             _log(f"  Script generation failed.")
             _log(f"    Detail: {err}")
             _log(f"    Try: simplify your instruction or check config slot assignments.")
+            _save_state_log("stage_6_script")
             return None
 
         # Save script for debugging regardless of simulation outcome
-        from datetime import datetime
-        debug_script = f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
+        debug_script = os.path.join(output_dir, f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
         with open(debug_script, 'w') as f:
             f.write(script)
         _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
 
         # Stage 7: Opentrons simulation
-        _log(f"\n{C.header('[Stage 7/8]')} Running Opentrons simulation...")
+        _stage("[Stage 7/8] Running Opentrons simulation...")
         success, simulation_log, runlog = simulate_script(script)
 
         if not success:
@@ -976,18 +1098,35 @@ class ProtocolAgent:
                 _log(f"  Simulation failed: {simulation_log[:500]}")
             _log(f"  The generated Python script did not pass the Opentrons simulator.")
             _log(f"  Check {debug_script} to see the generated code.")
+            _save_state_log("stage_7_simulation")
             return None
 
         _log(f"  {C.success('Simulation passed.')}")
 
-        # Stage 8: Intent verification (safety net)
-        _log(f"\n{C.header('[Stage 8/8]')} Verifying protocol matches original intent...")
+        # Stage 8: Protocol validation (safety net)
+        _stage("[Stage 8/8] Validating protocol...")
         from .spinner import Spinner
-        with Spinner("Verifying intent match..."):
-            verification = verify_intent_match(prompt, protocol_schema)
 
-        if verification.matches and verification.confidence >= 0.7:
-            _log(f"  {C.success(f'Intent verification passed (confidence: {verification.confidence:.0%})')}")
+        with Spinner("Validating protocol..."):
+            validation = validate_protocol(
+                intent=prompt,
+                spec=complete_spec,
+                schema=protocol_schema,
+                config=self.parser.config,
+                well_state_warnings=well_state_warnings,
+                step_summaries=step_summaries,
+            )
+
+        state_log["stage_8_validation"] = {
+            "matches": validation.matches,
+            "confidence": validation.confidence,
+            "issues": validation.issues,
+            "summary": validation.summary,
+        }
+
+        if validation.matches and validation.confidence >= 0.7:
+            _log(f"  {C.success(f'Validation passed (confidence: {validation.confidence:.0%})')}")
+            _save_state_log()
             return PipelineResult(
                 script=script,
                 simulation_log=simulation_log,
@@ -996,11 +1135,12 @@ class ProtocolAgent:
                 config=self.parser.config
             )
         else:
-            _log(f"  Intent mismatch (confidence: {verification.confidence:.0%})")
-            if verification.issues:
-                _log(f"  Issues: {'; '.join(verification.issues)}")
-            _log(f"  Summary: {verification.summary}")
+            _log(f"  Validation failed (confidence: {validation.confidence:.0%})")
+            if validation.issues:
+                _log(f"  Issues: {'; '.join(validation.issues)}")
+            _log(f"  Summary: {validation.summary}")
             _log(f"  The generated protocol may not match what you asked for.")
+            _save_state_log("stage_8_validation")
             return None
 
 

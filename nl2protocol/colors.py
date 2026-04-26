@@ -68,3 +68,12 @@ def warning(text: str) -> str:
 def info(text: str) -> str:
     """Informational — reasoning, suggestions. Dim white."""
     return _wrap_color(text, _DIM + _WHITE)
+
+def prompt(text: str) -> str:
+    """Interactive prompts. Bold cyan with ? prefix to stand out from output."""
+    prefix = _wrap_color("? ", _BOLD + _CYAN) if _colors_enabled() else "? "
+    return prefix + text
+
+def separator(width: int = 60) -> str:
+    """Thin horizontal rule between stages."""
+    return _wrap_color("─" * width, _DIM)

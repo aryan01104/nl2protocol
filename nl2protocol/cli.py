@@ -15,7 +15,6 @@ Options:
     -c, --config        Lab configuration JSON file (default: lab_config.json)
     -d, --data          CSV data file with experiment parameters
     -o, --output        Output protocol filename (timestamp auto-appended)
-    -r, --retries       Max retry attempts (default: 3)
     --generate-config   Infer lab config from instruction (no config file needed)
     --robot             After success, prompt to upload to OT-2 robot
     --validate-only     Only validate config file, don't generate protocol
@@ -120,15 +119,8 @@ Files:
 
     parser.add_argument(
         '-o', '--output',
-        default='generated_protocol.py',
-        help='Output base path - timestamp auto-appended (default: generated_protocol.py)'
-    )
-
-    parser.add_argument(
-        '-r', '--retries',
-        type=int,
-        default=3,
-        help='Maximum retry attempts for protocol generation (default: 3)'
+        default='output/generated_protocol.py',
+        help='Output base path - timestamp auto-appended (default: output/generated_protocol.py)'
     )
 
     parser.add_argument(
@@ -167,6 +159,25 @@ Files:
         help='Copy starter lab config and .env to current directory'
     )
 
+    parser.add_argument(
+        '--full-confirmation',
+        action='store_true',
+        help='Show all parameters for confirmation, bypassing auto-accept'
+    )
+
+    parser.add_argument(
+        '--confirmation-threshold',
+        type=float,
+        default=0.7,
+        help='Auto-accept instruction/config values with confidence >= threshold (default: 0.7)'
+    )
+
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Show full reasoning, provenance details, and debug information'
+    )
+
     return parser
 
 
@@ -178,9 +189,6 @@ def validate_args(args: argparse.Namespace) -> None:
 
     if args.data and not os.path.isfile(args.data):
         raise FileNotFoundError(f"Data file not found: {args.data}")
-
-    if args.retries < 1:
-        raise ValueError("--retries must be at least 1")
 
     # Ensure output directory exists
     output_dir = Path(args.output).parent
@@ -517,7 +525,7 @@ def main(argv: list = None) -> int:
 
     # Handle --validate-only
     if args.validate_only:
-        from .validate_config import validate_config_file
+        from .validation.validate_config import validate_config_file
         result = validate_config_file(args.config)
         if result.valid:
             print(f"Config '{args.config}' is valid.")
@@ -549,7 +557,7 @@ def main(argv: list = None) -> int:
     output_path = get_timestamped_output_path(args.output)
 
     # Import here to allow --help to work without dependencies
-    from .app import ProtocolAgent
+    from .pipeline import ProtocolAgent
     from .errors import NL2ProtocolError, APIKeyError, ConfigFileError
 
     # Handle --generate-config mode (deprecated)
@@ -559,7 +567,7 @@ def main(argv: list = None) -> int:
         print(f"\n  {cwarn('Note:')} --generate-config is deprecated and may produce unreliable configs.", file=sys.stderr)
         print(f"  Recommended: create a config.json describing your actual equipment,", file=sys.stderr)
         print(f"  then use -c config.json. See .env.example and config_examples/.\n", file=sys.stderr)
-        from .config_generator import ConfigGenerator, format_config_for_display
+        from ..archive.config_generator import ConfigGenerator, format_config_for_display
         import tempfile
 
         print("Inferring lab configuration from your instruction...")
@@ -632,7 +640,9 @@ def main(argv: list = None) -> int:
         result = agent.run_pipeline(
             prompt=intent,
             csv_path=args.data,
-            max_retries=args.retries
+            full_confirmation=args.full_confirmation,
+            confirmation_threshold=args.confirmation_threshold,
+            verbose=args.verbose,
         )
     except NL2ProtocolError as e:
         print(f"\nError: {e}", file=sys.stderr)
