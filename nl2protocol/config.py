@@ -10,7 +10,7 @@ import os
 from typing import Dict, Any
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from .errors import APIKeyError, ConfigFileError
 from .models.labware import get_well_info
@@ -56,7 +56,7 @@ class ConfigLoader:
     """
 
     def __init__(self, config_path: str = "lab_config.json", model_name: str = "claude-sonnet-4-20250514"):
-        load_dotenv()
+        load_dotenv(find_dotenv(usecwd=True))
         self.model_name = model_name
         self.config_path = config_path
         self.config = None

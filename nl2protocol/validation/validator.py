@@ -12,7 +12,7 @@ import os
 from dataclasses import dataclass
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 
 @dataclass
@@ -80,7 +80,7 @@ def validate_protocol(
     Cross-checks per-step commands, well state warnings, and hardware config
     to catch mismatches the simulator can't detect (wrong substances, wrong wells).
     """
-    load_dotenv()
+    load_dotenv(find_dotenv(usecwd=True))
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return ValidationResult(

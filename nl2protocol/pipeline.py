@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from typing import Optional
 
 from anthropic import Anthropic
-from dotenv import load_dotenv
 
 from .models import ProtocolSchema
 from .config import ConfigLoader

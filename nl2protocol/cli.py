@@ -24,33 +24,9 @@ Notes:
     - Output files are timestamped (e.g., protocol_20240315_143022.py)
     - Requires ANTHROPIC_API_KEY environment variable
 """
-# Suppress verbose logging BEFORE any imports that use HuggingFace
-import os
-import sys
-import warnings
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
-os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
-os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
-
-# This disables the "unauthenticated requests" warning
-os.environ["HF_HUB_VERBOSITY"] = "error"
-
-# Suppress warnings
-warnings.filterwarnings("ignore", message=".*unauthenticated.*")
-warnings.filterwarnings("ignore", message=".*HF_TOKEN.*")
-warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
-
-import logging
-logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
-logging.getLogger("transformers").setLevel(logging.ERROR)
-logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-
 import argparse
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -308,8 +284,8 @@ def handle_setup() -> int:
     Returns:
         0 on success, 1 on failure/cancel
     """
-    from dotenv import load_dotenv
-    load_dotenv()
+    from dotenv import find_dotenv, load_dotenv
+    load_dotenv(find_dotenv(usecwd=True))
 
     print("\n" + "=" * 50)
     print("nl2protocol Setup")
@@ -562,8 +538,8 @@ def main(argv: list = None) -> int:
             if offer_setup_on_missing_key():
                 # Retry with new key
                 try:
-                    from dotenv import load_dotenv
-                    load_dotenv(override=True)  # Reload .env
+                    from dotenv import find_dotenv, load_dotenv
+                    load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
                     generator = ConfigGenerator()
                     generated_config = generator.generate(intent)
                 except APIKeyError:
@@ -604,8 +580,8 @@ def main(argv: list = None) -> int:
         if offer_setup_on_missing_key():
             # Retry with new key
             try:
-                from dotenv import load_dotenv
-                load_dotenv(override=True)  # Reload .env
+                from dotenv import find_dotenv, load_dotenv
+                load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
                 agent = ProtocolAgent(config_path=config_path)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)

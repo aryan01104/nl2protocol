@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from typing import Literal, Optional
 from anthropic import Anthropic
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from nl2protocol.errors import APIKeyError
 
 
@@ -76,7 +76,7 @@ class InputValidator:
     """Validates user inputs before protocol generation using LLM classification."""
 
     def __init__(self, model_name: str = "claude-sonnet-4-20250514"):
-        load_dotenv()
+        load_dotenv(find_dotenv(usecwd=True))
         self.model_name = model_name
         self._setup_client()
 
