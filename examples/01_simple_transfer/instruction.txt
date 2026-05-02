@@ -1,0 +1,1 @@
+Transfer 50uL from source plate wells A1, A2, A3 to destination plate wells B1, B2, B3. Use a new tip for each transfer.

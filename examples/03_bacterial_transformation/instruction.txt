@@ -1,0 +1,28 @@
+Perform heat shock bacterial transformation with 4 different plasmids:
+
+Setup:
+- Temperature module is used for heat shock (keep at 4C initially)
+- Tube rack A1-A4 contains 4 different plasmid DNA samples (1-5 ng/uL)
+- Tube rack B1-B4 contains 50uL aliquots of chemically competent E. coli cells (on ice/temp module)
+- Tube rack C1 contains SOC recovery medium (room temperature)
+- Agar plates in slots for plating (manual step after protocol)
+
+Protocol:
+1. Set temperature module to 4°C and wait for it to stabilize (keep cells cold)
+2. Add 2uL of each plasmid DNA to corresponding competent cell tubes:
+   - Plasmid A1 to cells B1
+   - Plasmid A2 to cells B2
+   - Plasmid A3 to cells B3
+   - Plasmid A4 to cells B4
+3. Mix each tube gently 3 times at 20uL (do not vortex - cells are fragile)
+4. Pause protocol - incubate on ice (temp module at 4C) for 30 minutes
+5. Comment: "Heat shock step - set temp module to 42C for exactly 45 seconds"
+6. Set temperature module to 42°C for heat shock
+7. Pause briefly - user monitors heat shock timing (45 seconds)
+8. Set temperature module back to 4°C immediately
+9. Pause - incubate on ice for 2 minutes
+10. Add 200uL of SOC medium to each transformation tube (B1-B4)
+11. Mix gently 3 times at 100uL
+12. Pause - user transfers tubes to 37C shaker for 1 hour recovery, then plates on selective media
+
+Use fresh tips between different plasmids to prevent cross-contamination.

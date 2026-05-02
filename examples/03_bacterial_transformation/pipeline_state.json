@@ -1,0 +1,1172 @@
+{
+  "timestamp": "2026-05-02T01:41:06.279804",
+  "input": {
+    "instruction": "Perform heat shock bacterial transformation with 4 different plasmids:\n\nSetup:\n- Temperature module is used for heat shock (keep at 4C initially)\n- Tube rack A1-A4 contains 4 different plasmid DNA samples (1-5 ng/uL)\n- Tube rack B1-B4 contains 50uL aliquots of chemically competent E. coli cells (on ice/temp module)\n- Tube rack C1 contains SOC recovery medium (room temperature)\n- Agar plates in slots for plating (manual step after protocol)\n\nProtocol:\n1. Set temperature module to 4\u00b0C and wait for it to stabilize (keep cells cold)\n2. Add 2uL of each plasmid DNA to corresponding competent cell tubes:\n   - Plasmid A1 to cells B1\n   - Plasmid A2 to cells B2\n   - Plasmid A3 to cells B3\n   - Plasmid A4 to cells B4\n3. Mix each tube gently 3 times at 20uL (do not vortex - cells are fragile)\n4. Pause protocol - incubate on ice (temp module at 4C) for 30 minutes\n5. Comment: \"Heat shock step - set temp module to 42C for exactly 45 seconds\"\n6. Set temperature module to 42\u00b0C for heat shock\n7. Pause briefly - user monitors heat shock timing (45 seconds)\n8. Set temperature module back to 4\u00b0C immediately\n9. Pause - incubate on ice for 2 minutes\n10. Add 200uL of SOC medium to each transformation tube (B1-B4)\n11. Mix gently 3 times at 100uL\n12. Pause - user transfers tubes to 37C shaker for 1 hour recovery, then plates on selective media\n\nUse fresh tips between different plasmids to prevent cross-contamination.",
+    "config": {
+      "labware": {
+        "tiprack_20": {
+          "load_name": "opentrons_96_tiprack_20ul",
+          "slot": "1",
+          "label": "tiprack_20"
+        },
+        "tiprack_300": {
+          "load_name": "opentrons_96_tiprack_300ul",
+          "slot": "4",
+          "label": "tiprack_300"
+        },
+        "reagent_rack": {
+          "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+          "slot": "2",
+          "label": "reagent_rack"
+        }
+      },
+      "pipettes": {
+        "left": {
+          "model": "p20_single_gen2",
+          "tipracks": [
+            "tiprack_20"
+          ]
+        },
+        "right": {
+          "model": "p300_single_gen2",
+          "tipracks": [
+            "tiprack_300"
+          ]
+        }
+      },
+      "modules": {
+        "temp_mod": {
+          "module_type": "temperature",
+          "slot": "3"
+        }
+      }
+    }
+  },
+  "stage_2_extraction": {
+    "protocol_type": "heat_shock_bacterial_transformation",
+    "summary": "Perform heat shock bacterial transformation with 4 different plasmids using temperature cycling and SOC recovery",
+    "reasoning": "This is a bacterial transformation protocol using heat shock method. Let me break down what the user wants:\n\n1. This is a named protocol: \"heat shock bacterial transformation\"\n2. They have 4 different plasmids (A1-A4) and corresponding competent cells (B1-B4)\n3. The protocol involves temperature changes, mixing, pauses, and transfers\n\nLet me identify the parameters:\n- Explicitly specified volumes: 2uL plasmid DNA, 20uL mixing volume, 200uL SOC medium, 100uL mixing volume\n- Explicitly specified temperatures: 4\u00b0C, 42\u00b0C\n- Explicitly specified durations: 30 minutes, 45 seconds, 2 minutes, 1 hour\n- Pipette strategy: fresh tips between different plasmids\n- Number of replicates: 4 different plasmids, but this isn't replication - it's 4 separate samples\n\nLabware mentioned:\n- \"temperature module\" - for temperature control\n- \"tube rack\" - contains plasmids (A1-A4), competent cells (B1-B4), and SOC medium (C1)\n- \"agar plates\" - mentioned but not used in protocol steps\n\nInitial contents:\n- Tube rack A1-A4: plasmid DNA samples\n- Tube rack B1-B4: 50uL competent E. coli cells\n- Tube rack C1: SOC recovery medium\n\nLet me go through the steps:\n1. Set temp to 4\u00b0C and wait\n2. Transfer 2uL plasmid to corresponding cells (4 transfers)\n3. Mix each tube (4 mix operations, but same volume so can compress)\n4. Pause for 30 minutes\n5. Comment about heat shock\n6. Set temp to 42\u00b0C\n7. Pause for user to monitor timing\n8. Set temp back to 4\u00b0C\n9. Pause for 2 minutes\n10. Add 200uL SOC to each tube (4 transfers, same volume so can compress)\n11. Mix each tube (4 mix operations, same volume so can compress)\n12. Final pause for user handling\n\nI can compress the transfers and mixes since they're the same volume to multiple destinations.",
+    "steps": [
+      {
+        "order": 1,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User explicitly instructed to set temperature module to 4\u00b0C initially",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module to 4\u00b0C'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 2,
+        "action": "wait_for_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to wait for temperature to stabilize at 4\u00b0C",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'wait for it to stabilize' at 4\u00b0C",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 3,
+        "action": "transfer",
+        "composition_provenance": {
+          "justification": "User explicitly described adding plasmid DNA to corresponding competent cell tubes",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": {
+          "value": "plasmid DNA",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified transferring 'plasmid DNA' samples",
+            "confidence": 1.0
+          }
+        },
+        "volume": {
+          "value": 2.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Add 2uL of each plasmid DNA'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "A1",
+            "A2",
+            "A3",
+            "A4"
+          ],
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Tube rack A1-A4 contains 4 different plasmid DNA samples'",
+            "confidence": 1.0
+          }
+        },
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified corresponding transfers to 'cells B1-B4'",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": "new_tip_each",
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 4,
+        "action": "mix",
+        "composition_provenance": {
+          "justification": "User instructed to mix each transformation tube gently after adding plasmid",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": {
+          "value": 20.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Mix each tube gently 3 times at 20uL'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified mixing each competent cell tube B1-B4",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": [
+          {
+            "action": "mix",
+            "repetitions": 3,
+            "volume": null
+          }
+        ],
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "do not vortex - cells are fragile"
+      },
+      {
+        "order": 5,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for 30-minute ice incubation",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": {
+          "value": 30.0,
+          "unit": "minutes",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'incubate on ice (temp module at 4C) for 30 minutes'",
+            "confidence": 1.0
+          }
+        },
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "incubate on ice (temp module at 4C) for 30 minutes"
+      },
+      {
+        "order": 6,
+        "action": "comment",
+        "composition_provenance": {
+          "justification": "User explicitly provided this comment text",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "Heat shock step - set temp module to 42C for exactly 45 seconds"
+      },
+      {
+        "order": 7,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to set temperature to 42\u00b0C for heat shock step",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 42.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module to 42\u00b0C for heat shock'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 8,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for monitoring heat shock timing",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "user monitors heat shock timing (45 seconds)"
+      },
+      {
+        "order": 9,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to immediately return temperature to 4\u00b0C after heat shock",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module back to 4\u00b0C immediately'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 10,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for 2-minute ice incubation",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": {
+          "value": 2.0,
+          "unit": "minutes",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'incubate on ice for 2 minutes'",
+            "confidence": 1.0
+          }
+        },
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "incubate on ice for 2 minutes"
+      },
+      {
+        "order": 11,
+        "action": "transfer",
+        "composition_provenance": {
+          "justification": "User instructed to add SOC medium to each transformation tube for recovery",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": {
+          "value": "SOC medium",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified adding 'SOC medium'",
+            "confidence": 1.0
+          }
+        },
+        "volume": {
+          "value": 200.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Add 200uL of SOC medium'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": {
+          "description": "tube rack",
+          "well": "C1",
+          "wells": null,
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Tube rack C1 contains SOC recovery medium'",
+            "confidence": 1.0
+          }
+        },
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified adding SOC to 'each transformation tube (B1-B4)'",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 12,
+        "action": "mix",
+        "composition_provenance": {
+          "justification": "User instructed to mix each tube after adding SOC medium",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": {
+          "value": 100.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Mix gently 3 times at 100uL'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": null,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified mixing each transformation tube after adding SOC",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": [
+          {
+            "action": "mix",
+            "repetitions": 3,
+            "volume": null
+          }
+        ],
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 13,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed final pause for manual handling and recovery",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "user transfers tubes to 37C shaker for 1 hour recovery, then plates on selective media"
+      }
+    ],
+    "explicit_volumes": [
+      2.0,
+      20.0,
+      50.0,
+      100.0,
+      200.0
+    ],
+    "initial_contents": [
+      {
+        "labware": "tube rack",
+        "well": "A1",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "tube rack",
+        "well": "A2",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "tube rack",
+        "well": "A3",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "tube rack",
+        "well": "A4",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "tube rack",
+        "well": "B1",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "tube rack",
+        "well": "B2",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "tube rack",
+        "well": "B3",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "tube rack",
+        "well": "B4",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "tube rack",
+        "well": "C1",
+        "substance": "SOC recovery medium",
+        "volume_ul": null
+      }
+    ],
+    "prefilled_labware": []
+  },
+  "stage_3_provenance": [],
+  "stage_3.5_resolution": {
+    "tube rack": "reagent_rack"
+  },
+  "stage_4_constraints": {
+    "errors": [],
+    "warnings": [
+      "[WARN] Step 0: Protocol uses temperature control but no labware is on the temperature module\n       Why: Temperature commands will heat/cool the module, but labware on a separate slot won't be affected. If your samples need temperature control, the labware must sit on the module.\n       Suggestion: Add \"on_module\": \"<module_label>\" to the labware entry in your config.json, and set its slot to match the module's slot."
+    ]
+  },
+  "stage_5_spec": {
+    "protocol_type": "heat_shock_bacterial_transformation",
+    "summary": "Perform heat shock bacterial transformation with 4 different plasmids using temperature cycling and SOC recovery",
+    "reasoning": "This is a bacterial transformation protocol using heat shock method. Let me break down what the user wants:\n\n1. This is a named protocol: \"heat shock bacterial transformation\"\n2. They have 4 different plasmids (A1-A4) and corresponding competent cells (B1-B4)\n3. The protocol involves temperature changes, mixing, pauses, and transfers\n\nLet me identify the parameters:\n- Explicitly specified volumes: 2uL plasmid DNA, 20uL mixing volume, 200uL SOC medium, 100uL mixing volume\n- Explicitly specified temperatures: 4\u00b0C, 42\u00b0C\n- Explicitly specified durations: 30 minutes, 45 seconds, 2 minutes, 1 hour\n- Pipette strategy: fresh tips between different plasmids\n- Number of replicates: 4 different plasmids, but this isn't replication - it's 4 separate samples\n\nLabware mentioned:\n- \"temperature module\" - for temperature control\n- \"tube rack\" - contains plasmids (A1-A4), competent cells (B1-B4), and SOC medium (C1)\n- \"agar plates\" - mentioned but not used in protocol steps\n\nInitial contents:\n- Tube rack A1-A4: plasmid DNA samples\n- Tube rack B1-B4: 50uL competent E. coli cells\n- Tube rack C1: SOC recovery medium\n\nLet me go through the steps:\n1. Set temp to 4\u00b0C and wait\n2. Transfer 2uL plasmid to corresponding cells (4 transfers)\n3. Mix each tube (4 mix operations, but same volume so can compress)\n4. Pause for 30 minutes\n5. Comment about heat shock\n6. Set temp to 42\u00b0C\n7. Pause for user to monitor timing\n8. Set temp back to 4\u00b0C\n9. Pause for 2 minutes\n10. Add 200uL SOC to each tube (4 transfers, same volume so can compress)\n11. Mix each tube (4 mix operations, same volume so can compress)\n12. Final pause for user handling\n\nI can compress the transfers and mixes since they're the same volume to multiple destinations.",
+    "steps": [
+      {
+        "order": 1,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User explicitly instructed to set temperature module to 4\u00b0C initially",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module to 4\u00b0C'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 2,
+        "action": "wait_for_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to wait for temperature to stabilize at 4\u00b0C",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'wait for it to stabilize' at 4\u00b0C",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 3,
+        "action": "transfer",
+        "composition_provenance": {
+          "justification": "User explicitly described adding plasmid DNA to corresponding competent cell tubes",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": {
+          "value": "plasmid DNA",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified transferring 'plasmid DNA' samples",
+            "confidence": 1.0
+          }
+        },
+        "volume": {
+          "value": 2.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Add 2uL of each plasmid DNA'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "A1",
+            "A2",
+            "A3",
+            "A4"
+          ],
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Tube rack A1-A4 contains 4 different plasmid DNA samples'",
+            "confidence": 1.0
+          }
+        },
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified corresponding transfers to 'cells B1-B4'",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": "new_tip_each",
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 4,
+        "action": "mix",
+        "composition_provenance": {
+          "justification": "User instructed to mix each transformation tube gently after adding plasmid",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": {
+          "value": 20.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Mix each tube gently 3 times at 20uL'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified mixing each competent cell tube B1-B4",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": [
+          {
+            "action": "mix",
+            "repetitions": 3,
+            "volume": null
+          }
+        ],
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "do not vortex - cells are fragile"
+      },
+      {
+        "order": 5,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for 30-minute ice incubation",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": {
+          "value": 30.0,
+          "unit": "minutes",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'incubate on ice (temp module at 4C) for 30 minutes'",
+            "confidence": 1.0
+          }
+        },
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "incubate on ice (temp module at 4C) for 30 minutes"
+      },
+      {
+        "order": 6,
+        "action": "comment",
+        "composition_provenance": {
+          "justification": "User explicitly provided this comment text",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "Heat shock step - set temp module to 42C for exactly 45 seconds"
+      },
+      {
+        "order": 7,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to set temperature to 42\u00b0C for heat shock step",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 42.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module to 42\u00b0C for heat shock'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 8,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for monitoring heat shock timing",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "user monitors heat shock timing (45 seconds)"
+      },
+      {
+        "order": 9,
+        "action": "set_temperature",
+        "composition_provenance": {
+          "justification": "User instructed to immediately return temperature to 4\u00b0C after heat shock",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": {
+          "value": 4.0,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Set temperature module back to 4\u00b0C immediately'",
+            "confidence": 1.0
+          }
+        },
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 10,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed to pause for 2-minute ice incubation",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": {
+          "value": 2.0,
+          "unit": "minutes",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'incubate on ice for 2 minutes'",
+            "confidence": 1.0
+          }
+        },
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "incubate on ice for 2 minutes"
+      },
+      {
+        "order": 11,
+        "action": "transfer",
+        "composition_provenance": {
+          "justification": "User instructed to add SOC medium to each transformation tube for recovery",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": {
+          "value": "SOC medium",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified adding 'SOC medium'",
+            "confidence": 1.0
+          }
+        },
+        "volume": {
+          "value": 200.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Add 200uL of SOC medium'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": {
+          "description": "tube rack",
+          "well": "C1",
+          "wells": null,
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Tube rack C1 contains SOC recovery medium'",
+            "confidence": 1.0
+          }
+        },
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified adding SOC to 'each transformation tube (B1-B4)'",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 12,
+        "action": "mix",
+        "composition_provenance": {
+          "justification": "User instructed to mix each tube after adding SOC medium",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": {
+          "value": 100.0,
+          "unit": "uL",
+          "exact": true,
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified 'Mix gently 3 times at 100uL'",
+            "confidence": 1.0
+          }
+        },
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": {
+          "description": "tube rack",
+          "well": null,
+          "wells": [
+            "B1",
+            "B2",
+            "B3",
+            "B4"
+          ],
+          "well_range": null,
+          "resolved_label": "reagent_rack",
+          "provenance": {
+            "source": "instruction",
+            "reason": "User specified mixing each transformation tube after adding SOC",
+            "confidence": 1.0
+          }
+        },
+        "post_actions": [
+          {
+            "action": "mix",
+            "repetitions": 3,
+            "volume": null
+          }
+        ],
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": null
+      },
+      {
+        "order": 13,
+        "action": "pause",
+        "composition_provenance": {
+          "justification": "User instructed final pause for manual handling and recovery",
+          "grounding": [
+            "instruction"
+          ],
+          "confidence": 1.0
+        },
+        "substance": null,
+        "volume": null,
+        "temperature": null,
+        "duration": null,
+        "source": null,
+        "destination": null,
+        "post_actions": null,
+        "replicates": null,
+        "tip_strategy": null,
+        "pipette_hint": null,
+        "note": "user transfers tubes to 37C shaker for 1 hour recovery, then plates on selective media"
+      }
+    ],
+    "explicit_volumes": [
+      2.0,
+      20.0,
+      50.0,
+      100.0,
+      200.0
+    ],
+    "initial_contents": [
+      {
+        "labware": "reagent_rack",
+        "well": "A1",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "A2",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "A3",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "A4",
+        "substance": "plasmid DNA",
+        "volume_ul": null
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "B1",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "B2",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "B3",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "B4",
+        "substance": "chemically competent E. coli cells",
+        "volume_ul": 50.0
+      },
+      {
+        "labware": "reagent_rack",
+        "well": "C1",
+        "substance": "SOC recovery medium",
+        "volume_ul": null
+      }
+    ],
+    "prefilled_labware": []
+  },
+  "stage_8_validation": {
+    "matches": true,
+    "confidence": 0.95,
+    "issues": [
+      "Step 3 transfer commands don't explicitly show source wells A1\u2192B1, A2\u2192B2, A3\u2192B3, A4\u2192B4 mapping - need to verify correct plasmid-to-cell pairing",
+      "Step 11 shows 6 commands for what should be 4 transfers (200uL SOC to each B1-B4) - may indicate tip changes or multiple aspirations but seems excessive"
+    ],
+    "summary": "Protocol correctly implements all major steps of heat shock transformation including temperature controls, transfers, mixing, and pauses, with minor concerns about transfer command details."
+  }
+}

@@ -1,0 +1,118 @@
+Simulation completed successfully.
+
+Run Log:
+  Setting Temperature Module temperature to 4.0 °C (rounded off to nearest integer)
+  Waiting for Temperature Module to reach temperature 4.0 °C (rounded off to nearest integer)
+  Transferring 2.0 from A1 of reagent_rack on slot 2 to B1 of reagent_rack on slot 2
+  Picking up tip from A1 of tiprack_20 on slot 1
+  Aspirating 2.0 uL from A1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 2.0 uL into B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Transferring 2.0 from A2 of reagent_rack on slot 2 to B2 of reagent_rack on slot 2
+  Picking up tip from B1 of tiprack_20 on slot 1
+  Aspirating 2.0 uL from A2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 2.0 uL into B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Transferring 2.0 from A3 of reagent_rack on slot 2 to B3 of reagent_rack on slot 2
+  Picking up tip from C1 of tiprack_20 on slot 1
+  Aspirating 2.0 uL from A3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 2.0 uL into B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Transferring 2.0 from A4 of reagent_rack on slot 2 to B4 of reagent_rack on slot 2
+  Picking up tip from D1 of tiprack_20 on slot 1
+  Aspirating 2.0 uL from A4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 2.0 uL into B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from E1 of tiprack_20 on slot 1
+  Mixing 3 times with a volume of 20.0 ul
+  Aspirating 20.0 uL from B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B1 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from F1 of tiprack_20 on slot 1
+  Mixing 3 times with a volume of 20.0 ul
+  Aspirating 20.0 uL from B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B2 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from G1 of tiprack_20 on slot 1
+  Mixing 3 times with a volume of 20.0 ul
+  Aspirating 20.0 uL from B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B3 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from H1 of tiprack_20 on slot 1
+  Mixing 3 times with a volume of 20.0 ul
+  Aspirating 20.0 uL from B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Aspirating 20.0 uL from B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dispensing 20.0 uL into B4 of reagent_rack on slot 2 at 7.56 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Pausing robot operation: incubate on ice (temp module at 4C) for 30 minutes
+  Heat shock step - set temp module to 42C for exactly 45 seconds
+  Setting Temperature Module temperature to 42.0 °C (rounded off to nearest integer)
+  Pausing robot operation: user monitors heat shock timing (45 seconds)
+  Setting Temperature Module temperature to 4.0 °C (rounded off to nearest integer)
+  Pausing robot operation: incubate on ice for 2 minutes
+  Picking up tip from A1 of tiprack_300 on slot 4
+  Transferring 200.0 from C1 of reagent_rack on slot 2 to B1 of reagent_rack on slot 2
+  Aspirating 200.0 uL from C1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 200.0 uL into B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Transferring 200.0 from C1 of reagent_rack on slot 2 to B2 of reagent_rack on slot 2
+  Aspirating 200.0 uL from C1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 200.0 uL into B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Transferring 200.0 from C1 of reagent_rack on slot 2 to B3 of reagent_rack on slot 2
+  Aspirating 200.0 uL from C1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 200.0 uL into B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Transferring 200.0 from C1 of reagent_rack on slot 2 to B4 of reagent_rack on slot 2
+  Aspirating 200.0 uL from C1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 200.0 uL into B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from B1 of tiprack_300 on slot 4
+  Mixing 3 times with a volume of 100.0 ul
+  Aspirating 100.0 uL from B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B1 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from C1 of tiprack_300 on slot 4
+  Mixing 3 times with a volume of 100.0 ul
+  Aspirating 100.0 uL from B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B2 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from D1 of tiprack_300 on slot 4
+  Mixing 3 times with a volume of 100.0 ul
+  Aspirating 100.0 uL from B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B3 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Picking up tip from E1 of tiprack_300 on slot 4
+  Mixing 3 times with a volume of 100.0 ul
+  Aspirating 100.0 uL from B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Aspirating 100.0 uL from B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dispensing 100.0 uL into B4 of reagent_rack on slot 2 at 92.86 uL/sec
+  Dropping tip into A1 of Opentrons Fixed Trash on slot 12
+  Pausing robot operation: user transfers tubes to 37C shaker for 1 hour recovery, then plates on selective media
