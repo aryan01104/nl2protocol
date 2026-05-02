@@ -84,7 +84,7 @@ class CompositionProvenance(BaseModel):
 class ProvenancedVolume(BaseModel):
     """A volume with provenance tracking."""
     value: float = Field(..., gt=0, description="Numeric volume. Copy the user's number exactly — never round or adjust.")
-    unit: Literal["uL", "mL"] = "uL"
+    unit: Literal["uL", "mL"] = Field(..., description="Required. Must be 'uL' or 'mL' — never inferred or defaulted.")
     exact: bool = Field(True, description=(
         "True if the user stated this exact number ('100uL'). "
         "False if the user hedged ('about 100uL', '~50uL') or if this value was inferred. "

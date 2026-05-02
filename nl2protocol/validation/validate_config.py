@@ -48,7 +48,7 @@ class ConfigValidator:
     def __init__(self):
         # Cache valid labware names from opentrons_shared_data
         self._valid_labware: Set[str] = set()
-        self._shared_data_unavailable = False
+        self._shared_data_unavailable = False # is the state for whether we are able to fetch the data from opentrons api
         self._load_valid_labware()
 
     def _load_valid_labware(self) -> None:

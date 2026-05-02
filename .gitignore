@@ -34,5 +34,18 @@ Thumbs.db
 # Local-only directories
 scripts/
 notes/
-docs/
 archive/
+
+# Personal study material
+lecs/
+lecs2/
+testing_material/
+
+# Local Claude Code state (contains personal memory and session data)
+.claude/
+
+# docs/ is ignored, but ADRs and plans are public-facing portfolio artifacts.
+# Re-include them while keeping personal notes in docs/ private.
+docs/*
+!docs/adr/
+!docs/plans/

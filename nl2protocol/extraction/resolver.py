@@ -11,7 +11,7 @@ from typing import List
 from nl2protocol.models.spec import ProtocolSpec, LocationRef
 
 
-class LabwareResolver:
+class LabwareResolver: # is below the current docstring for the class, isnt this more approporaite for the function?
     """Resolves user-language labware descriptions to config labels.
 
     One LLM call maps all descriptions to config labels using domain knowledge

@@ -130,12 +130,6 @@ Files:
     )
 
     parser.add_argument(
-        '--validate-only',
-        action='store_true',
-        help='Only validate config file, do not generate protocol'
-    )
-
-    parser.add_argument(
         '--generate-config',
         action='store_true',
         help='[Deprecated] Infer lab config from instruction. Use -c with a config file instead.'
@@ -522,17 +516,6 @@ def main(argv: list = None) -> int:
     # Handle --init
     if args.init:
         return handle_init()
-
-    # Handle --validate-only
-    if args.validate_only:
-        from .validation.validate_config import validate_config_file
-        result = validate_config_file(args.config)
-        if result.valid:
-            print(f"Config '{args.config}' is valid.")
-            return 0
-        else:
-            print(result, file=sys.stderr)
-            return 1
 
     # For protocol generation, --intent is required
     if not args.intent:

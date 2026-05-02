@@ -57,7 +57,23 @@ def _format_step_line(step) -> str:
     dur = f" for {step.duration.value} {step.duration.unit}" if step.duration else ""
     substance = f" of {step.substance.value}" if step.substance else ""
 
-    return f"{step.order}. {step.action.upper()}{temp}{vol}{substance}{src}{dst}{dur}"
+    # Post-actions: surface mix/blow_out/touch_tip etc. so downstream consumers
+    # (notably the Stage 8 validator) don't conclude they're missing.
+    post = ""
+    if step.post_actions:
+        parts = []
+        for pa in step.post_actions:
+            if pa.action == "mix" and pa.repetitions and pa.volume:
+                parts.append(f"mix {pa.repetitions}x at {pa.volume.value}{pa.volume.unit}")
+            elif pa.volume:
+                parts.append(f"{pa.action} {pa.volume.value}{pa.volume.unit}")
+            else:
+                parts.append(pa.action)
+        post = " -> " + ", ".join(parts)
+
+    tip = f" [tip: {step.tip_strategy}]" if getattr(step, "tip_strategy", None) else ""
+
+    return f"{step.order}. {step.action.upper()}{temp}{vol}{substance}{src}{dst}{dur}{post}{tip}"
 
 
 def validate_schema_against_spec(spec: ProtocolSpec, schema) -> List[str]:

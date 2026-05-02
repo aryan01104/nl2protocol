@@ -392,7 +392,81 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json"):
         self.config_path = config_path
-        self.parser = ConfigLoader(config_path=config_path)
+        self.config_loader = ConfigLoader(config_path=config_path)
+
+    @staticmethod
+    def _summarize_well_list(wells: list) -> str:
+        """Compact display string for a list of wells.
+
+        Returns 'A1-H3' when wells form a contiguous rectangular block,
+        else 'A1, A2, A3, … (N wells)' for irregular sets.
+        Single-well lists return just the well name.
+        """
+        if not wells:
+            return ""
+        if len(wells) == 1:
+            return wells[0]
+
+        # Try rectangular block: rows x cols where rows are contiguous letters
+        # and cols are contiguous integers and every (r, c) is present.
+        try:
+            rows = sorted({w[0] for w in wells})
+            cols = sorted({int(w[1:]) for w in wells})
+            row_codes = [ord(r) for r in rows]
+            cols_contig = cols == list(range(cols[0], cols[-1] + 1))
+            rows_contig = row_codes == list(range(row_codes[0], row_codes[-1] + 1))
+            full = len(wells) == len(rows) * len(cols)
+            present = {(w[0], int(w[1:])) for w in wells}
+            covers = all((r, c) in present for r in rows for c in cols)
+            if cols_contig and rows_contig and full and covers:
+                return f"{rows[0]}{cols[0]}-{rows[-1]}{cols[-1]}"
+        except (ValueError, IndexError):
+            pass
+
+        head = ", ".join(wells[:3])
+        return f"{head}, … ({len(wells)} wells)"
+
+    @staticmethod
+    def _build_initial_volume_queue(spec, config) -> list:
+        """Build the confirmation queue for WellContents entries with null
+        volume_ul. Groups entries that share (labware, substance) into
+        single grouped prompts.
+
+        Returns a list of confirmable dicts:
+          {type: 'initial_volume',       labware, well,  substance, default_volume}     -- single
+          {type: 'initial_volume_group', labware, wells, substance, default_volume}     -- group
+        """
+        from .validation.constraints import WellStateTracker
+
+        # Bucket null-volume entries by (labware, substance).
+        buckets = {}
+        for ic in spec.initial_contents:
+            if ic.volume_ul is not None:
+                continue
+            key = (ic.labware, ic.substance)
+            buckets.setdefault(key, []).append(ic.well)
+
+        queue = []
+        for (labware, substance), wells in buckets.items():
+            fallback = WellStateTracker._get_well_capacity_static(
+                labware, config) or 15000.0
+            if len(wells) == 1:
+                queue.append({
+                    "type": "initial_volume",
+                    "labware": labware,
+                    "well": wells[0],
+                    "substance": substance,
+                    "default_volume": fallback,
+                })
+            else:
+                queue.append({
+                    "type": "initial_volume_group",
+                    "labware": labware,
+                    "wells": wells,
+                    "substance": substance,
+                    "default_volume": fallback,
+                })
+        return queue
 
     @staticmethod
     def _infer_source_containers(spec) -> list:
@@ -483,7 +557,7 @@ class ProtocolAgent:
         if not assignments:
             return {}
 
-        available_labels = list(self.parser.config.get("labware", {}).keys())
+        available_labels = list(self.config_loader.config.get("labware", {}).keys())
         # Start with LLM suggestions as current assignments
         current = {a["description"]: a["resolved_label"] for a in assignments}
 
@@ -495,7 +569,7 @@ class ProtocolAgent:
                 desc = a["description"]
                 label = current.get(desc)
                 if label:
-                    load_name = self.parser.config["labware"][label].get("load_name", "")
+                    load_name = self.config_loader.config["labware"][label].get("load_name", "")
                     _log(f"    [{i}] \"{desc}\" → {C.success(label)} ({C.dim(load_name)})")
                 else:
                     _log(f"    [{i}] \"{desc}\" → {C.warning('??? (no match)')}")
@@ -533,7 +607,7 @@ class ProtocolAgent:
                     desc = assignments[idx]["description"]
                     _log(f"\n    Reassigning \"{desc}\":")
                     for j, label in enumerate(available_labels, 1):
-                        load_name = self.parser.config["labware"][label].get("load_name", "")
+                        load_name = self.config_loader.config["labware"][label].get("load_name", "")
                         marker = " ←" if label == current.get(desc) else ""
                         _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
                     pick = _prompt_input(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
@@ -570,12 +644,25 @@ class ProtocolAgent:
         edits = []
         for i, w in enumerate(confirmable, 1):
             # --- Initial volume items (null volume_ul in initial_contents) ---
-            if w.get("type") == "initial_volume":
+            if w.get("type") in ("initial_volume", "initial_volume_group"):
                 default = w["default_volume"]
+                is_group = w["type"] == "initial_volume_group"
+                # Build display: single well or grouped wells.
+                if is_group:
+                    well_str = self._summarize_well_list(w["wells"])
+                    count = len(w["wells"])
+                    target_wells = set(w["wells"])
+                    location_desc = f"{w['labware']} {well_str} ({count} wells)"
+                    apply_note = f" (applied to all {count} wells)"
+                else:
+                    target_wells = {w["well"]}
+                    location_desc = f"{w['labware']} {w['well']}"
+                    apply_note = ""
+
                 _log(f"  [{i}/{len(confirmable)}] Initial contents: "
-                     f"{w['labware']} {w['well']}, \"{w['substance']}\" — "
+                     f"{location_desc}, \"{w['substance']}\" — "
                      f"no volume stated")
-                _log(f"    1) Enter volume")
+                _log(f"    1) Enter volume{apply_note}")
                 _log(f"    2) Accept default ({default:.0f}uL, well capacity)")
                 _log(f"    3) Exit (edit instruction and run again)")
 
@@ -587,11 +674,11 @@ class ProtocolAgent:
                     if new_val:
                         try:
                             vol = float(new_val)
-                            # Write back to spec
+                            # Write back to every WellContents entry covered.
                             for ic in spec.initial_contents:
-                                if ic.labware == w['labware'] and ic.well == w['well']:
+                                if ic.labware == w['labware'] and ic.well in target_wells:
                                     ic.volume_ul = vol
-                            _log(f"    → {C.success(f'{vol}uL')}")
+                            _log(f"    → {C.success(f'{vol}uL')}{apply_note}")
                         except ValueError:
                             _log(f"    Invalid number, using default ({default:.0f}uL).")
                     else:
@@ -701,7 +788,7 @@ class ProtocolAgent:
 
         return spec
 
-    def run_pipeline(self, prompt: str, csv_path: str = None, skip_validation: bool = False,
+    def run_pipeline(self, prompt: str, csv_path: str = None,
                      full_confirmation: bool = False, confirmation_threshold: float = 0.7,
                      verbose: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
@@ -747,8 +834,8 @@ class ProtocolAgent:
         # Stage 1: Validate config and instruction
         _stage("[Stage 1/8] Validating instruction and config...")
         try:
-            self.parser.load_config()
-            state_log["input"]["config"] = self.parser.config
+            self.config_loader.load_config()
+            state_log["input"]["config"] = self.config_loader.config
             _log(f"  {C.success('Config validated.')}")
         except Exception as e:
             _log(f"  {C.error('Config validation failed:')}")
@@ -756,39 +843,38 @@ class ProtocolAgent:
             _save_state_log("stage_1_config")
             return None
 
-        if not skip_validation:
-            from .validation.input_validator import InputValidator
-            validator = InputValidator()
-            try:
-                validation = validator.classify(prompt)
-            except Exception as e:
-                _log(f"  {C.error(str(e))}")
-                return None
+        
+        from .validation.input_validator import InputValidator
+        validator = InputValidator()
+        try:
+            validation = validator.classify(prompt)
+        except Exception as e:
+            _log(f"  {C.error(str(e))}")
+            return None
 
-            if not validation.is_valid_protocol:
-                if validation.classification == "QUESTION":
-                    _log("  This looks like a question, not a protocol instruction.")
-                    _log("  Try rephrasing as an action: 'Transfer 100uL from A1 to B1'")
-                elif validation.classification == "AMBIGUOUS":
-                    _log("  This instruction is too vague to generate a protocol.")
-                    _log("  Try adding specific volumes, wells, and labware names.")
-                elif validation.classification == "INVALID":
-                    _log("  This doesn't appear to be a liquid-handling protocol.")
-                    _log("  The OT-2 can only pipette — it can't centrifuge, read absorbance, etc.")
-                if validation.suggestion:
-                    _log(f"  Suggestion: {validation.suggestion}")
-                return None
-            _log(f"  {C.success('Input validated as protocol instruction.')}")
-        else:
-            _log("  Skipping input validation.")
+        if not validation.is_valid_protocol:
+            if validation.classification == "QUESTION":
+                _log("  This looks like a question, not a protocol instruction.")
+                _log("  Try rephrasing as an action: 'Transfer 100uL from A1 to B1'")
+            elif validation.classification == "AMBIGUOUS":
+                _log("  This instruction is too vague to generate a protocol.")
+                _log("  Try adding specific volumes, wells, and labware names.")
+            elif validation.classification == "INVALID":
+                _log("  This doesn't appear to be a liquid-handling protocol.")
+                _log("  The OT-2 can only pipette — it can't centrifuge, read absorbance, etc.")
+            if validation.suggestion:
+                _log(f"  Suggestion: {validation.suggestion}")
+            return None
+        _log(f"  {C.success('Input validated as protocol instruction.')}")
+        
 
         # Stage 2: Reason through the instruction → ProtocolSpec
         _stage("[Stage 2/8] Reasoning through protocol instruction...")
         extractor = SemanticExtractor(
-            client=self.parser.client,
-            model_name=self.parser.model_name
+            client=self.config_loader.client,
+            model_name=self.config_loader.model_name
         )
-        spec = extractor.extract(prompt, self.parser.config)
+        spec = extractor.extract(prompt, self.config_loader.config)
 
         if spec is None:
             _log("\n  Could not extract a protocol from your instruction.")
@@ -830,7 +916,7 @@ class ProtocolAgent:
         _stage("[Stage 3/8] Validating and completing specification...")
 
         # Provenance verification — check instruction/config claims
-        provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.parser.config)
+        provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.config_loader.config)
         fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
 
         state_log["stage_3_provenance"] = provenance_warnings
@@ -856,7 +942,7 @@ class ProtocolAgent:
             _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
                 _log(f"    - {g}")
-            spec, fills = extractor.fill_gaps(spec, self.parser.config)
+            spec, fills = extractor.fill_gaps(spec, self.config_loader.config)
             if fills:
                 _log(f"  Filled from config:")
                 for f in fills:
@@ -867,7 +953,7 @@ class ProtocolAgent:
                 for g in remaining_gaps:
                     _log(f"    - {g}")
                 _log("  Attempting self-refinement (re-reasoning with gap feedback)...")
-                refined = extractor.refine(spec, remaining_gaps, prompt, self.parser.config)
+                refined = extractor.refine(spec, remaining_gaps, prompt, self.config_loader.config)
                 if refined:
                     spec = refined
                     final_gaps = extractor.missing_fields(spec)
@@ -925,7 +1011,7 @@ class ProtocolAgent:
         _stage("[Stage 3.5/8] Resolving labware references...")
         from .extraction import LabwareResolver
         resolver = LabwareResolver(
-            config=self.parser.config,
+            config=self.config_loader.config,
             client=extractor.client,
             model_name=extractor.model_name,
         )
@@ -967,7 +1053,7 @@ class ProtocolAgent:
         # Stage 4: Constraint checking (deterministic, no LLM)
         _stage("[Stage 4/8] Checking hardware constraints...")
         from .validation.constraints import ConstraintChecker
-        checker = ConstraintChecker(self.parser.config)
+        checker = ConstraintChecker(self.config_loader.config)
         constraint_result = checker.check_all(spec)
 
         state_log["stage_4_constraints"] = {
@@ -1002,20 +1088,9 @@ class ProtocolAgent:
             _log(f"  {C.success('All constraints satisfied.')}")
 
         # Build full confirmation queue: provenance warnings + null initial volumes
+        # (grouped per (labware, substance) when multiple wells share the gap).
         confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
-
-        from .validation.constraints import WellStateTracker
-        for ic in spec.initial_contents:
-            if ic.volume_ul is None:
-                fallback = WellStateTracker._get_well_capacity_static(
-                    ic.labware, self.parser.config) or 15000.0
-                confirmable.append({
-                    "type": "initial_volume",
-                    "labware": ic.labware,
-                    "well": ic.well,
-                    "substance": ic.substance,
-                    "default_volume": fallback,
-                })
+        confirmable.extend(self._build_initial_volume_queue(spec, self.config_loader.config))
 
         # Confirm with user
         # (fabrications already blocked in Stage 3 — only non-fabrication warnings remain)
@@ -1023,7 +1098,8 @@ class ProtocolAgent:
             spec, non_fabrications,
             threshold=confirmation_threshold,
             full=full_confirmation,
-            extra_confirmable=[w for w in confirmable if w.get("type") == "initial_volume"],
+            extra_confirmable=[w for w in confirmable
+                               if w.get("type") in ("initial_volume", "initial_volume_group")],
         ))
 
         if sys.stdin.isatty():
@@ -1048,7 +1124,7 @@ class ProtocolAgent:
             from .extraction import CompleteProtocolSpec
             complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
             protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
-                complete_spec, self.parser.config)
+                complete_spec, self.config_loader.config)
             _log(f"  {C.dim('Schema generated.')}")
         except Exception as e:
             err = str(e)
@@ -1112,7 +1188,7 @@ class ProtocolAgent:
                 intent=prompt,
                 spec=complete_spec,
                 schema=protocol_schema,
-                config=self.parser.config,
+                config=self.config_loader.config,
                 well_state_warnings=well_state_warnings,
                 step_summaries=step_summaries,
             )
@@ -1132,7 +1208,7 @@ class ProtocolAgent:
                 simulation_log=simulation_log,
                 protocol_schema=protocol_schema,
                 runlog=runlog,
-                config=self.parser.config
+                config=self.config_loader.config
             )
         else:
             _log(f"  Validation failed (confidence: {validation.confidence:.0%})")

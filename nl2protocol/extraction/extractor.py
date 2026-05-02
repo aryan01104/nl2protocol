@@ -316,9 +316,12 @@ Output the corrected specification.
             for r in range(lo, hi + 1):
                 wells.add(f"{chr(r)}{start_col}")
         else:
-            # Diagonal or block — just return endpoints
-            wells.add(start)
-            wells.add(end)
+            # Block: rectangle from (min_row, min_col) to (max_row, max_col)
+            r_lo, r_hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
+            c_lo, c_hi = min(start_col, end_col), max(start_col, end_col)
+            for r in range(r_lo, r_hi + 1):
+                for c in range(c_lo, c_hi + 1):
+                    wells.add(f"{chr(r)}{c}")
         return wells
 
     @staticmethod
@@ -428,7 +431,7 @@ Output the corrected specification.
             "message": message,
         }
 
-    def _verify_instruction_claims(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
+    def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
         """Verify all source='instruction' claims against the instruction text.
 
         If the LLM claims a value came from the instruction but the value
@@ -687,7 +690,7 @@ Output the corrected specification.
           'low_confidence' — inferred value (always prompt user)
         """
         warnings = []
-        warnings.extend(self._verify_instruction_claims(spec, instruction))
+        warnings.extend(self._verify_claimed_instruction_provenance(spec, instruction))
         warnings.extend(self._verify_config_claims(spec, config))
         warnings.extend(self._flag_uncertain_claims(spec))
         return warnings
@@ -757,7 +760,7 @@ Output the corrected specification.
     def format_for_confirmation(spec: ProtocolSpec, provenance_warnings: List[dict] = None,
                                 threshold: float = 0.7, full: bool = False,
                                 extra_confirmable: List[dict] = None) -> str:
-        """Format spec for user confirmation, grouped by provenance bucket.
+        """Format SPEC for user confirmation, grouped by provenance bucket.
 
         Three sections:
           1. Auto-accepted: instruction/config values above threshold (count only)
@@ -828,16 +831,15 @@ Output the corrected specification.
                 for f in fields:
                     lines.append(f"       {f}")
 
+                # Post-action provenance only (the action/reps/volume text
+                # is already in the step_line above via _format_step_line).
                 if step.post_actions:
                     for pa in step.post_actions:
-                        pa_parts = [pa.action]
-                        if pa.repetitions:
-                            pa_parts.append(f"{pa.repetitions}x")
                         if pa.volume:
                             p = pa.volume.provenance
-                            pa_parts.append(f"{pa.volume.value}{pa.volume.unit} "
-                                            f"[{p.source}, {p.confidence}]")
-                        lines.append(f"       -> {' '.join(pa_parts)}")
+                            lines.append(f"       {pa.action} volume: "
+                                         f"{pa.volume.value}{pa.volume.unit} "
+                                         f"[{p.source}, {p.confidence}]")
 
                 if step.pipette_hint:
                     lines.append(f"       -> pipette: {step.pipette_hint}")
@@ -863,19 +865,12 @@ Output the corrected specification.
                     if "instruction" in comp.grounding and comp.confidence >= threshold:
                         auto_accepted += 1
 
-            # Step overview (always shown for context)
+            # Step overview (always shown for context).
+            # _format_step_line is the canonical one-line projection — it now
+            # includes post-actions and tip strategy. Don't re-render here.
             lines.append("  STEPS:")
             for step in spec.steps:
-                step_line = _format_step_line(step)
-                lines.append(f"    {step_line}")
-                if step.post_actions:
-                    for pa in step.post_actions:
-                        pa_parts = []
-                        if pa.repetitions:
-                            pa_parts.append(f"{pa.repetitions}x")
-                        if pa.volume:
-                            pa_parts.append(f"at {pa.volume.value}{pa.volume.unit}")
-                        lines.append(f"       -> {pa.action} {' '.join(pa_parts)}")
+                lines.append(f"    {_format_step_line(step)}")
             lines.append("")
 
             if auto_accepted:
@@ -893,6 +888,16 @@ Output the corrected specification.
                                      f"\"{w['substance']}\" — no volume stated")
                         lines.append(f"        Default: {w['default_volume']:.0f}uL "
                                      f"(well capacity)")
+                    elif w.get("type") == "initial_volume_group":
+                        # Compact range display for grouped wells.
+                        from ..pipeline import ProtocolAgent
+                        well_str = ProtocolAgent._summarize_well_list(w["wells"])
+                        n = len(w["wells"])
+                        lines.append(f"    [{i}] Initial contents: "
+                                     f"{w['labware']} {well_str} ({n} wells), "
+                                     f"\"{w['substance']}\" — no volume stated")
+                        lines.append(f"        Default: {w['default_volume']:.0f}uL "
+                                     f"per well (well capacity)")
                     else:
                         step = next((s for s in spec.steps if s.order == w['step']), None)
                         if step:

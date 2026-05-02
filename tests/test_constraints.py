@@ -547,3 +547,49 @@ class TestProvenance:
         output = SemanticExtractor.format_for_confirmation(spec, full=True)
         assert "50.0uL" in output
         assert "domain_default" in output
+
+    def test_post_action_rendered_once_in_threshold_mode(self):
+        """Regression: _format_step_line and format_for_confirmation used
+        to both render '-> mix Nx at VuL' independently, producing duplicate
+        lines. _format_step_line is now the single source of truth."""
+        from nl2protocol.extraction import SemanticExtractor
+
+        spec = make_spec(
+            [
+                ExtractedStep(
+                    order=1, action="transfer",
+                    volume=_vol(2.0),
+                    source=LocationRef(description="src", well="A1"),
+                    destination=LocationRef(description="dst", well="A1"),
+                    post_actions=[PostAction(action="mix", repetitions=3,
+                                             volume=_vol(10.0))],
+                    composition_provenance=_comp(),
+                )
+            ],
+            explicit_volumes=[2.0]
+        )
+        output = SemanticExtractor.format_for_confirmation(spec)
+        # The post-action description must appear exactly once.
+        assert output.count("-> mix") == 1
+        assert "mix 3x at 10.0uL" in output
+
+    def test_tip_strategy_surfaces_in_step_line(self):
+        """Regression: _format_step_line did not surface tip_strategy,
+        so the Stage 8 validator couldn't see it."""
+        from nl2protocol.extraction import SemanticExtractor
+
+        spec = make_spec(
+            [
+                ExtractedStep(
+                    order=1, action="transfer",
+                    volume=_vol(2.0),
+                    source=LocationRef(description="src", well="A1"),
+                    destination=LocationRef(description="dst", well="A1"),
+                    tip_strategy="new_tip_each",
+                    composition_provenance=_comp(),
+                )
+            ],
+            explicit_volumes=[2.0]
+        )
+        output = SemanticExtractor.format_for_confirmation(spec)
+        assert "new_tip_each" in output
