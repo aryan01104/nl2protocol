@@ -1,522 +1,274 @@
 # nl2protocol
 
-Convert natural language instructions into executable [Opentrons](https://opentrons.com/) OT-2 robot protocols using Claude LLM.
+A neuro-symbolic system that turns natural-language lab instructions into Opentrons OT-2 robot protocols. An LLM does the parts that require interpretation — extracting structured intent from language, judging final correctness against the original instruction. Deterministic Python does the parts that require precision — hardware mapping, code generation, simulation.
 
-Describe your lab procedure in plain English, and nl2protocol generates validated, simulator-tested Python code ready to run on Opentrons OT-2 liquid-handling robots.
+Every value the LLM produces carries a structured provenance citation back to its source. The resulting spec is machine-checked against the user's instruction before any code is generated, and the user is asked to confirm exactly the values that the system cannot verify on its own.
 
-The system uses a neuro-symbolic architecture: the LLM reasons through your protocol (chain-of-thought), a deterministic constraint checker validates against your hardware, and deterministic code handles all hardware mapping. User-specified values are never silently changed, hardware conflicts are surfaced with explanations (not silently resolved), and every inferred parameter is tagged with its provenance.
+This is a CLI-native interactive pipeline, not a batch converter: stage-by-stage progress streams to the user, and uncertain values (inferred fields, weak domain defaults, ambiguous labware mappings) are dynamically routed to per-item confirmation rather than silently accepted.
 
-> **Status**: Alpha (v0.3.0). 8 protocol test cases + 12 failure mode test cases + 32 automated pytest tests. See [Roadmap](#roadmap) for planned improvements.
+## Demo
 
----
-
-## Table of Contents
-
-- [How It Works](#how-it-works)
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [CLI Reference](#cli-reference)
-- [Configuration](#configuration)
-- [Supported Commands](#supported-commands)
-- [Architecture](#architecture)
-- [Demo Protocols](#demo-protocols)
-- [Data Curation (RAG)](#data-curation-rag)
-- [Testing](#testing)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-
----
-
-## How It Works
-
-Let's walk through what happens when you type an instruction. This shows what the system does well, where it's careful, and where it still has gaps.
-
-### Example: "Distribute 10.5uL of master mix from tube rack A1 to wells A1-H3 of the PCR plate. Transfer 2uL of DNA template. Mix 3 times at 10uL. Use the p20."
-
-**Stage 1 — The system reasons through your instruction (LLM, one call).**
-
-It doesn't jump to code. It thinks first, like a reasoning model:
-
-> "This is a PCR setup. Two steps: distribute master mix, then transfer template with mixing. The user said 10.5uL — that's specific, I'll preserve it exactly. They said 'use the p20' — I'll record that as a hint. Wells A1-H3 means 24 wells in column-major order."
-
-It produces a **ProtocolSpec** — a structured understanding of what you want, in science terms. No Opentrons API names, no slot numbers, no pipette mounts. Just: what action, what substance, what volume, from where, to where.
-
-**Stage 2 — The system checks its own work (deterministic, no LLM).**
-
-- *Hallucination guard*: It regex-extracts every volume from your instruction text (10.5, 2.0, 10.0) and checks that the spec's volumes match. If the LLM invented a volume that isn't in your text, it gets flagged.
-- *Sufficiency check*: Does every step have what it needs? Volume? Source? Destination? If not, it tries to fill gaps from the config (e.g., "the reservoir" → find which config labware is a reservoir).
-- *Self-refinement*: If gaps remain after filling, it feeds them back to the LLM once: "Step 3 is missing a volume — re-read the instruction." This is one retry for understanding, not for code generation.
-
-**Stage 3 — It shows you what it understood and asks for confirmation.**
+Real stdout from a run on a 28-line bacterial transformation protocol (4 plasmids, temperature module heat-shock cycle, dual pipettes). Cut for length — full uncropped output: [`examples/03_bacterial_transformation/run_output.txt`](examples/03_bacterial_transformation/run_output.txt).
 
 ```
+$ nl2protocol -i instruction.txt -c lab_config.json
+
+────────────────────────────────────────────────────────────
+[Stage 1/8] Validating instruction and config...
+  Config validated.
+  Classifying input...
+  Input validated as protocol instruction.
+
+────────────────────────────────────────────────────────────
+[Stage 2/8] Reasoning through protocol instruction...
+  Protocol type: heat_shock_bacterial_transformation
+  Steps: 13
+  Reasoning:
+    Bacterial transformation using heat shock. 4 plasmids (A1-A4) and
+    corresponding cells (B1-B4). Explicit volumes 2/20/100/200uL, temps
+    4°C/42°C, durations 30 min / 45 sec / 2 min / 1 hr. The 4 plasmid
+    transfers share the same volume — compress to one step over B1-B4...
+
+────────────────────────────────────────────────────────────
+[Stage 3/8] Validating and completing specification...
+  Specification is complete.
+  Locked volumes: [2.0, 20.0, 50.0, 100.0, 200.0]
+
+────────────────────────────────────────────────────────────
+[Stage 3.5/8] Resolving labware references...
+  All labware resolved.
+
+────────────────────────────────────────────────────────────
+[Stage 4/8] Checking hardware constraints...
+  All constraints satisfied.
+
+============================================================
 PROTOCOL SPECIFICATION
-  1. DISTRIBUTE 10.5uL of master mix from tube rack well A1
-     to PCR plate wells A1-H3
-  2. TRANSFER 2.0uL of DNA template from sample plate wells A1-H3
-     to PCR plate wells A1-H3
-     → mix 3x at 10.0uL
-     → pipette hint: p20
-  
-  Locked volumes (from instruction): [2.0, 10.0, 10.5]
+============================================================
+  STEPS:
+    1. SET_TEMPERATURE 4.0°C
+    2. TRANSFER 2.0uL of plasmid DNA from tube rack to wells B1-B4
+    3. MIX 20.0uL at wells B1-B4
+    4. PAUSE for 30.0 minutes
+    ... (9 more: heat shock cycle, SOC recovery, final pauses)
 
-  Does this look right? [Y/n]
+  31 parameter(s) auto-accepted (instruction/config, confidence >= 0.7)
+  NEEDS CONFIRMATION (2):
+    [1] reagent_rack A1-A4, "plasmid DNA"      — no volume stated
+    [2] reagent_rack C1, "SOC recovery medium" — no volume stated
+============================================================
+
+────────────────────────────────────────────────────────────
+[Stage 5/8] Converting specification to protocol schema...
+  Schema generated.
+... (Stages 6-8: script generation, simulation, intent verification — all passed, confidence 95%)
+
+────────────────────────────────────────────────
+  Protocol generated successfully.
+  Commands:   43 (8x transfer, 8x mix, 4x pause, 3x set_temperature, ...)
+  Pipettes:   p20_single_gen2 (left), p300_single_gen2 (right)
+  Output:     output/generated_protocol.py
 ```
 
-You can say no and rephrase. The "locked volumes" line tells you which values came directly from your text — the system will never change these.
+Three things to notice in the run above:
 
-**Stage 4 — Deterministic conversion to robot instructions (no LLM).**
+- **Chain-of-thought reasoning is visible**, not hidden in a black box (Stage 2). You see what the LLM understood before it produced any structured output.
+- **The protocol is presented in scientific terms** (`SET_TEMPERATURE 4.0°C`, `TRANSFER 2.0uL of plasmid DNA from tube rack to wells B1-B4`) before any hardware code is generated.
+- **The system identifies only the values that need user input** — 2 items out of 13 steps, with 31 parameters auto-accepted — rather than asking the user to vet everything.
 
-`spec_to_schema()` maps science to hardware using your lab config:
-- "tube rack" → scores against config labels → best match: `reagent_rack` (slot 2)
-- 10.5uL → scans pipette ranges → p20 (1-20uL) fits, p300 (20-300uL) doesn't → assigns left mount
-- "A1-H3" → expands to [A1, B1, C1, ..., H3] (24 wells, column-major)
+Three full input → output pairs are in [`examples/`](examples/).
 
-This is where the earlier bug was fixed. The old system asked the LLM to make these hardware decisions. When a volume didn't fit a pipette, the retry loop would change the volume (10.5 → 20.0) instead of switching the pipette. Now the volume is copied directly — no LLM can touch it — and the pipette is selected deterministically from the range.
+## Quick start
 
-**Stage 5 — Code generation (deterministic, no LLM).**
-
-`ProtocolSchema` → Python script. Same schema always produces the same code. This was already working well in the earlier architecture.
-
-**Stage 6 — Simulation and verification.**
-
-The Python runs through the Opentrons simulator (catches tip errors, invalid wells, API mistakes). Then an LLM checks intent: "does this protocol match what the user asked?" as a safety net.
-
-### What it can't do yet
-
-**It doesn't ask you about missing parameters.** If you say "do a serial dilution" without specifying a volume, the LLM infers 100uL from domain knowledge and tags it as `(inferred)`. You see the tag in the confirmation step, but the system doesn't proactively ask: "what volume did you want? typical is 100uL." This is the next feature to build.
-
-**Complex well layouts can trip it up.** "Drug 1 goes to columns 1-3 in triplicate, Drug 2 goes to columns 4-6" requires understanding that each drug's 8 concentrations map across replicate columns. The well range parser handles standard formats but not every natural language description.
-
-**It can run out of tips.** Big protocols (6 drugs × 8 concentrations × triplicate) need more tip changes than the configured tipracks can provide. The simulator correctly catches this, but the system doesn't suggest "add more tipracks to your config."
-
-### Where values come from
-
-Every value in the generated protocol has one of three origins:
-
-1. **From your instruction** — volumes, wells, substances you explicitly wrote. These are ground truth and are never modified. Tagged as explicit.
-2. **From domain knowledge (LLM)** — when you say "serial dilution" without specifying volume, the LLM may infer 100uL as typical. Tagged as `(inferred)` so you can see it and override.
-3. **From your config** — labware API names, deck slots, pipette mounts, tiprack assignments. These are facts about your physical setup, looked up deterministically.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 1: REASONING (LLM — one call)                            │
-│                                                                  │
-│  The LLM thinks through the protocol step by step:              │
-│  "This is a PCR setup. It has 2 steps. 10.5uL needs the p20."  │
-│                                                                  │
-│  Input:  Natural language instruction + lab config               │
-│  Output: ProtocolSpec (structured JSON — the "science language") │
-│          Actions, substances, volumes, wells, tip strategy       │
-│          Volumes tagged as explicit / approximate / inferred     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 2: VALIDATION (deterministic — no LLM)                   │
-│                                                                  │
-│  Hallucination guard: do extracted volumes match instruction?    │
-│  Sufficiency check: does every step have what it needs?          │
-│  Gap filling: infer missing sources from config contents         │
-│  Self-refinement: if gaps remain, ask LLM to try once more      │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 3: USER CONFIRMATION                                     │
-│                                                                  │
-│  "Here's what I understood:                                      │
-│   1. DISTRIBUTE 10.5uL of master mix...                          │
-│   2. TRANSFER 2uL of DNA template...                             │
-│   Does this look right? [Y/n]"                                   │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 4: DETERMINISTIC CONVERSION (no LLM)                     │
-│                                                                  │
-│  spec_to_schema(): Maps science → hardware                      │
-│    "tube rack" → reagent_rack, slot 2                            │
-│    10.5uL → p20 pipette on left mount                            │
-│    "A1-H3" → [A1, B1, C1, ..., H3]                              │
-│                                                                  │
-│  Volumes are COPIED, never re-interpreted.                       │
-│  Pipette selection is deterministic (volume → range match).      │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 5: CODE GENERATION (deterministic — no LLM)              │
-│  ProtocolSchema → Python script (Opentrons API v2.15)           │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│  STAGE 6: SIMULATION + VERIFICATION                              │
-│  Opentrons simulator (catches hardware errors)                   │
-│  + LLM intent verification (safety net, ≥70% confidence)        │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-                        working_protocol.py
-```
-
-**Why this architecture?** An earlier version used a single LLM call to generate the full robot schema directly, with a retry loop for errors. We found that the retry loop could silently corrupt user-specified values — for example, changing a volume from 10.5uL to 20.0uL to fit a wrong pipette's range. By separating understanding (LLM) from hardware mapping (deterministic code), user-specified values flow through untouched. The LLM reasons about science; the code handles engineering.
-
----
-
-## Features
-
-- **Natural Language Input** — Describe experiments in plain English, or pass a `.txt` / `.pdf` file.
-- **Chain-of-Thought Reasoning** — The LLM thinks through your protocol step by step before producing structured output, handling both simple instructions and named protocols (e.g., "do the Bradford assay").
-- **Hardware Constraint Checker** — Deterministic validation catches pipette capacity conflicts, missing labware, invalid wells, and module availability *before* code generation. Conflicts are surfaced with explanations and suggested fixes — never silently resolved.
-- **Provenance Tracking** — Every parameter is tagged: explicit (from your instruction), `[INFERRED]` (domain knowledge), or `[APPROX]` (hedged values like "~100uL"). The scientist sees exactly what came from where.
-- **Well State Tracking** — Tracks volume in every well during schema generation. Catches aspirating from empty wells, well overflow, and wrong source labware.
-- **Source Container Inference** — Automatically identifies pre-filled source containers (reservoirs, tube racks) and asks the scientist to confirm before proceeding.
-- **Interactive Missing Labware Resolution** — When instruction references equipment not in your config, the system suggests the Opentrons load_name with reasoning and offers to add it.
-- **Deterministic Hardware Mapping** — Pipette selection, labware resolution, and well expansion are all deterministic code. User-specified volumes are never re-interpreted by an LLM.
-- **Hallucination Guard** — Regex-extracted volumes from your instruction are cross-checked against the spec. Invented values get flagged.
-- **Hardware Module Support** — Temperature, magnetic, heater-shaker, and thermocycler modules.
-- **Simulator-Validated** — Every protocol passes the Opentrons simulation before output.
-- **Intent Verification** — A second LLM pass confirms the generated protocol matches what you asked for.
-- **Robot Upload** — Push protocols directly to your OT-2 via HTTP API, or use demo mode.
-- **Terminal UX** — Colored output, animated spinners during LLM calls, text wrapping, end-of-run summary. Respects `NO_COLOR`.
-
----
-
-## Installation
-
-### Prerequisites
-
-- Python 3.10+
-- An [Anthropic API key](https://console.anthropic.com/) (Claude)
-
-### Install and Set Up
-
-```bash
-pip install git+https://github.com/aryan01104/nl2protocol.git
-nl2protocol --init
-```
-
-This creates two files in your current directory:
-- **`lab_config.json`** — starter deck layout (edit to match your equipment)
-- **`.env`** — put your [Anthropic API key](https://console.anthropic.com/) here
-
-Then run:
-```bash
-nl2protocol -i "Transfer 100uL from source_plate A1 to dest_plate B1" -c lab_config.json
-```
-
-### Developer Setup
+Requires Python 3.10+ and an [Anthropic API key](https://console.anthropic.com/).
 
 ```bash
 git clone https://github.com/aryan01104/nl2protocol.git
 cd nl2protocol
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-nl2protocol --init
-```
+python3 -m venv venv
+source venv/bin/activate
+pip install .
 
----
+nl2protocol --setup                   # interactive: prompts for API key, writes .env
+cp config_examples/lab_config.example.json lab_config.json
 
-## Quick Start
-
-### CLI
-
-```bash
+# Run with an inline instruction:
 nl2protocol -i "Transfer 100uL from source_plate A1 to dest_plate B1" -c lab_config.json
+
+# Or with both instruction and config as files (typical for real protocols):
+nl2protocol -i my_protocol.txt -c lab_config.json
 ```
 
-### Python API
+The `-i` flag accepts an inline string, a path to a `.txt` file, or a path to a `.pdf` file. For PDF input, install with `pip install ".[pdf]"`. For development, `pip install -e ".[dev]"`.
 
-```python
-from nl2protocol import ProtocolAgent
+## What it does
 
-agent = ProtocolAgent(config_path="lab_config.json")
-result = agent.run_pipeline(
-    prompt="Transfer 50uL from wells A1-A8 of the source plate to dest plate"
-)
+The pipeline runs in 8 stages. Only 4 of them use an LLM, and each LLM call has a constrained job — none of them produce the final output script directly. The other 4 stages are deterministic Python and exist precisely so that user-specified values cannot be silently corrupted by the LLM at any point after extraction.
 
-if result:
-    print(result.script)
-    with open("my_protocol.py", "w") as f:
-        f.write(result.script)
+**Stage 1 — Input classification (LLM).** A short LLM call decides whether the user's input is a real protocol instruction, a question, an ambiguous statement, or something the OT-2 can't do (e.g., centrifugation, absorbance reading). Non-protocol inputs are rejected with a suggestion before any expensive extraction work.
+
+**Stage 2 — Protocol extraction with reasoning (LLM).** The main extraction call. The LLM is instructed to think step-by-step inside `<reasoning>` tags before emitting a structured `<spec>` JSON. The output is a `ProtocolSpec` — a Pydantic-validated structure expressing the protocol in scientific terms (actions, substances, volumes, well descriptions, tip strategy) rather than hardware terms (no slot numbers, no API names, no pipette mounts yet). Every value in the spec carries a `Provenance` object identifying where it came from.
+
+**Stage 3 — Provenance verification + sufficiency check (deterministic).** For each value the LLM tagged with `source="instruction"`, the system independently checks that the value actually appears in the user's instruction text. Mismatches are blocked as fabrication errors before they propagate. The sufficiency check then asks: does every step have everything it needs? If not, the system tries to fill missing fields from the lab config (e.g., resolve "the reservoir" to a specific reservoir), and if that fails, it asks the LLM to refine the spec with the gaps as feedback. Only fully-resolved specs proceed.
+
+**Stage 3.5 — Labware reference resolution (LLM).** A small dedicated LLM call maps the user's labware descriptions ("tube rack", "the PCR plate") to specific labware labels in the user's lab config. The system displays the resolution to the user for confirmation before proceeding — ambiguous mappings get the user's input, obvious one-match cases proceed automatically.
+
+**Stage 4 — Hardware constraint checking (deterministic).** Once the spec is resolved, a constraint checker validates it against the lab config: pipette range vs. volume, tip availability, labware-vs-module compatibility, well capacity vs. operations, mount conflicts. Hardware conflicts are surfaced with explanations rather than silently resolved (e.g., "step 3 needs 5uL but only the p300 is loaded; add a p20 or change the volume").
+
+**Stage 5 — Spec-to-schema conversion (deterministic).** This is the critical stage. A pure-Python function maps the science-language `ProtocolSpec` to the hardware-language `ProtocolSchema`: labware labels become Opentrons API load_names, volumes become arguments to `transfer()` calls, well descriptions become well lists or ranges. Volumes are copied verbatim — there is no LLM in the path between the user's `100uL` and the schema's `aspirate(100, ...)`.
+
+**Stages 6–7 — Script generation and simulation (deterministic).** A pure-Python template renders the schema into Opentrons Python code (same input always produces the same script). The script then runs through the actual Opentrons simulator, which catches hardware-level errors earlier stages can't see — invalid wells given a chosen labware definition, tip rack exhaustion at runtime, deck-coordinate conflicts, deprecated API patterns. Failures are blocking.
+
+**Stage 8 — Intent verification (LLM).** A separate LLM call compares the generated protocol back to the user's original instruction and produces a confidence score plus a list of specific issues if any. This is a defense-in-depth layer, not a contract: it catches semantic mismatches the simulator can't see (e.g., "you asked for mix 10 times, the script mixes once") but it's an LLM judgment with its own noise.
+
+The thread connecting all of this: the LLM is allowed to interpret natural language and produce a structured intermediate, and the LLM is allowed to evaluate the final output, but **the LLM is never in the path that translates verified spec into executable code.** That's a deliberate boundary.
+
+## Architecture decisions
+
+The following decisions shaped the system. Each section is self-contained; ADR links are for the full record.
+
+### Provenance as a first-class schema feature
+
+A standard Pydantic schema enforces shape — required fields, types, ranges, enums. It cannot enforce *meaning*. An LLM extraction can produce a perfectly well-formed `ProtocolSpec` whose 100uL transfer step refers to a value the user never wrote, or whose substance was hallucinated from context.
+
+The fix is to require the LLM to attach a structured citation to every quantity it emits. In this codebase, every volume / duration / temperature / substance / labware reference is wrapped in a `Provenanced*` Pydantic type carrying a `Provenance` object: `{source, reason, confidence}`. The `source` field is the categorical signal — one of `instruction` (user wrote it verbatim), `domain_default` (standard practice for a named protocol), or `inferred` (LLM reasoning with no direct support). The `reason` field is a one-sentence justification, and `confidence` is a self-reported number.
+
+The verifier then dispatches on `source`:
+
+- `source="instruction"` claims are checked against the actual instruction text. The verifier extracts every numeric volume, well position, and duration from the text using regex, then confirms the value actually appears. Mismatches are flagged as fabrication errors and block the pipeline.
+- `source="domain_default"` claims with high LLM-self-reported confidence are accepted silently (the LLM has cited a standard practice for a named protocol, and we have no ground-truth to check against beyond domain experts the system doesn't have access to). Weak `domain_default` claims are routed to user confirmation.
+- `source="inferred"` claims are always routed to user confirmation. The system treats "LLM reasoning with no anchor" as inherently unverifiable.
+
+The honest limit: provenance is generated by the same LLM that produces the values. It's not an external check. What the technique provides is structured verifiability for the subset of claims that *are* externally checkable (those grounded in the instruction text), and structured triage for the subset that aren't (delegated to the user). Full thinking in [ADR-0002](docs/adr/0002-provenanced-protocol-spec.md).
+
+### Multi-stage pipeline with deterministic schema generation
+
+An earlier version of the system used a single LLM call to produce the full Opentrons schema directly, with a retry loop on validation errors. This produced a specific class of silent failure: when a `10.5uL` value didn't fit the pipette the LLM had assigned, the next retry would change the volume to `20.0uL` to fit the pipette, instead of switching to a smaller pipette. The volume the user explicitly specified became collateral damage to the LLM's effort to produce a passing schema.
+
+The current architecture splits this into two phases with a deterministic boundary between them:
+
+- **Phase 1 (LLM):** the LLM produces a `ProtocolSpec` in *science language*. Actions, substances, volumes, well descriptions, tip strategy. No labware API names, no slot numbers, no pipette mounts. The LLM's job ends with a structured spec that a domain expert could read and verify.
+- **Phase 2 (deterministic):** a pure-Python `spec_to_schema()` function maps the science-language spec to a hardware-language `ProtocolSchema` using the user's lab config. This function does pipette assignment by deterministic range check, labware resolution by config lookup, well expansion by parsing well descriptions into lists. There is no LLM in this function. Volumes are copied through unmodified.
+
+The consequence is that values the user specified are protected by code structure, not by LLM compliance. A `10.5uL` in the user's instruction is `10.5uL` in the generated `transfer()` call. The pipeline becomes diagnosable: when something's wrong, you can point to which stage owns the failure (extraction lost meaning, constraints found a hardware conflict, the simulator caught a runtime issue) rather than having one monolithic LLM call to debug.
+
+The cost is more code and more stages. The benefit is that the most expensive failure mode — silent corruption of a user-specified value — is no longer expressible by the architecture.
+
+### Interactive CLI pipeline with structured user confirmation
+
+A natural objection to the provenance system is: what about the claims it can't verify? `domain_default` and `inferred` values are LLM-generated with no external ground truth in the codebase. Why should a user trust them?
+
+The system's commitment: **don't trust them — surface them.** Most LLM-to-code projects in this space are batch converters (input text in, code out, no intermediate user touchpoints). This project is CLI-native instead because lab-protocol generation is a domain where a scientist's interpretation matters at multiple points along the pipeline — labware mappings can be ambiguous, named protocols invoke domain defaults, inferred values warrant a second look. Treating the whole flow as one text-to-code transformation hides exactly the decisions the user would want visibility into.
+
+So the pipeline streams stage-by-stage progress to stderr (stdout stays clean for the generated script), and at specific decision points pauses to ask the user about claims the verifier could not establish on its own. For example, when a Bradford spec includes a 5-min incubation tagged `domain_default` with confidence 0.6:
+
+```
+[3] Step 4 INCUBATE 5 min — Bradford assay standard practice
+    (domain_default, confidence 0.6, "standard Bradford post-mix incubation")
+    Accept / edit / skip?
 ```
 
----
+The routing is by source and confidence, not by guess: `inferred` claims always need confirmation; weak `domain_default` claims need confirmation; strong `domain_default` and verified `instruction` claims pass silently. Similar items are grouped (e.g., 8 wells in a column with no stated volume become one prompt, not 8). A 17-step protocol might surface 3 review items, not 17 — users review only what's actually uncertain.
 
-## CLI Reference
+There is a non-interactive mode for CI / scripting (when stdin is not a TTY, the pipeline auto-accepts safe defaults and refuses to generate when ambiguity is unresolvable), but the design assumes a human in the loop by default because that's where the verification mechanism for non-instruction claims actually lives. The same pattern is what current research on LLM hallucination treats as the realistic frontier: deterministic verification of what's checkable, structured triage for what isn't, human in the loop for what's left over.
 
-```
-nl2protocol [OPTIONS]
-```
+### Cited-text provenance ([ADR-0003](docs/adr/0003-cited-text-provenance.md), Status: Waiting)
 
-| Flag | Description |
-|------|-------------|
-| `-i`, `--instruction` | Instruction text, or path to `.txt` / `.pdf` file |
-| `-c`, `--config` | Path to lab config JSON |
-| `--generate-config` | Auto-generate config from instruction |
-| `-d`, `--data` | Path to CSV data file |
-| `-o`, `--output` | Output file path (default: timestamped `generated_protocol_*.py`) |
-| `--robot` | Upload to OT-2 after successful generation |
-| `--validate-only` | Validate config file and exit |
-| `--help` | Show help |
+The current verifier checks `source="instruction"` claims by regex-extracting volumes/wells/durations from the user's text and looking up each LLM-claimed value. This works for clean cases (`100uL`) but has known precision/recall problems: a volume written as `100 μL` (Greek mu) or `one hundred microliters` doesn't match the regex, so honest LLM output gets flagged as a false fabrication. Substring matches on substance and labware names produce collisions ("ATP" appears inside "ATPase"). Coverage is fundamentally bounded by what the regex grammar happens to handle.
 
-### Examples
+ADR-0003 proposes promoting `Provenance.reason` (currently free-form prose) to a structured `cited_text` field carrying the verbatim substring of the user's instruction that the LLM is grounding the value in. The verifier then becomes a uniform substring check across all field types: does `cited_text` appear in the instruction, and is the value contained in `cited_text`? This collapses about 115 lines of regex extractors and per-category verifier logic into ~30 lines of substring checks, eliminates the regex coverage problem, and gives the LLM a clearer schema constraint to honor.
 
-```bash
-# Read instruction from file
-nl2protocol -i protocol.txt -c lab_config.json
+The change is in `Waiting` status because LLM reliability on the new format is the unknown that determines whether the design works in practice — and that can only be measured by building an evaluation set. Implementation plan in [`docs/plans/cited-text-provenance-plan.md`](docs/plans/cited-text-provenance-plan.md).
 
-# With CSV data
-nl2protocol -i "Distribute samples per data file" -c lab.json -d samples.csv
+## Research influences
 
-# Upload to robot after generation
-nl2protocol -i "Mix wells A1-A6" -c lab.json --robot
+The architecture draws on specific work, mapped to where each idea lives in the code:
 
-# Validate config file only
-nl2protocol --validate-only -c lab_config.json
-```
+- **Chain-of-thought reasoning at extraction time** (Stage 2 — `<reasoning>` block emitted before structured `<spec>` JSON): follows Sebastian Raschka's *Build a Reasoning Model From Scratch* (Manning, 2024), Chapter 4 on inference-time compute scaling. Implemented in [`nl2protocol/extraction/extractor.py`](nl2protocol/extraction/extractor.py) — see the in-file "Raschka, Ch.4" reference.
+- **Self-refinement on detected gaps** (Stage 3 — when the sufficiency check finds missing fields, the LLM is re-prompted with explicit gap feedback rather than re-running blind): follows Chapter 5 of the same book on self-refinement as inference-time scaling. Implemented in [`extractor.refine()`](nl2protocol/extraction/extractor.py) — see the in-file "Raschka, Ch.5" reference.
+- **Provenance schema and source-typed verification** — this is the project's own design, not lifted from any single paper. Every value carries a structured `{source, reason, confidence}` citation produced by the LLM during extraction; the verifier dispatches on source to apply different checks (regex against the instruction text for `instruction` claims, route-to-user for `inferred` and weak `domain_default` claims). The combination of per-value structured provenance, source-typed dispatch, and explicit human-in-the-loop delegation for unverifiable claims is original to this project. Adjacent research that informed the general direction:
+    - *Atomic-claim factuality* (FactScore, SAFE, SelfCheckGPT) — for the pattern of decomposing model output into checkable atoms.
+    - *Verbalized uncertainty* (Lin et al. 2022, *Teaching models to express their uncertainty in words*) — for the self-reported `confidence` field.
+    - *Citation generation in grounded LLM systems* (Anthropic Citations API, FACTS Grounding) — for the principle that grounded outputs should carry pointers to their sources.
 
----
+  The reasoning behind the specific design choices, and what these techniques don't solve in the lab-protocol domain, is in [ADR-0002](docs/adr/0002-provenanced-protocol-spec.md) and [ADR-0003](docs/adr/0003-cited-text-provenance.md).
+- **XML-tagged separation of reasoning and structured output** in the extraction prompt follows Anthropic's published prompt-engineering guidance. Implemented in [`prompts.py`](nl2protocol/extraction/prompts.py).
 
-## Configuration
+## Examples
 
-### Lab Config (`lab_config.json`)
+The [`examples/`](examples/) directory has three end-to-end runs, ordered by complexity. Each example has the input instruction, the lab config, the generated Opentrons script, the simulator log, the per-stage pipeline debug log, and (for examples 1 and 3) the captured CLI stdout.
 
-Describes your physical deck layout — labware, pipettes, and optional hardware modules.
+| # | Directory | Demonstrates |
+|---|-----------|--------------|
+| 1 | [`01_simple_transfer/`](examples/01_simple_transfer/) | Direct extraction with explicit tip strategy. Three transfers compressed to one logical step, expanded back to three `transfer()` calls. |
+| 2 | [`02_pcr_mastermix/`](examples/02_pcr_mastermix/) | Multi-pipette routing (p20 + p300), distribute-vs-transfer operation selection, per-sample `mix_after`. |
+| 3 | [`03_bacterial_transformation/`](examples/03_bacterial_transformation/) | 12-step heat-shock protocol with temperature module orchestration, multiple pauses, dual pipettes, per-reagent tip discipline. |
 
-```json
-{
-    "labware": {
-        "tiprack": {
-            "load_name": "opentrons_96_tiprack_300ul",
-            "slot": "1"
-        },
-        "source_plate": {
-            "load_name": "corning_96_wellplate_360ul_flat",
-            "slot": "2",
-            "contents": { "A1": "Sample A", "A2": "Sample B" }
-        },
-        "dest_plate": {
-            "load_name": "corning_96_wellplate_360ul_flat",
-            "slot": "3"
-        }
-    },
-    "pipettes": {
-        "left": {
-            "model": "p300_single_gen2",
-            "tipracks": ["tiprack"]
-        }
-    },
-    "modules": {
-        "temp_mod": {
-            "module_type": "temperature",
-            "slot": "6"
-        }
-    }
-}
-```
+LLM extraction is non-deterministic, so reproducing these locally may produce slightly different scripts. The system's verification stages — not the LLM — are what guarantee any generated script is sound.
 
-See `nl2protocol/config_examples/lab_config.example.json` for a full example with modules.
-
-### Robot Config (`robot_config.json`)
-
-```json
-{
-    "robot_ip": "192.168.1.100",
-    "robot_name": "My OT-2",
-    "demo_mode": true
-}
-```
-
-Set `demo_mode: false` and update `robot_ip` to connect to a real robot. The robot and your machine must be on the same network. Find your robot's IP on its touchscreen under Settings > Network.
-
----
-
-## Supported Commands
-
-### Liquid Handling
-
-| Command | Description |
-|---------|-------------|
-| `aspirate` | Draw liquid into pipette tip |
-| `dispense` | Push liquid out of pipette tip |
-| `mix` | Aspirate/dispense cycles to mix |
-| `transfer` | Move liquid from source to destination |
-| `distribute` | One source to multiple destinations |
-| `consolidate` | Multiple sources to one destination |
-| `blow_out` | Expel remaining liquid/air |
-| `touch_tip` | Touch tip to well sides |
-| `air_gap` | Add air gap to prevent dripping |
-| `pick_up_tip` / `drop_tip` | Manual tip management |
-
-### Flow Control
-
-| Command | Description |
-|---------|-------------|
-| `pause` | Pause for user intervention |
-| `delay` | Wait for specified time |
-| `comment` | Add comment to run log |
-
-### Hardware Modules
-
-| Module | Commands |
-|--------|----------|
-| Temperature | `set_temperature`, `wait_for_temperature`, `deactivate` |
-| Magnetic | `engage_magnets`, `disengage_magnets` |
-| Heater-Shaker | `set_shake_speed`, `open_latch`, `close_latch` |
-| Thermocycler | `set_block_temperature`, `set_lid_temperature`, `open_lid`, `close_lid`, `run_profile` |
-
----
-
-## Architecture
-
-### Two languages, one pipeline
-
-The system has two representations of a protocol, and a deterministic bridge between them:
-
-**ProtocolSpec** (`extractor.py`) — the "science language." Actions, substances, volumes, wells, tip strategy. No hardware details. This is what the LLM produces. A scientist can read it and say "yes, that's what I want."
-
-**ProtocolSchema** (`models.py`) — the "hardware language." Opentrons API labware names, deck slots, pipette mounts, command objects. This is what gets converted to Python code. A robot can execute it.
-
-**`spec_to_schema()`** (`extractor.py`) — the deterministic bridge. Maps "tube rack" → `reagent_rack` on slot 2. Maps 10.5uL → p20 on left mount. Expands "A1-H3" → 24 wells. No LLM involved, so values can't be corrupted.
-
-### Project Structure
+## Project structure
 
 ```
 nl2protocol/
 ├── nl2protocol/
-│   ├── extractor.py          # ProtocolSpec + reasoning + spec_to_schema()
-│   ├── app.py                # Pipeline orchestration + code generation + simulation
-│   ├── constraints.py        # Hardware constraint checker + well state tracker
-│   ├── models.py             # ProtocolSchema + hardware-level validation
-│   ├── parser.py             # Config loading + well info enrichment
-│   ├── cli.py                # Command-line interface
-│   ├── colors.py             # ANSI terminal colors (respects NO_COLOR)
-│   ├── spinner.py            # Zero-dependency animated spinner
-│   ├── robot.py              # OT-2 HTTP API client
-│   ├── input_validator.py    # Classify input (protocol / question / invalid)
-│   ├── validate_config.py    # Lab config JSON validation
-│   ├── errors.py             # Custom exceptions + API error formatting
-│   └── config_examples/      # Sample lab configs
+│   ├── cli.py              # Argument parsing, --setup, --init, output handling
+│   ├── pipeline.py         # 8-stage pipeline orchestration
+│   ├── config.py           # Lab config loading + Anthropic client init
+│   ├── extraction/
+│   │   ├── extractor.py    # ProtocolSpec extraction (Stage 2) + provenance verifier
+│   │   ├── prompts.py      # Reasoning + extraction prompt templates
+│   │   ├── resolver.py     # Labware reference resolution (Stage 3.5)
+│   │   └── schema_builder.py  # spec_to_schema() — deterministic hardware mapping
+│   ├── models/
+│   │   ├── spec.py         # ProtocolSpec + Provenanced* types (the "science language")
+│   │   ├── schema.py       # ProtocolSchema (the "hardware language")
+│   │   └── labware.py      # Opentrons labware definitions + well info
+│   └── validation/
+│       ├── input_validator.py    # Stage 1 — classify input as protocol/question/invalid
+│       ├── constraints.py        # Stage 4 — hardware constraint checker, well state tracker
+│       ├── validate_config.py    # Lab config schema validation
+│       └── validator.py          # Stage 8 — LLM intent verification
 │
-├── tests/                    # 32 automated pytest tests (no API key needed)
-├── test_cases/
-│   ├── examples/             # 13 working protocols to try (start here)
-│   └── failure_modes/        # 12 cases designed to trigger specific errors
-├── notes/                    # Architecture notes and design docs
-├── pyproject.toml            # Package metadata and dependencies
-└── requirements.txt          # Python dependencies
+├── examples/               # 3 end-to-end runs (input + output + debug logs)
+├── test_cases/             # 13 protocol examples + 12 failure mode cases
+├── tests/                  # pytest tests (no API key needed)
+├── docs/adr/               # Architecture decision records
+├── docs/plans/             # Deferred implementation plans + architecture writeup
+└── config_examples/        # Sample lab configs (basic, modules, thermocycler, high-throughput)
 ```
 
-### Key Design Decisions
+## Limitations
 
-1. **LLM reasons, code maps.** The LLM's only job is to understand the instruction and produce a structured spec. All hardware decisions (which pipette, which slot, which API name) are deterministic code. This is why user-specified volumes can never be silently changed — they never pass through an LLM after extraction.
+What the system explicitly does not try to do, with reasons:
 
-2. **Chain-of-thought reasoning.** The extraction prompt asks the LLM to think step by step before producing structured output (inspired by [Raschka, Ch. 4](https://www.manning.com/books/build-a-reasoning-model-from-scratch) on inference-time compute scaling). This handles both simple instructions ("transfer 100uL") and complex ones ("do the Bradford assay") with the same call — the reasoning adapts to complexity.
-
-3. **Pydantic validation at the boundary.** `ProtocolSchema` enforces that labware exists in config, volumes are within pipette range, and all references are valid. Error messages now suggest which pipette to switch to (not just "volume out of range"), guiding self-correction toward the right fix.
-
-4. **Three sources of truth.** Every value in the output has a clear origin: from your instruction (explicit, locked), from domain knowledge (inferred, shown to you), or from your config (deterministic lookup). You can trace any value back to why it's there.
-
----
-
-## Examples
-
-13 working protocols and 12 failure mode cases in `test_cases/`. Start here:
-
-```bash
-# Simplest example
-python -m nl2protocol \
-  -i test_cases/examples/simple_transfer/instruction.txt \
-  -c test_cases/examples/simple_transfer/config.json
-
-# More complex: qPCR with standard curve + temperature module
-python -m nl2protocol \
-  -i test_cases/examples/qpcr_standard_curve/instruction.txt \
-  -c test_cases/examples/qpcr_standard_curve/config.json
-
-# See a failure mode: pipette too small for requested volume
-python -m nl2protocol \
-  -i test_cases/failure_modes/pipette_insufficient/instruction.txt \
-  -c test_cases/failure_modes/pipette_insufficient/config.json
-```
-
-See [test_cases/README.md](./test_cases/README.md) for the full list.
-
----
-
-## Testing
-
-### Automated Tests
-
-32 deterministic pytest tests — no API key needed:
-
-```bash
-python -m pytest tests/ -v
-```
-
-Covers: constraint checker, well state tracker, serial dilution correctness, volume validation, provenance display, and 12 failure mode scenarios.
-
-### Example Protocols
-
-13 working protocols in `test_cases/examples/` and 12 failure mode cases in `test_cases/failure_modes/`. See [test_cases/README.md](./test_cases/README.md) for the full list.
-
----
+- **Domain knowledge claims are not auto-verified.** Values the LLM tags as `domain_default` (e.g., "Bradford assay incubation is 5 minutes") are routed to user confirmation rather than auto-accepted, because the system has no authoritative external knowledge base to check them against. The user is the verification mechanism for these claims by design.
+- **The Stage 8 intent verifier is a defense layer, not a contract.** It uses an LLM-as-judge approach to check whether the generated protocol matches the user's instruction. This is empirically useful (it catches real semantic issues that the simulator can't see) but it is itself an LLM call and has its own noise. A "passed" Stage 8 raises confidence but doesn't guarantee correctness.
+- **Non-pipetting hardware is out of scope.** Centrifuges, plate readers, gel boxes, microscopes — these aren't on the OT-2 deck and the system makes no attempt to handle them. Instructions that require them will be classified as invalid in Stage 1.
+- **No cross-protocol state.** Each run is independent. The system does not remember that a previous run filled some wells, applied some labels, or left tips in a particular state.
+- **LLM extraction is non-deterministic.** Running the same instruction twice can produce different specs and different scripts. The verification stages (provenance check, hardware constraints, simulation, intent verification) are what guarantee any individual run is sound — not the LLM's consistency.
+- **The verifier's coverage is bounded by its regex extractors.** A volume written as `100 μL` (Greek mu) or `one hundred microliters` is not caught by the current regex; honest LLM output using these forms gets flagged as a false fabrication. ADR-0003 proposes a structured fix; until then, this is a known precision gap.
 
 ## Roadmap
 
-### Planned
+The next direction is captured in [ADR-0003 (Waiting)](docs/adr/0003-cited-text-provenance.md): replace regex-based instruction verification with a structured `cited_text` field on `Provenance` carrying the verbatim instruction substring grounding each value. Implementation plan in [`docs/plans/cited-text-provenance-plan.md`](docs/plans/cited-text-provenance-plan.md). Gated on building an evaluation set first, because the change cannot be safely validated by smoke testing alone.
 
-- [ ] **Interactive parameter filling** — When a volume is inferred, ask the scientist with a reasoned suggestion instead of silently filling it
-- [ ] **Lab inventory import** — Import equipment list from Opentrons App or CSV, replacing the manual config.json
-- [ ] **Simulation error feedback** — Feed simulator errors back to the reasoning step for re-extraction
-- [ ] **API mode** — Return structured JSON responses instead of interactive prompts, for agent-to-agent use
-- [ ] **Opentrons Flex support** — Extend beyond OT-2 to support the newer Opentrons Flex platform
+A pipeline architecture writeup explaining what each stage owes the next is at [`docs/plans/pipeline-and-testing.md`](docs/plans/pipeline-and-testing.md).
 
----
+## Tests
 
-## Example Instructions
-
-Here are some example natural language instructions the system can handle:
-
-**Serial Dilution**
-```
-Perform a 2x serial dilution across row A. Start with 200uL stock in A1.
-Transfer 100uL from A1 to A2, mix, then A2 to A3, and so on through A12.
+```bash
+pytest tests/ -v
 ```
 
-**Plate Replication**
-```
-Copy 50uL from each well in column 1 of the source plate to the corresponding
-wells in column 1 of the destination plate. Use a new tip for each transfer.
-```
+Tests run without an API key. Coverage: hardware constraint checker, well state tracker, tip strategy, confirmation queue grouping, and a battery of failure-mode tests in [`tests/test_failure_modes.py`](tests/test_failure_modes.py). The failure-mode tests are deliberately designed to trigger specific error paths (invalid wells, missing labware, equivalent labware names, pipette overcommit, etc.) — they're how the system's error handling stays honest.
 
-**Temperature-Controlled Transfer**
-```
-Set the temperature module to 4C and wait until it reaches temperature.
-Then transfer 20uL from each sample tube to the cold plate, using a new tip each time.
-```
+## Tech stack
 
-**PCR Setup**
-```
-Distribute 10uL of master mix from tube rack A1 to all wells of a 96-well PCR plate.
-Then add 2uL of template DNA from wells A1-H1 of the source plate to the
-corresponding rows of the PCR plate.
-```
-
----
-
-## Contributing
-
-This project is in alpha. Contributions are welcome — particularly around:
-- Additional RAG training examples (especially module-heavy protocols)
-- Labware load name validation
-- Test coverage
-- Documentation improvements
-
-Please open an issue to discuss before submitting large changes.
-
----
+- Python 3.10+
+- [Pydantic](https://docs.pydantic.dev/) — schema validation, the discipline boundary between LLM output and the rest of the system
+- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude API
+- [Opentrons API](https://docs.opentrons.com/) — protocol execution and simulation
 
 ## License
 
-MIT
+MIT.
