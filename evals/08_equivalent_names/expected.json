@@ -1,0 +1,13 @@
+{
+    "source": "test_cases/failure_modes/equivalent_names",
+    "description": "Happy path for the labware resolver: instruction uses informal user-language ('Eppendorf tubes', 'flat-bottom microplate', 'trough') that must resolve to the config labels (tube_rack, assay_plate, reagent_reservoir). If the resolver succeeds, no constraint errors should fire. This tests the LLM-driven resolution stage end-to-end on real synonyms.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "explicit_volumes_include": [25.0, 200.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

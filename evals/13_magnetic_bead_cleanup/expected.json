@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/examples/magnetic_bead_cleanup",
+    "description": "Complex happy path with magnetic module: 11-step DNA cleanup including bead resuspension, magnet engage/disengage cycles, ethanol washes, and elution. Distinct from eval 12 (temperature module) — exercises module-labware-mismatch checks for the magnetic module when the sample plate sits on it (the config uses on_module='mag_mod'). Tests multi-step structure with reused tips for waste removal.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 5,
+        "explicit_volumes_include": [50.0, 200.0, 30.0, 25.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

@@ -12,13 +12,22 @@ Each eval references a canonical `(instruction.txt, config.json)` pair in `test_
 evals/
   README.md
   run.py
-  01_simple_transfer/
-    expected.json     ← {"source": "test_cases/examples/simple_transfer", invariants...}
-  02_serial_dilution/...
-  03_pcr_mastermix/...
-  04_pipette_insufficient/...
-  05_labware_missing/...
+  01_simple_transfer/        happy: baseline multi-well transfer
+  02_serial_dilution/        happy: 2-fold dilution chain
+  03_pcr_mastermix/          happy: 10.5uL preservation (motivated the spec/schema split)
+  04_pipette_insufficient/   failure: PIPETTE_CAPACITY violation
+  05_labware_missing/        failure: LABWARE_NOT_FOUND violation
+  06_module_missing/         failure: MODULE_NOT_FOUND violation
+  07_combined_config_gaps/   failure: multiple violation types in one spec
+  08_equivalent_names/       happy/resolver: user-language → config labels
+  09_compact_instruction/    happy: terse-syntax robustness
+  10_misspelled_instruction/ happy: typo robustness
+  11_distribute/             happy: distribute action type
+  13_magnetic_bead_cleanup/  happy: magnetic module + multi-step (NOT YET VERIFIED — pending API credits)
+  14_bradford_assay/         happy: mixed provenance / domain_default routing (NOT YET VERIFIED — pending API credits)
 ```
+
+13 evals shipped. Numbering has a gap at 12 — `12_qpcr_standard_curve` was dropped during initial verification because the labware resolver couldn't match its informal labware names ("tube rack" → `reagent_tube_rack`) to the config's snake_case labels. That class of complex-config eval can come back when task #4 (orchestration refactor) lets the eval runner drive the user-confirmation queue with scripted answers — the resolver weakness is recovered by user confirmation in production, but the eval runner currently bypasses that stage. See [Deferred assertions](#deferred-assertions-intentionally-not-yet-in-expectedjson) below.
 
 ## Why this layer exists (vs. manual runs of `examples/`)
 
@@ -82,13 +91,27 @@ ANTHROPIC_API_KEY=... python evals/run.py                       # all evals
 ANTHROPIC_API_KEY=... python evals/run.py --eval 04_pipette_insufficient
 ```
 
-Exit code is 0 iff every eval passes. Each eval makes one real Claude API call (the extraction stage); refinement / verifier / intent-verification stages are not exercised by this runner — they're separate concerns.
+Exit code is 0 iff every eval passes. Each eval makes one real Claude API call to the extraction stage and one to the labware resolver — refinement, simulation, and the (now-removed) intent verifier are not exercised. Stage 1 input classification is also bypassed (different code path).
 
 ## What evals do NOT measure
 
 - **Model output quality in absolute terms** — these are pass/fail invariants, not graded scores. For real model evaluation you'd need LLM-as-judge or human review (out of scope for this set).
-- **Stages 3 / 6 / 7 / 8 of the pipeline** — confirmation prompts, simulation, intent verification. The runner stops after constraints. Adding more stages would couple the runner to UX that's hard to mock.
-- **Generated Python script execution.** That's the Opentrons simulator's job (Stage 6); evals here cover semantic extraction + hardware constraints, not script runtime behavior.
+- **CLI / interactive UX** — the runner calls the Python API directly (`SemanticExtractor.extract`, `LabwareResolver.resolve`, `ConstraintChecker.check_all`). It does NOT invoke `ProtocolAgent.run_pipeline` or any of the `_prompt_input` confirmation flows. Confirmation-queue behavior, stage banners, and CLI output are all UX concerns tested elsewhere (manually via `examples/`, deterministically via `tests/integration/`).
+- **Stages bypassed by design**: Stage 1 (input classification — separate LLM call), Stage 3 (interactive confirmations — UX), Stage 5b (deterministic script generation — covered by `tests/integration/`), Stage 6 (Opentrons simulation — slow, covered by `examples/`), Stage 7 ~~intent verification~~ (removed in [ADR-0004](../docs/adr/0004-remove-intent-verifier.md)).
+- **Generated Python script execution.** That's the Opentrons simulator's job; evals here cover semantic extraction + labware resolution + hardware constraints, not script runtime behavior.
+
+## Deferred assertions (intentionally not yet in `expected.json`)
+
+The runner only asserts on three things today: did extraction succeed, basic spec shape (step count, action types, explicit volumes), and constraint check expectations. Several other useful invariants are accessible from the same data we already produce, and would meaningfully tighten the eval signal — but require extending the schema and runner. Documented here so a later pass can pick them up without re-discovering the design space:
+
+| Deferred assertion | What it would catch | Why valuable |
+|---|---|---|
+| **`spec.provenance_for_volumes`** — assert specific volumes carry the expected provenance source (`"instruction"` vs `"domain_default"` vs `"inferred"`) | LLM hedging: e.g., `bradford_assay`'s 5-min incubation should be `domain_default`, not `instruction`. User-stated `100uL` should be `instruction`, never `inferred`. | Tests the load-bearing invariant of [ADR-0002](../docs/adr/0002-provenanced-protocol-spec.md) — provenance routing decides what gets confirmed by the user vs. accepted automatically. |
+| **`spec.resolved_labels_include`** — assert specific user-language labware descriptions resolved to specific config labels | E.g., for `08_equivalent_names`: `"Eppendorf tubes" → "tube_rack"`. Tests the resolver succeeded, not just that constraints didn't fire. | Stronger signal than "no constraint errors" — currently the resolver could resolve to the wrong label and as long as the wrong label is *also* in the config, no error fires. |
+| **`constraints.expect_warnings`** (boolean) | Tests that warnings (vs errors) fire when expected. E.g., a spec with assumed-volume initial contents should produce specific warning strings. | Cheap; warnings are second-class citizens of constraint-check output and currently invisible to evals. |
+| **Stage 1 classification** — extend the runner to call `InputValidator.classify` first | Tests that `nonsensical_instruction` cases are rejected at Stage 1, not extraction. | Different LLM call (Haiku); needs runner extension. Worth adding when there's a clear regression pattern to catch. |
+
+These additions are all **additive** — existing `expected.json` files would keep passing as written. None are blocking the current eval set's value; deferred until a clear regression makes them necessary.
 
 ## Adding a new eval
 

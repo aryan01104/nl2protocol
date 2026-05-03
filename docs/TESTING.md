@@ -67,7 +67,7 @@ The `requires_llm` marker (a `pytest.mark.skipif` checking for the env var) keep
 
 | Location | Evals | What it exercises |
 |---|---|---|
-| `evals/` | 5 | Real-LLM runs of (instruction → extract → labware-resolve → constraints) with loose-invariant oracles in per-eval `expected.json`. 3 happy-path evals (simple_transfer, serial_dilution, pcr_mastermix) plus 2 engineered failure cases (pipette_insufficient → expects PIPETTE_CAPACITY violation; labware_missing → expects LABWARE_NOT_FOUND violation). Sourced from `test_cases/` to avoid duplication. |
+| `evals/` | 13 (11 verified + 2 pending API credits) | Real-LLM runs of (instruction → extract → labware-resolve → constraints) with loose-invariant oracles in per-eval `expected.json`. Mix of happy paths (`simple_transfer`, `serial_dilution`, `pcr_mastermix`, `equivalent_names`, `compact_instruction`, `misspelled_instruction`, `distribute`, plus pending: `magnetic_bead_cleanup`, `bradford_assay`) and engineered failure cases (`pipette_insufficient`, `labware_missing`, `module_missing`, `combined_config_gaps`). Sourced from `test_cases/` to avoid duplication. |
 
 This is the only layer that exercises the real Anthropic API. Run via `python evals/run.py` (gated on `ANTHROPIC_API_KEY`); not in CI by design. Catches model-behavior regressions that no mock-based layer can detect — model upgrades, prompt drift, hedging behavior, hallucinated structure. See [`evals/README.md`](../evals/README.md) for the full discipline.
 

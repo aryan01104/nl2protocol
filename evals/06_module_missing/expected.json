@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/failure_modes/module_missing",
+    "description": "Failure case: instruction asks to set a temperature module to 37°C, but the config has no temperature module configured. The LLM should still extract a valid spec (it doesn't know what's in the config), and the constraint checker should flag MODULE_NOT_FOUND. Tests the neuro-symbolic boundary at the module level (parallel to eval 04 which tests it at the pipette level).",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "explicit_volumes_include": [200.0]
+    },
+    "constraints": {
+        "expect_errors": true,
+        "violation_types_required": ["MODULE_NOT_FOUND"]
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/examples/bradford_assay",
+    "description": "Happy path with mixed provenance: 8 unknown samples + BSA standard curve. Some volumes are user-stated (10uL, 200uL) but the protocol contains domain knowledge the LLM may need to attach `domain_default` provenance to (e.g., the dilution math implies specific volumes per standard tube, the 5-minute incubation is a Bradford-assay convention). Tests that the user's explicit volumes are preserved verbatim while the LLM's inferred steps stay sound.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 3,
+        "explicit_volumes_include": [10.0, 200.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}
