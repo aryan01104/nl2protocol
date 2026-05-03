@@ -14,17 +14,16 @@ The framework used here follows the standard test pyramid (unit → integration 
               │   System (full pipeline)    │  test_failure_modes.py (LLM-gated)
               └────────────────────────────┘
             ┌──────────────────────────────┐
-            │       Integration             │  not yet covered — gap, see Roadmap
+            │       Integration             │  tests/integration/ (mocked LLM)
             └──────────────────────────────┘
           ┌────────────────────────────────┐
-          │             Unit                │  test_constraints.py
-          │                                 │  test_confirmation_grouping.py
-          │                                 │  test_tip_strategy.py
-          │                                 │  test_failure_modes.py (deterministic)
+          │             Unit                │  tests/test_*.py
+          │                                 │  tests/property/ (Hypothesis)
+          │                                 │  tests/test_boundaries.py (BVA)
           └────────────────────────────────┘
 ```
 
-The base of the pyramid is wide — most tests are unit-level, exercising specific functions in isolation against hand-crafted inputs. The middle (integration) is currently thin and is the most concrete place additional tests would help. The top (system) is partially covered by LLM-gated failure-mode tests; full end-to-end runs are exercised manually via `examples/` rather than asserted by CI.
+279 tests total. The base is wide — contract tests on every public function in the deterministic core, plus Hypothesis property tests, plus explicit boundary-value tests. The middle is filled by mocked-LLM integration tests of the stage chain. The top is partially covered by LLM-gated failure-mode tests; full end-to-end runs are exercised manually via `examples/` rather than asserted by CI.
 
 ## What's tested
 
@@ -32,9 +31,29 @@ The base of the pyramid is wide — most tests are unit-level, exercising specif
 
 | File | Tests | What it exercises |
 |---|---|---|
-| `test_constraints.py` | 24 | Hardware constraint checker (Stage 4): pipette range vs. requested volume, labware reference resolution, module presence, tip availability, well state tracking (overflow / underflow / cross-step volume accounting), substance tracking, serial-dilution chain correctness, post-action provenance routing. |
-| `test_confirmation_grouping.py` | 18 | Confirmation queue grouping logic: when multiple null-volume initial-content entries share a (labware, substance) key, they should collapse into one user prompt rather than N. Tests rectangular block detection, partial blocks, irregular sets, multi-substance behavior. |
-| `test_tip_strategy.py` | 7 | Tip-strategy expansion: `new_tip_each` vs. `same_tip` decisions across single-source / multi-source / cross-step cases, plus the rule that `mix_after` forces a new tip per destination. |
+| `test_constraints.py` | 122 | Hardware constraint checker (`get_pipette_range`, `get_pipette_for_volume`, `get_all_pipette_ranges`, `ConstraintChecker.check_all`, `WellState.add/remove`, `WellStateTracker.dispense/aspirate/get_volume/get_substances/well_has_liquid`) — one prescriptive contract test per docstring clause. |
+| `test_spec_validators.py` | 22 | Pydantic model-validators on `ExtractedStep.coerce_replicates`, `ProtocolSpec.validate_step_ordering`, `CompleteProtocolSpec.validate_completeness`. |
+| `test_labware.py` | 17 | `get_well_info` — Opentrons-known labware path, all heuristic-substring patterns (parametrized), and pin-tested wart paths (default-96-well silent fallback). |
+| `test_input_validator.py` | 18 | Phase-1 deterministic length-check path of `InputValidator.classify` (LLM call mocked out). |
+| `test_errors.py` | 18 | `format_error_for_cli`, `format_api_error` dispatch tables; exception-class message construction. |
+| `test_config.py` | 19 | `normalize_config`, `enrich_config_with_wells`, `ConfigLoader.__init__`, `ConfigLoader.load_config`. |
+| `test_validate_config.py` | 19 | `ConfigValidator.validate` orchestration, the two convenience functions, `ValidationResult.__str__`. |
+| `test_confirmation_grouping.py` | 18 | Confirmation queue grouping logic — rectangular blocks, partial blocks, irregular sets. |
+| `test_tip_strategy.py` | 7 | Tip-strategy expansion: `new_tip_each` vs. `same_tip` across single/multi-source/cross-step cases. |
+| `test_boundaries.py` | 18 | Explicit edge-of-range tests at exact thresholds (0.01uL tolerance, pipette range edges via `math.nextafter`, Pydantic `ge`/`le`/`gt` boundaries). See [Boundary inventory](#boundary-inventory). |
+
+### Property-based tests — Hypothesis, deterministic
+
+| File | Properties | What it exercises |
+|---|---|---|
+| `tests/property/test_constraint_properties.py` | 13 | Helper-level invariants: `get_pipette_range` returns correct range for any recognized prefix; `get_pipette_for_volume` returns mounts whose range covers the volume; `WellState.add/remove` cumulative arithmetic and substance dedup. |
+| `tests/property/test_check_all_properties.py` | 7 | Orchestration-level invariants on `ConstraintChecker.check_all`: determinism, spec/config purity, every violation has all 6 structured fields, volume-completeness, volume-soundness, well-validity completeness. Built on inline Hypothesis strategies for `ProtocolSpec`, `LocationRef`, `Provenance`, etc. |
+
+### Integration tests — mocked Anthropic client, deterministic
+
+| File | Tests | What it exercises |
+|---|---|---|
+| `tests/integration/test_pipeline_with_mocks.py` | 5 | Stage chain with the LLM mocked at `SemanticExtractor`'s client boundary: extract → constraints → spec_to_schema → generate_python_script. Covers happy paths (single transfer, multi-step), and cases where downstream stages catch what the LLM can't (oversized volume, well outside labware grid), plus malformed-LLM-response handling. Skips the interactive `_prompt_input` paths in `ProtocolAgent.run_pipeline` by design — those couple to UX, not pipeline shape. |
 
 ### System tests — LLM-dependent, gated on `ANTHROPIC_API_KEY`
 
@@ -51,7 +70,7 @@ Following the principle that *exhaustive testing is impossible*, here is what we
 - **Generated Opentrons script execution on real hardware.** The Opentrons simulator (Stage 7) is the test oracle for protocol correctness at the API level. We do not run scripts on a physical OT-2 in CI — that requires hardware, network access, and would not catch new classes of bugs that the simulator misses.
 - **LLM intent verification (Stage 8) accuracy.** The Stage 8 verifier is itself an LLM call; testing whether its judgments are correct would require an evaluation set of (instruction, generated_script, expected_verdict) triples, which we have not built. This is acknowledged in the README's Limitations and tracked as future work.
 - **Domain knowledge claims** (e.g., "is 5 minutes the right Bradford incubation?"). These are routed to user confirmation by design (see [ADR-0002](adr/0002-provenanced-protocol-spec.md)). The system does not assert correctness on these and tests cannot either.
-- **Long-running fuzzing / property-based search.** Currently no property-based tests (Hypothesis) are present — the constraint checker would be a strong fit and is an open improvement (see Roadmap).
+- **Long-running fuzzing.** Hypothesis-based property tests (`tests/property/`) cover the constraint checker's helpers and orchestrator with ~50–100 generated inputs per property; broader fuzzing (e.g., multi-hour AFL-style runs) is not done.
 - **End-to-end pipeline runs in CI.** Full pipeline runs cost API tokens and are non-deterministic. The `examples/` directory acts as a manually-verified end-to-end witness instead.
 
 ## Testing principles followed

@@ -257,12 +257,13 @@ A pipeline architecture writeup explaining what each stage owes the next is at [
 ## Tests
 
 ```bash
-pytest tests/ -v                                     # 61 deterministic tests, no API key needed
-ANTHROPIC_API_KEY=... pytest tests/ -v               # also runs LLM-dependent system tests
-pytest tests/ --cov=nl2protocol --cov-report=term-missing   # with coverage
+pytest tests/ -v                                          # 279 deterministic tests, no API key needed
+ANTHROPIC_API_KEY=... pytest tests/ -v                    # also runs LLM-dependent system tests
+pytest tests/ --cov=nl2protocol --cov-branch              # with branch coverage
+mutmut run                                                # mutation testing of validation/constraints.py
 ```
 
-The suite is split between deterministic unit tests (constraint checker, well state tracker, tip strategy, confirmation queue grouping) and LLM-gated system tests (extraction edge cases — misspellings, equivalent labware names, compact instructions, non-protocol input rejection). A battery of failure-mode tests in [`tests/test_failure_modes.py`](tests/test_failure_modes.py) is deliberately designed to trigger specific error paths (invalid wells, missing labware, pipette overcommit, etc.) — they're how the error handling stays honest as the codebase changes.
+The suite stacks four paradigms: **contract tests** (one-per-clause unit tests of the deterministic core, written from prescriptive function docstrings), **property tests** (Hypothesis-generated inputs verifying invariants in `tests/property/`), **boundary tests** (explicit edge-of-range cases in `tests/test_boundaries.py`), and **integration tests** (mocked-LLM stage-chain tests in `tests/integration/`). LLM-gated failure-mode tests (`tests/test_failure_modes.py`) cover real extraction behavior on edge cases. Mutation testing (mutmut) is configured against `validation/constraints.py` to verify the suite asserts on behavior, not just executes lines — current score 44.7%.
 
 For the full strategy — what's tested, what's deliberately not, which course principles the suite follows, and the open improvements — see [`docs/TESTING.md`](docs/TESTING.md).
 

@@ -32,6 +32,9 @@ llm_failed_output*.txt
 htmlcov/
 mutants/
 
+# Debug dumps from extractor failures
+extractor_debug_*.txt
+
 # OS
 .DS_Store
 Thumbs.db
