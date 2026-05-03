@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/examples/distribute",
+    "description": "Happy path exercising the 'distribute' ActionType: single source (reservoir A1) → many destinations (column 1 of plate). Tests that the LLM picks the specific 'distribute' action rather than collapsing into a generic 'transfer' loop. Distinct from existing transfer-based evals because 'distribute' takes different schema branches downstream.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "explicit_volumes_include": [100.0],
+        "actions_present": ["distribute"]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

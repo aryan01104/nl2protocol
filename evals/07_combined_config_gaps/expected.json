@@ -1,0 +1,11 @@
+{
+    "source": "test_cases/failure_modes/combined_config_gaps",
+    "description": "Failure case: a magnetic-bead cleanup instruction that references a temperature module, magnetic module, waste reservoir, ethanol reservoir, tube rack, and PCR plate — none of which are in the config (which only has a tiprack, deep_well_plate, and p300). The constraint checker must flag MULTIPLE distinct violation types in a single result — verifies the checker accumulates violations across all 5 categories rather than short-circuiting on the first error.",
+    "extract": {
+        "should_succeed": true
+    },
+    "constraints": {
+        "expect_errors": true,
+        "violation_types_required": ["MODULE_NOT_FOUND", "LABWARE_NOT_FOUND"]
+    }
+}

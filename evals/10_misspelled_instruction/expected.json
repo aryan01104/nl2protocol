@@ -1,0 +1,13 @@
+{
+    "source": "test_cases/failure_modes/misspelled_instruction",
+    "description": "Happy path for typo robustness: instruction has multiple misspellings ('Trasfer', 'resevoir', 'destintion', 'tipp', 'templete', 'sorce', 'useing'). The LLM should still extract a valid spec preserving both volumes (50 and 5 uL). Tests that the extraction layer is robust to noisy real-world input typical of lab-bench typing.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "explicit_volumes_include": [50.0, 5.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

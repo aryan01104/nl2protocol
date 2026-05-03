@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/failure_modes/compact_instruction",
+    "description": "Happy path for terse-syntax robustness: a Bradford-assay instruction in highly compressed shorthand ('10uL standards (A1-A4 tube rack) to plate A1-A4, 200uL Bradford reagent...'). The LLM must extract a valid multi-step spec from the abbreviated phrasing, preserving both volume values, and the constraint checker should pass.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 2,
+        "explicit_volumes_include": [10.0, 200.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}
