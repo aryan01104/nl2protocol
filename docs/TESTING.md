@@ -76,7 +76,7 @@ This is the only layer that exercises the real Anthropic API. Run via `python ev
 Following the principle that *exhaustive testing is impossible*, here is what we explicitly do not cover, with reasons:
 
 - **Generated Opentrons script execution on real hardware.** The Opentrons simulator (Stage 7) is the test oracle for protocol correctness at the API level. We do not run scripts on a physical OT-2 in CI — that requires hardware, network access, and would not catch new classes of bugs that the simulator misses.
-- **LLM intent verification (Stage 8) accuracy.** The Stage 8 verifier is itself an LLM call; testing whether its judgments are correct would require an evaluation set of (instruction, generated_script, expected_verdict) triples. The `evals/` set covers extraction + constraints but not Stage 8 — that's a separate eval set tracked as future work.
+- **(Removed) LLM intent verification (Stage 8).** Stage 8 was deleted in [ADR-0004](adr/0004-remove-intent-verifier.md). Its ~95% false-positive rate eroded user trust faster than its rare true catches could earn it back. The deterministic constraint checker (Stage 4) and Opentrons simulator (Stage 7) carry the load-bearing safety guarantees on their own.
 - **Domain knowledge claims** (e.g., "is 5 minutes the right Bradford incubation?"). These are routed to user confirmation by design (see [ADR-0002](adr/0002-provenanced-protocol-spec.md)). The system does not assert correctness on these and tests cannot either.
 - **Long-running fuzzing.** Hypothesis-based property tests (`tests/property/`) cover the constraint checker's helpers and orchestrator with ~50–100 generated inputs per property; broader fuzzing (e.g., multi-hour AFL-style runs) is not done.
 - **End-to-end pipeline runs in CI.** Full pipeline runs cost API tokens and are non-deterministic. The `examples/` directory acts as a manually-verified end-to-end witness instead.
@@ -142,7 +142,6 @@ Stronger measures exist and are deliberately not used here as the *primary* sign
 | `models/schema.py` | 74% | 64% | Pydantic schemas for stages 1–3; the 10-point gap reflects untested validator else-paths (only the rejection cases are asserted, not the accept cases). |
 | `extraction/schema_builder.py` | 55% | 50% | Deterministic schema-building paths covered; LLM-driven branches not. |
 | `extraction/extractor.py` | 32% | 27% | LLM-driven; only exercised when `ANTHROPIC_API_KEY` is set. |
-| `validation/validator.py` | 22% | 16% | Stage 8 LLM intent verifier — deliberately not unit-tested (see "What's deliberately not tested"). |
 | `pipeline.py`, `cli.py`, `robot.py` | 9% / 0% / 14% | 7% / 0% / 11% | End-to-end orchestrators — exercised by `examples/` runs and manual CLI use, not by CI. |
 | **TOTAL** | **41%** | **37%** | |
 
@@ -243,6 +242,4 @@ Concrete next-steps for the suite, in priority order:
 3. **Boundary-value tests promoted to a named module.** Pull edge-of-range tests into a `test_boundaries.py` so the boundary discipline is explicit and the cases are easy to extend.
 4. **Integration tests with a mocked Anthropic client.** The pipeline as a whole — extractor → verifier → constraint checker → schema_builder → script generator — is currently only tested end-to-end via real LLM calls. Mocking the client lets the pipeline-shape contract be tested deterministically.
 5. **Pydantic-validator tests.** Confirm the `Provenance` validator (e.g., `ProvenancedVolume.unit` is required) rejects malformed LLM output at parse time, not just at downstream-use time.
-6. **Eval set for Stage 8 intent verification.** A small held-out set of (instruction, script, expected verdict) triples to measure the intent verifier's precision/recall over time. Gated on having time to label the set; tracked alongside the [ADR-0003](adr/0003-cited-text-provenance.md) eval-set work.
-
-Items 1–3 are the highest-leverage additions and are tracked separately in the project's task list.
+Items 1–3 are the highest-leverage additions and are tracked separately in the project's task list. (Item 6, originally an eval set for Stage 8 intent verification, was dropped — Stage 8 was removed in [ADR-0004](adr/0004-remove-intent-verifier.md).)

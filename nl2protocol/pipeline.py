@@ -47,7 +47,6 @@ def _prompt_input(msg: str) -> str:
     return input(C.prompt(msg)).strip()
 
 from opentrons import simulate
-from .validation.validator import ValidationResult, validate_protocol
 
 
 @dataclass
@@ -1178,45 +1177,19 @@ class ProtocolAgent:
 
         _log(f"  {C.success('Simulation passed.')}")
 
-        # Stage 8: Protocol validation (safety net)
-        _stage("[Stage 8/8] Validating protocol...")
-        from .spinner import Spinner
-
-        with Spinner("Validating protocol..."):
-            validation = validate_protocol(
-                intent=prompt,
-                spec=complete_spec,
-                schema=protocol_schema,
-                config=self.config_loader.config,
-                well_state_warnings=well_state_warnings,
-                step_summaries=step_summaries,
-            )
-
-        state_log["stage_8_validation"] = {
-            "matches": validation.matches,
-            "confidence": validation.confidence,
-            "issues": validation.issues,
-            "summary": validation.summary,
-        }
-
-        if validation.matches and validation.confidence >= 0.7:
-            _log(f"  {C.success(f'Validation passed (confidence: {validation.confidence:.0%})')}")
-            _save_state_log()
-            return PipelineResult(
-                script=script,
-                simulation_log=simulation_log,
-                protocol_schema=protocol_schema,
-                runlog=runlog,
-                config=self.config_loader.config
-            )
-        else:
-            _log(f"  Validation failed (confidence: {validation.confidence:.0%})")
-            if validation.issues:
-                _log(f"  Issues: {'; '.join(validation.issues)}")
-            _log(f"  Summary: {validation.summary}")
-            _log(f"  The generated protocol may not match what you asked for.")
-            _save_state_log("stage_8_validation")
-            return None
+        # Pipeline complete. (Stage 8 — LLM intent verification — was removed
+        # in ADR-0004; the deterministic constraint checker (Stage 4) and
+        # Opentrons simulator (Stage 7) cover the load-bearing checks reliably,
+        # while the intent verifier had a ~95% false-positive rate that eroded
+        # user trust. See docs/adr/0004-remove-intent-verifier.md.)
+        _save_state_log()
+        return PipelineResult(
+            script=script,
+            simulation_log=simulation_log,
+            protocol_schema=protocol_schema,
+            runlog=runlog,
+            config=self.config_loader.config
+        )
 
 
 if __name__ == "__main__":
