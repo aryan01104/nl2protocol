@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/failure_modes/pipette_insufficient",
+    "description": "Failure case: instruction asks for a 500uL transfer but only a p20 pipette (max 20uL) is configured. The LLM should still extract a valid spec (it has no knowledge of pipette ranges), and the deterministic constraint checker should flag PIPETTE_CAPACITY. Tests the neuro-symbolic boundary: what the LLM extracts vs what the hardware can do.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "explicit_volumes_include": [500.0]
+    },
+    "constraints": {
+        "expect_errors": true,
+        "violation_types_required": ["PIPETTE_CAPACITY"]
+    }
+}

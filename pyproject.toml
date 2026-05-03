@@ -35,6 +35,8 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
+    "hypothesis>=6.0.0",
+    "mutmut>=3.0.0",
 ]
 pdf = [
     "pypdf>=4.0.0",

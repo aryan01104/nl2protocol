@@ -166,7 +166,22 @@ Troubleshooting:
 
 
 def format_error_for_cli(error: Exception) -> str:
-    """Format an error message for CLI display."""
+    """Format an exception for CLI display, distinguishing project errors from others.
+
+    Pre:    `error` is any Exception instance (including any subclass).
+
+    Post:   If `error` is an instance of `NL2ProtocolError` (or any subclass —
+            ConfigurationError, ValidationError, EquipmentError,
+            GenerationError, etc.): returns `f"Error: {str(error)}"`.
+            Otherwise: returns
+            `f"Unexpected error: {type(error).__name__}: {str(error)}"`.
+            The exact-class name (not the parent class name) appears for
+            non-project errors.
+
+    Side effects: None. Pure, deterministic.
+
+    Raises: Never (does not propagate exceptions from `str(error)`).
+    """
     if isinstance(error, NL2ProtocolError):
         return f"Error: {str(error)}"
     else:
@@ -174,10 +189,32 @@ def format_error_for_cli(error: Exception) -> str:
 
 
 def format_api_error(e: Exception) -> str:
-    """Convert raw Anthropic API errors into user-friendly messages.
+    """Convert an Anthropic API exception into a one-line actionable message.
 
-    Instead of dumping 'Error code: 400 - {"type": "error", ...}',
-    returns a one-liner the scientist can act on.
+    Pre:    `e` is any Exception (typically one raised by the Anthropic SDK,
+            but the function handles arbitrary exceptions via the catch-all
+            else branch).
+
+    Post:   Dispatch table by `isinstance` (checked in this order; first match
+            wins):
+              * `anthropic.AuthenticationError` → "API authentication failed.
+                Check your ANTHROPIC_API_KEY is valid and not expired."
+              * `anthropic.RateLimitError` → "Rate limited by the API.
+                Wait 30-60 seconds and try again."
+              * `anthropic.APIStatusError` → message depends on str(e).lower():
+                  - contains "credit" OR "balance" → credit-balance message
+                  - contains "overloaded" → overloaded message
+                  - otherwise → "API error (status {e.status_code}). ..."
+              * `anthropic.APITimeoutError` → timeout message
+              * `anthropic.APIConnectionError` → connection message
+              * Anything else → "Unexpected error: {type(e).__name__}"
+            All returned messages are one line and end with an actionable
+            instruction the scientist can follow.
+
+    Side effects: Lazy imports `anthropic` on first call. No I/O, no mutation.
+
+    Raises: Never (the catch-all else branch handles any non-anthropic
+            exception type).
     """
     import anthropic
 

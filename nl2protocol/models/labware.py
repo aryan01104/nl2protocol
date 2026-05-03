@@ -9,13 +9,58 @@ from typing import Dict, Any
 
 
 def get_well_info(load_name: str) -> Dict[str, Any]:
-    """
-    Get well layout for a labware load_name.
+    """Resolve a labware load_name to its well-layout dict (rows, cols, wells).
 
-    Primary: uses Opentrons' own labware definitions (authoritative source).
-    Fallback: heuristic pattern matching on the load_name string.
+    Pre:    `load_name` is a string. The legible domain has two parts:
+              - Opentrons-known load_names (e.g. "corning_96_wellplate_360ul_flat")
+                — resolved authoritatively via Opentrons' own labware library.
+              - Heuristic-recognized strings: any load_name whose lowercase
+                form contains exactly one of these substring patterns
+                (checked in priority order):
+                    "_384_"                       → 16 rows × 24 cols
+                    "_96_"                        →  8 rows × 12 cols
+                    "_48_"                        →  6 rows ×  8 cols
+                    "_24_"                        →  4 rows ×  6 cols
+                    "_12_reservoir" / "_12_well_reservoir"
+                                                  →  1 row  × 12 cols
+                    "_12_"                        →  3 rows ×  4 cols
+                    "_6_"                         →  2 rows ×  3 cols
+                    "_1_reservoir" / "_1_well"    →  1 row  ×  1 col
 
-    Returns: dict with rows, cols, row_range, col_range, well_count, valid_wells.
+    Post:   Returns a dict with exactly six keys:
+              - rows (int): number of rows
+              - cols (int): number of columns
+              - row_range (str): "A-X" if rows > 1, else "A"
+              - col_range (str): "1-N" (always range form, even when cols=1)
+              - well_count (int): equals rows * cols (also equals
+                len(valid_wells) for the heuristic path; for the Opentrons
+                path equals len(defn["wells"]))
+              - valid_wells (List[str]): well-name strings (e.g. "A1"), sorted
+                column-major then row (Opentrons path) or row-major then col
+                (heuristic path) — sort order differs between paths.
+            For Opentrons-known load_names: dimensions match Opentrons'
+            definition exactly.
+            For heuristic-recognized load_names: dimensions match the
+            substring dispatch table above.
+
+    KNOWN WARTS (current behavior, pin-tested below):
+      1. Unrecognized load_names that don't match any pattern silently fall
+         through to the default 8 rows × 12 cols (96-well plate). A typo
+         in a load_name is indistinguishable from a real 96-well plate.
+      2. Empty string `""` falls through to the same default — a labware
+         entry with a missing/empty `load_name` silently appears as a
+         96-well plate to downstream callers (e.g. `_check_well_validity`).
+      Both warts mean this function never returns a "could not resolve"
+      signal. Callers cannot distinguish "valid 96-well plate" from
+      "garbage in, default out". A future fix should raise on
+      unrecognized input or return None.
+
+    Side effects: Imports `opentrons.protocols.labware` lazily on the
+                  Opentrons path. Logs a WARNING via the module-level
+                  logger when falling back to the heuristic path.
+
+    Raises: AttributeError if `load_name` is not a string (from `.lower()`).
+            Does NOT raise on unrecognized input — see WARTS above.
     """
     # Try the Opentrons labware library first — this is the real data
     try:

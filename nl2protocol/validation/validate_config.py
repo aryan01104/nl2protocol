@@ -29,6 +29,22 @@ class ValidationResult:
     warnings: List[ValidationError] = field(default_factory=list)
 
     def __str__(self) -> str:
+        """Format the result as a human-readable summary string.
+
+        Pre:    `self.valid` and `self.errors` are populated.
+
+        Post:   If `self.valid` is True: returns the single string
+                "Config is valid".
+                Otherwise: returns a multi-line string starting with
+                "Config invalid (N errors):" (where N = `len(self.errors)`)
+                followed by one indented line per error in
+                "  - [{category}] {message}" format. Warnings are NOT
+                included in this string (separate field).
+
+        Side effects: None.
+
+        Raises: Never.
+        """
         if self.valid:
             return "Config is valid"
         error_msgs = [f"  - [{e.category}] {e.message}" for e in self.errors]
@@ -63,7 +79,32 @@ class ConfigValidator:
             self._shared_data_unavailable = True
 
     def validate(self, config: Dict[str, Any]) -> ValidationResult:
-        """Validate a lab configuration."""
+        """Run every category of config validation; return a structured result.
+
+        Pre:    `config` is a dict (typically loaded from a lab_config.json).
+                `self._valid_labware` was populated (or marked unavailable)
+                in `__init__`.
+
+        Post:   Returns a `ValidationResult` with:
+                  * `valid` = True iff `len(errors) == 0`.
+                  * `errors` = combined list from up to five check categories
+                    (in order): schema → labware-against-API → slot
+                    conflicts → mount conflicts → tiprack refs.
+                  * `warnings` = ["shared_data_unavailable" warning] iff
+                    `self._shared_data_unavailable` is True; otherwise [].
+                Each error has `category` ∈ {"schema", "labware", "slot",
+                "mount", "tiprack"}, a human-readable `message`, and a
+                JSON `path` string.
+                SHORT-CIRCUIT: if schema validation produces ANY error
+                whose message contains "Missing required" (i.e., a
+                top-level field is missing), then categories 2–5 are
+                SKIPPED. Other schema errors (wrong type, missing nested
+                field) do NOT trigger the short-circuit.
+
+        Side effects: None. Read-only validation.
+
+        Raises: Never.
+        """
         errors: List[ValidationError] = []
         warnings: List[ValidationError] = []
 
@@ -272,13 +313,39 @@ class ConfigValidator:
 
 
 def validate_config(config: Dict[str, Any]) -> ValidationResult:
-    """Convenience function to validate a config dict."""
+    """Convenience: construct a ConfigValidator and run validate(config).
+
+    Pre:    `config` is a dict.
+    Post:   Returns the same ValidationResult that
+            `ConfigValidator().validate(config)` would return.
+    Side effects: Constructs a fresh ConfigValidator (which lazy-loads the
+                  Opentrons labware library on each call — non-trivial cost
+                  per call; suitable for one-shot use, not loops).
+    Raises: Never.
+    """
     validator = ConfigValidator()
     return validator.validate(config)
 
 
 def validate_config_file(path: str) -> ValidationResult:
-    """Validate a config file by path."""
+    """Read a JSON config file and validate it.
+
+    Pre:    `path` is a string (file path).
+
+    Post:   On success: opens `path`, parses JSON, returns
+            `validate_config(parsed_dict)`.
+            On FileNotFoundError: returns ValidationResult(valid=False)
+            with one error of category="file", message="Config file not
+            found: {path}".
+            On json.JSONDecodeError: returns ValidationResult(valid=False)
+            with one error of category="file", message="Invalid JSON: {e}".
+
+    Side effects: Reads the file at `path` from disk.
+
+    Raises: Never (file-not-found and JSON errors are wrapped in a
+            ValidationResult; other exceptions, e.g. PermissionError,
+            propagate).
+    """
     import json
     try:
         with open(path, 'r') as f:

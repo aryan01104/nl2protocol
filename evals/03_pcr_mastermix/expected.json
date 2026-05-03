@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/examples/pcr_mastermix",
+    "description": "Realistic two-pipette protocol: distribute 10.5uL master mix to 24 wells, then transfer 2uL DNA template per sample with mixing. Tests preservation of the awkward 10.5uL volume (this exact case motivated the deterministic spec/schema split — see ADR-0001).",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 2,
+        "explicit_volumes_include": [10.5, 2.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

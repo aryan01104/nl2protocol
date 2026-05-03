@@ -109,16 +109,54 @@ PIPETTE_SPECS: Dict[str, Tuple[float, float]] = {
 
 
 def get_pipette_range(model: str) -> Optional[Tuple[float, float]]:
-    """Get (min, max) volume range for a pipette model string."""
+    """Map an Opentrons pipette model load-name to its (min_uL, max_uL) range.
+
+    Pre:    `model` is a non-empty Opentrons pipette load-name string of the
+            form "<spec>_<channels>_<generation>" — e.g. "p300_single_gen2",
+            "p1000_multi_flex". Recognized specs are exactly the keys of
+            PIPETTE_SPECS: {"p10", "p20", "p50", "p300", "p1000"}.
+
+    Post:   Returns (min_uL, max_uL) — the pipette's accurate-volume range in
+            microliters — iff `model.lower()` starts with "<spec>_" for some
+            spec in PIPETTE_SPECS. Returns None otherwise. Volumes are always
+            in microliters; this function is never responsible for unit
+            conversion.
+
+    Side effects: None. No I/O, no mutation, deterministic.
+
+    Raises: AttributeError if `model` is not a string.
+    """
     model_lower = model.lower()
     for key, (lo, hi) in PIPETTE_SPECS.items():
-        if key in model_lower:
+        if model_lower.startswith(key + "_"):
             return (lo, hi)
     return None
 
 
 def get_pipette_for_volume(volume: float, config: dict) -> Optional[str]:
-    """Find which mount can handle this volume. Returns mount or None."""
+    """Find the first configured mount whose pipette can accurately handle `volume`.
+
+    Pre:    `volume` is a real number in microliters. `config` is a dict that
+            may contain "pipettes" → {mount_name: {"model": str, ...}}, where
+            each "model" is an Opentrons load-name in the legible domain of
+            `get_pipette_range` (e.g. "p300_single_gen2"). The caller is
+            responsible for any unit conversion; this function never converts.
+
+    Post:   Returns the mount name (e.g. "left", "right") of the first pipette
+            in dict-insertion order over `config["pipettes"]` whose
+            accurate-volume range [min_uL, max_uL] satisfies
+            `min_uL <= volume <= max_uL`. Returns None iff one of:
+              - `config` has no "pipettes" key,
+              - `config["pipettes"]` is empty,
+              - no configured pipette's range covers `volume`,
+              - every configured pipette's model is unrecognized by
+                `get_pipette_range`.
+
+    Side effects: None. Does not mutate `config`. Deterministic.
+
+    Raises: KeyError if any pipette entry is missing the "model" key.
+            AttributeError if a "model" value is not a string.
+    """
     if "pipettes" not in config:
         return None
     for mount, pip in config["pipettes"].items():
@@ -129,7 +167,27 @@ def get_pipette_for_volume(volume: float, config: dict) -> Optional[str]:
 
 
 def get_all_pipette_ranges(config: dict) -> Dict[str, Tuple[float, float]]:
-    """Get {mount: (min, max)} for all configured pipettes."""
+    """Map every recognized configured mount to its pipette's (min_uL, max_uL).
+
+    Pre:    `config` is a dict, optionally with "pipettes" → {mount_name (str):
+            {"model": str, ...}}, where each "model" is an Opentrons load-name
+            in the legible domain of `get_pipette_range`.
+
+    Post:   Returns a new dict {mount: (min_uL, max_uL)} containing one entry
+            for every mount in `config["pipettes"]` whose model is recognized
+            by `get_pipette_range`. Mounts with unrecognized models are
+            silently omitted (NOT included with a None or sentinel value).
+            Returns {} iff one of:
+              - `config` has no "pipettes" key,
+              - `config["pipettes"]` is empty,
+              - every configured pipette's model is unrecognized.
+            Volumes are always in microliters.
+
+    Side effects: None. Does not mutate `config`. Deterministic.
+
+    Raises: KeyError if any pipette entry is missing the "model" key.
+            AttributeError if a "model" value is not a string.
+    """
     result = {}
     for mount, pip in config.get("pipettes", {}).items():
         rng = get_pipette_range(pip["model"])
@@ -154,7 +212,19 @@ class ConstraintChecker:
         self.pipette_ranges = get_all_pipette_ranges(config)
 
     def check_all(self, spec: ProtocolSpec) -> ConstraintCheckResult:
-        """Run all constraint checks. Returns structured result."""
+        """Run every constraint check and collect violations.
+
+        Pre:    `spec` is a Pydantic-validated `ProtocolSpec`. `self.config`
+                was supplied at construction.
+        Post:   Returns a `ConstraintCheckResult` containing zero or more
+                `ConstraintViolation`s. Empty `violations` list iff every check
+                passes. Each violation has all six structured fields populated
+                (type, severity, step, what, why, suggestion). The same logical
+                problem is not double-reported across check categories.
+        Pure:   Does not mutate `spec` or `self.config`. No I/O, no LLM, no
+                randomness — same inputs always produce the same result.
+        Raises: Never. Malformed inputs are the caller's responsibility.
+        """
         result = ConstraintCheckResult()
 
         for step in spec.steps:
@@ -532,12 +602,52 @@ class WellState:
     substances: List[str] = field(default_factory=list)
 
     def add(self, volume: float, substance: str = "unknown"):
+        """Add liquid (and optionally record a substance label) to this well.
+
+        Pre:    `volume` is a non-negative real number in microliters.
+                `substance` is a string (may be empty). The caller is
+                responsible for any unit conversion. Behavior on negative
+                `volume` is undefined.
+
+        Post:   `self.volume_ul` is incremented by exactly `volume` (no
+                clamping; no maximum check — well-capacity overflow detection
+                is the caller's responsibility, e.g. via
+                `WellStateTracker.dispense`).
+                `self.substances` has `substance` appended at the end iff
+                `substance` is non-empty AND `substance` is not already
+                present (exact string equality, case-sensitive). Otherwise
+                `self.substances` is unchanged.
+
+        Side effects: Mutates `self.volume_ul`. Possibly mutates
+                      `self.substances` (appends one element).
+
+        Raises: Never.
+        """
         self.volume_ul += volume
         if substance and substance not in self.substances:
             self.substances.append(substance)
 
     def remove(self, volume: float) -> bool:
-        """Remove volume. Returns False if insufficient."""
+        """Try to remove `volume` from this well. Returns False if insufficient.
+
+        Pre:    `volume` is a non-negative real number in microliters.
+                Behavior on negative `volume` is undefined.
+
+        Post:   Returns True iff `volume <= self.volume_ul + 0.01` (a fixed
+                0.01uL tolerance for float drift).
+                On True:  `self.volume_ul` is set to
+                          `max(0.0, self.volume_ul - volume)` — clamped at
+                          0, so consuming a within-tolerance overdraw leaves
+                          the well at exactly 0.
+                          `self.substances` is unchanged.
+                On False: `self.volume_ul` and `self.substances` are both
+                          unchanged.
+
+        Side effects: Mutates `self.volume_ul` only when returning True.
+                      Never mutates `self.substances`.
+
+        Raises: Never.
+        """
         if volume > self.volume_ul + 0.01:  # small tolerance
             return False
         self.volume_ul = max(0, self.volume_ul - volume)
@@ -601,9 +711,33 @@ class WellStateTracker:
             self.state[labware][well] = WellState()
 
     def dispense(self, labware: str, well: str, volume: float, substance: str = "unknown"):
-        """Record a dispense into a well."""
-        if not labware:
-            return
+        """Record a dispense (volume + substance) into a tracked well; warn on overflow.
+
+        Pre:    `labware` is a non-empty string — the labware label as used
+                in `self.config["labware"]`. (Pydantic guarantees this for
+                schema-driven callers; passing None or "" is a contract
+                violation and will crash.)
+                `well` is a well-name string (e.g. "A1").
+                `volume` is a non-negative real number in microliters.
+                Behavior on negative `volume` is undefined.
+                `substance` is a string (defaults to "unknown"); follows
+                `WellState.add` semantics for empty/duplicate handling.
+
+        Post:   Ensures (labware, well) exists in `self.state` (creating an
+                empty `WellState` if absent), then records the dispense via
+                `WellState.add(volume, substance)`. If the well's cumulative
+                tracked volume now exceeds the labware's estimated capacity
+                (per `_get_well_capacity`), exactly one overflow warning
+                string is appended to `self.warnings` for this call; for
+                wells whose initial volume was assumed (i.e. in
+                `self._default_volume_wells`), the warning includes an
+                additional NOTE about the assumption.
+
+        Side effects: Mutates `self.state[labware][well]` (creating entries
+                      if needed) and possibly appends to `self.warnings`.
+
+        Raises: TypeError if `labware` is None (out-of-contract input).
+        """
         self._ensure_well(labware, well)
         self.state[labware][well].add(volume, substance)
 
@@ -619,9 +753,36 @@ class WellStateTracker:
             self.warnings.append(msg)
 
     def aspirate(self, labware: str, well: str, volume: float) -> bool:
-        """Record an aspiration from a well. Returns False if well is empty/insufficient."""
-        if not labware:
-            return True  # Can't check without labware
+        """Record an aspiration from a well. Returns False if it would underflow.
+
+        Pre:    `labware` is a non-empty string — the labware label as used
+                in `self.config["labware"]`. (Pydantic guarantees this for
+                schema-driven callers; passing None or "" is a contract
+                violation and will crash.)
+                `well` is a well-name string (e.g. "A1").
+                `volume` is a non-negative real number in microliters.
+                Behavior on negative `volume` is undefined.
+
+        Post:   Ensures (labware, well) exists in `self.state`. Then:
+                  * If the well's tracked volume is < 0.01uL (treated as
+                    "empty") and `volume > 0`: returns False; appends one
+                    "appears to be empty" warning to `self.warnings` (or
+                    suppresses it if a warning for this (labware, well)
+                    has already been emitted — see `self._warned_wells`).
+                    `self.state` is unchanged.
+                  * Otherwise if `volume > tracked_volume + 0.01`: returns
+                    False; appends one deduplicated "only has ~X uL" warning.
+                    `self.state` is unchanged.
+                  * Otherwise: returns True; decrements the well's volume by
+                    `volume` (via `WellState.remove`); `self.warnings` is
+                    unchanged.
+
+        Side effects: Mutates `self.state[labware][well]` (always at least
+                      via `_ensure_well`; volume only on True return).
+                      May append to `self.warnings` and `self._warned_wells`.
+
+        Raises: TypeError if `labware` is None (out-of-contract input).
+        """
         self._ensure_well(labware, well)
         key = (labware, well)
         current = self.state[labware][well].volume_ul
@@ -645,19 +806,62 @@ class WellStateTracker:
         return True
 
     def get_volume(self, labware: str, well: str) -> float:
-        """Get current volume in a well."""
+        """Read the currently tracked volume (uL) for a well.
+
+        Pre:    `labware` and `well` are strings.
+
+        Post:   Returns the tracker's current `volume_ul` for the
+                (labware, well) lookup. Returns 0.0 if the lookup is unseen
+                (labware not in `self.state`, or well not under that labware).
+                NOTE: this conflates "well never tracked" with "well tracked
+                at exactly 0uL". Callers needing to distinguish must inspect
+                `self.state` directly. This inspector is intended for tests
+                and external observers; internal logic should not branch on
+                its return value.
+
+        Side effects: None. Pure read.
+
+        Raises: Never.
+        """
         if labware in self.state and well in self.state[labware]:
             return self.state[labware][well].volume_ul
         return 0.0
 
     def get_substances(self, labware: str, well: str) -> List[str]:
-        """Get what's in a well."""
+        """Read the list of substance labels recorded in a well.
+
+        Pre:    `labware` and `well` are strings.
+
+        Post:   Returns the substance list for the (labware, well) lookup.
+                Returns [] if the lookup is unseen.
+                CAVEAT: returns a direct reference to the tracker's internal
+                list — mutating the returned list mutates the tracker's
+                state. Callers must treat the return value as read-only;
+                copy with `list(...)` if mutation is needed.
+
+        Side effects: None. Pure read.
+
+        Raises: Never.
+        """
         if labware in self.state and well in self.state[labware]:
             return self.state[labware][well].substances
         return []
 
     def well_has_liquid(self, labware: str, well: str) -> bool:
-        """Check if a well has any liquid in it."""
+        """Return True iff the well has more than 0.01uL tracked.
+
+        Pre:    `labware` and `well` are strings.
+
+        Post:   Returns True iff `self.get_volume(labware, well) > 0.01`.
+                Equivalently: True iff the (labware, well) lookup has been
+                seen by the tracker AND its tracked volume strictly exceeds
+                the 0.01uL float-tolerance threshold. False for unseen
+                lookups or for wells tracked at 0.0–0.01uL.
+
+        Side effects: None. Pure read.
+
+        Raises: Never.
+        """
         return self.get_volume(labware, well) > 0.01
 
     @staticmethod
