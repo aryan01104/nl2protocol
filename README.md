@@ -61,7 +61,7 @@ PROTOCOL SPECIFICATION
 ────────────────────────────────────────────────────────────
 [Stage 5/8] Converting specification to protocol schema...
   Schema generated.
-... (Stages 6-8: script generation, simulation, intent verification — all passed, confidence 95%)
+... (Stages 6-7: script generation, simulation — all passed)
 
 ────────────────────────────────────────────────
   Protocol generated successfully.
@@ -119,9 +119,9 @@ The pipeline runs in 8 stages. Only 4 of them use an LLM, and each LLM call has 
 
 **Stages 6–7 — Script generation and simulation (deterministic).** A pure-Python template renders the schema into Opentrons Python code (same input always produces the same script). The script then runs through the actual Opentrons simulator, which catches hardware-level errors earlier stages can't see — invalid wells given a chosen labware definition, tip rack exhaustion at runtime, deck-coordinate conflicts, deprecated API patterns. Failures are blocking.
 
-**Stage 8 — Intent verification (LLM).** A separate LLM call compares the generated protocol back to the user's original instruction and produces a confidence score plus a list of specific issues if any. This is a defense-in-depth layer, not a contract: it catches semantic mismatches the simulator can't see (e.g., "you asked for mix 10 times, the script mixes once") but it's an LLM judgment with its own noise.
+The thread connecting all of this: the LLM is allowed to interpret natural language and produce a structured intermediate, but **the LLM is never in the path that translates verified spec into executable code.** That's a deliberate boundary.
 
-The thread connecting all of this: the LLM is allowed to interpret natural language and produce a structured intermediate, and the LLM is allowed to evaluate the final output, but **the LLM is never in the path that translates verified spec into executable code.** That's a deliberate boundary.
+(An earlier Stage 8 LLM intent-verification step was removed in [ADR-0004](docs/adr/0004-remove-intent-verifier.md) — its ~95% false-positive rate eroded user trust faster than the rare true catch could earn it back. The deterministic checks above carry the load-bearing safety guarantees on their own.)
 
 ## Architecture decisions
 
@@ -226,8 +226,7 @@ nl2protocol/
 │   └── validation/
 │       ├── input_validator.py    # Stage 1 — classify input as protocol/question/invalid
 │       ├── constraints.py        # Stage 4 — hardware constraint checker, well state tracker
-│       ├── validate_config.py    # Lab config schema validation
-│       └── validator.py          # Stage 8 — LLM intent verification
+│       └── validate_config.py    # Lab config schema validation
 │
 ├── examples/               # 3 end-to-end runs (input + output + debug logs)
 ├── test_cases/             # 13 protocol examples + 12 failure mode cases
@@ -242,10 +241,10 @@ nl2protocol/
 What the system explicitly does not try to do, with reasons:
 
 - **Domain knowledge claims are not auto-verified.** Values the LLM tags as `domain_default` (e.g., "Bradford assay incubation is 5 minutes") are routed to user confirmation rather than auto-accepted, because the system has no authoritative external knowledge base to check them against. The user is the verification mechanism for these claims by design.
-- **The Stage 8 intent verifier is a defense layer, not a contract.** It uses an LLM-as-judge approach to check whether the generated protocol matches the user's instruction. This is empirically useful (it catches real semantic issues that the simulator can't see) but it is itself an LLM call and has its own noise. A "passed" Stage 8 raises confidence but doesn't guarantee correctness.
+- **No semantic-intent LLM judge.** An earlier Stage 8 used an LLM-as-judge to compare the generated script against the original instruction. It produced ~95% false positives, which eroded user trust faster than its rare true catches could earn it back. It was removed (see [ADR-0004](docs/adr/0004-remove-intent-verifier.md)) — the deterministic constraint checker, the Opentrons simulator, and the user-confirmation UX in Stage 3 cover the bug classes that actually mattered.
 - **Non-pipetting hardware is out of scope.** Centrifuges, plate readers, gel boxes, microscopes — these aren't on the OT-2 deck and the system makes no attempt to handle them. Instructions that require them will be classified as invalid in Stage 1.
 - **No cross-protocol state.** Each run is independent. The system does not remember that a previous run filled some wells, applied some labels, or left tips in a particular state.
-- **LLM extraction is non-deterministic.** Running the same instruction twice can produce different specs and different scripts. The verification stages (provenance check, hardware constraints, simulation, intent verification) are what guarantee any individual run is sound — not the LLM's consistency.
+- **LLM extraction is non-deterministic.** Running the same instruction twice can produce different specs and different scripts. The verification stages (provenance check, hardware constraints, simulation) are what guarantee any individual run is sound — not the LLM's consistency.
 - **The verifier's coverage is bounded by its regex extractors.** A volume written as `100 μL` (Greek mu) or `one hundred microliters` is not caught by the current regex; honest LLM output using these forms gets flagged as a false fabrication. ADR-0003 proposes a structured fix; until then, this is a known precision gap.
 
 ## Roadmap
