@@ -1,0 +1,15 @@
+{
+    "source": "test_cases/examples/simple_transfer",
+    "description": "Baseline happy-path: a simple multi-well transfer should extract cleanly and pass all hardware constraints.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 1,
+        "explicit_volumes_include": [50.0],
+        "actions_present": ["transfer"]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

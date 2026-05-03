@@ -1,0 +1,14 @@
+{
+    "source": "test_cases/examples/serial_dilution",
+    "description": "Happy multi-step: 2-fold serial dilution across row A. The LLM must produce multiple steps (diluent fill + N dilution transfers with mixing). The 100uL volume is the user's stated value and must be preserved.",
+    "extract": {
+        "should_succeed": true
+    },
+    "spec": {
+        "step_count_at_least": 2,
+        "explicit_volumes_include": [100.0]
+    },
+    "constraints": {
+        "expect_errors": false
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "source": "test_cases/failure_modes/labware_missing",
+    "description": "Failure case: instruction references a 384-well assay plate, but the config has no such labware (only a tiprack and reservoir). The LLM should extract a spec (it doesn't know the config), and the constraint checker should flag LABWARE_NOT_FOUND. Tests that unresolved labware references surface as structured violations rather than silent failures downstream.",
+    "extract": {
+        "should_succeed": true
+    },
+    "constraints": {
+        "expect_errors": true,
+        "violation_types_required": ["LABWARE_NOT_FOUND"]
+    }
+}

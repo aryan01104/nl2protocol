@@ -63,12 +63,20 @@ The framework used here follows the standard test pyramid (unit → integration 
 
 The `requires_llm` marker (a `pytest.mark.skipif` checking for the env var) keeps the suite green for contributors without API access. CI-style runs can include LLM tests by exporting the key first.
 
+### Eval set — real LLM, manual / pre-release
+
+| Location | Evals | What it exercises |
+|---|---|---|
+| `evals/` | 5 | Real-LLM runs of (instruction → extract → labware-resolve → constraints) with loose-invariant oracles in per-eval `expected.json`. 3 happy-path evals (simple_transfer, serial_dilution, pcr_mastermix) plus 2 engineered failure cases (pipette_insufficient → expects PIPETTE_CAPACITY violation; labware_missing → expects LABWARE_NOT_FOUND violation). Sourced from `test_cases/` to avoid duplication. |
+
+This is the only layer that exercises the real Anthropic API. Run via `python evals/run.py` (gated on `ANTHROPIC_API_KEY`); not in CI by design. Catches model-behavior regressions that no mock-based layer can detect — model upgrades, prompt drift, hedging behavior, hallucinated structure. See [`evals/README.md`](../evals/README.md) for the full discipline.
+
 ## What's deliberately not tested
 
 Following the principle that *exhaustive testing is impossible*, here is what we explicitly do not cover, with reasons:
 
 - **Generated Opentrons script execution on real hardware.** The Opentrons simulator (Stage 7) is the test oracle for protocol correctness at the API level. We do not run scripts on a physical OT-2 in CI — that requires hardware, network access, and would not catch new classes of bugs that the simulator misses.
-- **LLM intent verification (Stage 8) accuracy.** The Stage 8 verifier is itself an LLM call; testing whether its judgments are correct would require an evaluation set of (instruction, generated_script, expected_verdict) triples, which we have not built. This is acknowledged in the README's Limitations and tracked as future work.
+- **LLM intent verification (Stage 8) accuracy.** The Stage 8 verifier is itself an LLM call; testing whether its judgments are correct would require an evaluation set of (instruction, generated_script, expected_verdict) triples. The `evals/` set covers extraction + constraints but not Stage 8 — that's a separate eval set tracked as future work.
 - **Domain knowledge claims** (e.g., "is 5 minutes the right Bradford incubation?"). These are routed to user confirmation by design (see [ADR-0002](adr/0002-provenanced-protocol-spec.md)). The system does not assert correctness on these and tests cannot either.
 - **Long-running fuzzing.** Hypothesis-based property tests (`tests/property/`) cover the constraint checker's helpers and orchestrator with ~50–100 generated inputs per property; broader fuzzing (e.g., multi-hour AFL-style runs) is not done.
 - **End-to-end pipeline runs in CI.** Full pipeline runs cost API tokens and are non-deterministic. The `examples/` directory acts as a manually-verified end-to-end witness instead.
