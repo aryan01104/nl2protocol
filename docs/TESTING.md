@@ -53,7 +53,9 @@ The framework used here follows the standard test pyramid (unit → integration 
 
 | File | Tests | What it exercises |
 |---|---|---|
-| `tests/integration/test_pipeline_with_mocks.py` | 5 | Stage chain with the LLM mocked at `SemanticExtractor`'s client boundary: extract → constraints → spec_to_schema → generate_python_script. Covers happy paths (single transfer, multi-step), and cases where downstream stages catch what the LLM can't (oversized volume, well outside labware grid), plus malformed-LLM-response handling. Skips the interactive `_prompt_input` paths in `ProtocolAgent.run_pipeline` by design — those couple to UX, not pipeline shape. |
+| `tests/integration/test_pipeline_with_mocks.py` | 5 | Stage chain with the LLM mocked at `SemanticExtractor`'s client boundary: extract → constraints → spec_to_schema → generate_python_script. Covers happy paths (single transfer, multi-step), and cases where downstream stages catch what the LLM can't (oversized volume, well outside labware grid), plus malformed-LLM-response handling. |
+| `tests/integration/test_protocol_agent_cm_wiring.py` | 4 | Verifies the `ConfirmationManager` dependency-injection wiring on `ProtocolAgent`: default constructor uses `InteractiveCM`, explicit `ScriptedCM`/`AutoConfirmCM` is stored and routes prompts correctly, exhausted scripts surface clearly. Phase A of the pipeline.py orchestration-vs-UX refactor; full-pipeline-with-scripted-confirmations integration is Phase B. |
+| `tests/test_confirmation.py` | 10 | Contract tests for the three `ConfirmationManager` implementations (`InteractiveCM`, `AutoConfirmCM`, `ScriptedCM`). Currently in `tests/` rather than `tests/integration/` because they're pure unit tests of the new module. |
 
 ### System tests — LLM-dependent, gated on `ANTHROPIC_API_KEY`
 

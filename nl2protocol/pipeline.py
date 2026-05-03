@@ -41,11 +41,6 @@ def _stage(label: str):
     _log(C.header(label))
 
 
-def _prompt_input(msg: str) -> str:
-    """Styled input prompt that stands out from surrounding output."""
-    _log()  # breathing room before prompt
-    return input(C.prompt(msg)).strip()
-
 from opentrons import simulate
 
 
@@ -388,9 +383,21 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 
 
 class ProtocolAgent:
-    def __init__(self, config_path: str = "lab_config.json"):
+    def __init__(self, config_path: str = "lab_config.json",
+                 confirmation_manager=None):
+        """
+        Args:
+            config_path: path to lab_config.json
+            confirmation_manager: optional ConfirmationManager (see
+                nl2protocol.confirmation). Defaults to InteractiveCM, which
+                preserves the existing CLI behavior. Tests and evals can pass
+                ScriptedCM(answers) or AutoConfirmCM() to drive the pipeline
+                non-interactively.
+        """
+        from nl2protocol.confirmation import InteractiveCM
         self.config_path = config_path
         self.config_loader = ConfigLoader(config_path=config_path)
+        self.cm = confirmation_manager or InteractiveCM()
 
     @staticmethod
     def _summarize_well_list(wells: list) -> str:
@@ -575,11 +582,11 @@ class ProtocolAgent:
 
             # Prompt
             if all_resolved:
-                response = _prompt_input("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
+                response = self.cm.prompt("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
             else:
                 _log(f"  {C.dim('Assign all ??? items before confirming. If your config is missing')}")
                 _log(f"  {C.dim('labware, quit (q) and add it to your config.json, then re-run.')}")
-                response = _prompt_input("Pick a number to assign (q=quit): ").lower()
+                response = self.cm.prompt("Pick a number to assign (q=quit): ").lower()
 
             if response == 'q':
                 _log("  Aborted.")
@@ -608,7 +615,7 @@ class ProtocolAgent:
                         load_name = self.config_loader.config["labware"][label].get("load_name", "")
                         marker = " ←" if label == current.get(desc) else ""
                         _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
-                    pick = _prompt_input(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
+                    pick = self.cm.prompt(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
                     if pick.isdigit():
                         pick_idx = int(pick) - 1
                         if 0 <= pick_idx < len(available_labels):
@@ -664,11 +671,11 @@ class ProtocolAgent:
                 _log(f"    2) Accept default ({default:.0f}uL, well capacity)")
                 _log(f"    3) Exit (edit instruction and run again)")
 
-                response = _prompt_input("Pick 1-3: ").strip()
+                response = self.cm.prompt("Pick 1-3: ").strip()
                 if response == '3':
                     return None
                 elif response == '1':
-                    new_val = _prompt_input(f"Volume in uL: ").strip()
+                    new_val = self.cm.prompt(f"Volume in uL: ").strip()
                     if new_val:
                         try:
                             vol = float(new_val)
@@ -703,7 +710,7 @@ class ProtocolAgent:
             if reason:
                 _log(f"    Inferred: {reason}")
 
-            response = _prompt_input("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
+            response = self.cm.prompt("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
 
             if response == 'q':
                 return None
@@ -711,7 +718,7 @@ class ProtocolAgent:
                 _log(f"  {C.dim('Accepting all remaining items.')}")
                 break
             elif response == 'e':
-                new_val = _prompt_input(f"New value for {w['field']}: ")
+                new_val = self.cm.prompt(f"New value for {w['field']}: ")
                 if new_val:
                     edits.append((w, new_val))
                     _log(f"    → {C.success(new_val)}")
@@ -988,7 +995,7 @@ class ProtocolAgent:
                 sub = f" ({substance})" if substance else ""
                 _log(f"    - {labware} well {well}{sub}")
             if sys.stdin.isatty():
-                response = _prompt_input("Is this correct? [Y/n]: ").lower()
+                response = self.cm.prompt("Is this correct? [Y/n]: ").lower()
                 if response in ('n', 'no'):
                     _log("  Aborted. Adjust your instruction to clarify source containers.")
                     state_log["stage_3_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
@@ -1072,7 +1079,7 @@ class ProtocolAgent:
 
             if sys.stdin.isatty():
                 _log("  These conflicts mean the protocol may not execute correctly.")
-                response = _prompt_input("Proceed anyway? [y/N]: ").lower()
+                response = self.cm.prompt("Proceed anyway? [y/N]: ").lower()
                 if response not in ('y', 'yes'):
                     _log("  Aborted. Fix your config or instruction and retry.")
                     _save_state_log("stage_4_constraints")
@@ -1108,7 +1115,7 @@ class ProtocolAgent:
                     _log("  Aborted by user.")
                     return None
             else:
-                response = _prompt_input("Proceed with this specification? [Y/n]: ").lower()
+                response = self.cm.prompt("Proceed with this specification? [Y/n]: ").lower()
                 if response in ('n', 'no'):
                     _log("  Aborted by user.")
                     return None
