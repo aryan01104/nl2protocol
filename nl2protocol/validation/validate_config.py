@@ -95,11 +95,15 @@ class ConfigValidator:
                 Each error has `category` ∈ {"schema", "labware", "slot",
                 "mount", "tiprack"}, a human-readable `message`, and a
                 JSON `path` string.
-                SHORT-CIRCUIT: if schema validation produces ANY error
-                whose message contains "Missing required" (i.e., a
-                top-level field is missing), then categories 2–5 are
-                SKIPPED. Other schema errors (wrong type, missing nested
-                field) do NOT trigger the short-circuit.
+                SHORT-CIRCUIT: secondary checks (categories 2–5) are
+                skipped iff `config["labware"]` or `config["pipettes"]`
+                is missing OR not a dict. This subsumes both the
+                "Missing required field" case AND the "wrong top-level
+                type" case (preventing `.items()` crashes on strings).
+                Other schema errors (a labware entry that itself isn't
+                a dict, missing nested fields like "load_name") do NOT
+                trigger the short-circuit — secondary checks tolerate
+                those gracefully.
 
         Side effects: None. Read-only validation.
 
@@ -118,8 +122,13 @@ class ConfigValidator:
         # 1. Schema validation
         errors.extend(self._validate_schema(config))
 
-        # Only continue with other validations if basic schema is valid
-        if not any(e.category == "schema" and "Missing required" in e.message for e in errors):
+        # Secondary checks (2-5) iterate `.items()` on labware/pipettes — only
+        # safe when both are dicts. This guard catches both the
+        # "Missing required field" case (config.get returns None, not a dict)
+        # and the "wrong top-level type" case (config["labware"] is a string).
+        labware_ok = isinstance(config.get("labware"), dict)
+        pipettes_ok = isinstance(config.get("pipettes"), dict)
+        if labware_ok and pipettes_ok:
             # 2. Labware validation
             errors.extend(self._validate_config_labware_against_api(config))
 

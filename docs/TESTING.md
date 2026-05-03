@@ -221,15 +221,18 @@ Every numeric boundary in the deterministic core, the tests that cover it, and t
 
 The principle: every numeric threshold deserves at least four tests — *just inside* both endpoints (BVA equivalence-class membership) and *just outside* both endpoints (boundary-violation detection). Where existing tests skip the *exact-edge* value (because the edge is a single representable float), `test_boundaries.py` fills the gap.
 
-## Known design warts (surfaced by contract pass)
+## Resolved design warts (fixed in fix-design-warts branch)
 
-Documented and pin-tested for follow-up — current behavior is enshrined by tests so a future fix surfaces in the right place:
+Four warts surfaced by the contract pass were fixed by `fix-design-warts`:
 
-- **`models/labware.py:get_well_info`** silently returns a fictional 8×12 (96-well plate) layout for any unrecognized load_name AND for empty strings. A typo in `lab_config.json`'s `load_name` is indistinguishable from a real 96-well plate. Caller `validation/constraints.py:_check_well_validity` passes possibly-empty strings, so the wart is reachable in practice. Fix likely: raise `ValueError` on unrecognized/empty input, then update the caller to skip empty load_names explicitly.
-- **`validation/validate_config.py:ConfigValidator.validate`** crashes with `AttributeError` when `config["labware"]` or `config["pipettes"]` is the wrong type (e.g. a string instead of a dict). The schema check correctly flags "must be an object", but the short-circuit only triggers on "Missing required" errors, so secondary checks proceed and crash on `labware.items()`. Fix: widen the short-circuit to also skip secondary checks when `config.get("labware")` or `config.get("pipettes")` isn't a dict. Pin-tested by `test_labware_wrong_type_currently_crashes`.
-- **`validation/input_validator.py:InputValidator.classify`** mixes deterministic length-pre-checks with the LLM call in one method. Phase 1 (length checks) is therefore not unit-testable without an API key — tests work around it with monkeypatched env + mocked client. Fix: extract the length validation to a static method or module function.
-- **`validation/constraints.py:WellStateTracker.get_volume`** conflates "well never tracked" with "well tracked at exactly 0uL" by returning `0.0` for both. Documented as an inspector-only quirk; internal logic does not branch on it.
-- **`validation/constraints.py:WellStateTracker.get_substances`** returns a direct reference to the tracker's internal substance list rather than a copy — mutation by the caller mutates the tracker's state. Documented as a known leaky reference; pin-tested so a future copy-on-read fix surfaces.
+- **`models/labware.py:get_well_info`** — fixed: now raises `ValueError` on unrecognized or empty `load_name` instead of silently returning a fictional 96-well plate. Caller `_check_well_validity` catches the ValueError and defers to the upstream config validator (which already flags unknown load_names as `LABWARE_NOT_FOUND`).
+- **`validation/validate_config.py:ConfigValidator.validate`** — fixed: short-circuit guard now uses `isinstance(config.get("labware"), dict)` instead of substring-matching on error messages. Wrong-type top-level fields now produce a structured `ValidationResult(valid=False)` rather than crashing with `AttributeError`.
+- **`validation/input_validator.py:InputValidator.classify`** — fixed: deterministic length pre-check extracted to module-level `check_input_length(text)`. Length checks are now testable without any client mocking. `classify()` delegates and short-circuits on early return.
+- **`validation/constraints.py:WellStateTracker.get_substances`** — fixed: returns `list(...)` (shallow copy) so mutation by the caller no longer affects tracker state.
+
+## Remaining documented quirks
+
+- **`validation/constraints.py:WellStateTracker.get_volume`** conflates "well never tracked" with "well tracked at exactly 0uL" by returning `0.0` for both. Documented as an inspector-only quirk; internal logic does not branch on it. Not fixed because the conflation has no production caller (only tests use this method) and changing it would require deciding between `Optional[float]` (breaking-change to the API) or a new `is_well_tracked(...)` method (API surface bloat).
 
 ## Roadmap
 

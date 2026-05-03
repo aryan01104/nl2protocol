@@ -70,35 +70,28 @@ class TestGetWellInfoHeuristicDispatch:
         assert info["well_count"] == expected_rows * expected_cols
 
 
-class TestGetWellInfoWarts:
-    """KNOWN WARTS — pin-tests for current silent-fallback behavior."""
-
-    # Wart 1: unrecognized load_name → default 8x12 (silent lie)
-    def test_unrecognized_loadname_defaults_to_96well(self):
-        info = get_well_info("totally_unknown_garbage_string")
-        assert info["rows"] == 8
-        assert info["cols"] == 12
-        assert info["well_count"] == 96
-
-    # Wart 2: empty string → default 8x12 (silent lie)
-    def test_empty_string_defaults_to_96well(self):
-        info = get_well_info("")
-        assert info["rows"] == 8
-        assert info["cols"] == 12
-        assert info["well_count"] == 96
-
-    # Both warts: caller cannot distinguish "real plate" from "garbage in"
-    def test_garbage_and_real_96well_indistinguishable(self):
-        garbage = get_well_info("typo_in_loadname")
-        real = get_well_info("custom_96_my_plate")
-        assert garbage["rows"] == real["rows"]
-        assert garbage["cols"] == real["cols"]
-        assert garbage["well_count"] == real["well_count"]
-
-
 class TestGetWellInfoRaises:
-    """Raises: AttributeError if load_name is not a string."""
+    """Post-fix: unknown / empty load_names raise ValueError loudly rather
+    than silently returning a 96-well default. Was previously a documented
+    wart; fixed so typos in lab_config.json surface as clear errors.
+    """
 
-    def test_raises_attribute_error_on_none(self):
-        with pytest.raises(AttributeError):
+    # Unrecognized load_name → ValueError (was: silent 96-well fallback)
+    def test_unrecognized_loadname_raises_value_error(self):
+        with pytest.raises(ValueError, match="Unrecognized labware load_name"):
+            get_well_info("totally_unknown_garbage_string")
+
+    # Empty string → ValueError (was: silent 96-well fallback)
+    def test_empty_string_raises_value_error(self):
+        with pytest.raises(ValueError, match="empty load_name"):
+            get_well_info("")
+
+    # None is falsy and treated the same as empty string — ValueError, not AttributeError.
+    def test_none_raises_value_error_for_empty(self):
+        with pytest.raises(ValueError, match="empty load_name"):
             get_well_info(None)
+
+    # Non-string non-falsy input (e.g. an int) still hits .lower() and raises AttributeError.
+    def test_non_string_raises_attribute_error(self):
+        with pytest.raises(AttributeError):
+            get_well_info(12345)

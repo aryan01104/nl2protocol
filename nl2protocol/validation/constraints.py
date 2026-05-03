@@ -399,8 +399,16 @@ class ConstraintChecker:
 
             lw_config = self.config.get("labware", {}).get(label, {})
             load_name = lw_config.get("load_name", "")
-            well_info = get_well_info(load_name)
-            if not well_info:
+            if not load_name:
+                # Labware entry exists but has no load_name. Config validation
+                # is responsible for catching this; constraint checking skips.
+                continue
+            try:
+                well_info = get_well_info(load_name)
+            except ValueError:
+                # Unknown load_name. The config validator's
+                # `_validate_config_labware_against_api` is responsible for
+                # flagging this; we don't double-report from here.
                 continue
 
             valid_wells = set(well_info.get("valid_wells", []))
@@ -832,19 +840,17 @@ class WellStateTracker:
 
         Pre:    `labware` and `well` are strings.
 
-        Post:   Returns the substance list for the (labware, well) lookup.
-                Returns [] if the lookup is unseen.
-                CAVEAT: returns a direct reference to the tracker's internal
-                list — mutating the returned list mutates the tracker's
-                state. Callers must treat the return value as read-only;
-                copy with `list(...)` if mutation is needed.
+        Post:   Returns a fresh list (shallow copy) of the substance labels
+                for the (labware, well) lookup. Returns [] if the lookup is
+                unseen. Mutating the returned list does NOT affect the
+                tracker's state.
 
         Side effects: None. Pure read.
 
         Raises: Never.
         """
         if labware in self.state and well in self.state[labware]:
-            return self.state[labware][well].substances
+            return list(self.state[labware][well].substances)
         return []
 
     def well_has_liquid(self, labware: str, well: str) -> bool:

@@ -11,7 +11,7 @@ from typing import Dict, Any
 def get_well_info(load_name: str) -> Dict[str, Any]:
     """Resolve a labware load_name to its well-layout dict (rows, cols, wells).
 
-    Pre:    `load_name` is a string. The legible domain has two parts:
+    Pre:    `load_name` is a non-empty string. The legible domain has two parts:
               - Opentrons-known load_names (e.g. "corning_96_wellplate_360ul_flat")
                 — resolved authoritatively via Opentrons' own labware library.
               - Heuristic-recognized strings: any load_name whose lowercase
@@ -43,25 +43,22 @@ def get_well_info(load_name: str) -> Dict[str, Any]:
             For heuristic-recognized load_names: dimensions match the
             substring dispatch table above.
 
-    KNOWN WARTS (current behavior, pin-tested below):
-      1. Unrecognized load_names that don't match any pattern silently fall
-         through to the default 8 rows × 12 cols (96-well plate). A typo
-         in a load_name is indistinguishable from a real 96-well plate.
-      2. Empty string `""` falls through to the same default — a labware
-         entry with a missing/empty `load_name` silently appears as a
-         96-well plate to downstream callers (e.g. `_check_well_validity`).
-      Both warts mean this function never returns a "could not resolve"
-      signal. Callers cannot distinguish "valid 96-well plate" from
-      "garbage in, default out". A future fix should raise on
-      unrecognized input or return None.
-
     Side effects: Imports `opentrons.protocols.labware` lazily on the
                   Opentrons path. Logs a WARNING via the module-level
                   logger when falling back to the heuristic path.
 
-    Raises: AttributeError if `load_name` is not a string (from `.lower()`).
-            Does NOT raise on unrecognized input — see WARTS above.
+    Raises: AttributeError if `load_name` is not a string.
+            ValueError if `load_name` is empty OR doesn't match any
+            recognized Opentrons or heuristic pattern — surfaces unknown
+            load_names loudly (typos in lab_config.json should be caught
+            by config validation upstream; if this raises in production,
+            it indicates a programming error that bypassed validation).
     """
+    if not load_name:
+        raise ValueError(
+            "get_well_info called with empty load_name; caller must validate "
+            "labware config has a non-empty 'load_name' field before lookup"
+        )
     # Try the Opentrons labware library first — this is the real data
     try:
         from opentrons.protocols.labware import get_labware_definition
@@ -107,7 +104,14 @@ def get_well_info(load_name: str) -> Dict[str, Any]:
     elif "_1_reservoir" in ln or "_1_well" in ln:
         rows, cols = 1, 1
     else:
-        rows, cols = 8, 12
+        # No recognized pattern. Fail loudly rather than defaulting to 96-well —
+        # a typo in lab_config.json should not silently masquerade as a valid plate.
+        raise ValueError(
+            f"Unrecognized labware load_name: '{load_name}'. Expected an Opentrons "
+            f"load_name (e.g. 'corning_96_wellplate_360ul_flat') or a string containing "
+            f"one of the recognized substring patterns (_384_, _96_, _48_, _24_, _12_, "
+            f"_6_, _1_reservoir, _1_well)."
+        )
 
     row_letters = [chr(ord('A') + i) for i in range(rows)]
     well_names = [f"{r}{c}" for r in row_letters for c in range(1, cols + 1)]
