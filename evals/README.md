@@ -113,6 +113,41 @@ The runner only asserts on three things today: did extraction succeed, basic spe
 
 These additions are all **additive** — existing `expected.json` files would keep passing as written. None are blocking the current eval set's value; deferred until a clear regression makes them necessary.
 
+## Blocked on task #4: full-pipeline evals with scripted confirmations
+
+The biggest expansion of the eval layer — covering the user-confirmation queue (Stage 3), the deterministic schema/script generation (Stage 5), and the Opentrons simulator (Stage 6) — is **blocked on the pipeline.py orchestration-vs-UX refactor (task #4)**.
+
+Today the runner calls `SemanticExtractor.extract` → `LabwareResolver.resolve` → `ConstraintChecker.check_all` directly via the Python API. It deliberately bypasses `ProtocolAgent.run_pipeline()` because that orchestrator is coupled to interactive `_prompt_input(...)` calls scattered through 1230 lines — there's no clean injection point for canned answers.
+
+Task #4 introduces a `ConfirmationManager` interface (`InteractiveCM` for the CLI, `ScriptedCM` for tests/evals) that separates orchestration from interactive UX. Once it lands, the eval runner gains a second mode:
+
+```python
+# Today (direct-API mode, unchanged)
+spec = extractor.extract(instruction, config)
+spec = resolver.resolve(spec)
+result = checker.check_all(spec)
+
+# After task #4 (full-pipeline mode, new):
+agent = ProtocolAgent(config_path, confirmation_manager=ScriptedCM(answers))
+pipeline_result = agent.run_pipeline(instruction)
+# Assert on pipeline_result.script, .simulation_log, etc.
+```
+
+`expected.json` gains an optional `confirmations` block declaring canned answers per scenario — labware resolution mappings, initial-volume assumptions, default-confirm-all behavior. The runner reads it and constructs a `ScriptedCM` per eval. Existing 13 evals stay in direct-API mode (no `confirmations` block); new evals that need the full pipeline opt in.
+
+What this unlocks (none possible today):
+
+- **The complex resolver evals dropped earlier** (e.g. `12_qpcr_standard_curve`) come back as full-pipeline tests with scripted resolution answers — exercising the production path where Stage 3 confirmation patches up resolver weaknesses with the user.
+- **Confirmation-queue grouping logic** (`_build_initial_volume_queue`, the rectangular-block detection) gets exercised end-to-end against real LLM extraction output, not just unit-tested with hand-crafted specs.
+- **Stage 1 input classification** becomes testable in the eval layer — the runner enters at the top of `run_pipeline()`, including the `InputValidator.classify` LLM call.
+- **Generated script + simulation log** become assertable — `PipelineResult.script` and `result.simulation_log` are already in the dataclass; we just don't run that far today.
+- **Stage 5 deterministic transforms** get a real-LLM upstream signal — currently their inputs are hand-crafted Pydantic instances in `tests/integration/`; with full-pipeline evals, the inputs come from actual LLM extraction.
+
+Order of operations after task #4:
+1. Extend `evals/run.py` to support both modes (direct-API and full-pipeline-with-scripted-confirmations). Two-mode coexistence keeps existing 13 evals fast and unchanged.
+2. Re-add `12_qpcr_standard_curve` (and possibly `15_bacterial_transformation`, others) with `confirmations` blocks.
+3. Promote the relevant items from "Deferred assertions" above into first-class `expected.json` schema fields.
+
 ## Adding a new eval
 
 1. Create `evals/<NN>_<name>/expected.json`.
