@@ -42,6 +42,37 @@ class InputValidationResult:
         return result
 
 
+def check_input_length(user_input: str) -> Optional[InputValidationResult]:
+    """Deterministic length pre-check; returns INVALID result if out of bounds, else None.
+
+    Pre:    `user_input` is a string.
+
+    Post:   Returns InputValidationResult(classification="INVALID", reason=...,
+            suggestion=...) iff one of:
+              * `len(user_input.strip()) < 3` → reason "Input too short"
+              * `len(user_input) > 10000`     → reason "Input too long"
+            Otherwise returns None — caller should proceed with full
+            classification (typically the LLM call).
+
+    Side effects: None. Pure.
+
+    Raises: Never.
+    """
+    if len(user_input.strip()) < 3:
+        return InputValidationResult(
+            classification="INVALID",
+            reason="Input too short",
+            suggestion="Please provide a complete protocol instruction, e.g., 'Transfer 100uL from well A1 to B1'",
+        )
+    if len(user_input) > 10000:
+        return InputValidationResult(
+            classification="INVALID",
+            reason="Input too long",
+            suggestion="Please provide a concise protocol instruction (under 10,000 characters)",
+        )
+    return None
+
+
 CLASSIFY_PROMPT = """You are classifying user inputs for a lab protocol generation system.
 
 Classify the input as one of:
@@ -92,48 +123,24 @@ class InputValidator:
         Pre:    `user_input` is a string. `self.client` is a constructed
                 Anthropic client (set in __init__ via `_setup_client`).
 
-        Post:   Two-phase resolution.
-                Phase 1 — DETERMINISTIC length checks (no LLM call):
-                  * If `len(user_input.strip()) < 3`: returns
-                    InputValidationResult(classification="INVALID",
-                    reason="Input too short", suggestion=<example string>).
-                  * If `len(user_input) > 10000`: returns
-                    InputValidationResult(classification="INVALID",
-                    reason="Input too long", suggestion=<concise hint>).
-                  Both checks return WITHOUT calling the Anthropic API.
-                Phase 2 — LLM call:
-                  For inputs that pass both length checks, the method calls
-                  the Anthropic API to classify and returns an
-                  InputValidationResult parsed from the JSON response. The
-                  returned classification is one of {PROTOCOL, QUESTION,
-                  AMBIGUOUS, INVALID}; `reason` is a non-empty string;
-                  `suggestion` is a string or None.
+        Post:   Delegates the deterministic length pre-check to
+                `check_input_length`. If that returns an InputValidationResult,
+                returns it directly (no LLM call). Otherwise, calls the
+                Anthropic API and returns an InputValidationResult parsed
+                from the JSON response. The returned classification is one
+                of {PROTOCOL, QUESTION, AMBIGUOUS, INVALID}; `reason` is a
+                non-empty string; `suggestion` is a string or None.
 
-        Side effects: Phase 1 is pure. Phase 2 makes an Anthropic API call
-                      (network I/O) and renders a Spinner to stdout.
+        Side effects: None when the length pre-check rejects. Otherwise
+                      makes an Anthropic API call (network I/O) and renders
+                      a Spinner to stdout.
 
         Raises: RuntimeError ("Input validation failed: ...") if the API
                 call fails or the response is unparseable.
-
-        Design smell: Phase 1 (deterministic length checks) and Phase 2
-                      (LLM call) are mixed in one method, so Phase 1 cannot
-                      be unit-tested without an API key. Candidate for
-                      extraction to a static method or module function.
         """
-        # Quick length checks before calling LLM
-        if len(user_input.strip()) < 3:
-            return InputValidationResult(
-                classification="INVALID",
-                reason="Input too short",
-                suggestion="Please provide a complete protocol instruction, e.g., 'Transfer 100uL from well A1 to B1'"
-            )
-
-        if len(user_input) > 10000:
-            return InputValidationResult(
-                classification="INVALID",
-                reason="Input too long",
-                suggestion="Please provide a concise protocol instruction (under 10,000 characters)"
-            )
+        early = check_input_length(user_input)
+        if early is not None:
+            return early
 
         try:
             from nl2protocol.spinner import Spinner

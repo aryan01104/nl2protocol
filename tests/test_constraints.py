@@ -848,18 +848,18 @@ class TestWellStateTrackerInspectors:
         tracker = WellStateTracker(simple_config, spec)
         assert tracker.get_substances("source_plate", "A1") == []
 
-    # get_substances — Caveat: returns a reference to internal list
-    def test_get_substances_returns_internal_reference(self, simple_config):
+    # get_substances — Post: returns a copy; mutating the result does NOT
+    # affect the tracker's internal state. (Was previously a leaky reference;
+    # fixed to return a shallow copy.)
+    def test_get_substances_returns_independent_copy(self, simple_config):
         spec = make_spec([self._dummy_step()], initial_contents=[])
         tracker = WellStateTracker(simple_config, spec)
         tracker.dispense("source_plate", "A1", 50.0, "buffer")
 
         returned = tracker.get_substances("source_plate", "A1")
-        # The contract says callers must not mutate, but THIS test verifies
-        # the leaky-reference behavior so future refactors that switch to
-        # returning a copy will surface here and force a contract update.
-        returned.append("test_marker")
-        assert "test_marker" in tracker.get_substances("source_plate", "A1")
+        returned.append("test_marker")  # mutate the returned list
+        # Tracker's internal state must be unaffected.
+        assert "test_marker" not in tracker.get_substances("source_plate", "A1")
 
     # well_has_liquid — Post: True after dispense
     def test_well_has_liquid_true_after_dispense(self, simple_config):

@@ -64,16 +64,23 @@ class TestValidate:
         assert result.valid is False
         assert any("Missing required field 'pipettes'" in e.message for e in result.errors)
 
-    # KNOWN WART: when 'labware' or 'pipettes' is the wrong type (e.g. a string),
-    # the schema check correctly emits "must be an object", but the short-circuit
-    # only triggers on "Missing required" errors, so secondary checks proceed
-    # and crash on `labware.items()`. This pin-tests the crash so a future fix
-    # in `validate()` (widen short-circuit to also skip when labware/pipettes
-    # aren't dicts) will surface here as a test failure to update.
-    def test_labware_wrong_type_currently_crashes(self):
+    # Post: when 'labware' or 'pipettes' is the wrong type (e.g. a string),
+    # the function returns a structured ValidationResult(valid=False) with the
+    # schema error — it does NOT crash. The short-circuit guard skips secondary
+    # checks (which would otherwise hit `.items()` on the string and crash).
+    def test_labware_wrong_type_returns_structured_error_no_crash(self):
         config = {"labware": "not_a_dict", "pipettes": {"left": {"model": "p300_single_gen2"}}}
-        with pytest.raises(AttributeError, match="'str' object has no attribute 'items'"):
-            ConfigValidator().validate(config)
+        result = ConfigValidator().validate(config)  # must not raise
+        assert result.valid is False
+        assert any(e.category == "schema" and "must be an object" in e.message
+                   for e in result.errors)
+
+    def test_pipettes_wrong_type_returns_structured_error_no_crash(self):
+        config = {"labware": {}, "pipettes": "not_a_dict"}
+        result = ConfigValidator().validate(config)  # must not raise
+        assert result.valid is False
+        assert any(e.category == "schema" and "must be an object" in e.message
+                   for e in result.errors)
 
     # Post: labware entry missing load_name → schema error
     def test_labware_missing_load_name(self):

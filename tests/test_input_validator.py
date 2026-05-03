@@ -1,12 +1,9 @@
 """
 Contract tests for nl2protocol.validation.input_validator.
 
-Scope: only the deterministic length-check phase of `InputValidator.classify`.
-The LLM-call phase is integration territory and is not exercised here.
-
-Setup: tests stub `ANTHROPIC_API_KEY` so InputValidator() can construct
-without raising APIKeyError, then mock `self.client` so any accidental
-LLM-call path raises a clear failure.
+`check_input_length` is the pure deterministic pre-check — tested directly
+without any client setup. `InputValidator.classify` delegates to it; a small
+set of integration tests verify that delegation works (mocked client).
 """
 
 import os
@@ -14,78 +11,81 @@ import pytest
 from unittest.mock import MagicMock
 
 from nl2protocol.validation.input_validator import (
-    InputValidator, InputValidationResult,
+    InputValidator, InputValidationResult, check_input_length,
 )
 
 
 # ============================================================================
-# FIXTURES
+# check_input_length — pure function, no fixtures needed
+# ============================================================================
+
+class TestCheckInputLengthTooShort:
+    """Post: len(strip(input)) < 3 → INVALID 'Input too short'."""
+
+    @pytest.mark.parametrize("short_input", ["", " ", "  ", "a", "ab", "  a  "])
+    def test_short_input_returns_invalid_too_short(self, short_input):
+        result = check_input_length(short_input)
+        assert result is not None
+        assert result.classification == "INVALID"
+        assert result.reason == "Input too short"
+        assert result.suggestion is not None
+
+    # Boundary: exactly 3 non-whitespace chars returns None (proceed to LLM)
+    def test_three_char_input_passes_length_check(self):
+        assert check_input_length("abc") is None
+
+
+class TestCheckInputLengthTooLong:
+    """Post: len(input) > 10000 → INVALID 'Input too long'."""
+
+    def test_long_input_returns_invalid_too_long(self):
+        result = check_input_length("x" * 10001)
+        assert result is not None
+        assert result.classification == "INVALID"
+        assert result.reason == "Input too long"
+        assert result.suggestion is not None
+
+    # Boundary: exactly 10000 chars returns None (proceed to LLM)
+    def test_ten_thousand_char_input_passes_length_check(self):
+        assert check_input_length("z" * 10000) is None
+
+
+# ============================================================================
+# InputValidator.classify — verifies delegation to check_input_length
 # ============================================================================
 
 @pytest.fixture
 def validator(monkeypatch):
     """Construct an InputValidator with a stubbed API key + mocked client.
 
-    The mocked client raises if any LLM call is attempted, so tests of the
-    deterministic length-check path can assert "no LLM call was made".
+    The mocked client raises on any call, so tests can assert that the
+    length-pre-check short-circuited (LLM was NOT invoked).
     """
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-stub-key")
     v = InputValidator()
     mock_client = MagicMock()
-    mock_client.messages.create.side_effect = AssertionError(
-        "Test reached the LLM path; this test should only exercise the "
-        "deterministic length-check path."
-    )
+    mock_client.messages.create.side_effect = AssertionError("LLM should not be called")
     v.client = mock_client
     return v
 
 
-# ============================================================================
-# InputValidator.classify — Phase 1 (deterministic length checks)
-# ============================================================================
-
-class TestClassifyTooShort:
-    """Phase 1: len(user_input.strip()) < 3 → INVALID 'Input too short'."""
-
-    @pytest.mark.parametrize("short_input", ["", " ", "  ", "a", "ab", "  a  "])
-    def test_short_input_returns_invalid_too_short(self, validator, short_input):
-        result = validator.classify(short_input)
-        assert result.classification == "INVALID"
-        assert result.reason == "Input too short"
-        assert result.suggestion is not None  # contract: suggestion provided
+class TestClassifyDelegation:
+    """classify() should delegate to check_input_length and short-circuit on early return."""
 
     def test_short_input_does_not_call_llm(self, validator):
-        # The mocked client raises AssertionError on any call. If the LLM
-        # path is reached, this test fails with that AssertionError.
-        validator.classify("hi")
+        result = validator.classify("hi")
+        assert result.reason == "Input too short"
         validator.client.messages.create.assert_not_called()
-
-    # Boundary: exactly 3 non-whitespace chars passes length checks → LLM is called
-    def test_three_char_input_passes_length_check_and_attempts_llm(self, validator):
-        # The mock client raises, classify wraps it in RuntimeError; we
-        # don't care about the raise — only that the LLM was invoked.
-        with pytest.raises(RuntimeError):
-            validator.classify("abc")
-        validator.client.messages.create.assert_called_once()
-
-
-class TestClassifyTooLong:
-    """Phase 1: len(user_input) > 10000 → INVALID 'Input too long'."""
-
-    def test_long_input_returns_invalid_too_long(self, validator):
-        result = validator.classify("x" * 10001)
-        assert result.classification == "INVALID"
-        assert result.reason == "Input too long"
-        assert result.suggestion is not None
 
     def test_long_input_does_not_call_llm(self, validator):
-        validator.classify("y" * 50000)
+        result = validator.classify("y" * 50000)
+        assert result.reason == "Input too long"
         validator.client.messages.create.assert_not_called()
 
-    # Boundary: exactly 10000 chars passes the length check → LLM is called
-    def test_ten_thousand_char_input_passes_length_check_and_attempts_llm(self, validator):
-        with pytest.raises(RuntimeError):
-            validator.classify("z" * 10000)
+    # Inputs that pass the length pre-check proceed to the LLM call.
+    def test_inputs_passing_length_check_attempt_llm_call(self, validator):
+        with pytest.raises(RuntimeError):  # mock raises, classify wraps as RuntimeError
+            validator.classify("Transfer 100uL from A1 to B1")
         validator.client.messages.create.assert_called_once()
 
 
