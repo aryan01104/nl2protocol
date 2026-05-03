@@ -206,7 +206,23 @@ class ExtractedStep(BaseModel):
 
     @model_validator(mode='after')
     def coerce_replicates(self) -> 'ExtractedStep':
-        """replicates=1 means no replication — treat as null."""
+        """Normalize `replicates` so that "no replication" is uniformly None.
+
+        Pre:    ExtractedStep instance with all fields populated by Pydantic;
+                `self.replicates` is None or any int (the field has no `ge=`
+                bound, so 0 and negative ints reach this validator).
+
+        Post:   If `self.replicates` is None: unchanged.
+                If `self.replicates >= 2`: unchanged (real replication count).
+                If `self.replicates < 2` (i.e. 1, 0, or negative): coerced
+                to None — 1 replicate means no replication, and 0/negative
+                are silently normalized rather than rejected (lenient
+                normalization for hallucinated LLM output). Returns self.
+
+        Side effects: May mutate `self.replicates` (sets to None when < 2).
+
+        Raises: Never.
+        """
         if self.replicates is not None and self.replicates < 2:
             self.replicates = None
         return self
@@ -272,6 +288,26 @@ class ProtocolSpec(BaseModel):
 
     @model_validator(mode='after')
     def validate_step_ordering(self) -> 'ProtocolSpec':
+        """Require step.order values to form a permutation of {1, 2, ..., N}.
+
+        Pre:    ProtocolSpec instance with `self.steps` populated; each
+                `step.order` is an int (Pydantic's `ge=1` on ExtractedStep
+                already guarantees order >= 1).
+
+        Post:   If `sorted([s.order for s in self.steps])` equals
+                `[1, 2, ..., len(steps)]`: returns self unchanged.
+                Otherwise raises ValueError. Permutations are allowed
+                (e.g. orders `[3, 1, 2]` pass — only the multiset matters,
+                not the list-position order). Forbidden cases include
+                gaps (`[1, 3]`), duplicates (`[1, 1, 2]`), 0-based
+                (`[0, 1, 2]`), and not-starting-at-1 (`[2, 3, 4]`).
+
+        Side effects: None. Read-only validation.
+
+        Raises: ValueError with the offending order list embedded in the
+                message, formatted as
+                "Step orders must be consecutive 1..N, got [list]".
+        """
         orders = [s.order for s in self.steps]
         if sorted(orders) != list(range(1, len(orders) + 1)):
             raise ValueError(f"Step orders must be consecutive 1..N, got {orders}")
@@ -291,6 +327,34 @@ class CompleteProtocolSpec(ProtocolSpec):
 
     @model_validator(mode='after')
     def validate_completeness(self) -> 'CompleteProtocolSpec':
+        """Require every step to have all fields its action needs for codegen.
+
+        Pre:    CompleteProtocolSpec instance with `self.steps` populated.
+                `validate_step_ordering` (inherited from ProtocolSpec) has
+                already passed.
+
+        Post:   For each step, action-specific completeness rules apply:
+                  * "Liquid" actions {transfer, distribute, consolidate,
+                    aspirate, dispense, mix, serial_dilution} require
+                    `step.volume` to be non-None.
+                  * "Transfer-like" actions {transfer, distribute,
+                    serial_dilution, consolidate} additionally require
+                    BOTH `step.source` and `step.destination` to be non-None.
+                  * Other actions (e.g. delay, set_temperature) impose no
+                    completeness requirements.
+                If every step satisfies its rules: returns self unchanged.
+                Otherwise: collects ALL issues across ALL steps (does not
+                short-circuit on the first), then raises a single ValueError
+                whose message starts with "Spec is incomplete (N issue(s)):"
+                followed by issues joined by "; ". When `step.substance`
+                is set, the issue message includes a `for 'X'` substance
+                hint where X is `step.substance.value`.
+
+        Side effects: None. Read-only validation.
+
+        Raises: ValueError listing every incomplete-field issue across all
+                steps (single raise; never multiple).
+        """
         errors = []
         liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
                           "dispense", "mix", "serial_dilution"}

@@ -257,10 +257,14 @@ A pipeline architecture writeup explaining what each stage owes the next is at [
 ## Tests
 
 ```bash
-pytest tests/ -v
+pytest tests/ -v                                     # 61 deterministic tests, no API key needed
+ANTHROPIC_API_KEY=... pytest tests/ -v               # also runs LLM-dependent system tests
+pytest tests/ --cov=nl2protocol --cov-report=term-missing   # with coverage
 ```
 
-Tests run without an API key. Coverage: hardware constraint checker, well state tracker, tip strategy, confirmation queue grouping, and a battery of failure-mode tests in [`tests/test_failure_modes.py`](tests/test_failure_modes.py). The failure-mode tests are deliberately designed to trigger specific error paths (invalid wells, missing labware, equivalent labware names, pipette overcommit, etc.) — they're how the system's error handling stays honest.
+The suite is split between deterministic unit tests (constraint checker, well state tracker, tip strategy, confirmation queue grouping) and LLM-gated system tests (extraction edge cases — misspellings, equivalent labware names, compact instructions, non-protocol input rejection). A battery of failure-mode tests in [`tests/test_failure_modes.py`](tests/test_failure_modes.py) is deliberately designed to trigger specific error paths (invalid wells, missing labware, pipette overcommit, etc.) — they're how the error handling stays honest as the codebase changes.
+
+For the full strategy — what's tested, what's deliberately not, which course principles the suite follows, and the open improvements — see [`docs/TESTING.md`](docs/TESTING.md).
 
 ## Tech stack
 

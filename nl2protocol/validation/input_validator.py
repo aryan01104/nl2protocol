@@ -87,14 +87,38 @@ class InputValidator:
         self.client = Anthropic(api_key=api_key)
 
     def classify(self, user_input: str) -> InputValidationResult:
-        """
-        Classify user input to determine if it's a valid protocol instruction.
+        """Classify `user_input` as PROTOCOL / QUESTION / AMBIGUOUS / INVALID.
 
-        Args:
-            user_input: The raw user input string
+        Pre:    `user_input` is a string. `self.client` is a constructed
+                Anthropic client (set in __init__ via `_setup_client`).
 
-        Returns:
-            InputValidationResult with classification, reason, and optional suggestion
+        Post:   Two-phase resolution.
+                Phase 1 — DETERMINISTIC length checks (no LLM call):
+                  * If `len(user_input.strip()) < 3`: returns
+                    InputValidationResult(classification="INVALID",
+                    reason="Input too short", suggestion=<example string>).
+                  * If `len(user_input) > 10000`: returns
+                    InputValidationResult(classification="INVALID",
+                    reason="Input too long", suggestion=<concise hint>).
+                  Both checks return WITHOUT calling the Anthropic API.
+                Phase 2 — LLM call:
+                  For inputs that pass both length checks, the method calls
+                  the Anthropic API to classify and returns an
+                  InputValidationResult parsed from the JSON response. The
+                  returned classification is one of {PROTOCOL, QUESTION,
+                  AMBIGUOUS, INVALID}; `reason` is a non-empty string;
+                  `suggestion` is a string or None.
+
+        Side effects: Phase 1 is pure. Phase 2 makes an Anthropic API call
+                      (network I/O) and renders a Spinner to stdout.
+
+        Raises: RuntimeError ("Input validation failed: ...") if the API
+                call fails or the response is unparseable.
+
+        Design smell: Phase 1 (deterministic length checks) and Phase 2
+                      (LLM call) are mixed in one method, so Phase 1 cannot
+                      be unit-tested without an API key. Candidate for
+                      extraction to a static method or module function.
         """
         # Quick length checks before calling LLM
         if len(user_input.strip()) < 3:

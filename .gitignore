@@ -27,6 +27,11 @@ output/
 test_results/
 llm_failed_output*.txt
 
+# Coverage and mutation testing artifacts
+.coverage
+htmlcov/
+mutants/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -44,8 +49,10 @@ testing_material/
 # Local Claude Code state (contains personal memory and session data)
 .claude/
 
-# docs/ is ignored, but ADRs and plans are public-facing portfolio artifacts.
-# Re-include them while keeping personal notes in docs/ private.
+# docs/ is ignored, but ADRs, plans, and the testing strategy doc are
+# public-facing portfolio artifacts. Re-include them while keeping
+# personal notes in docs/ private.
 docs/*
 !docs/adr/
 !docs/plans/
+!docs/TESTING.md
