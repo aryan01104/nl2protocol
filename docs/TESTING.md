@@ -141,15 +141,15 @@ A test failure means one of three things, in decreasing order of likelihood:
 
 To verify the 87% branch coverage on `validation/constraints.py` is real (not theatre — code that runs but has no assertions on its behavior), the module was mutation-tested with [mutmut](https://mutmut.readthedocs.io/) v3.5 against `tests/test_constraints.py`. Mutation testing perturbs the source (flip `>` to `>=`, change a constant, delete a branch) and checks whether any test catches the change.
 
-**Results (one-shot run, 2026-05-03):**
+**Results across phases (all on the same 845 mutants):**
 
-| Outcome | Count | What it means |
-|---|---|---|
-| Killed (caught) | 333 | A test failed when the mutant was introduced — good. |
-| Survived (uncaught) | 490 | All tests passed despite the behavior change — gap. |
-| Timed out | 22 | Mutant caused infinite loop; counted neither way. |
-| **Total** | **845** | |
-| **Mutation score** | **40.5%** | killed / (killed + survived) |
+| Phase | Test set | Killed | Survived | Score |
+|---|---|---|---|---|
+| 0 — Contract tests only | `test_constraints.py` | 333 | 490 | **40.5%** |
+| 1 — + helper properties | + `tests/property/test_constraint_properties.py` | 349 | 496 | **41.3%** |
+| 2 — + `check_all` properties | + `tests/property/test_check_all_properties.py` | **378** | 467 | **44.7%** |
+
+The progression confirms the technique works — each phase added properties that killed previously-surviving mutants. Lift was modest because the bulk of survivors are in private `_check_*` helpers (alt-pipette suggestion logic, suggestion-message construction) where neither leaf-helper nor orchestration-level properties reach without targeted strategies.
 
 The 40.5% is striking next to 87% branch coverage and is exactly what mutation testing exists to surface: branch coverage proves the *line* ran; mutation testing proves the *behavior* was asserted on. The two answer different questions.
 
@@ -167,6 +167,32 @@ mutmut run        # uses [mutmut] section in setup.cfg
 mutmut results    # list survivors
 mutmut show <id>  # diff for a specific mutant
 ```
+
+## Boundary inventory
+
+Every numeric boundary in the deterministic core, the tests that cover it, and the principle (BVA — boundary-value analysis) it enforces. Centralized here so the boundary discipline is visible at a glance — the actual tests live in scattered files for locality.
+
+| Boundary | Source location | Edge tests live in |
+|---|---|---|
+| Pipette range — exact min/max (inclusive) | `validation/constraints.py:get_pipette_for_volume` | `test_constraints.py:TestGetPipetteForVolume.test_range_endpoints_are_inclusive` |
+| Pipette range — smallest float below min | (same) | `test_boundaries.py:TestPipetteRangeFloatEdges.test_smallest_float_below_min_not_covered` |
+| Pipette range — smallest float above max | (same) | `test_boundaries.py:TestPipetteRangeFloatEdges.test_smallest_float_above_max_not_covered` |
+| Pipette spec prefix collision (p10 vs p1000) | `validation/constraints.py:get_pipette_range` | `test_constraints.py:TestGetPipetteRange.test_p1000_does_not_collide_with_p10` |
+| Well-state 0.01 uL tolerance — well_has_liquid at exactly 0.01 | `validation/constraints.py:WellStateTracker.well_has_liquid` | `test_boundaries.py:TestWellHasLiquidAtExactThreshold` |
+| Well-state 0.01 uL tolerance — remove at exact +0.01 overdraw | `validation/constraints.py:WellState.remove` | `test_boundaries.py:TestWellStateRemoveAtExactToleranceBoundary` |
+| Well-state 0.01 uL tolerance — within (0.005) and outside (0.5) | (same) | `test_constraints.py:TestWellStateRemove.test_within_tolerance_overdraw_succeeds` and `test_outside_tolerance_overdraw_fails` |
+| Well capacity overflow — at and above estimated capacity | `validation/constraints.py:WellStateTracker.dispense` | `test_constraints.py:TestWellStateTracker.test_well_overflow_warns` |
+| Provenance.confidence — exact 0.0 and 1.0 (inclusive endpoints) | `models/spec.py:Provenance` | `test_boundaries.py:TestProvenanceConfidenceBoundaries` |
+| Provenance.confidence — just outside [0, 1] | (same) | (same) |
+| ProvenancedVolume.value — exact 0 (rejected) and smallest positive (accepted) | `models/spec.py:ProvenancedVolume` | `test_boundaries.py:TestProvenancedVolumeBoundaries` |
+| ExtractedStep.replicates — coercion at 1, 0, negative | `models/spec.py:ExtractedStep.coerce_replicates` | `test_spec_validators.py:TestCoerceReplicates` |
+| ExtractedStep.order — `ge=1` boundary at 0 | `models/spec.py:ExtractedStep` | `test_spec_validators.py:TestValidateStepOrdering.test_zero_based_rejected_by_field_constraint` |
+| ProtocolSpec.steps — minimum length 1 | `models/spec.py:ProtocolSpec` | (Pydantic-enforced; covered transitively by every other test that passes a spec) |
+| Step ordering — gap, duplicate, starts-at-2 | `models/spec.py:ProtocolSpec.validate_step_ordering` | `test_spec_validators.py:TestValidateStepOrdering` |
+| Tip sufficiency — tip count > tipracks × 96 | `validation/constraints.py:_check_tip_sufficiency` | `test_constraints.py:TestTipSufficiency` |
+| Input length — < 3 chars and > 10000 chars | `validation/input_validator.py:InputValidator.classify` | `test_input_validator.py:TestClassifyTooShort`, `TestClassifyTooLong` |
+
+The principle: every numeric threshold deserves at least four tests — *just inside* both endpoints (BVA equivalence-class membership) and *just outside* both endpoints (boundary-violation detection). Where existing tests skip the *exact-edge* value (because the edge is a single representable float), `test_boundaries.py` fills the gap.
 
 ## Known design warts (surfaced by contract pass)
 
