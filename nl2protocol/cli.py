@@ -148,6 +148,18 @@ Files:
         help='Show full reasoning, provenance details, and debug information'
     )
 
+    parser.add_argument(
+        '--html-report',
+        nargs='?',
+        const='_DEFAULT_',
+        default=None,
+        metavar='PATH',
+        help='Write a self-contained HTML provenance report to PATH after the run. '
+             'If PATH is omitted, defaults to output/report_<timestamp>.html. '
+             'Opens in any browser; shows the 4-stage decomposition '
+             '(instruction → spec → complete spec → script) with color-coded provenance.'
+    )
+
     return parser
 
 
@@ -573,8 +585,20 @@ def main(argv: list = None) -> int:
         config_path = temp_config.name
         print(f"\nUsing generated config: {config_path}")
 
+    # Build the optional HTML reporter if --html-report was passed.
+    reporter = None
+    html_report_path = None
+    if args.html_report is not None:
+        from datetime import datetime
+        from .reporting import HTMLReporter
+        if args.html_report == '_DEFAULT_':
+            html_report_path = f"output/report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        else:
+            html_report_path = args.html_report
+        reporter = HTMLReporter(output_path=html_report_path)
+
     try:
-        agent = ProtocolAgent(config_path=config_path)
+        agent = ProtocolAgent(config_path=config_path, reporter=reporter)
     except APIKeyError as e:
         # Offer interactive setup if key is missing
         if offer_setup_on_missing_key():
@@ -582,7 +606,7 @@ def main(argv: list = None) -> int:
             try:
                 from dotenv import find_dotenv, load_dotenv
                 load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
-                agent = ProtocolAgent(config_path=config_path)
+                agent = ProtocolAgent(config_path=config_path, reporter=reporter)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)
                 return 1
@@ -643,6 +667,8 @@ def main(argv: list = None) -> int:
     print(f"  {clabel('Simulation:')} {success('passed')}", file=sys.stderr)
     print(f"  Output:     {output_path}", file=sys.stderr)
     print(f"  Log:        {log_path}", file=sys.stderr)
+    if html_report_path:
+        print(f"  Report:     {html_report_path}", file=sys.stderr)
     print(f"{'─' * 48}", file=sys.stderr)
 
     # Also print paths to stdout (machine-parseable)

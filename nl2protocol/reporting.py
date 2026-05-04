@@ -139,3 +139,210 @@ class CapturingReporter:
     def first_of_kind(self, kind: EventKind) -> Optional[StageEvent]:
         events = self.events_of_kind(kind)
         return events[0] if events else None
+
+
+# ============================================================================
+# HTMLReporter — renders a self-contained report.html at finalize()
+# ============================================================================
+
+# Color CSS classes for each Provenance.source value. Kept in sync with the
+# template's CSS variables so the visualization is consistent.
+_PROV_CLASS = {
+    "instruction":    "prov-instruction",
+    "config":         "prov-config",
+    "domain_default": "prov-domain_default",
+    "inferred":       "prov-inferred",
+}
+
+
+def _render_provenanced_value(value: Any, prov, label: str = "") -> str:
+    """Wrap a provenanced value in an HTML span colored by its source.
+
+    `prov` is a Provenance dataclass (has .source, .reason, .confidence).
+    The `title` attribute (HTML hover tooltip) shows the reason + confidence.
+    """
+    import html
+    source = getattr(prov, "source", "inferred")
+    reason = getattr(prov, "reason", "")
+    confidence = getattr(prov, "confidence", 0.0)
+    css_class = _PROV_CLASS.get(source, "prov-inferred")
+    tooltip = f"{source} (confidence {confidence:.0%}): {reason}"
+    rendered_value = html.escape(str(value))
+    rendered_tooltip = html.escape(tooltip, quote=True)
+    return f'<span class="{css_class}" title="{rendered_tooltip}">{rendered_value}</span>'
+
+
+def _step_class(grounding: List[str], is_orphan: bool) -> str:
+    """CSS class for a step block based on its CompositionProvenance grounding."""
+    if is_orphan:
+        return "step-orphan"
+    if "instruction" in grounding and len(grounding) == 1:
+        return "step-grounded-instruction"
+    return "step-grounded-mixed"
+
+
+def _step_to_render_dict(step) -> dict:
+    """Convert an ExtractedStep into the dict shape the template expects.
+
+    Walks the step's provenanced fields (volume, source, destination, etc.)
+    and renders each one as a colored HTML span. Builds a list of detail
+    lines that the template iterates over.
+
+    A step is considered "orphan" (no instruction origin) when its
+    composition_provenance.grounding does NOT include "instruction" —
+    e.g. grounding=["domain_default"] alone means the LLM added this step
+    purely from domain knowledge. In Phase 3 these steps will get no
+    composite arrow back to the instruction column.
+    """
+    comp = step.composition_provenance
+    grounding = list(getattr(comp, "grounding", []))
+    is_orphan = "instruction" not in grounding
+
+    detail_lines = []
+
+    if step.volume is not None:
+        v = _render_provenanced_value(
+            f"{step.volume.value} {step.volume.unit}",
+            step.volume.provenance,
+        )
+        detail_lines.append(f'<span class="label">volume:</span> {v}')
+
+    if step.source is not None:
+        bits = []
+        if step.source.well:
+            bits.append(f"well {step.source.well}")
+        if step.source.wells:
+            bits.append(f"wells [{', '.join(step.source.wells[:6])}{'...' if len(step.source.wells) > 6 else ''}]")
+        if step.source.well_range:
+            bits.append(step.source.well_range)
+        loc_text = f"{step.source.description} ({', '.join(bits)})" if bits else step.source.description
+        if step.source.provenance:
+            v = _render_provenanced_value(loc_text, step.source.provenance)
+        else:
+            import html as _html
+            v = _html.escape(loc_text)
+        detail_lines.append(f'<span class="label">source:</span> {v}')
+
+    if step.destination is not None:
+        bits = []
+        if step.destination.well:
+            bits.append(f"well {step.destination.well}")
+        if step.destination.wells:
+            bits.append(f"wells [{', '.join(step.destination.wells[:6])}{'...' if len(step.destination.wells) > 6 else ''}]")
+        if step.destination.well_range:
+            bits.append(step.destination.well_range)
+        loc_text = f"{step.destination.description} ({', '.join(bits)})" if bits else step.destination.description
+        if step.destination.provenance:
+            v = _render_provenanced_value(loc_text, step.destination.provenance)
+        else:
+            import html as _html
+            v = _html.escape(loc_text)
+        detail_lines.append(f'<span class="label">destination:</span> {v}')
+
+    if step.substance is not None:
+        v = _render_provenanced_value(step.substance.value, step.substance.provenance)
+        detail_lines.append(f'<span class="label">substance:</span> {v}')
+
+    if step.duration is not None:
+        v = _render_provenanced_value(
+            f"{step.duration.value} {step.duration.unit}",
+            step.duration.provenance,
+        )
+        detail_lines.append(f'<span class="label">duration:</span> {v}')
+
+    if step.temperature is not None:
+        v = _render_provenanced_value(
+            f"{step.temperature.value}°C",
+            step.temperature.provenance,
+        )
+        detail_lines.append(f'<span class="label">temperature:</span> {v}')
+
+    if step.replicates is not None:
+        detail_lines.append(f'<span class="label">replicates:</span> {step.replicates}×')
+
+    return {
+        "order": step.order,
+        "action": step.action,
+        "justification": comp.justification,
+        "confidence": f"{comp.confidence:.0%}",
+        "step_class": _step_class(grounding, is_orphan),
+        "is_orphan": is_orphan,
+        "detail_lines": detail_lines,
+    }
+
+
+class HTMLReporter(CapturingReporter):
+    """Buffers events; at finalize(), renders a self-contained HTML report.
+
+    The output file is one HTML document — inline CSS, no external resources,
+    no JS. Open it in any browser. Self-contained means you can email it,
+    commit it to a repo, or link it from a portfolio.
+
+    Pre:    Constructed with `output_path` (where the HTML file will be
+            written at finalize()).
+
+    Post:   Each emit() collects a StageEvent (inherited from
+            CapturingReporter). finalize() reads the buffered events,
+            extracts instruction / spec / complete_spec / generated_script
+            from them, walks the provenance fields, renders the Jinja2
+            template to `self.output_path`.
+    """
+
+    def __init__(self, output_path: str):
+        super().__init__()
+        self.output_path = output_path
+
+    def finalize(self) -> None:
+        from datetime import datetime
+        from pathlib import Path
+
+        try:
+            from jinja2 import Environment, FileSystemLoader, select_autoescape
+        except ImportError:
+            print("HTMLReporter requires jinja2: pip install 'nl2protocol[reporting]'")
+            return
+
+        # Find the template file relative to this module.
+        template_dir = Path(__file__).parent / "reporting_templates"
+        env = Environment(
+            loader=FileSystemLoader(str(template_dir)),
+            autoescape=select_autoescape(["html"]),
+        )
+        template = env.get_template("report.html.jinja")
+
+        # Pull the load-bearing data out of the captured events.
+        instruction_event = self.first_of_kind("raw_instruction")
+        spec_event = self.first_of_kind("extracted_spec")
+        completed_spec_event = self.first_of_kind("completed_spec")
+        script_event = self.first_of_kind("generated_script")
+
+        instruction = (instruction_event.data.get("instruction", "")
+                       if instruction_event else "")
+        spec_steps = []
+        if spec_event:
+            spec = spec_event.data.get("spec")
+            if spec:
+                spec_steps = [_step_to_render_dict(s) for s in spec.steps]
+
+        completed_steps = []
+        if completed_spec_event:
+            cspec = completed_spec_event.data.get("spec")
+            if cspec:
+                completed_steps = [_step_to_render_dict(s) for s in cspec.steps]
+
+        generated_script = (script_event.data.get("script", "")
+                            if script_event else "")
+
+        success = bool(script_event)  # if we got to script generation, the run succeeded
+
+        rendered = template.render(
+            instruction=instruction,
+            spec_steps=spec_steps,
+            completed_steps=completed_steps,
+            generated_script=generated_script,
+            success=success,
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.output_path).write_text(rendered, encoding="utf-8")

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nl2protocol report — {{ timestamp }}</title>
+<style>
+  /* ───────── Layout ───────── */
+  :root {
+    --col-instruction: #e63946;   /* red-coral */
+    --col-config:      #9d4edd;   /* purple */
+    --col-domain:      #ffb703;   /* gold */
+    --col-inferred:    #fb8500;   /* orange */
+    --bg:              #fdf6e3;   /* warm off-white (matches sketch) */
+    --panel:           #ffffff;
+    --ink:             #1a1a1a;
+    --dim:             #6b6b6b;
+    --grid:            #e5e0d4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  }
+  header {
+    padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--grid);
+  }
+  header h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  header .meta {
+    color: var(--dim);
+    font-size: 13px;
+  }
+  .legend {
+    display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .legend .swatch {
+    display: inline-block; width: 12px; height: 12px;
+    border-radius: 2px; margin-right: 6px; vertical-align: middle;
+  }
+
+  /* ───────── 4-column grid ───────── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr 1.3fr 1.4fr;
+    gap: 16px;
+    padding: 24px 32px;
+    min-height: calc(100vh - 200px);
+  }
+  .col {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+  .col h2 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    border-bottom: 1px solid var(--grid);
+    padding-bottom: 8px;
+  }
+
+  /* ───────── Provenance color spans ───────── */
+  .prov-instruction    { color: var(--col-instruction); font-weight: 500; cursor: help; }
+  .prov-config         { color: var(--col-config);      font-weight: 500; cursor: help; }
+  .prov-domain_default { color: var(--col-domain);      font-weight: 500; cursor: help; background: rgba(255, 183, 3, 0.12); padding: 0 3px; border-radius: 2px; }
+  .prov-inferred       { color: var(--col-inferred);    font-weight: 500; cursor: help; background: rgba(251, 133, 0, 0.12); padding: 0 3px; border-radius: 2px; }
+
+  /* ───────── Instruction column ───────── */
+  .instruction-text {
+    white-space: pre-wrap;
+    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ───────── Spec / step rendering ───────── */
+  .step {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border-left: 3px solid transparent;
+    background: rgba(0, 0, 0, 0.015);
+    border-radius: 0 4px 4px 0;
+  }
+  .step.step-orphan { border-left-color: var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
+  .step.step-grounded-instruction { border-left-color: var(--col-instruction); }
+  .step.step-grounded-mixed { border-left-color: var(--col-domain); }
+  .step-header {
+    font-size: 12px;
+    color: var(--dim);
+    margin-bottom: 6px;
+    font-style: italic;
+    cursor: help;
+  }
+  .step-action {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--ink);
+  }
+  .step-detail {
+    margin-left: 12px;
+    font-size: 13px;
+    color: #333;
+  }
+  .step-detail .label { color: var(--dim); margin-right: 4px; }
+  .step-orphan-warning {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--col-inferred);
+    font-weight: 500;
+  }
+
+  /* ───────── Code column ───────── */
+  pre.code {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre;
+    overflow-x: auto;
+    color: #1a1a1a;
+  }
+
+  /* ───────── Footer ───────── */
+  footer {
+    padding: 16px 32px 24px;
+    border-top: 1px solid var(--grid);
+    color: var(--dim);
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+  }
+  footer a { color: var(--dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>nl2protocol report</h1>
+  <div class="meta">
+    Generated {{ timestamp }} ·
+    Status: {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+  </div>
+  <div class="legend">
+    <span><span class="swatch" style="background: var(--col-instruction)"></span>from instruction</span>
+    <span><span class="swatch" style="background: var(--col-config)"></span>from config</span>
+    <span><span class="swatch" style="background: var(--col-domain)"></span>domain default</span>
+    <span><span class="swatch" style="background: var(--col-inferred)"></span>inferred</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ───────── Column 1: Instruction ───────── -->
+  <div class="col">
+    <h2>Instruction</h2>
+    <div class="instruction-text">{{ instruction }}</div>
+  </div>
+
+  <!-- ───────── Column 2: Extracted Spec ───────── -->
+  <div class="col">
+    <h2>Extracted Spec</h2>
+    {% if spec_steps %}
+      {% for step in spec_steps %}
+        <div class="step {{ step.step_class }}">
+          <div class="step-header" title="{{ step.justification|e }} (confidence {{ step.confidence }})">
+            {% if step.is_orphan %}⚠ {% endif %}{{ step.justification }}
+          </div>
+          <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
+          {% for line in step.detail_lines %}
+            <div class="step-detail">{{ line|safe }}</div>
+          {% endfor %}
+          {% if step.is_orphan %}
+            <div class="step-orphan-warning">⚠ no instruction origin — review (LLM inference only)</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: var(--dim)">(extraction did not produce a spec)</p>
+    {% endif %}
+  </div>
+
+  <!-- ───────── Column 3: Complete Spec ───────── -->
+  <div class="col">
+    <h2>Complete Spec</h2>
+    {% if completed_steps %}
+      {% for step in completed_steps %}
+        <div class="step {{ step.step_class }}">
+          <div class="step-header" title="{{ step.justification|e }} (confidence {{ step.confidence }})">
+            {% if step.is_orphan %}⚠ {% endif %}{{ step.justification }}
+          </div>
+          <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
+          {% for line in step.detail_lines %}
+            <div class="step-detail">{{ line|safe }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: var(--dim)">(complete-spec stage not reached)</p>
+    {% endif %}
+  </div>
+
+  <!-- ───────── Column 4: Generated Code ───────── -->
+  <div class="col">
+    <h2>Generated Python</h2>
+    {% if generated_script %}
+      <pre class="code">{{ generated_script|e }}</pre>
+    {% else %}
+      <p style="color: var(--dim)">(script-generation stage not reached)</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<footer>
+  <span>nl2protocol · provenance-traced protocol generation</span>
+  <span>Hover any colored value or step header for the original reasoning.</span>
+</footer>
+
+</body>
+</html>
