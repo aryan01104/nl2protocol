@@ -51,6 +51,64 @@ def _spec(steps, **kwargs):
 
 
 # ============================================================================
+# CompositionProvenance.require_instruction_grounding — invariant tests
+# ============================================================================
+
+class TestCompositionProvenanceGroundingInvariant:
+    """Architectural invariant: every step must trace back to user instruction.
+    A CompositionProvenance whose grounding does not include 'instruction'
+    is rejected at parse time — this prevents the LLM from silently injecting
+    steps that have no instruction origin.
+    """
+
+    # Post: grounding=['instruction'] alone is valid
+    def test_instruction_alone_is_valid(self):
+        cp = CompositionProvenance(
+            justification="user explicitly described this step",
+            grounding=["instruction"],
+            confidence=1.0,
+        )
+        assert cp.grounding == ["instruction"]
+
+    # Post: grounding=['instruction', 'domain_default'] is valid (compound)
+    def test_instruction_plus_domain_default_is_valid(self):
+        cp = CompositionProvenance(
+            justification="step expanded from named protocol",
+            grounding=["instruction", "domain_default"],
+            confidence=0.8,
+        )
+        assert "instruction" in cp.grounding
+        assert "domain_default" in cp.grounding
+
+    # Post: grounding=['domain_default'] alone is REJECTED — no instruction origin
+    def test_domain_default_alone_is_rejected(self):
+        with pytest.raises(ValidationError, match="must include 'instruction'"):
+            CompositionProvenance(
+                justification="LLM added this from domain knowledge",
+                grounding=["domain_default"],
+                confidence=0.5,
+            )
+
+    # Post: grounding=[] is rejected by the Literal/min_length constraint anyway
+    def test_empty_grounding_is_rejected(self):
+        with pytest.raises(ValidationError):
+            CompositionProvenance(
+                justification="orphan",
+                grounding=[],
+                confidence=0.5,
+            )
+
+    # Post: grounding=['config'] is rejected — 'config' is no longer a valid Literal
+    def test_config_grounding_is_rejected(self):
+        with pytest.raises(ValidationError):
+            CompositionProvenance(
+                justification="step from lab config",
+                grounding=["config"],
+                confidence=1.0,
+            )
+
+
+# ============================================================================
 # ExtractedStep.coerce_replicates — contract tests
 # ============================================================================
 
