@@ -55,19 +55,29 @@ class CompositionProvenance(BaseModel):
     """Tracks why a step exists — what reasoning justifies linking its parameters together.
 
     Unlike Provenance (single source for a single value), a step's existence
-    is a synthesis: the user said 'Bradford assay' (instruction) + Bradford
-    requires incubation (domain_default) + config has a temp module (config).
-    Multiple sources combine through first-principle reasoning.
+    is a synthesis. Architectural invariant: every step MUST be grounded in
+    'instruction' — the LLM is permitted to interpret natural language and
+    expand named protocols via domain knowledge, but it is NOT permitted to
+    inject steps the user did not ask for. A step grounded only in
+    domain_default (without instruction grounding) would be a hallucination
+    — pre-validated against by the schema below.
+
+    Note: 'config' is NOT a valid grounding source for extraction-stage steps
+    because the extractor LLM does not have access to the lab config. Config
+    is only visible to the labware-resolver and constraint-checker stages,
+    neither of which produces CompositionProvenance.
     """
     justification: str = Field(..., description=(
         "What reasoning connects these parameters into one step? "
-        "Cite the instruction phrase, domain knowledge, and/or config constraints "
+        "Cite the instruction phrase and (optionally) the domain knowledge "
         "that justify this step's existence as a distinct action."
     ))
-    grounding: List[Literal["instruction", "config", "domain_default"]] = Field(..., description=(
-        "Which sources contributed to this step's existence. A step can be grounded "
-        "in multiple sources simultaneously. "
-        "Example: ['instruction', 'domain_default'] for a step the user implied via a named protocol."
+    grounding: List[Literal["instruction", "domain_default"]] = Field(..., description=(
+        "Which sources contributed to this step's existence. MUST include "
+        "'instruction' — every step traces back to something the user asked "
+        "for. May additionally include 'domain_default' when expanding a "
+        "named protocol (e.g., 'Bradford assay' → ['instruction', "
+        "'domain_default'] for steps the user implied via the named protocol)."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this step should exist. "
@@ -75,6 +85,32 @@ class CompositionProvenance(BaseModel):
         "0.8 = standard part of a named protocol the user invoked. "
         "0.5 = seems necessary but user didn't mention it."
     ))
+
+    @model_validator(mode='after')
+    def require_instruction_grounding(self) -> 'CompositionProvenance':
+        """Every step must trace back to user instruction.
+
+        Pre:    Pydantic-validated CompositionProvenance instance with
+                grounding ⊆ {'instruction', 'domain_default'} (Literal-enforced).
+
+        Post:   Raises ValueError if 'instruction' is not in self.grounding.
+                The schema invariant is: the LLM may interpret what the user
+                said, expand named protocols via domain knowledge, but MUST
+                NOT inject steps the user did not ask for. A step grounded
+                only in domain_default would violate this and is rejected
+                at parse time rather than silently inserted into the spec.
+
+        Raises: ValueError when grounding does not include 'instruction'.
+        """
+        if "instruction" not in self.grounding:
+            raise ValueError(
+                f"composition_provenance.grounding must include 'instruction' "
+                f"— every step must trace back to something the user asked for. "
+                f"Got grounding={self.grounding}. If a step is purely domain "
+                f"knowledge with no instruction origin, it should not be added "
+                f"to the spec — surface it to the user instead."
+            )
+        return self
 
 
 # ============================================================================

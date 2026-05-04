@@ -91,13 +91,17 @@ def provenance():
 
 
 def composition_provenance():
+    """Generate a CompositionProvenance with a valid grounding per schema:
+    must include 'instruction'; allowed values are 'instruction' and
+    'domain_default' only ('config' is not a valid grounding source for
+    extraction-stage steps — see CompositionProvenance docstring)."""
     return st.builds(
         CompositionProvenance,
         justification=st.text(min_size=1, max_size=30),
-        grounding=st.lists(
-            st.sampled_from(["instruction", "config", "domain_default"]),
-            min_size=1, max_size=3, unique=True,
-        ),
+        grounding=st.sampled_from([
+            ["instruction"],
+            ["instruction", "domain_default"],
+        ]),
         confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
     )
 

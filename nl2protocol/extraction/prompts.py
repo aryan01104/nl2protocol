@@ -34,7 +34,8 @@ RULES:
 
 PROVENANCE — every value you extract MUST have a provenance object:
   provenance: {{source, reason, confidence}}
-  source: "instruction" (user wrote it), "config" (from lab config), "domain_default" (standard practice), "inferred" (guess)
+  source: "instruction" (user wrote it), "domain_default" (standard practice), "inferred" (guess)
+  NOTE: do NOT use "config" — you do not have access to the lab config at this stage; config-derived values are filled in by a later resolution stage.
   reason: one sentence citing WHERE the value came from
   confidence: 0.0-1.0
 
@@ -69,7 +70,11 @@ PROVENANCE — every value you extract MUST have a provenance object:
 COMPOSITION PROVENANCE — every step MUST have a composition_provenance object:
   composition_provenance: {{justification, grounding, confidence}}
   justification: what reasoning links these parameters into this step
-  grounding: list of sources that contribute — ["instruction"], ["instruction", "domain_default"], etc.
+  grounding: list of sources that contribute. Allowed values: "instruction" and "domain_default" only.
+             MUST always include "instruction" — every step must trace back to something the user
+             asked for. Do NOT add steps with grounding=["domain_default"] alone — if a step has
+             no instruction origin, it's a hallucination and should not be added to the spec.
+             "config" is NOT a valid grounding here — you do not have access to the lab config.
   confidence: how confident this step should exist
 
   Calibration examples:
@@ -79,6 +84,9 @@ COMPOSITION PROVENANCE — every step MUST have a composition_provenance object:
     User says "do a Bradford assay" and you add a 5-min incubation step:
       composition_provenance: {{justification: "Bradford assay requires incubation after mixing reagent",
                                 grounding: ["instruction", "domain_default"], confidence: 0.8}}
+    INVALID: a step the user did not mention even implicitly:
+      composition_provenance: {{justification: "I think the user might also want X",
+                                grounding: ["domain_default"], confidence: 0.3}}  ← REJECTED at parse time
 
 LABWARE REFERENCES:
 - The "description" field in LocationRef should contain the user's EXACT wording for the labware.
