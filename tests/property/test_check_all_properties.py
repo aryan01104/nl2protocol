@@ -82,27 +82,57 @@ def wells_outside_96_grid():
 
 
 def provenance():
-    return st.builds(
-        Provenance,
-        source=st.sampled_from(["instruction", "config", "domain_default", "inferred"]),
-        reason=st.text(min_size=1, max_size=30),
-        confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+    """Generate a Provenance valid under the new schema:
+    cited_text REQUIRED for instruction-sourced; reasoning REQUIRED for
+    domain_default/inferred-sourced. 'config' is no longer a valid source
+    for extractor-emitted provenance (see ADR-0005).
+    """
+    return st.one_of(
+        st.builds(
+            Provenance,
+            source=st.just("instruction"),
+            cited_text=st.text(min_size=1, max_size=30),
+            reasoning=st.none(),
+            confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        ),
+        st.builds(
+            Provenance,
+            source=st.sampled_from(["domain_default", "inferred"]),
+            cited_text=st.none(),
+            reasoning=st.text(min_size=1, max_size=30),
+            confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        ),
     )
 
 
 def composition_provenance():
-    """Generate a CompositionProvenance with a valid grounding per schema:
-    must include 'instruction'; allowed values are 'instruction' and
-    'domain_default' only ('config' is not a valid grounding source for
-    extraction-stage steps — see CompositionProvenance docstring)."""
-    return st.builds(
-        CompositionProvenance,
-        justification=st.text(min_size=1, max_size=30),
-        grounding=st.sampled_from([
-            ["instruction"],
-            ["instruction", "domain_default"],
-        ]),
-        confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+    """Generate a CompositionProvenance valid under the new schema (ADR-0005):
+    step_cited_text + parameters_cited_texts + parameters_reasoning REQUIRED;
+    step_reasoning REQUIRED when grounding includes 'domain_default';
+    grounding MUST include 'instruction' ('config' is invalid).
+    """
+    text_strat = st.text(min_size=1, max_size=30)
+    return st.one_of(
+        # Pure instruction-grounded
+        st.builds(
+            CompositionProvenance,
+            step_cited_text=text_strat,
+            step_reasoning=st.none(),
+            parameters_cited_texts=st.lists(text_strat, min_size=1, max_size=3),
+            parameters_reasoning=text_strat,
+            grounding=st.just(["instruction"]),
+            confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        ),
+        # Compound grounding (instruction + domain_default) — step_reasoning required
+        st.builds(
+            CompositionProvenance,
+            step_cited_text=text_strat,
+            step_reasoning=text_strat,
+            parameters_cited_texts=st.lists(text_strat, min_size=1, max_size=3),
+            parameters_reasoning=text_strat,
+            grounding=st.just(["instruction", "domain_default"]),
+            confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        ),
     )
 
 

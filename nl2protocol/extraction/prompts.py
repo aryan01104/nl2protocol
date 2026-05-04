@@ -33,17 +33,38 @@ RULES:
 - Leave "explicit_volumes" empty — it will be populated automatically
 
 PROVENANCE — every value you extract MUST have a provenance object:
-  provenance: {{source, reason, confidence}}
+  provenance: {{source, cited_text OR reasoning, confidence}}
   source: "instruction" (user wrote it), "domain_default" (standard practice), "inferred" (guess)
-  NOTE: do NOT use "config" — you do not have access to the lab config at this stage; config-derived values are filled in by a later resolution stage.
-  reason: one sentence citing WHERE the value came from
+  NOTE: do NOT use "config" — you do not have access to the lab config at this stage;
+  config-derived values are filled in by a later resolution stage.
+
+  THE TWO FIELDS ARE MUTUALLY EXCLUSIVE BY SOURCE:
+    source = "instruction"            → cited_text REQUIRED, reasoning MUST be omitted/null
+    source = "domain_default"         → reasoning REQUIRED, cited_text MUST be omitted/null
+    source = "inferred"               → reasoning REQUIRED, cited_text MUST be omitted/null
+
+  cited_text: a verbatim substring from the instruction that grounds this value.
+              The substring MUST appear character-for-character in the instruction text
+              (case-insensitive, whitespace-normalized). For numbers, the cited substring
+              should contain the value as written (e.g., "100uL of buffer" cites "100uL").
+              Used ONLY when source = "instruction".
+
+  reasoning:  one sentence explaining how this value follows from domain knowledge or inference.
+              For "domain_default": cite the protocol and standard practice.
+              For "inferred": state the reasoning chain (e.g., arithmetic, derivation).
+              Used ONLY when source ∈ {{"domain_default", "inferred"}}.
+
   confidence: 0.0-1.0
+              1.0 = user literally wrote it
+              0.8 = standard protocol default, clearly that protocol
+              0.6 = reasonable inference from context
+              0.4 = plausible guess with weak support
 
   For volumes, also set "exact":
     exact: true if the user stated this exact number ("100uL")
     exact: false if hedged ("about 100uL", "~50uL") or if inferred from domain knowledge
 
-  CRITICAL: source="instruction" means the EXACT value appears VERBATIM in the instruction text.
+  CRITICAL: source="instruction" means the EXACT value appears VERBATIM in the instruction.
   If you computed or derived a value from instruction numbers (arithmetic, doubling, summing,
   calculating dead volume, etc.), that is source="inferred", NOT source="instruction".
   The test is simple: can you point to the exact string in the instruction? If not, it's not "instruction".
@@ -51,42 +72,83 @@ PROVENANCE — every value you extract MUST have a provenance object:
   Calibration examples:
     User says "Transfer 100uL from A1 to B1":
       volume: {{value: 100, unit: "uL", exact: true,
-               provenance: {{source: "instruction", reason: "'100uL' in text", confidence: 1.0}}}}
+               provenance: {{source: "instruction", cited_text: "100uL", confidence: 1.0}}}}
     User says "about 50uL":
       volume: {{value: 50, unit: "uL", exact: false,
-               provenance: {{source: "instruction", reason: "'about 50uL' in text", confidence: 0.9}}}}
+               provenance: {{source: "instruction", cited_text: "about 50uL", confidence: 0.9}}}}
     User says "do a Bradford assay" (you infer 50uL working volume):
       volume: {{value: 50, unit: "uL", exact: false,
-               provenance: {{source: "domain_default", reason: "Bradford assay standard working volume", confidence: 0.7}}}}
+               provenance: {{source: "domain_default",
+                             reasoning: "Bradford assay standard working volume per Pierce protocol",
+                             confidence: 0.7}}}}
 
   ANTI-PATTERNS (do NOT do these):
     User says "add 2uL to each of 4 tubes" and you compute total = 8uL:
-      WRONG: {{source: "instruction", reason: "2uL x 4 = 8uL"}}
-      RIGHT: {{source: "inferred", reason: "Computed: 2uL per tube x 4 tubes", confidence: 0.9}}
+      WRONG: {{source: "instruction", cited_text: "2uL"}}  (8 is NOT in the instruction)
+      RIGHT: {{source: "inferred", reasoning: "Computed: 2uL per tube x 4 tubes = 8uL total", confidence: 0.9}}
     User says "mix at half the total volume" where total is 100uL:
-      WRONG: {{source: "instruction", reason: "half of 100uL"}}
-      RIGHT: {{source: "inferred", reason: "Half of 100uL total volume", confidence: 0.8}}}}
+      WRONG: {{source: "instruction", cited_text: "100uL"}}  (the value 50 isn't there)
+      RIGHT: {{source: "inferred", reasoning: "Half of 100uL total volume = 50uL", confidence: 0.8}}
+    Mixing both fields:
+      WRONG: {{source: "instruction", cited_text: "100uL", reasoning: "user said it"}}  (don't add reasoning when sourced from instruction)
+      RIGHT: {{source: "instruction", cited_text: "100uL", confidence: 1.0}}
 
-COMPOSITION PROVENANCE — every step MUST have a composition_provenance object:
-  composition_provenance: {{justification, grounding, confidence}}
-  justification: what reasoning links these parameters into this step
-  grounding: list of sources that contribute. Allowed values: "instruction" and "domain_default" only.
-             MUST always include "instruction" — every step must trace back to something the user
-             asked for. Do NOT add steps with grounding=["domain_default"] alone — if a step has
-             no instruction origin, it's a hallucination and should not be added to the spec.
-             "config" is NOT a valid grounding here — you do not have access to the lab config.
-  confidence: how confident this step should exist
+COMPOSITION PROVENANCE — every step MUST have a composition_provenance object answering TWO questions:
+
+  Q1 — STEP EXISTENCE: why does a step of this kind exist at all?
+       Answered by: step_cited_text (REQUIRED) + optional step_reasoning (when domain expansion).
+
+  Q2 — PARAMETER COHESION: why do these specific parameter values belong to this same step?
+       Answered by: parameters_cited_texts (REQUIRED, list of one or more verbatim phrases)
+                  + parameters_reasoning (REQUIRED, one paragraph linking the cites to the values).
+
+  composition_provenance: {{
+    step_cited_text: <verbatim instruction phrase that triggered this step kind>,
+    step_reasoning: <optional, only when grounding includes 'domain_default'>,
+    parameters_cited_texts: [<one or more verbatim phrases grounding the parameter values>],
+    parameters_reasoning: <one paragraph explaining how the cites combine into one operation>,
+    grounding: <list, must include "instruction"; may also include "domain_default">,
+    confidence: <0.0-1.0>
+  }}
+
+  RULES:
+    - step_cited_text MUST appear verbatim in the instruction.
+    - parameters_cited_texts MUST each appear verbatim in the instruction.
+    - grounding MUST include "instruction" — every step traces back to something the user asked for.
+      Do NOT add steps with grounding=["domain_default"] alone — that's a hallucination, REJECTED at parse time.
+    - When grounding includes "domain_default", step_reasoning is REQUIRED — explain how the cited
+      instruction phrase expanded into this step type via domain knowledge.
+    - "config" is NOT a valid grounding here — you do not have access to the lab config.
 
   Calibration examples:
-    User says "transfer 100uL from A1 to B1":
-      composition_provenance: {{justification: "User explicitly described this transfer",
-                                grounding: ["instruction"], confidence: 1.0}}
-    User says "do a Bradford assay" and you add a 5-min incubation step:
-      composition_provenance: {{justification: "Bradford assay requires incubation after mixing reagent",
-                                grounding: ["instruction", "domain_default"], confidence: 0.8}}
-    INVALID: a step the user did not mention even implicitly:
-      composition_provenance: {{justification: "I think the user might also want X",
-                                grounding: ["domain_default"], confidence: 0.3}}  ← REJECTED at parse time
+
+    User says "Add 2uL of each plasmid DNA to corresponding competent cell tubes (Plasmid A1 to cells B1, A2 to B2, A3 to B3, A4 to B4)":
+      composition_provenance: {{
+        step_cited_text: "Add 2uL of each plasmid DNA",
+        step_reasoning: null,
+        parameters_cited_texts: ["Add 2uL of each plasmid DNA to corresponding competent cell tubes",
+                                 "Plasmid A1 to cells B1, A2 to B2, A3 to B3, A4 to B4"],
+        parameters_reasoning: "First phrase establishes the action (add 2uL plasmid DNA) and source/destination labware. Second phrase grounds the per-well A1→B1, A2→B2 mapping. Together they fully specify the transfer.",
+        grounding: ["instruction"],
+        confidence: 1.0
+      }}
+
+    User says "do a Bradford assay" and you add a 5-min incubation step (domain expansion):
+      composition_provenance: {{
+        step_cited_text: "do a Bradford assay",
+        step_reasoning: "The standard Bradford workflow includes a 5-minute incubation between dye addition and absorbance read to allow the dye-protein complex to develop fully.",
+        parameters_cited_texts: ["do a Bradford assay"],
+        parameters_reasoning: "The 5-minute duration is the canonical Bradford incubation time per Bio-Rad / Pierce protocols. No parameter values were user-stated for this step; all parameters come from the domain default.",
+        grounding: ["instruction", "domain_default"],
+        confidence: 0.8
+      }}
+
+    INVALID — a step the user did not mention even implicitly:
+      composition_provenance: {{
+        step_cited_text: "<no instruction phrase fits>",
+        ...,
+        grounding: ["domain_default"]  ← REJECTED at parse time
+      }}
 
 LABWARE REFERENCES:
 - The "description" field in LocationRef should contain the user's EXACT wording for the labware.

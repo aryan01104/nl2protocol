@@ -22,24 +22,35 @@ WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 # ============================================================================
 
 class Provenance(BaseModel):
-    """Tracks where a single extracted value came from.
+    """Per-value provenance: where a single extracted value came from.
 
-    source is the primary signal (categorical, verifiable by grounding checks).
-    confidence is secondary (rank-usable for UX routing, not absolute-calibrated).
+    Structured cite + reasoning, separated by which question is being answered:
+      - source == "instruction"           → cited_text required (verbatim quote)
+      - source in {"domain_default",      → reasoning required (explanation)
+                   "inferred"}
+
+    'config' is NOT a valid source for extractor-emitted Provenance —
+    the extractor LLM does not have access to the lab config. See ADR-0005.
     """
-    source: Literal["instruction", "config", "domain_default", "inferred"] = Field(..., description=(
+    source: Literal["instruction", "domain_default", "inferred"] = Field(..., description=(
         "Where this value came from. "
-        "'instruction' = user literally wrote it. "
-        "'config' = read from the lab config. "
-        "'domain_default' = standard practice for a named protocol. "
-        "'inferred' = reasoning or guess with no direct support."
+        "'instruction' = user literally wrote it (cited_text required). "
+        "'domain_default' = standard practice for a named protocol (reasoning required). "
+        "'inferred' = reasoning or guess with no direct support (reasoning required)."
     ))
-    reason: str = Field(..., description=(
-        "One sentence explaining why this value. "
-        "For 'instruction': cite the phrase from the text. "
-        "For 'config': cite the config key. "
+    cited_text: Optional[str] = Field(None, description=(
+        "The verbatim substring from the instruction text that grounds this value. "
+        "REQUIRED when source == 'instruction'. Must appear verbatim in the instruction "
+        "(case-insensitive, whitespace-normalized). For numbers, the cited substring "
+        "should contain the value (e.g., for value=100uL, cited_text might be "
+        "'100uL of buffer'). Leave null when source is 'domain_default' or 'inferred'."
+    ))
+    reasoning: Optional[str] = Field(None, description=(
+        "One sentence explaining how this value follows from domain knowledge or inference. "
+        "REQUIRED when source in {'domain_default', 'inferred'}. "
         "For 'domain_default': cite the protocol and standard practice. "
-        "For 'inferred': state the reasoning chain."
+        "For 'inferred': state the reasoning chain. "
+        "Leave null when source is 'instruction' (use cited_text instead)."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this value is correct. "
@@ -50,34 +61,101 @@ class Provenance(BaseModel):
         "Below 0.4 = not sure."
     ))
 
+    @model_validator(mode='after')
+    def require_appropriate_field_for_source(self) -> 'Provenance':
+        """Enforce: cited_text iff source == 'instruction'; reasoning iff source != 'instruction'.
+
+        Pre:    Pydantic-validated Provenance instance.
+
+        Post:   Raises ValueError if the source/cited_text/reasoning fields
+                are inconsistent. The two fields are mutually exclusive by
+                source: instruction-sourced values must cite a substring;
+                domain/inferred values must explain reasoning.
+
+        Raises: ValueError when the conditional invariant is violated.
+        """
+        if self.source == "instruction":
+            if not self.cited_text:
+                raise ValueError(
+                    "Provenance with source='instruction' requires cited_text "
+                    "(the verbatim substring from the instruction). "
+                    f"Got cited_text={self.cited_text!r}."
+                )
+            if self.reasoning:
+                raise ValueError(
+                    "Provenance with source='instruction' must NOT carry reasoning — "
+                    "the citation IS the justification. Move any explanation into a "
+                    "separate field or onto the parent CompositionProvenance."
+                )
+        else:  # domain_default or inferred
+            if not self.reasoning:
+                raise ValueError(
+                    f"Provenance with source='{self.source}' requires reasoning "
+                    "(an explanation of how the value follows from domain knowledge or inference). "
+                    f"Got reasoning={self.reasoning!r}."
+                )
+            if self.cited_text:
+                raise ValueError(
+                    f"Provenance with source='{self.source}' must NOT carry cited_text — "
+                    "non-instruction-sourced values cannot ground in user-quoted text."
+                )
+        return self
+
 
 class CompositionProvenance(BaseModel):
-    """Tracks why a step exists — what reasoning justifies linking its parameters together.
+    """Per-step provenance: answers TWO questions about why a step exists as a unit.
 
-    Unlike Provenance (single source for a single value), a step's existence
-    is a synthesis. Architectural invariant: every step MUST be grounded in
-    'instruction' — the LLM is permitted to interpret natural language and
-    expand named protocols via domain knowledge, but it is NOT permitted to
-    inject steps the user did not ask for. A step grounded only in
-    domain_default (without instruction grounding) would be a hallucination
-    — pre-validated against by the schema below.
+    Q1 (step existence): Why does a step of this kind exist at all?
+       Answered by: step_cited_text (the user phrase that triggered it)
+                  + optional step_reasoning (how a domain expansion produced this step type).
 
-    Note: 'config' is NOT a valid grounding source for extraction-stage steps
-    because the extractor LLM does not have access to the lab config. Config
-    is only visible to the labware-resolver and constraint-checker stages,
-    neither of which produces CompositionProvenance.
+    Q2 (parameter cohesion): Why do these specific parameter values belong to this same step?
+       Answered by: parameters_cited_texts (one or more user phrases grounding the values)
+                  + parameters_reasoning (how the cites combine into one operation).
+
+    Both questions must be answered. The split makes the provenance debuggable and
+    machine-renderable as visualization arrows (see HTML report Phase 3 + ADR-0005).
+
+    Architectural invariant: every step MUST be grounded in 'instruction'. The LLM
+    is permitted to interpret natural language and expand named protocols via domain
+    knowledge, but it is NOT permitted to inject steps the user did not ask for.
+
+    'config' is NOT a valid grounding source — the extractor LLM does not have
+    access to the lab config.
     """
-    justification: str = Field(..., description=(
-        "What reasoning connects these parameters into one step? "
-        "Cite the instruction phrase and (optionally) the domain knowledge "
-        "that justify this step's existence as a distinct action."
+    # Q1: Why this step exists
+    step_cited_text: str = Field(..., description=(
+        "The verbatim phrase from the instruction that triggered this kind of step "
+        "(e.g., 'Add 2uL of plasmid DNA' for a transfer step, or 'do a Bradford assay' "
+        "for a step expanded from a named protocol). MUST appear verbatim in the "
+        "instruction text."
     ))
+    step_reasoning: Optional[str] = Field(None, description=(
+        "Optional explanation of how the cited instruction phrase expanded into THIS "
+        "step type. Only used when grounding includes 'domain_default' — explains the "
+        "domain-knowledge step (e.g., 'Bradford workflow includes a 5-min incubation "
+        "between dye and absorbance read'). Leave null when the step is grounded "
+        "purely in instruction (the cite is sufficient)."
+    ))
+
+    # Q2: Why these specific parameter values cohere as one step
+    parameters_cited_texts: List[str] = Field(..., min_length=1, description=(
+        "One or more verbatim phrases from the instruction that ground the specific "
+        "parameter values for this step (volume + source + destination + substance + "
+        "duration etc.). Often a single phrase covers all parameters; for complex "
+        "steps, multiple phrases combine. Each must appear verbatim in the instruction."
+    ))
+    parameters_reasoning: str = Field(..., description=(
+        "One paragraph explaining how the parameters_cited_texts combine to fully "
+        "specify this step's parameters. For named-protocol expansions where some "
+        "parameter values come from domain defaults, explain which parts are user-stated "
+        "vs domain-defaulted."
+    ))
+
     grounding: List[Literal["instruction", "domain_default"]] = Field(..., description=(
-        "Which sources contributed to this step's existence. MUST include "
-        "'instruction' — every step traces back to something the user asked "
-        "for. May additionally include 'domain_default' when expanding a "
-        "named protocol (e.g., 'Bradford assay' → ['instruction', "
-        "'domain_default'] for steps the user implied via the named protocol)."
+        "Which sources contributed to this step's existence. MUST include 'instruction' "
+        "— every step traces back to something the user asked for. May additionally "
+        "include 'domain_default' when expanding a named protocol."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this step should exist. "
@@ -90,17 +168,10 @@ class CompositionProvenance(BaseModel):
     def require_instruction_grounding(self) -> 'CompositionProvenance':
         """Every step must trace back to user instruction.
 
-        Pre:    Pydantic-validated CompositionProvenance instance with
-                grounding ⊆ {'instruction', 'domain_default'} (Literal-enforced).
-
-        Post:   Raises ValueError if 'instruction' is not in self.grounding.
-                The schema invariant is: the LLM may interpret what the user
-                said, expand named protocols via domain knowledge, but MUST
-                NOT inject steps the user did not ask for. A step grounded
-                only in domain_default would violate this and is rejected
-                at parse time rather than silently inserted into the spec.
-
-        Raises: ValueError when grounding does not include 'instruction'.
+        Raises ValueError if 'instruction' is not in self.grounding. A step
+        grounded only in domain_default would be a step the LLM injected
+        without instruction backing — exactly the hallucination pattern
+        we removed Stage 8 for in ADR-0004.
         """
         if "instruction" not in self.grounding:
             raise ValueError(
@@ -109,6 +180,29 @@ class CompositionProvenance(BaseModel):
                 f"Got grounding={self.grounding}. If a step is purely domain "
                 f"knowledge with no instruction origin, it should not be added "
                 f"to the spec — surface it to the user instead."
+            )
+        return self
+
+    @model_validator(mode='after')
+    def require_step_reasoning_for_domain_expansion(self) -> 'CompositionProvenance':
+        """If the step's existence depends on domain knowledge, step_reasoning must explain why.
+
+        Pre:    Pydantic-validated CompositionProvenance with grounding populated.
+
+        Post:   When 'domain_default' is in grounding, step_reasoning is required
+                — the step exists because of domain knowledge expansion, and that
+                expansion must be explained. When grounding is just ['instruction'],
+                step_reasoning is optional (the cite is sufficient).
+
+        Raises: ValueError when domain_default is in grounding but step_reasoning
+                is missing.
+        """
+        if "domain_default" in self.grounding and not self.step_reasoning:
+            raise ValueError(
+                "composition_provenance.step_reasoning is required when "
+                "grounding includes 'domain_default' — explain how the cited "
+                "instruction phrase expanded into this step via domain knowledge. "
+                f"Got step_reasoning={self.step_reasoning!r}."
             )
         return self
 

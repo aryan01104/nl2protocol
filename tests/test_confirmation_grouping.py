@@ -25,12 +25,16 @@ from nl2protocol.extraction import (
 # ============================================================================
 
 def _prov():
-    return Provenance(source="instruction", reason="t", confidence=1.0)
+    return Provenance(source="instruction", cited_text="t", confidence=1.0)
 
 
 def _comp():
     return CompositionProvenance(
-        justification="t", grounding=["instruction"], confidence=1.0,
+        step_cited_text="t",
+        parameters_cited_texts=["t"],
+        parameters_reasoning="t",
+        grounding=["instruction"],
+        confidence=1.0,
     )
 
 

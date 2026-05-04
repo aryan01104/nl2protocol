@@ -753,34 +753,36 @@ class ProtocolAgent:
             if not step:
                 continue
 
+            from nl2protocol.models.spec import Provenance
+            # User-edited values are no longer "from instruction" — they're inferred
+            # via user interaction. Replace the provenance with one that satisfies
+            # the new schema invariants (cited_text iff source=='instruction', etc.).
+            user_edit_prov = Provenance(
+                source="inferred",
+                reasoning="User-edited during confirmation",
+                confidence=1.0,
+            )
+
             field = w['field']
             if field == "volume" and step.volume:
                 try:
                     step.volume.value = float(new_val)
-                    step.volume.provenance.source = "instruction"
-                    step.volume.provenance.confidence = 1.0
-                    step.volume.provenance.reason = "User-edited during confirmation"
+                    step.volume.provenance = user_edit_prov
                 except ValueError:
                     pass
             elif field == "substance" and step.substance:
                 step.substance.value = new_val
-                step.substance.provenance.source = "instruction"
-                step.substance.provenance.confidence = 1.0
-                step.substance.provenance.reason = "User-edited during confirmation"
+                step.substance.provenance = user_edit_prov
             elif field == "duration" and step.duration:
                 try:
                     step.duration.value = float(new_val)
-                    step.duration.provenance.source = "instruction"
-                    step.duration.provenance.confidence = 1.0
-                    step.duration.provenance.reason = "User-edited during confirmation"
+                    step.duration.provenance = user_edit_prov
                 except ValueError:
                     pass
             elif field == "temperature" and step.temperature:
                 try:
                     step.temperature.value = float(new_val)
-                    step.temperature.provenance.source = "instruction"
-                    step.temperature.provenance.confidence = 1.0
-                    step.temperature.provenance.reason = "User-edited during confirmation"
+                    step.temperature.provenance = user_edit_prov
                 except ValueError:
                     pass
             elif field == "composition":
@@ -792,9 +794,7 @@ class ProtocolAgent:
                     if field.startswith(pa.action) and "volume" in field and pa.volume:
                         try:
                             pa.volume.value = float(new_val)
-                            pa.volume.provenance.source = "instruction"
-                            pa.volume.provenance.confidence = 1.0
-                            pa.volume.provenance.reason = "User-edited during confirmation"
+                            pa.volume.provenance = user_edit_prov
                         except ValueError:
                             pass
 

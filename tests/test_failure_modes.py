@@ -57,18 +57,27 @@ def make_spec(steps, **kwargs):
     return ProtocolSpec(steps=steps, **defaults)
 
 
-def _prov(source="instruction", reason="test", confidence=1.0):
-    """Shorthand for test provenance."""
-    return Provenance(source=source, reason=reason, confidence=confidence)
+def _prov(source="instruction", text="test cited text", confidence=1.0):
+    """Shorthand for test provenance. `text` becomes cited_text for instruction-sourced,
+    reasoning for non-instruction-sourced."""
+    if source == "instruction":
+        return Provenance(source=source, cited_text=text, confidence=confidence)
+    return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
-def _comp(grounding=None, justification="test step", confidence=1.0):
+def _comp(grounding=None, label="test step", confidence=1.0):
     """Shorthand for test composition provenance."""
-    return CompositionProvenance(
-        justification=justification,
-        grounding=grounding or ["instruction"],
+    grounding = grounding or ["instruction"]
+    kwargs = dict(
+        step_cited_text=label,
+        parameters_cited_texts=[label],
+        parameters_reasoning=label,
+        grounding=grounding,
         confidence=confidence,
     )
+    if "domain_default" in grounding:
+        kwargs["step_reasoning"] = "test domain expansion reasoning"
+    return CompositionProvenance(**kwargs)
 
 
 def _vol(value, unit="uL", exact=True, source="instruction"):

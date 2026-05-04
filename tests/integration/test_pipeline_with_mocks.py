@@ -78,23 +78,25 @@ def _spec_simple_transfer(volume_uL: float = 100.0):
                 "order": 1,
                 "action": "transfer",
                 "composition_provenance": {
-                    "justification": "user said transfer",
+                    "step_cited_text": "transfer 100uL from A1 to B1",
+                    "parameters_cited_texts": ["transfer 100uL from A1 to B1"],
+                    "parameters_reasoning": "user phrase fully specifies the transfer parameters",
                     "grounding": ["instruction"],
                     "confidence": 1.0,
                 },
                 "volume": {
                     "value": volume_uL, "unit": "uL", "exact": True,
-                    "provenance": {"source": "instruction", "reason": "stated", "confidence": 1.0},
+                    "provenance": {"source": "instruction", "cited_text": "100uL", "confidence": 1.0},
                 },
                 "source": {
                     "description": "source_plate", "well": "A1",
                     "resolved_label": "source_plate",
-                    "provenance": {"source": "instruction", "reason": "stated", "confidence": 1.0},
+                    "provenance": {"source": "instruction", "cited_text": "from A1", "confidence": 1.0},
                 },
                 "destination": {
                     "description": "dest_plate", "well": "B1",
                     "resolved_label": "dest_plate",
-                    "provenance": {"source": "instruction", "reason": "stated", "confidence": 1.0},
+                    "provenance": {"source": "instruction", "cited_text": "to B1", "confidence": 1.0},
                 },
             }
         ],
@@ -106,13 +108,15 @@ def _spec_multi_step():
     base_step = lambda order, action, **extras: {
         "order": order, "action": action,
         "composition_provenance": {
-            "justification": "test step",
+            "step_cited_text": "test step phrase",
+            "parameters_cited_texts": ["test step phrase"],
+            "parameters_reasoning": "test reasoning ties cite to parameters",
             "grounding": ["instruction"],
             "confidence": 1.0,
         },
         **extras,
     }
-    prov = {"source": "instruction", "reason": "stated", "confidence": 1.0}
+    prov = {"source": "instruction", "cited_text": "test step phrase", "confidence": 1.0}
     transfer_extras = lambda src, dst: {
         "volume": {"value": 50.0, "unit": "uL", "exact": True, "provenance": prov},
         "source": {"description": "source_plate", "well": src, "resolved_label": "source_plate", "provenance": prov},

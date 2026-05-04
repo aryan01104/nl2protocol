@@ -30,12 +30,16 @@ def config():
 
 
 def _prov():
-    return Provenance(source="instruction", reason="test", confidence=1.0)
+    return Provenance(source="instruction", cited_text="test cited text", confidence=1.0)
 
 
 def _comp():
     return CompositionProvenance(
-        justification="test step", grounding=["instruction"], confidence=1.0,
+        step_cited_text="test step",
+        parameters_cited_texts=["test step"],
+        parameters_reasoning="test step",
+        grounding=["instruction"],
+        confidence=1.0,
     )
 
 

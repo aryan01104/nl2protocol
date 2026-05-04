@@ -78,23 +78,30 @@ def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     if field_name in field_map:
         val = field_map[field_name]
         if val and hasattr(val, 'provenance') and val.provenance:
-            return val.provenance.reason
+            return _provenance_text(val.provenance)
         if field_name == "composition":
-            return step.composition_provenance.justification
+            return step.composition_provenance.step_cited_text
         return None
 
     # Location refs: "source location", "source labware", "source wells", etc.
     for prefix, ref in [("source", step.source), ("destination", step.destination), ("dest", step.destination)]:
         if field_name.startswith(prefix) and ref and ref.provenance:
-            return ref.provenance.reason
+            return _provenance_text(ref.provenance)
 
     # Post-action fields: "mix volume", "blow_out volume", etc.
     if step.post_actions:
         for pa in step.post_actions:
             if field_name.startswith(pa.action) and pa.volume and pa.volume.provenance:
-                return pa.volume.provenance.reason
+                return _provenance_text(pa.volume.provenance)
 
     return None
+
+
+def _provenance_text(prov) -> str:
+    """Return the human-readable explanation for a Provenance, picking the
+    field populated by the new schema: cited_text for instruction-sourced,
+    reasoning for domain_default/inferred-sourced. See ADR-0005."""
+    return prov.cited_text or prov.reasoning or ""
 
 
 # ============================================================================
@@ -804,7 +811,10 @@ Output the corrected specification.
                 grounding = ",".join(comp.grounding) if comp.grounding else "inferred"
                 lines.append(f"    {step_line}")
                 lines.append(f"       composition: [{grounding.upper()}, {comp.confidence}]")
-                lines.append(f"         \"{comp.justification}\"")
+                lines.append(f"         step trigger: \"{comp.step_cited_text}\"")
+                if comp.step_reasoning:
+                    lines.append(f"         step reasoning: {comp.step_reasoning}")
+                lines.append(f"         parameters: {comp.parameters_reasoning}")
 
                 # Per-field provenance
                 fields = []

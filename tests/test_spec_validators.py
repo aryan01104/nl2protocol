@@ -19,16 +19,24 @@ from nl2protocol.models.spec import (
 # HELPERS
 # ============================================================================
 
-def _prov(source="instruction", reason="test", confidence=1.0):
-    return Provenance(source=source, reason=reason, confidence=confidence)
+def _prov(source="instruction", text="test cited text", confidence=1.0):
+    if source == "instruction":
+        return Provenance(source=source, cited_text=text, confidence=confidence)
+    return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
-def _comp(grounding=None, justification="test step", confidence=1.0):
-    return CompositionProvenance(
-        justification=justification,
-        grounding=grounding or ["instruction"],
+def _comp(grounding=None, label="test step", confidence=1.0):
+    grounding = grounding or ["instruction"]
+    kwargs = dict(
+        step_cited_text=label,
+        parameters_cited_texts=[label],
+        parameters_reasoning=label,
+        grounding=grounding,
         confidence=confidence,
     )
+    if "domain_default" in grounding:
+        kwargs["step_reasoning"] = "test domain expansion reasoning"
+    return CompositionProvenance(**kwargs)
 
 
 def _vol(value, unit="uL"):
@@ -61,21 +69,28 @@ class TestCompositionProvenanceGroundingInvariant:
     steps that have no instruction origin.
     """
 
+    # Common kwargs to keep test signal focused on the grounding invariant.
+    # Each test below overrides only `grounding` (or other) to exercise the
+    # specific clause being tested.
+    _DEFAULT_KWARGS = dict(
+        step_cited_text="user said this",
+        parameters_cited_texts=["user said this with these parameters"],
+        parameters_reasoning="ties the cite to the parameter values",
+        confidence=1.0,
+    )
+
     # Post: grounding=['instruction'] alone is valid
     def test_instruction_alone_is_valid(self):
-        cp = CompositionProvenance(
-            justification="user explicitly described this step",
-            grounding=["instruction"],
-            confidence=1.0,
-        )
+        cp = CompositionProvenance(**self._DEFAULT_KWARGS, grounding=["instruction"])
         assert cp.grounding == ["instruction"]
 
-    # Post: grounding=['instruction', 'domain_default'] is valid (compound)
+    # Post: grounding=['instruction', 'domain_default'] is valid (compound) — but
+    # requires step_reasoning when domain_default is in grounding.
     def test_instruction_plus_domain_default_is_valid(self):
         cp = CompositionProvenance(
-            justification="step expanded from named protocol",
+            **self._DEFAULT_KWARGS,
             grounding=["instruction", "domain_default"],
-            confidence=0.8,
+            step_reasoning="explains how the cited instruction expanded via domain knowledge",
         )
         assert "instruction" in cp.grounding
         assert "domain_default" in cp.grounding
@@ -84,28 +99,20 @@ class TestCompositionProvenanceGroundingInvariant:
     def test_domain_default_alone_is_rejected(self):
         with pytest.raises(ValidationError, match="must include 'instruction'"):
             CompositionProvenance(
-                justification="LLM added this from domain knowledge",
+                **self._DEFAULT_KWARGS,
                 grounding=["domain_default"],
-                confidence=0.5,
+                step_reasoning="LLM added this from domain knowledge",
             )
 
     # Post: grounding=[] is rejected by the Literal/min_length constraint anyway
     def test_empty_grounding_is_rejected(self):
         with pytest.raises(ValidationError):
-            CompositionProvenance(
-                justification="orphan",
-                grounding=[],
-                confidence=0.5,
-            )
+            CompositionProvenance(**self._DEFAULT_KWARGS, grounding=[])
 
     # Post: grounding=['config'] is rejected — 'config' is no longer a valid Literal
     def test_config_grounding_is_rejected(self):
         with pytest.raises(ValidationError):
-            CompositionProvenance(
-                justification="step from lab config",
-                grounding=["config"],
-                confidence=1.0,
-            )
+            CompositionProvenance(**self._DEFAULT_KWARGS, grounding=["config"])
 
 
 # ============================================================================
