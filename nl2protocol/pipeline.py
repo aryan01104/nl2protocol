@@ -384,7 +384,8 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json",
-                 confirmation_manager=None):
+                 confirmation_manager=None,
+                 reporter=None):
         """
         Args:
             config_path: path to lab_config.json
@@ -393,11 +394,17 @@ class ProtocolAgent:
                 preserves the existing CLI behavior. Tests and evals can pass
                 ScriptedCM(answers) or AutoConfirmCM() to drive the pipeline
                 non-interactively.
+            reporter: optional Reporter (see nl2protocol.reporting). Defaults
+                to ConsoleReporter, which preserves the existing CLI banners.
+                Tests pass CapturingReporter to inspect the structured event
+                stream without I/O. Future HTML/TUI sinks plug in here.
         """
         from nl2protocol.confirmation import InteractiveCM
+        from nl2protocol.reporting import ConsoleReporter
         self.config_path = config_path
         self.config_loader = ConfigLoader(config_path=config_path)
         self.cm = confirmation_manager or InteractiveCM()
+        self.reporter = reporter or ConsoleReporter()
 
     @staticmethod
     def _summarize_well_list(wells: list) -> str:
@@ -815,6 +822,14 @@ class ProtocolAgent:
         """
         from datetime import datetime
         from .extraction import SemanticExtractor
+        from .reporting import StageEvent
+
+        # Emit raw instruction event for downstream reporters (HTMLReporter etc.)
+        self.reporter.emit(StageEvent(
+            kind="raw_instruction",
+            data={"instruction": prompt},
+            stage_name="input",
+        ))
 
         # DEV ONLY — remove before public release.
         # Intermediate state log: accumulates spec snapshots throughout the
@@ -880,6 +895,14 @@ class ProtocolAgent:
             model_name=self.config_loader.model_name
         )
         spec = extractor.extract(prompt, self.config_loader.config)
+
+        if spec is not None:
+            # Emit extracted spec event for downstream reporters.
+            self.reporter.emit(StageEvent(
+                kind="extracted_spec",
+                data={"spec": spec},
+                stage_name="stage_2_extraction",
+            ))
 
         if spec is None:
             _log("\n  Could not extract a protocol from your instruction.")
@@ -1128,6 +1151,12 @@ class ProtocolAgent:
         try:
             from .extraction import CompleteProtocolSpec
             complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
+            # Emit completed spec event for downstream reporters.
+            self.reporter.emit(StageEvent(
+                kind="completed_spec",
+                data={"spec": complete_spec},
+                stage_name="stage_5_spec",
+            ))
             protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
                 complete_spec, self.config_loader.config)
             _log(f"  {C.dim('Schema generated.')}")
@@ -1148,6 +1177,12 @@ class ProtocolAgent:
         try:
             script = generate_python_script(protocol_schema)
             _log(f"  {C.dim('Script generated.')}")
+            # Emit generated script event for downstream reporters.
+            self.reporter.emit(StageEvent(
+                kind="generated_script",
+                data={"script": script},
+                stage_name="stage_6_script",
+            ))
         except ValueError as e:
             err = str(e)
             _log(f"  Script generation failed.")
@@ -1190,6 +1225,9 @@ class ProtocolAgent:
         # while the intent verifier had a ~95% false-positive rate that eroded
         # user trust. See docs/adr/0004-remove-intent-verifier.md.)
         _save_state_log()
+        # Flush buffered events for any reporter that batches (HTMLReporter etc.).
+        # ConsoleReporter (default) is a no-op here.
+        self.reporter.finalize()
         return PipelineResult(
             script=script,
             simulation_log=simulation_log,
