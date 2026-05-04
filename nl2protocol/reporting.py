@@ -158,27 +158,35 @@ _PROV_CLASS = {
 def _render_provenanced_value(value: Any, prov, label: str = "") -> str:
     """Wrap a provenanced value in an HTML span colored by its source.
 
-    `prov` is a Provenance dataclass (has .source, .reason, .confidence).
-    The `title` attribute (HTML hover tooltip) shows the reason + confidence.
+    Per ADR-0005, `prov` carries either cited_text (when source='instruction')
+    or reasoning (when source in domain_default/inferred). The hover tooltip
+    surfaces whichever field is populated.
     """
     import html
     source = getattr(prov, "source", "inferred")
-    reason = getattr(prov, "reason", "")
+    cited_text = getattr(prov, "cited_text", None)
+    reasoning = getattr(prov, "reasoning", None)
     confidence = getattr(prov, "confidence", 0.0)
     css_class = _PROV_CLASS.get(source, "prov-inferred")
-    tooltip = f"{source} (confidence {confidence:.0%}): {reason}"
+    explanation = cited_text or reasoning or ""
+    tooltip = f"{source} (confidence {confidence:.0%}): {explanation}"
     rendered_value = html.escape(str(value))
     rendered_tooltip = html.escape(tooltip, quote=True)
     return f'<span class="{css_class}" title="{rendered_tooltip}">{rendered_value}</span>'
 
 
-def _step_class(grounding: List[str], is_orphan: bool) -> str:
-    """CSS class for a step block based on its CompositionProvenance grounding."""
-    if is_orphan:
-        return "step-orphan"
-    if "instruction" in grounding and len(grounding) == 1:
-        return "step-grounded-instruction"
-    return "step-grounded-mixed"
+def _step_class(grounding: List[str]) -> str:
+    """CSS class for a step block based on its CompositionProvenance grounding.
+
+    Per ADR-0005's "instruction" invariant, every step has instruction
+    grounding — orphan steps are rejected at parse time, so step-orphan
+    is no longer a possible state. Compound grounding (instruction +
+    domain_default) renders as 'mixed' to surface the domain-knowledge
+    expansion in the visualization.
+    """
+    if "domain_default" in grounding:
+        return "step-grounded-mixed"
+    return "step-grounded-instruction"
 
 
 def _step_to_render_dict(step) -> dict:
@@ -189,14 +197,14 @@ def _step_to_render_dict(step) -> dict:
     lines that the template iterates over.
 
     A step is considered "orphan" (no instruction origin) when its
-    composition_provenance.grounding does NOT include "instruction" —
-    e.g. grounding=["domain_default"] alone means the LLM added this step
-    purely from domain knowledge. In Phase 3 these steps will get no
-    composite arrow back to the instruction column.
+    composition_provenance carries the new ADR-0005 schema:
+    step_cited_text + parameters_cited_texts + parameters_reasoning,
+    plus optional step_reasoning when grounding includes 'domain_default'.
+    Orphan steps are no longer possible — the schema invariant rejects
+    them at parse time.
     """
     comp = step.composition_provenance
     grounding = list(getattr(comp, "grounding", []))
-    is_orphan = "instruction" not in grounding
 
     detail_lines = []
 
@@ -263,10 +271,15 @@ def _step_to_render_dict(step) -> dict:
     return {
         "order": step.order,
         "action": step.action,
-        "justification": comp.justification,
+        # Q1 (step existence): the verbatim phrase that triggered this step kind
+        "step_cited_text": comp.step_cited_text,
+        "step_reasoning": comp.step_reasoning,         # only set when grounding has domain_default
+        # Q2 (parameter cohesion): how the values fit together as one step
+        "parameters_cited_texts": list(comp.parameters_cited_texts),
+        "parameters_reasoning": comp.parameters_reasoning,
         "confidence": f"{comp.confidence:.0%}",
-        "step_class": _step_class(grounding, is_orphan),
-        "is_orphan": is_orphan,
+        "step_class": _step_class(grounding),
+        "grounding": grounding,
         "detail_lines": detail_lines,
     }
 

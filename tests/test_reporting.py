@@ -162,13 +162,15 @@ class TestHTMLReporterRendering:
 
     def _build_minimal_spec(self):
         """Construct a minimal ProtocolSpec with one transfer step.
-        All values carry instruction-source provenance."""
+        All values carry instruction-source provenance per ADR-0005:
+        cited_text required for instruction-sourced; structured Q1+Q2
+        composite provenance."""
         from nl2protocol.models.spec import (
             CompositionProvenance, ExtractedStep, LocationRef, Provenance,
             ProtocolSpec, ProvenancedVolume,
         )
 
-        prov = Provenance(source="instruction", reason="user said so", confidence=1.0)
+        prov = Provenance(source="instruction", cited_text="user said so", confidence=1.0)
         step = ExtractedStep(
             order=1,
             action="transfer",
@@ -176,7 +178,9 @@ class TestHTMLReporterRendering:
             source=LocationRef(description="source_plate", well="A1", provenance=prov),
             destination=LocationRef(description="dest_plate", well="B1", provenance=prov),
             composition_provenance=CompositionProvenance(
-                justification="user explicitly requested transfer",
+                step_cited_text="user explicitly requested transfer",
+                parameters_cited_texts=["user explicitly requested transfer"],
+                parameters_reasoning="single user phrase grounds all transfer parameters",
                 grounding=["instruction"],
                 confidence=1.0,
             ),
@@ -211,10 +215,12 @@ class TestHTMLReporterRendering:
         # Spec column has the step with prov-instruction color class on the volume.
         assert "prov-instruction" in content
         assert "100.0 uL" in content
-        # Step header shows the LLM's justification.
+        # Step header shows the new Q1 cite (step_cited_text).
         assert "user explicitly requested transfer" in content
         # Step block carries the grounded-instruction CSS class.
         assert "step-grounded-instruction" in content
+        # Q2 (parameters_reasoning) appears in the cohesion section.
+        assert "single user phrase grounds all transfer parameters" in content
 
     def test_renders_generated_script(self, tmp_path):
         out = tmp_path / "report.html"
@@ -228,24 +234,28 @@ class TestHTMLReporterRendering:
         assert "def run(protocol):" in content
         assert "pipette.transfer" in content
 
-    def test_orphan_step_renders_with_warning(self, tmp_path):
-        """A step whose grounding does NOT include 'instruction' is an
-        'orphan' — it has no instruction origin (LLM added it from domain
-        knowledge or config alone). Should render with the orphan CSS
-        class + warning text."""
+    def test_compound_grounding_renders_with_mixed_class(self, tmp_path):
+        """A step with grounding=['instruction', 'domain_default'] (a domain-
+        expanded named protocol step) renders with the 'mixed' CSS class +
+        the step_reasoning explanation surfaces in the header. Note: orphan
+        steps (grounding without 'instruction') are no longer possible —
+        rejected at parse time per ADR-0005's invariant."""
         from nl2protocol.models.spec import (
             CompositionProvenance, ExtractedStep, ProtocolSpec,
         )
         step = ExtractedStep(
             order=1,
-            action="comment",
+            action="delay",
             composition_provenance=CompositionProvenance(
-                justification="LLM added this step from standard Bradford workflow",
-                grounding=["domain_default"],   # no "instruction" → orphan
-                confidence=0.5,
+                step_cited_text="do a Bradford assay",
+                step_reasoning="Bradford workflow includes a 5-min incubation between dye and read",
+                parameters_cited_texts=["do a Bradford assay"],
+                parameters_reasoning="5-min duration is the canonical Bradford incubation per Bio-Rad",
+                grounding=["instruction", "domain_default"],
+                confidence=0.8,
             ),
         )
-        spec = ProtocolSpec(summary="orphan test", steps=[step])
+        spec = ProtocolSpec(summary="compound grounding test", steps=[step])
 
         out = tmp_path / "report.html"
         r = HTMLReporter(str(out))
@@ -253,8 +263,26 @@ class TestHTMLReporterRendering:
         r.finalize()
         content = out.read_text()
 
-        assert "step-orphan" in content
-        assert "no instruction origin" in content
+        # Compound-grounded steps render with the 'mixed' class.
+        assert "step-grounded-mixed" in content
+        # The step_cited_text (Q1 cite) appears as the trigger.
+        assert "do a Bradford assay" in content
+        # The step_reasoning (Q1 explanation) appears for domain expansions.
+        assert "Bradford workflow includes a 5-min incubation" in content
+
+    def test_orphan_steps_are_impossible_per_schema_invariant(self):
+        """Per ADR-0005 the schema rejects steps without instruction grounding
+        at parse time. This is no longer a runtime concern for the renderer —
+        document the invariant via a Pydantic-validation assertion."""
+        from nl2protocol.models.spec import CompositionProvenance
+        with pytest.raises(Exception, match="instruction"):
+            CompositionProvenance(
+                step_cited_text="orphan",
+                parameters_cited_texts=["orphan"],
+                parameters_reasoning="no instruction backing",
+                grounding=["domain_default"],   # rejected
+                confidence=0.5,
+            )
 
     def test_status_reflects_pipeline_completion(self, tmp_path):
         """If a generated_script event was captured, status = success.

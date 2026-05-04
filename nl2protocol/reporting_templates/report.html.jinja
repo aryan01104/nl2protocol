@@ -116,12 +116,16 @@
     color: #333;
   }
   .step-detail .label { color: var(--dim); margin-right: 4px; }
-  .step-orphan-warning {
-    margin-top: 6px;
+  .step-cohesion {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--grid);
+    color: var(--dim);
     font-size: 11px;
-    color: var(--col-inferred);
-    font-weight: 500;
+    line-height: 1.4;
+    cursor: help;
   }
+  .step-cohesion em { color: var(--ink); font-style: italic; }
 
   /* ───────── Code column ───────── */
   pre.code {
@@ -176,16 +180,20 @@
     {% if spec_steps %}
       {% for step in spec_steps %}
         <div class="step {{ step.step_class }}">
-          <div class="step-header" title="{{ step.justification|e }} (confidence {{ step.confidence }})">
-            {% if step.is_orphan %}⚠ {% endif %}{{ step.justification }}
+          <div class="step-header"
+               title="Q1: step triggered by &quot;{{ step.step_cited_text|e }}&quot;{% if step.step_reasoning %}; expanded via domain knowledge: {{ step.step_reasoning|e }}{% endif %} (confidence {{ step.confidence }})">
+            triggered by: <em>"{{ step.step_cited_text }}"</em>
+            {% if step.step_reasoning %}<br><small>↳ domain expansion: {{ step.step_reasoning }}</small>{% endif %}
           </div>
           <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
           {% for line in step.detail_lines %}
             <div class="step-detail">{{ line|safe }}</div>
           {% endfor %}
-          {% if step.is_orphan %}
-            <div class="step-orphan-warning">⚠ no instruction origin — review (LLM inference only)</div>
-          {% endif %}
+          <div class="step-cohesion" title="Q2: how the parameters cohere as one step">
+            <small><em>parameters from:</em>
+            {% for cite in step.parameters_cited_texts %}"{{ cite }}"{% if not loop.last %}, {% endif %}{% endfor %}
+            — {{ step.parameters_reasoning }}</small>
+          </div>
         </div>
       {% endfor %}
     {% else %}
