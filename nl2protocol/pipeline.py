@@ -385,8 +385,7 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json",
                  confirmation_manager=None,
-                 reporter=None,
-                 use_gap_resolver: bool = False):
+                 reporter=None):
         """
         Args:
             config_path: path to lab_config.json
@@ -399,12 +398,6 @@ class ProtocolAgent:
                 to ConsoleReporter, which preserves the existing CLI banners.
                 Tests pass CapturingReporter to inspect the structured event
                 stream without I/O. Future HTML/TUI sinks plug in here.
-            use_gap_resolver: experimental flag (ADR-0008 PR2). When True,
-                the post-extraction stage 3 logic (verify/fill/refine/confirm)
-                is replaced with the unified gap-resolution orchestrator.
-                Default False — existing pipeline behavior is unchanged.
-                The new path is opt-in until validated against the existing
-                one in real runs (PR3 flips the default).
         """
         from nl2protocol.confirmation import InteractiveCM
         from nl2protocol.reporting import ConsoleReporter
@@ -412,81 +405,6 @@ class ProtocolAgent:
         self.config_loader = ConfigLoader(config_path=config_path)
         self.cm = confirmation_manager or InteractiveCM()
         self.reporter = reporter or ConsoleReporter()
-        self.use_gap_resolver = use_gap_resolver
-
-    @staticmethod
-    def _summarize_well_list(wells: list) -> str:
-        """Compact display string for a list of wells.
-
-        Returns 'A1-H3' when wells form a contiguous rectangular block,
-        else 'A1, A2, A3, … (N wells)' for irregular sets.
-        Single-well lists return just the well name.
-        """
-        if not wells:
-            return ""
-        if len(wells) == 1:
-            return wells[0]
-
-        # Try rectangular block: rows x cols where rows are contiguous letters
-        # and cols are contiguous integers and every (r, c) is present.
-        try:
-            rows = sorted({w[0] for w in wells})
-            cols = sorted({int(w[1:]) for w in wells})
-            row_codes = [ord(r) for r in rows]
-            cols_contig = cols == list(range(cols[0], cols[-1] + 1))
-            rows_contig = row_codes == list(range(row_codes[0], row_codes[-1] + 1))
-            full = len(wells) == len(rows) * len(cols)
-            present = {(w[0], int(w[1:])) for w in wells}
-            covers = all((r, c) in present for r in rows for c in cols)
-            if cols_contig and rows_contig and full and covers:
-                return f"{rows[0]}{cols[0]}-{rows[-1]}{cols[-1]}"
-        except (ValueError, IndexError):
-            pass
-
-        head = ", ".join(wells[:3])
-        return f"{head}, … ({len(wells)} wells)"
-
-    @staticmethod
-    def _build_initial_volume_queue(spec, config) -> list:
-        """Build the confirmation queue for WellContents entries with null
-        volume_ul. Groups entries that share (labware, substance) into
-        single grouped prompts.
-
-        Returns a list of confirmable dicts:
-          {type: 'initial_volume',       labware, well,  substance, default_volume}     -- single
-          {type: 'initial_volume_group', labware, wells, substance, default_volume}     -- group
-        """
-        from .validation.constraints import WellStateTracker
-
-        # Bucket null-volume entries by (labware, substance).
-        buckets = {}
-        for ic in spec.initial_contents:
-            if ic.volume_ul is not None:
-                continue
-            key = (ic.labware, ic.substance)
-            buckets.setdefault(key, []).append(ic.well)
-
-        queue = []
-        for (labware, substance), wells in buckets.items():
-            fallback = WellStateTracker._get_well_capacity_static(
-                labware, config) or 15000.0
-            if len(wells) == 1:
-                queue.append({
-                    "type": "initial_volume",
-                    "labware": labware,
-                    "well": wells[0],
-                    "substance": substance,
-                    "default_volume": fallback,
-                })
-            else:
-                queue.append({
-                    "type": "initial_volume_group",
-                    "labware": labware,
-                    "wells": wells,
-                    "substance": substance,
-                    "default_volume": fallback,
-                })
-        return queue
 
     @staticmethod
     def _infer_source_containers(spec) -> list:
@@ -646,168 +564,6 @@ class ProtocolAgent:
             else:
                 _log(f"  Invalid input. Pick a number, Enter, or q.")
 
-    def _confirm_provenance_items(self, spec, confirmable: list) -> Optional[bool]:
-        """Interactive per-item confirmation for uncertain provenance claims.
-
-        For each item in the confirmation queue, the user can:
-          - Accept (Enter/y) — keep the value as-is
-          - Reject (n) — abort the pipeline
-          - Edit (e) — type a replacement value
-
-        Returns True if all items accepted/edited, None if aborted.
-        """
-        from .extraction import _find_provenance_reason
-
-        _log(f"\n  {C.label('Confirm uncertain values:')}")
-        _log(f"  For each item: (Enter) accept, (e) edit, (s) skip all and accept, (q) quit\n")
-
-        edits = []
-        for i, w in enumerate(confirmable, 1):
-            # --- Initial volume items (null volume_ul in initial_contents) ---
-            if w.get("type") in ("initial_volume", "initial_volume_group"):
-                default = w["default_volume"]
-                is_group = w["type"] == "initial_volume_group"
-                # Build display: single well or grouped wells.
-                if is_group:
-                    well_str = self._summarize_well_list(w["wells"])
-                    count = len(w["wells"])
-                    target_wells = set(w["wells"])
-                    location_desc = f"{w['labware']} {well_str} ({count} wells)"
-                    apply_note = f" (applied to all {count} wells)"
-                else:
-                    target_wells = {w["well"]}
-                    location_desc = f"{w['labware']} {w['well']}"
-                    apply_note = ""
-
-                _log(f"  [{i}/{len(confirmable)}] Initial contents: "
-                     f"{location_desc}, \"{w['substance']}\" — "
-                     f"no volume stated")
-                _log(f"    1) Enter volume{apply_note}")
-                _log(f"    2) Accept default ({default:.0f}uL, well capacity)")
-                _log(f"    3) Exit (edit instruction and run again)")
-
-                response = self.cm.prompt("Pick 1-3: ").strip()
-                if response == '3':
-                    return None
-                elif response == '1':
-                    new_val = self.cm.prompt(f"Volume in uL: ").strip()
-                    if new_val:
-                        try:
-                            vol = float(new_val)
-                            # Write back to every WellContents entry covered.
-                            for ic in spec.initial_contents:
-                                if ic.labware == w['labware'] and ic.well in target_wells:
-                                    ic.volume_ul = vol
-                            _log(f"    → {C.success(f'{vol}uL')}{apply_note}")
-                        except ValueError:
-                            _log(f"    Invalid number, using default ({default:.0f}uL).")
-                    else:
-                        _log(f"    Empty input, using default ({default:.0f}uL).")
-                else:
-                    # '2', Enter, or anything else → accept default
-                    pass
-                continue
-
-            # --- Standard provenance items ---
-            step_obj = next((s for s in spec.steps if s.order == w['step']), None)
-            reason = _find_provenance_reason(step_obj, w['field']) if step_obj else None
-
-            # Describe step by action + substance
-            if step_obj:
-                action = step_obj.action.upper()
-                substance = f" ({step_obj.substance.value})" if step_obj.substance else ""
-                step_desc = f"Step {w['step']} {action}{substance}"
-            else:
-                step_desc = f"Step {w['step']}"
-
-            _log(f"  [{i}/{len(confirmable)}] {step_desc}, {w['field']}: "
-                 f"{C.warning(w['value'])}")
-            if reason:
-                _log(f"    Inferred: {reason}")
-
-            response = self.cm.prompt("Enter=accept, e=edit, s=accept all, q=quit: ").lower()
-
-            if response == 'q':
-                return None
-            elif response == 's':
-                _log(f"  {C.dim('Accepting all remaining items.')}")
-                break
-            elif response == 'e':
-                new_val = self.cm.prompt(f"New value for {w['field']}: ")
-                if new_val:
-                    edits.append((w, new_val))
-                    _log(f"    → {C.success(new_val)}")
-                else:
-                    _log(f"    Empty input, keeping original.")
-            elif response in ('', 'y', 'yes'):
-                pass  # accepted
-            else:
-                _log(f"    Unknown input, treating as accept.")
-
-        # Apply edits to spec
-        if edits:
-            spec = self._apply_provenance_edits(spec, edits)
-            _log(f"\n  {len(edits)} value(s) edited.")
-
-        return True
-
-    def _apply_provenance_edits(self, spec, edits: list):
-        """Apply user edits from the provenance confirmation flow.
-
-        Each edit is (warning_dict, new_value_str). Modifies spec in place.
-        """
-        for w, new_val in edits:
-            step = next((s for s in spec.steps if s.order == w['step']), None)
-            if not step:
-                continue
-
-            from nl2protocol.models.spec import Provenance
-            # User-edited values are no longer "from instruction" — they're inferred
-            # via user interaction. Replace the provenance with one that satisfies
-            # the new schema invariants (cited_text iff source=='instruction', etc.).
-            user_edit_prov = Provenance(
-                source="inferred",
-                reasoning="User-edited during confirmation",
-                confidence=1.0,
-            )
-
-            field = w['field']
-            if field == "volume" and step.volume:
-                try:
-                    step.volume.value = float(new_val)
-                    step.volume.provenance = user_edit_prov
-                except ValueError:
-                    pass
-            elif field == "substance" and step.substance:
-                step.substance.value = new_val
-                step.substance.provenance = user_edit_prov
-            elif field == "duration" and step.duration:
-                try:
-                    step.duration.value = float(new_val)
-                    step.duration.provenance = user_edit_prov
-                except ValueError:
-                    pass
-            elif field == "temperature" and step.temperature:
-                try:
-                    step.temperature.value = float(new_val)
-                    step.temperature.provenance = user_edit_prov
-                except ValueError:
-                    pass
-            elif field == "composition":
-                # Can't meaningfully edit composition — skip
-                pass
-            # Post-action fields
-            elif step.post_actions:
-                for pa in step.post_actions:
-                    if field.startswith(pa.action) and "volume" in field and pa.volume:
-                        try:
-                            pa.volume.value = float(new_val)
-                            pa.volume.provenance = user_edit_prov
-                        except ValueError:
-                            pass
-
-        return spec
-
     def run_pipeline(self, prompt: str, csv_path: str = None,
                      full_confirmation: bool = False, confirmation_threshold: float = 0.7,
                      verbose: bool = False) -> Optional[PipelineResult]:
@@ -951,181 +707,92 @@ class ProtocolAgent:
         # Stage 3: Validate extraction + check sufficiency + fill gaps
         _stage("[Stage 3/8] Validating and completing specification...")
 
-        if self.use_gap_resolver:
-            # Experimental path (ADR-0008 PR2 + PR3a). Runs the unified
-            # orchestrator in place of the legacy verify/fill/refine block.
-            from .gap_resolution import (
-                Orchestrator, CLIConfirmationHandler, default_apply_resolution,
-                MissingFieldsDetector, ProvenanceWarningDetector,
-                InitialContentsVolumeDetector, ConstraintViolationDetector,
-                LabwareAmbiguityDetector,
-                ConfigLookupSuggester, CarryoverSuggester,
-                WellCapacitySuggester, RegexFromNoteSuggester,
-                WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
-                IndependentReviewSuggester,
-            )
-            _log(f"  {C.dim('[experimental] using gap-resolver orchestrator (ADR-0008)')}")
+        # Stage 3: unified gap-resolution orchestrator (ADR-0008).
+        # PR3b deleted the legacy verify/fill/refine block and the use_gap_resolver
+        # flag — see ADR-0008's "what we replaced" appendix for the legacy → new
+        # mapping. The orchestrator handles missing fields, fabrications, initial
+        # volumes, constraint violations, and labware ambiguity in one loop.
+        from .gap_resolution import (
+            Orchestrator, CLIConfirmationHandler, default_apply_resolution,
+            MissingFieldsDetector, ProvenanceWarningDetector,
+            InitialContentsVolumeDetector, ConstraintViolationDetector,
+            LabwareAmbiguityDetector,
+            ConfigLookupSuggester, CarryoverSuggester,
+            WellCapacitySuggester, RegexFromNoteSuggester,
+            WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
+            IndependentReviewSuggester,
+        )
 
-            # PR3a step 3: run LabwareResolver BEFORE the orchestrator so
-            # the orchestrator's LabwareAmbiguityDetector sees post-resolver
-            # state — only refs the resolver couldn't pick land as Gaps.
-            # The resolver writes resolved_label_provenance on each pick so
-            # the IndependentReviewSuggester can second-opinion the choice.
-            # Stage 3.5's redundant resolver call is gated below.
-            from .extraction import LabwareResolver as _EarlyLabwareResolver
-            spec = _EarlyLabwareResolver(
-                config=self.config_loader.config,
+        # Run LabwareResolver BEFORE the orchestrator so LabwareAmbiguityDetector
+        # only flags refs the resolver couldn't pick (post-resolver state). The
+        # resolver writes resolved_label_provenance on each pick so the
+        # IndependentReviewSuggester can second-opinion the choice. Stage 3.5
+        # no longer runs the resolver — it's done here.
+        from .extraction import LabwareResolver as _EarlyLabwareResolver
+        spec = _EarlyLabwareResolver(
+            config=self.config_loader.config,
+            client=extractor.client,
+            model_name=extractor.model_name,
+        ).resolve(spec)
+
+        # Reviewer: smaller / different model than the extractor's per ADR-0008's
+        # bias-mitigation rationale. Haiku is cheap, fast, and sufficient for
+        # the structured two-claim verification task.
+        reviewer_model = "claude-haiku-4-5"
+        orch = Orchestrator(
+            detectors=[
+                MissingFieldsDetector(),
+                ProvenanceWarningDetector(extractor),  # only fabrications surface as Gaps
+                InitialContentsVolumeDetector(),
+                ConstraintViolationDetector(),
+                LabwareAmbiguityDetector(),
+            ],
+            suggesters=[
+                # Deterministic first (correct-or-empty, no LLM cost):
+                ConfigLookupSuggester(),
+                CarryoverSuggester(),
+                WellCapacitySuggester(),
+                RegexFromNoteSuggester(),
+                WellRangeClipSuggester(),
+                LabwareSuggester(),
+                # LLM spot last — bounded per-Gap call before falling through
+                # to the user. Replaces the old wholesale `refine`.
+                LLMSpotSuggester(client=extractor.client,
+                                  model_name=extractor.model_name),
+            ],
+            reviewer=IndependentReviewSuggester(
                 client=extractor.client,
-                model_name=extractor.model_name,
-            ).resolve(spec)
-            # Reviewer: smaller / different model than the extractor's, per ADR-0008's
-            # bias-mitigation rationale. Haiku is cheap, fast, and sufficiently
-            # capable for the structured two-claim verification task.
-            reviewer_model = "claude-haiku-4-5"
-            orch = Orchestrator(
-                detectors=[
-                    MissingFieldsDetector(),
-                    ProvenanceWarningDetector(extractor),  # only fabrications post-fix
-                    # PR3a: initial-contents null volumes routed through the
-                    # uniform Gap → Suggester loop. WellCapacitySuggester
-                    # proposes the labware capacity; CLIConfirmationHandler
-                    # prompts the user. The legacy `_build_initial_volume_queue`
-                    # downstream observes the now-filled fields and no-ops.
-                    InitialContentsVolumeDetector(),
-                    # PR3a: ERROR-severity hardware constraints become Gaps.
-                    # WellRangeClipSuggester proposes a clipped well-list for
-                    # the WELL_INVALID case; other violation types (pipette
-                    # capacity, labware-not-found, etc.) fall through to the
-                    # user. The legacy stage-4 "proceed anyway?" prompt
-                    # downstream still runs but its `has_errors` check
-                    # observes the now-empty result if the user accepted
-                    # the clip suggestion.
-                    ConstraintViolationDetector(),
-                    # PR3a step 3: LocationRefs the resolver couldn't pick
-                    # become Gaps. LabwareSuggester proposes a token-match
-                    # config label; user always confirms (low confidence,
-                    # never auto-accept — wrong labware mappings have
-                    # physical consequences). The orchestrator's apply
-                    # writes the chosen label into resolved_label and
-                    # stamps resolved_label_provenance with the user
-                    # action.
-                    LabwareAmbiguityDetector(),
-                ],
-                suggesters=[
-                    # Deterministic first (correct-or-empty, no LLM cost):
-                    ConfigLookupSuggester(),
-                    CarryoverSuggester(),
-                    WellCapacitySuggester(),
-                    RegexFromNoteSuggester(),
-                    WellRangeClipSuggester(),
-                    LabwareSuggester(),
-                    # LLM spot last in chain — bounded per-Gap call before
-                    # falling through to the user. Replaces the old wholesale
-                    # `refine` (no silent overwrites, no token-truncation).
-                    LLMSpotSuggester(client=extractor.client,
-                                      model_name=extractor.model_name),
-                ],
-                reviewer=IndependentReviewSuggester(
-                    client=extractor.client,
-                    model_name=reviewer_model,
-                ),
-                handler=CLIConfirmationHandler(cm=self.cm, log=_log),
-                apply_resolution=default_apply_resolution,
-            )
-            outcome = orch.run(spec, context={
-                "instruction": prompt,
-                "config": self.config_loader.config,
-            })
-            state_log["stage_3_gap_resolver"] = {
-                "converged": outcome.converged,
-                "aborted": outcome.aborted,
-                "iterations": [
-                    {
-                        "iteration": it.iteration,
-                        "gap_count": len(it.records),
-                        "auto_accepted": sum(1 for r in it.records if r.auto_accepted),
-                    }
-                    for it in outcome.iterations
-                ],
-            }
-            if outcome.aborted:
-                _log(f"  {C.error('Gap resolution aborted.')}")
-                _save_state_log("stage_3_gap_resolver")
-                return None
-            if not outcome.converged:
-                _log(f"  {C.error('Gap resolution hit iteration cap without converging.')}")
-                _save_state_log("stage_3_gap_resolver")
-                return None
-            _log(f"  {C.success('Gap resolution converged.')}")
-            spec = outcome.spec
-            non_fabrications = []  # already handled by the orchestrator
-        else:
-            # Legacy path — verify/missing/fill/refine inline.
-            provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.config_loader.config)
-            fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
-
-            state_log["stage_3_provenance"] = provenance_warnings
-
-            if fabrications:
-                _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
-                for w in fabrications:
-                    _log(f"    {C.error('!')} {w['message']}")
-                _log(f"\n  The LLM put values in wrong fields or misattributed their source.")
-                _log(f"  This usually means temperatures ended up in volume fields, or")
-                _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
-                _log(f"  Re-run, or try a more explicit instruction.")
-                _save_state_log("stage_3_provenance")
-                return None
-
-            non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
-            if non_fabrications:
-                _log(f"  {C.dim(f'{len(non_fabrications)} provenance note(s) — will review during confirmation.')}")
-
-            # Sufficiency check
-            gaps = extractor.missing_fields(spec)
-            if gaps:
-                _log(f"  Gaps found: {len(gaps)}")
-                for g in gaps:
-                    _log(f"    - {g}")
-                # TODO(ADR-0006 deferred): surface fill count + distinguish
-                # deterministic gap-fills from LLM-inferred values in the
-                # HTML report. Today both share source="inferred"; future work
-                # carves out a "filled by lookup/carryover" sub-marker.
-                spec, fills = extractor.fill_lookup_and_carryover_gaps(spec, self.config_loader.config)
-                if fills:
-                    _log(f"  Filled deterministically (lookup + carryover):")
-                    for f in fills:
-                        _log(f"    - {f}")
-                remaining_gaps = extractor.missing_fields(spec)
-                if remaining_gaps:
-                    _log(f"  Could not fill all gaps from config:")
-                    for g in remaining_gaps:
-                        _log(f"    - {g}")
-                    _log("  Attempting self-refinement (re-reasoning with gap feedback)...")
-                    refined = extractor.refine(spec, remaining_gaps, prompt, self.config_loader.config)
-                    if refined:
-                        spec = refined
-                        final_gaps = extractor.missing_fields(spec)
-                        if final_gaps:
-                            _log(f"  Refinement could not resolve all gaps:")
-                            for g in final_gaps:
-                                _log(f"    - {g}")
-                            _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
-                            state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "after_refine": final_gaps}
-                            _save_state_log("stage_3_gaps")
-                            return None
-                        _log("  Refinement resolved all gaps.")
-                    else:
-                        _log("  Self-refinement did not produce a valid specification.")
-                        _log("  The LLM could not fill the gaps listed above even after retrying.")
-                        _log("  Try: add more detail to your instruction, or simplify the protocol.")
-                        state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "refine_failed": True}
-                        _save_state_log("stage_3_gaps")
-                        return None
-                else:
-                    _log("  Gaps filled from config.")
-            else:
-                _log(f"  {C.dim('Specification is complete.')}")
+                model_name=reviewer_model,
+            ),
+            handler=CLIConfirmationHandler(cm=self.cm, log=_log),
+            apply_resolution=default_apply_resolution,
+        )
+        outcome = orch.run(spec, context={
+            "instruction": prompt,
+            "config": self.config_loader.config,
+        })
+        state_log["stage_3_gap_resolver"] = {
+            "converged": outcome.converged,
+            "aborted": outcome.aborted,
+            "iterations": [
+                {
+                    "iteration": it.iteration,
+                    "gap_count": len(it.records),
+                    "auto_accepted": sum(1 for r in it.records if r.auto_accepted),
+                }
+                for it in outcome.iterations
+            ],
+        }
+        if outcome.aborted:
+            _log(f"  {C.error('Gap resolution aborted.')}")
+            _save_state_log("stage_3_gap_resolver")
+            return None
+        if not outcome.converged:
+            _log(f"  {C.error('Gap resolution hit iteration cap without converging.')}")
+            _save_state_log("stage_3_gap_resolver")
+            return None
+        _log(f"  {C.success('Gap resolution converged.')}")
+        spec = outcome.spec
 
         if spec.explicit_volumes:
             _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")
@@ -1156,21 +823,10 @@ class ProtocolAgent:
                                      substance=substance or "reagent")
                     )
 
-        # Stage 3.5: Resolve labware references (description → config label)
-        _stage("[Stage 3.5/8] Resolving labware references...")
-        # PR3a step 3: when use_gap_resolver is on, the resolver already
-        # ran early (pre-orchestrator) — skip the redundant LLM call here.
-        # Stage 3.5's _confirm_labware_assignments still runs as the legacy
-        # whole-mapping panel until ADR-0009's whole-mapping-panel piece
-        # lands separately.
-        if not self.use_gap_resolver:
-            from .extraction import LabwareResolver
-            resolver = LabwareResolver(
-                config=self.config_loader.config,
-                client=extractor.client,
-                model_name=extractor.model_name,
-            )
-            spec = resolver.resolve(spec)
+        # Stage 3.5: Confirm labware assignments + check unresolved refs
+        # (resolver already ran inside stage 3 before the orchestrator —
+        # PR3b removed the redundant second resolve call).
+        _stage("[Stage 3.5/8] Confirming labware assignments...")
 
         state_log["stage_3.5_resolution"] = {
             ref.description: ref.resolved_label
@@ -1242,33 +898,11 @@ class ProtocolAgent:
         else:
             _log(f"  {C.success('All constraints satisfied.')}")
 
-        # Build full confirmation queue: provenance warnings + null initial volumes
-        # (grouped per (labware, substance) when multiple wells share the gap).
-        confirmable = [w for w in non_fabrications if w["severity"] in ("unverified", "low_confidence")]
-        confirmable.extend(self._build_initial_volume_queue(spec, self.config_loader.config))
-
-        # Confirm with user
-        # (fabrications already blocked in Stage 3 — only non-fabrication warnings remain)
-        _log(extractor.format_for_confirmation(
-            spec, non_fabrications,
-            threshold=confirmation_threshold,
-            full=full_confirmation,
-            extra_confirmable=[w for w in confirmable
-                               if w.get("type") in ("initial_volume", "initial_volume_group")],
-        ))
-
-        if sys.stdin.isatty():
-            if confirmable and not full_confirmation:
-                _log(f"\n  {len(confirmable)} item(s) need confirmation.")
-                accepted = self._confirm_provenance_items(spec, confirmable)
-                if accepted is None:
-                    _log("  Aborted by user.")
-                    return None
-            else:
-                response = self.cm.prompt("Proceed with this specification? [Y/n]: ").lower()
-                if response in ('n', 'no'):
-                    _log("  Aborted by user.")
-                    return None
+        # PR3b removed the pre-stage-5 confirmation queue. The orchestrator
+        # in stage 3 already routed every confirmable through CLIConfirmationHandler
+        # (initial volumes via InitialContentsVolumeDetector, provenance warnings
+        # via ProvenanceWarningDetector, etc.). No bulk-print pass needed; the
+        # HTML report (ADR-0009) replaces it for visual review.
 
         # Stage 5: Deterministic spec → ProtocolSchema
         _stage("[Stage 5/8] Converting specification to protocol schema...")

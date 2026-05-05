@@ -1,5 +1,15 @@
 # Pipeline and Testing Map
 
+> **Superseded by ADR-0008 (PR3b).** This doc describes the pre-PR3b
+> pipeline shape — six ad-hoc detect/fill/refine/confirm stretches in
+> `pipeline.py`. PR3b replaced all six with the unified gap-resolution
+> orchestrator (`nl2protocol/gap_resolution/`). For the legacy → new
+> mapping, see ADR-0008's "What PR3b replaced" appendix. Symbols
+> referenced below (`extractor.refine`, `_confirm_provenance_items`,
+> `_build_initial_volume_queue`, `_apply_provenance_edits`,
+> `format_for_confirmation`) no longer exist; recover via
+> `git show <pre-PR3b-commit>:<path>` if needed.
+
 How the pipeline runs, where the LLM lives, and what each deterministic stage owes the next one. Source: `nl2protocol/pipeline.py` (`ProtocolAgent.run_pipeline`).
 
 ## Linear flow

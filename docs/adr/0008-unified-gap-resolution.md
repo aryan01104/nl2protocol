@@ -1,6 +1,6 @@
 # ADR-0008: Unified gap-resolution interface
 
-**Status:** Proposed
+**Status:** Implemented (PR1 + PR2 + PR3a + PR3b — the orchestrator is the only resolution path; legacy `verify/fill/refine` block deleted in PR3b)
 **Date:** 2026-05-04
 
 ## Context
@@ -331,3 +331,49 @@ Land in three PRs:
 - `nl2protocol/pipeline.py:917-1153` — current post-extraction stages (to be replaced by the resolver loop)
 - `nl2protocol/extraction/extractor.py:250-302` — current `refine` implementation (to be demoted to opt-in last-resort)
 - `nl2protocol/extraction/extractor.py:441-676` — current detectors (to become `GapDetector` implementations)
+
+## Appendix: What PR3b replaced (cutover record)
+
+This appendix exists so future readers can understand what the legacy
+pipeline looked like without having to `git log -S` to recover deleted
+code. The deletions in PR3b are documented here in prose; the prose ages
+better than commented-out code blocks would.
+
+Before PR3b, the post-extraction stages of `pipeline.py` had **six
+ad-hoc deficiency-resolution stretches**, each implemented inline with
+its own user-prompt UI, its own writeback path, no shared audit trail,
+and no iteration. PR3b deletes them; the orchestrator loop subsumes
+all six. Concrete mapping:
+
+| Legacy code (deleted in PR3b)                   | Replaced by                                                         |
+|-------------------------------------------------|----------------------------------------------------------------------|
+| `extractor.verify_provenance_claims`            | `ProvenanceWarningDetector` (PR1) — wraps it; only fabrications surface as Gaps. Confidence gating moved to orchestrator's classify step. |
+| `extractor.missing_fields`                      | `MissingFieldsDetector` (PR1) — wraps it directly.                  |
+| `extractor.fill_lookup_and_carryover_gaps`      | `ConfigLookupSuggester` + `CarryoverSuggester` (PR2) — same logic, restructured per-Gap with explicit Suggestion + Provenance writes. |
+| `extractor.refine` (LLM self-refinement)        | `LLMSpotSuggester` (PR2) — bounded per-Gap LLM call with focused context. No more wholesale-rewrite token-truncation failures. |
+| `pipeline._build_initial_volume_queue`          | `InitialContentsVolumeDetector` + `WellCapacitySuggester` (PR3a step 1) — same data, per-Gap routing. (Grouping by labware+substance is the one regression — PR3b accepts per-Gap prompting; future work can re-add a batched detector if it proves annoying.) |
+| `pipeline._confirm_provenance_items`            | `CLIConfirmationHandler.present` (PR2) — uniform single-prompt path serving every gap kind. |
+| `pipeline._apply_provenance_edits`              | `default_apply_resolution` + `_stamp_user_action` / `_stamp_resolution_action` (PR2 + ADR-0009 step 4) — writes value AND stamps review_status atomically. |
+| `extractor.format_for_confirmation`             | gone — the orchestrator's per-Gap rendering replaces the bulk-print pass; the HTML report (ADR-0009 step 5) replaces it for visual review. |
+| `ConstraintChecker.check_all` (interactive "proceed anyway?") | `ConstraintViolationDetector` (PR3a step 2) — ERROR-severity violations become Gaps; `WellRangeClipSuggester` proposes fixes; `CLIConfirmationHandler` handles the prompt. The deterministic check_all itself stays as defense-in-depth. |
+| `pipeline._confirm_labware_assignments`         | `LabwareAmbiguityDetector` + `LabwareSuggester` (PR3a step 3) handle the ambiguous-pick case. The whole-mapping panel (the "show all assignments, edit any") is **deferred** — the legacy `_confirm_labware_assignments` STAYS until that lands in a follow-up. |
+
+Architectural moves that came with the deletion:
+
+- **One detect-suggest-resolve loop** instead of six. Re-detection between
+  iterations is a real affordance: a Gap whose resolution unblocks a
+  downstream Gap gets handled in a second iteration without restarting
+  the pipeline.
+- **Audit trail survives end-to-end.** Every Provenance carries
+  `review_status` reflecting reviewer + user actions; nothing
+  evaporates at apply time the way the legacy paths did.
+- **`use_gap_resolver` flag and CLI flag (`--use-gap-resolver`) removed.**
+  The orchestrator is the only resolution path now. Recovery via
+  `git show <pre-PR3b-commit>:nl2protocol/pipeline.py` if anyone ever
+  needs to reference the legacy shape.
+
+**Known regression**: per-Gap prompting for `initial_contents.volume_ul`
+loses the legacy queue's grouping (e.g. "set volume for A1, A2, A3, A4
+of sample_rack/buffer" used to be one prompt, now four). Acceptable for
+PR3b scope; a follow-up can add a `BatchedInitialContentsVolumeDetector`
+or per-bucket Gap shape if user feedback says the regression matters.

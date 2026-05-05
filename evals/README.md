@@ -138,7 +138,7 @@ pipeline_result = agent.run_pipeline(instruction)
 What this unlocks (none possible today):
 
 - **The complex resolver evals dropped earlier** (e.g. `12_qpcr_standard_curve`) come back as full-pipeline tests with scripted resolution answers — exercising the production path where Stage 3 confirmation patches up resolver weaknesses with the user.
-- **Confirmation-queue grouping logic** (`_build_initial_volume_queue`, the rectangular-block detection) gets exercised end-to-end against real LLM extraction output, not just unit-tested with hand-crafted specs.
+- **Gap-resolution orchestrator end-to-end** (`InitialContentsVolumeDetector`, `ConstraintViolationDetector`, `LabwareAmbiguityDetector`, plus the suggesters and reviewer pass) gets exercised against real LLM extraction output, not just unit-tested with hand-crafted specs. Replaces the pre-PR3b `_build_initial_volume_queue` grouping affordance — currently regresses to per-Gap prompting; future `BatchedInitialContentsVolumeDetector` would re-add the grouping signal.
 - **Stage 1 input classification** becomes testable in the eval layer — the runner enters at the top of `run_pipeline()`, including the `InputValidator.classify` LLM call.
 - **Generated script + simulation log** become assertable — `PipelineResult.script` and `result.simulation_log` are already in the dataclass; we just don't run that far today.
 - **Stage 5 deterministic transforms** get a real-LLM upstream signal — currently their inputs are hand-crafted Pydantic instances in `tests/integration/`; with full-pipeline evals, the inputs come from actual LLM extraction.

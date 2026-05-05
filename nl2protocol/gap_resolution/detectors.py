@@ -408,12 +408,12 @@ class LabwareAmbiguityDetector:
     pass on `resolved_label_provenance` — verified by
     IndependentReviewSuggester downstream).
 
-    The pipeline runs LabwareResolver BEFORE the orchestrator (in the
-    use_gap_resolver branch), so this detector sees post-resolver state.
-    If the resolver hasn't run yet (legacy ordering, or LabwareResolver
-    skipped because no client), every LocationRef has `resolved_label is
-    None` and every LocationRef becomes a Gap — defensive, surfaces all
-    refs to the user rather than silently passing them through.
+    The pipeline runs LabwareResolver BEFORE the orchestrator, so this
+    detector sees post-resolver state. If the resolver hasn't run yet
+    (e.g. no LLM client available), every LocationRef has
+    `resolved_label is None` and every LocationRef becomes a Gap —
+    defensive, surfaces all refs to the user rather than silently
+    passing them through.
 
     Pre:    `spec` is a ProtocolSpec; `context` is unused (config is read
             by the suggester, not the detector — this stays decoupled

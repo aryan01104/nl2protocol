@@ -160,15 +160,6 @@ Files:
              '(instruction → spec → complete spec → script) with color-coded provenance.'
     )
 
-    parser.add_argument(
-        '--use-gap-resolver',
-        action='store_true',
-        help='[experimental, ADR-0008] Replace the post-extraction logic '
-             '(detect/fill/refine/confirm) with the unified gap-resolution '
-             'orchestrator. Off by default — opt in to validate the new '
-             'path against the existing one.'
-    )
-
     return parser
 
 
@@ -607,8 +598,7 @@ def main(argv: list = None) -> int:
         reporter = HTMLReporter(output_path=html_report_path)
 
     try:
-        agent = ProtocolAgent(config_path=config_path, reporter=reporter,
-                              use_gap_resolver=args.use_gap_resolver)
+        agent = ProtocolAgent(config_path=config_path, reporter=reporter)
     except APIKeyError as e:
         # Offer interactive setup if key is missing
         if offer_setup_on_missing_key():
@@ -616,8 +606,7 @@ def main(argv: list = None) -> int:
             try:
                 from dotenv import find_dotenv, load_dotenv
                 load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
-                agent = ProtocolAgent(config_path=config_path, reporter=reporter,
-                              use_gap_resolver=args.use_gap_resolver)
+                agent = ProtocolAgent(config_path=config_path, reporter=reporter)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)
                 return 1

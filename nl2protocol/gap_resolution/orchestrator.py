@@ -2,9 +2,8 @@
 Orchestrator — the resolver loop (ADR-0008).
 
 Runs DETECT → topological-sort → SUGGEST → REVIEW → CLASSIFY → PRESENT →
-APPLY → RE-DETECT, up to N=3 iterations. Replaces the existing ad-hoc
-post-extraction logic in pipeline.py when the --use-gap-resolver flag is
-set.
+APPLY → RE-DETECT, up to N=3 iterations. Sole post-extraction resolution
+path since PR3b deleted the legacy verify/fill/refine block in pipeline.py.
 
 Per ADR-0008:
   - Suggesters tried in registry-defined precedence order; first non-None wins.
