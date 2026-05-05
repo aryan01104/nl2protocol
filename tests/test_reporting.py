@@ -365,6 +365,150 @@ class TestGracefulDegradeNoDataProvId:
         assert "data-prov-id" not in out
 
 
+class TestADR0009Rendering:
+    """ADR-0009 surfaces the Provenance schema expansion (positive_reasoning +
+    why_not_in_instruction + review_status + reviewer_objection) in the HTML
+    report's value-span data attributes and CSS classes."""
+
+    def _inferred_prov(self, **kwargs):
+        from nl2protocol.models.spec import Provenance
+        defaults = dict(
+            source="inferred",
+            positive_reasoning="config lookup yielded this well",
+            why_not_in_instruction="instruction omits the source labware for this substance",
+            confidence=0.9,
+        )
+        defaults.update(kwargs)
+        return Provenance(**defaults)
+
+    def test_emits_positive_reasoning_data_attr(self):
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert 'data-prov-positive-reasoning="config lookup yielded this well"' in out
+
+    def test_emits_why_not_in_instruction_data_attr(self):
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert 'data-prov-why-not-in-instruction=' in out
+
+    def test_emits_legacy_data_prov_reasoning_alias(self):
+        # Backwards-compat: any external consumer still reading the legacy
+        # single-`data-prov-reasoning` attr keeps working — the value is
+        # the new positive_reasoning content.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert 'data-prov-reasoning="config lookup yielded this well"' in out
+
+    def test_review_status_data_attr_always_present(self):
+        # Even on a default 'original' provenance, the data attr is emitted
+        # so the JS tooltip can read it without optional-chaining gymnastics.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert 'data-prov-review-status="original"' in out
+
+    def test_default_review_status_does_not_add_inline_badge_class(self):
+        # 'original' is the default — no CSS badge class added.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()  # review_status defaults to 'original'
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert "prov-review-original" not in out
+
+    def test_reviewed_disagree_adds_inline_badge_class(self):
+        # reviewed_disagree gets the .prov-review-reviewed-disagree class
+        # which the template's CSS uses to draw the inline ⚠ badge.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov(
+            review_status="reviewed_disagree",
+            reviewer_objection="instruction line 5 actually names this source",
+        )
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert "prov-review-reviewed-disagree" in out
+
+    def test_user_edited_adds_inline_badge_class(self):
+        # user_edited gets the .prov-review-user-edited class which the
+        # template's CSS uses to draw the inline ✎ badge.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov(review_status="user_edited")
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert "prov-review-user-edited" in out
+
+    def test_reviewer_objection_emits_data_attr_when_disagreed(self):
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov(
+            review_status="reviewed_disagree",
+            reviewer_objection="instruction line 5 actually names this source",
+        )
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert 'data-prov-reviewer-objection=' in out
+        assert "instruction line 5 actually names this source" in out
+
+    def test_no_reviewer_objection_attr_when_status_is_original(self):
+        # The Provenance invariant forbids reviewer_objection when status
+        # isn't reviewed_disagree, so it stays None and the data attr is
+        # NOT emitted — saves DOM noise on the common case.
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov()
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert "data-prov-reviewer-objection" not in out
+
+    def test_user_accepted_suggestion_class_present_no_inline_badge_in_css(self):
+        # user_accepted_suggestion adds the class so the tooltip can show
+        # the meta line, but the CSS does NOT draw an inline badge for it
+        # (positive/passive state — doesn't deserve column-scan attention).
+        # This test pins only the class plumbing; the CSS rule is asserted
+        # by manual inspection of the template (no inline ::after rule for
+        # this class).
+        from nl2protocol.reporting import _render_provenanced_value
+        prov = self._inferred_prov(review_status="user_accepted_suggestion")
+        out = _render_provenanced_value("rack (well A1)", prov,
+                                        prov_id="s0-source",
+                                        instruction="Transfer the buffer.")
+        assert "prov-review-user-accepted-suggestion" in out
+
+
+class TestResolvedSpecColumnRename:
+    """ADR-0009 renames the third column from 'Complete Spec' to 'Resolved
+    Spec' to match the post-orchestrator semantic, and to forward-compat
+    the planned five-column layout (ADR-0010)."""
+
+    def test_template_uses_resolved_spec_header(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        # Empty run is enough — we only care that the column header shipped
+        # in the rendered HTML is the new name.
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The column's <h2> must use the new name. We check for the actual
+        # rendered tag rather than the bare string so the test isn't fooled
+        # by the template comment that explains the rename (which contains
+        # the literal "Complete Spec" prose).
+        assert "<h2>Resolved Spec</h2>" in rendered
+        assert "<h2>Complete Spec</h2>" not in rendered
+
+
 class TestFindCitePosition:
     """Locating cited_text substrings in the instruction (case-insensitive,
     whitespace-tolerant)."""

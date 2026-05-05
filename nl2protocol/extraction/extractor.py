@@ -99,9 +99,9 @@ def _find_provenance_reason(step, field_name: str) -> Optional[str]:
 
 def _provenance_text(prov) -> str:
     """Return the human-readable explanation for a Provenance, picking the
-    field populated by the new schema: cited_text for instruction-sourced,
-    reasoning for domain_default/inferred-sourced. See ADR-0005."""
-    return prov.cited_text or prov.reasoning or ""
+    field populated by the schema: cited_text for instruction-sourced,
+    positive_reasoning for domain_default/inferred-sourced. See ADR-0005, ADR-0009."""
+    return prov.cited_text or prov.positive_reasoning or ""
 
 
 # ============================================================================
@@ -749,15 +749,18 @@ Output the corrected specification.
            When a step has a `substance` but no `source`, search the
            config's labware contents for a well that lists this substance.
            This is a config lookup keyed on substance name. Filled with
-           `Provenance(source="inferred", reasoning="<config path>",
+           `Provenance(source="inferred", positive_reasoning="<config path>",
+           why_not_in_instruction="<what the instruction omitted>",
            confidence=0.9)`.
 
         2. **Carryover gaps** (wait_for_temperature → prior set_temperature).
            A `wait_for_temperature` action with no `temperature` value is
            semantically forced — "wait until the module reaches its target"
            can only refer to the most recent `set_temperature` in the same
-           protocol. Filled with `Provenance(source="inferred", reasoning=
-           "Inherited from prior set_temperature step (X°C)...", confidence=0.95)`.
+           protocol. Filled with `Provenance(source="inferred",
+           positive_reasoning="Inherited from prior set_temperature (X°C)...",
+           why_not_in_instruction="instruction did not re-state the target",
+           confidence=0.95)`.
 
         Both kinds get inferred provenance attached so the report's ▴
         marker + tooltip surface what was filled and why.
@@ -792,10 +795,14 @@ Output the corrected specification.
                                 well=well,
                                 provenance=Provenance(
                                     source="inferred",
-                                    reasoning=(
-                                        f"Substance '{substance_val}' found in config labware "
-                                        f"'{label}' at well {well}. The instruction did not "
-                                        f"explicitly name the source for this transfer."
+                                    positive_reasoning=(
+                                        f"Substance '{substance_val}' is listed in "
+                                        f"config labware '{label}' at well {well}."
+                                    ),
+                                    why_not_in_instruction=(
+                                        f"The instruction names a substance "
+                                        f"('{substance_val}') to transfer but does not "
+                                        f"state which labware/well it comes from."
                                     ),
                                     confidence=0.9,
                                 ),
@@ -820,10 +827,17 @@ Output the corrected specification.
                     value=last_set_temp_celsius,
                     provenance=Provenance(
                         source="inferred",
-                        reasoning=(
-                            f"Inherited from prior set_temperature step "
-                            f"({last_set_temp_celsius}°C). The instruction did not "
-                            f"re-state the target temperature for this wait."
+                        positive_reasoning=(
+                            f"wait_for_temperature inherits from the most "
+                            f"recent set_temperature ({last_set_temp_celsius}°C); "
+                            f"the action's semantics force this — 'wait until "
+                            f"the module reaches its target' can only refer to "
+                            f"the most recent set_temperature."
+                        ),
+                        why_not_in_instruction=(
+                            "The instruction said to wait for the temperature "
+                            "to stabilize but did not re-state the target "
+                            "temperature for this wait."
                         ),
                         confidence=0.95,
                     ),

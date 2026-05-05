@@ -181,17 +181,34 @@ def _render_provenanced_value(
     prov_id: Optional[str] = None,
     instruction: Optional[str] = None,
 ) -> str:
-    """Wrap a provenanced value in an HTML span colored by its source.
+    """Wrap a provenanced value in an HTML span colored by its source AND
+    annotated with its review-lifecycle state.
 
-    Per ADR-0005, `prov` carries either cited_text (when source='instruction')
-    or reasoning (when source in domain_default/inferred). The JS tooltip
-    consumes the data-* attrs at hover time.
+    Per ADR-0005 + ADR-0009, `prov` carries:
+      - source-attribution: cited_text (when source='instruction') or
+        positive_reasoning + why_not_in_instruction (when source is
+        domain_default/inferred).
+      - review lifecycle: review_status (default 'original' when no reviewer
+        or user has touched the value yet) and reviewer_objection (set iff
+        review_status == 'reviewed_disagree').
+
+    The JS tooltip consumes the data-* attrs at hover time. The
+    `prov-review-<status>` CSS class drives the inline ⚠ / ✎ badges for
+    high-signal review states.
 
     Color rules:
       - source="instruction" with a recoverable cited_text → adds `palette-N`
         class so the value matches its cite span's hue in the instruction.
       - other sources → categorical class only (.prov-domain_default etc.)
         with dotted-underline styling driven from CSS.
+
+    Review-state rules:
+      - review_status != 'original' → adds `prov-review-<status>` class.
+        The CSS pseudo-element on this class draws the inline badge for
+        the two attention-worthy states (reviewed_disagree, user_edited).
+        Other non-original states (reviewed_agree, user_accepted_suggestion,
+        user_confirmed, user_skipped) get the class but no inline badge —
+        their state is surfaced in the tooltip only.
 
     Linkage rules (graceful degrade for unrecoverable cites):
       - data-prov-id is emitted ONLY when an instruction-sourced cited_text
@@ -202,7 +219,10 @@ def _render_provenanced_value(
     import html
     source = getattr(prov, "source", "inferred")
     cited_text = getattr(prov, "cited_text", None)
-    reasoning = getattr(prov, "reasoning", None)
+    positive_reasoning = getattr(prov, "positive_reasoning", None)
+    why_not_in_instruction = getattr(prov, "why_not_in_instruction", None)
+    review_status = getattr(prov, "review_status", "original") or "original"
+    reviewer_objection = getattr(prov, "reviewer_objection", None)
     confidence = getattr(prov, "confidence", 0.0)
 
     classes = [_PROV_CLASS.get(source, "prov-inferred")]
@@ -219,6 +239,12 @@ def _render_provenanced_value(
     if cite_recoverable and cited_text:
         classes.append(_palette_class(cited_text))
 
+    # Review-lifecycle class. The CSS pseudo-element on this class draws
+    # the inline ⚠ / ✎ badge for the two attention-worthy states; other
+    # non-original states get the class but render no inline badge.
+    if review_status != "original":
+        classes.append(f"prov-review-{review_status.replace('_', '-')}")
+
     rendered_value = html.escape(str(value))
 
     # data-prov-id ONLY when we can actually link to a cite span.
@@ -230,10 +256,18 @@ def _render_provenanced_value(
     # without us having to compute / escape a long native title= string.
     extra_attrs += f' data-prov-source="{html.escape(source, quote=True)}"'
     extra_attrs += f' data-prov-confidence="{confidence:.2f}"'
+    extra_attrs += f' data-prov-review-status="{html.escape(review_status, quote=True)}"'
     if cited_text:
         extra_attrs += f' data-prov-cited="{html.escape(cited_text, quote=True)}"'
-    if reasoning:
-        extra_attrs += f' data-prov-reasoning="{html.escape(reasoning, quote=True)}"'
+    if positive_reasoning:
+        extra_attrs += f' data-prov-positive-reasoning="{html.escape(positive_reasoning, quote=True)}"'
+        # Backwards-compat alias for any external consumer that still reads
+        # the legacy single-reasoning attr (kept until ADR-0010).
+        extra_attrs += f' data-prov-reasoning="{html.escape(positive_reasoning, quote=True)}"'
+    if why_not_in_instruction:
+        extra_attrs += f' data-prov-why-not-in-instruction="{html.escape(why_not_in_instruction, quote=True)}"'
+    if reviewer_objection:
+        extra_attrs += f' data-prov-reviewer-objection="{html.escape(reviewer_objection, quote=True)}"'
 
     # Non-instruction atoms get a ▴ marker so readers can spot at a glance
     # which values were filled in by the model vs literally lifted from

@@ -91,9 +91,14 @@ class ConfigLookupSuggester:
                         well=well,
                         provenance=Provenance(
                             source="inferred",
-                            reasoning=(
-                                f"Substance '{substance_val}' found in config "
-                                f"labware '{label}' at well {well}."
+                            positive_reasoning=(
+                                f"Config lookup: substance '{substance_val}' is "
+                                f"listed in labware '{label}' at well {well}."
+                            ),
+                            why_not_in_instruction=(
+                                f"The instruction names a substance "
+                                f"('{substance_val}') to transfer but does not "
+                                f"state which labware/well it comes from."
                             ),
                             confidence=0.9,
                         ),
@@ -154,10 +159,15 @@ class CarryoverSuggester:
                     value=celsius,
                     provenance=Provenance(
                         source="inferred",
-                        reasoning=(
-                            f"Inherited from prior set_temperature step "
-                            f"({celsius}°C). Action semantics force this — "
-                            f"wait_for_temperature targets the most recent set_temperature."
+                        positive_reasoning=(
+                            f"wait_for_temperature inherits from the most "
+                            f"recent set_temperature in the protocol; that "
+                            f"value is {celsius}°C."
+                        ),
+                        why_not_in_instruction=(
+                            "The instruction said to wait for the temperature "
+                            "to stabilize but did not re-state the target "
+                            "temperature."
                         ),
                         confidence=0.95,
                     ),
@@ -303,9 +313,13 @@ class RegexFromNoteSuggester:
             unit=unit,
             provenance=Provenance(
                 source="inferred",
-                reasoning=(
-                    f"Parsed from step note text '{step.note}': matched "
-                    f"'{m.group(0)}'."
+                positive_reasoning=(
+                    f"Step note contains a duration phrase '{m.group(0)}'; "
+                    f"interpreted as {value} {unit}."
+                ),
+                why_not_in_instruction=(
+                    "The duration was embedded in the step's free-text note "
+                    "rather than placed in the structured duration field."
                 ),
                 confidence=0.8,
             ),
@@ -647,8 +661,8 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
                 claims.append({
                     "field_path": f"steps[{step_idx}].{fname}",
                     "value": value_repr,
-                    "positive_reasoning": prov.reasoning or "",
-                    "why_not_in_instruction": "",  # ADR-0009 fields not yet on Provenance
+                    "positive_reasoning": prov.positive_reasoning or "",
+                    "why_not_in_instruction": prov.why_not_in_instruction or "",
                     "source": prov.source,
                     "confidence": prov.confidence,
                 })

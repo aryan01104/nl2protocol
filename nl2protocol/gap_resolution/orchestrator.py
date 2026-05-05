@@ -199,9 +199,15 @@ class Orchestrator:
                 suggestions[gap.id] = self._first_suggestion(gap, spec, context)
 
             # REVIEW: batched call over inferred/domain_default suggestions.
+            # Stamp the verdicts onto the spec's Provenances so the audit
+            # trail survives past this iteration (ADR-0009). The hasattr
+            # guard lets test fakes pass dict-specs without tripping the
+            # stamp; real ProtocolSpec instances always have `.steps`.
             reviews: dict = {}
             if self._reviewer is not None:
                 reviews = self._reviewer.review(spec, context)
+                if hasattr(spec, "steps"):
+                    stamp_reviewer_verdicts(spec, reviews)
 
             # CLASSIFY + PRESENT + APPLY
             for gap in gaps:
@@ -283,28 +289,157 @@ class Orchestrator:
 
 
 # ============================================================================
+# Reviewer-verdict stamping (ADR-0009)
+# ============================================================================
+
+def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
+    """Stamp review_status + reviewer_objection onto every Provenance whose
+    field_path appears in `reviews`.
+
+    Pre:    `spec` is a ProtocolSpec; `reviews` maps field_path -> ReviewResult
+            as returned by IndependentReviewSuggester.review(). Every
+            ReviewResult is well-formed (objection set iff disagreed) — that
+            invariant is enforced upstream by ReviewResult.__post_init__.
+
+    Post:   For each Provenance attached to a step field whose field_path is
+            in `reviews`:
+              * If review.confirms_positive AND review.confirms_negative:
+                  review_status      -> "reviewed_agree"
+                  reviewer_objection -> None
+              * Otherwise:
+                  review_status      -> "reviewed_disagree"
+                  reviewer_objection -> review.objection (verbatim)
+            The stamp covers per-step value fields (volume, duration,
+            temperature, substance, source, destination); LocationRef
+            provenance on source/destination is reached via attribute
+            traversal. Provenances whose field_path isn't in `reviews` are
+            left untouched — their review_status keeps its existing value
+            (typically "original" on the first reviewer pass).
+
+    Side effects: Mutates the spec in place — replaces `field_obj.provenance`
+            with a re-validated Provenance carrying the new state. Re-validation
+            re-runs Provenance's invariants (positive_reasoning required for
+            non-instruction sources; reviewer_objection iff reviewed_disagree).
+
+    Raises: pydantic.ValidationError if the resulting Provenance somehow
+            violates schema invariants — should not happen by construction.
+    """
+    from nl2protocol.models.spec import Provenance
+
+    for step_idx, step in enumerate(spec.steps):
+        for fname in ("volume", "duration", "temperature", "substance",
+                       "source", "destination"):
+            field_obj = getattr(step, fname, None)
+            if field_obj is None:
+                continue
+            prov = getattr(field_obj, "provenance", None)
+            if prov is None:
+                continue
+            review = reviews.get(f"steps[{step_idx}].{fname}")
+            if review is None:
+                continue
+            agreed = review.confirms_positive and review.confirms_negative
+            updates = {
+                "review_status": "reviewed_agree" if agreed else "reviewed_disagree",
+                "reviewer_objection": None if agreed else review.objection,
+            }
+            field_obj.provenance = Provenance.model_validate({
+                **prov.model_dump(), **updates,
+            })
+
+
+# ============================================================================
 # Default apply_resolution callback for the spec
 # ============================================================================
 
+def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
+    """Stamp `field_obj.provenance.review_status = user_action_provenance`,
+    clearing reviewer_objection in the process (a user action supersedes
+    any prior reviewer state).
+
+    Pre:    `field_obj` is None, or any object that may carry a
+            `.provenance` attribute (Provenanced*, LocationRef).
+            `user_action_provenance` is one of the user_* values that
+            Provenance.review_status accepts (user_confirmed,
+            user_edited, user_accepted_suggestion, user_skipped).
+
+    Post:   When `field_obj` has a non-None `.provenance`:
+              * field_obj.provenance is REPLACED with a re-validated copy
+                whose review_status equals the passed user_action_provenance
+                and whose reviewer_objection is None.
+            When `field_obj` is None or lacks a `.provenance`: no-op.
+            Re-validation re-runs Provenance's per-source invariants and
+            its review_status biconditional.
+
+    Side effects: Mutates `field_obj.provenance` in place.
+
+    Raises: pydantic.ValidationError if the resulting Provenance violates
+            its invariants — should not happen because user_action values
+            are all valid review_status Literals AND reviewer_objection
+            is cleared (so the disagree-iff-objection invariant can't
+            be violated).
+    """
+    if field_obj is None:
+        return
+    prov = getattr(field_obj, "provenance", None)
+    if prov is None:
+        return
+    from nl2protocol.models.spec import Provenance
+    field_obj.provenance = Provenance.model_validate({
+        **prov.model_dump(),
+        "review_status": user_action_provenance,
+        "reviewer_objection": None,
+    })
+
+
 def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
                               suggestion: Optional[Suggestion]) -> None:
-    """Write a Resolution's value into the spec at the gap's field_path.
+    """Write a Resolution's value into the spec at the gap's field_path AND
+    stamp the user's action onto the resulting Provenance (ADR-0009).
 
-    This is the "mutation point" the orchestrator uses. Path parsing is
-    minimal — supports `steps[N].<field>` and `initial_contents[N].volume_ul`,
-    which covers PR2's gap kinds. Future gap kinds may need extension.
+    Path-shape coverage (PR2 gap kinds):
+      * `initial_contents[N].volume_ul`     — primitive float write; no Provenance.
+      * `steps[N].<field>`                  — top-level step field; Provenance stamped.
+      * `steps[N].<field>.<subfield>`       — nested write under a parent model
+                                              (e.g. steps[0].destination.wells);
+                                              parent's Provenance stamped.
 
-    Pre:    `resolution.action` is "accept_suggestion" or "edit". Skip and
-            abort are handled by the orchestrator before calling this.
-    Post:   The spec is mutated in place. Provenance is attached to the
-            written value when applicable (LocationRef, Provenanced*).
+    Pre:    `resolution.action` is "accept_suggestion" or "edit"; skip and
+            abort are short-circuited by the orchestrator before calling this.
+            For "accept_suggestion", `resolution.new_value` is the same shape
+            as the field (a Provenance-bearing model for Provenanced fields,
+            a primitive for initial_contents.volume_ul).
+            For "edit", `resolution.new_value` is the user-typed scalar
+            already coerced by the handler's coerce_value callback.
+
+    Post:   The spec is mutated in place:
+              * accept_suggestion + Provenanced field:
+                  the field is REPLACED with `new_value`; new_value's
+                  provenance is stamped with review_status = user_accepted_suggestion.
+              * edit + Provenanced field:
+                  the field's `.value` attribute is mutated (preserving the
+                  surrounding model + its provenance type/shape); provenance
+                  is stamped with review_status = user_edited.
+              * subfield write:
+                  the subfield is set; parent's provenance is stamped.
+              * initial_contents.volume_ul:
+                  the float is written; no Provenance to stamp.
+            In all stamping cases, `reviewer_objection` is cleared because
+            the user's action terminates the review lifecycle for that value.
+
+    Side effects: Mutates the spec in place. Replaces or mutates Pydantic
+            sub-models on the spec.
+
+    Raises: pydantic.ValidationError on invariant violation in the resulting
+            Provenance.
     """
     import re
 
     path = gap.field_path
     new_value = resolution.new_value
+    user_action = resolution.user_action_provenance
 
-    # initial_contents[N].volume_ul
+    # initial_contents[N].volume_ul (primitive — no Provenance to stamp)
     m = re.match(r"initial_contents\[(\d+)\]\.volume_ul$", path)
     if m:
         idx = int(m.group(1))
@@ -315,7 +450,28 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
     m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
     if m:
         idx, fname = int(m.group(1)), m.group(2)
-        setattr(spec.steps[idx], fname, new_value)
+        if resolution.action == "accept_suggestion":
+            # new_value is a Provenance-bearing model from the suggester.
+            # Replace the field, then stamp.
+            setattr(spec.steps[idx], fname, new_value)
+            _stamp_user_action(new_value, user_action)
+        elif resolution.action == "edit":
+            # new_value is a user-typed scalar. Mutate the existing model's
+            # `.value` (preserving its type + provenance shape) so the field
+            # stays a well-formed Provenanced* / LocationRef.
+            existing = getattr(spec.steps[idx], fname, None)
+            if existing is not None and hasattr(existing, "value"):
+                existing.value = new_value
+                _stamp_user_action(existing, user_action)
+            else:
+                # Fall through to raw setattr (LocationRef edits without a
+                # .value attribute, or fields that don't exist yet). Stamp
+                # only if the new_value carries provenance.
+                setattr(spec.steps[idx], fname, new_value)
+                _stamp_user_action(new_value, user_action)
+        else:
+            # Defensive: any other action just writes raw.
+            setattr(spec.steps[idx], fname, new_value)
         return
 
     # steps[N].<field>.<subfield> (e.g. steps[0].destination.wells)
@@ -325,6 +481,10 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
         target = getattr(spec.steps[idx], fname)
         if target is not None:
             setattr(target, subfield, new_value)
+            # Stamp the parent's provenance — the subfield change is a
+            # user action on the same logical value (e.g., editing the
+            # well list under destination is editing destination).
+            _stamp_user_action(target, user_action)
         return
 
     # Unknown path shape: silently no-op (defensive — better than crashing).

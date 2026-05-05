@@ -20,6 +20,7 @@ from nl2protocol.gap_resolution import (
     Resolution,
     ReviewResult,
     Suggestion,
+    stamp_reviewer_verdicts,
     topo_sort_gaps,
 )
 
@@ -417,3 +418,285 @@ class TestRecords:
         assert record.auto_accepted is False
         assert record.resolution.action == "edit"
         assert record.resolution.new_value == "custom"
+
+
+# ============================================================================
+# Reviewer-verdict stamping (ADR-0009)
+# ============================================================================
+
+def _real_spec():
+    """Build a real ProtocolSpec with non-instruction Provenances on
+    volume / source / destination so the stamp helper has fields to mutate.
+    """
+    from nl2protocol.models.spec import (
+        CompositionProvenance, ExtractedStep, LocationRef,
+        Provenance, ProtocolSpec, ProvenancedVolume,
+    )
+
+    def _inferred_prov(reasoning="some reasoning",
+                       why_not="instruction omitted this"):
+        return Provenance(
+            source="inferred",
+            positive_reasoning=reasoning,
+            why_not_in_instruction=why_not,
+            confidence=0.9,
+        )
+
+    comp = CompositionProvenance(
+        step_cited_text="t",
+        parameters_cited_texts=["t"],
+        parameters_reasoning="t",
+        grounding=["instruction"],
+        confidence=1.0,
+    )
+    step = ExtractedStep(
+        order=1, action="transfer",
+        volume=ProvenancedVolume(
+            value=50.0, unit="uL", exact=True,
+            provenance=_inferred_prov("inferred 50uL", "instruction lacks the volume"),
+        ),
+        source=LocationRef(
+            description="src", well="A1",
+            provenance=_inferred_prov("config lookup", "instruction omits source"),
+        ),
+        destination=LocationRef(
+            description="dst", well="B1",
+            provenance=_inferred_prov("dest from context", "instruction omits dest"),
+        ),
+        composition_provenance=comp,
+    )
+    return ProtocolSpec(summary="t", steps=[step])
+
+
+class TestStampReviewerVerdicts:
+    """Walk spec; for each Provenance whose field_path appears in `reviews`,
+    stamp review_status (and reviewer_objection on disagreement)."""
+
+    def test_agreement_stamps_reviewed_agree_no_objection(self):
+        spec = _real_spec()
+        reviews = {
+            "steps[0].volume": ReviewResult(
+                field_path="steps[0].volume",
+                confirms_positive=True, confirms_negative=True,
+                objection=None,
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        prov = spec.steps[0].volume.provenance
+        assert prov.review_status == "reviewed_agree"
+        assert prov.reviewer_objection is None
+
+    def test_disagreement_stamps_reviewed_disagree_with_objection(self):
+        spec = _real_spec()
+        reviews = {
+            "steps[0].source": ReviewResult(
+                field_path="steps[0].source",
+                confirms_positive=True, confirms_negative=False,
+                objection="instruction line 3 names this source verbatim",
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        prov = spec.steps[0].source.provenance
+        assert prov.review_status == "reviewed_disagree"
+        assert prov.reviewer_objection == "instruction line 3 names this source verbatim"
+
+    def test_disagreement_on_positive_also_stamps_disagree(self):
+        # Either-claim disagreement → reviewed_disagree (not just both-disagree).
+        spec = _real_spec()
+        reviews = {
+            "steps[0].volume": ReviewResult(
+                field_path="steps[0].volume",
+                confirms_positive=False, confirms_negative=True,
+                objection="50uL is not standard for this protocol",
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        assert spec.steps[0].volume.provenance.review_status == "reviewed_disagree"
+
+    def test_field_not_in_reviews_left_untouched(self):
+        spec = _real_spec()
+        # Only stamp volume; source + destination should keep their original status.
+        reviews = {
+            "steps[0].volume": ReviewResult(
+                field_path="steps[0].volume",
+                confirms_positive=True, confirms_negative=True,
+                objection=None,
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        assert spec.steps[0].volume.provenance.review_status == "reviewed_agree"
+        assert spec.steps[0].source.provenance.review_status == "original"
+        assert spec.steps[0].destination.provenance.review_status == "original"
+
+    def test_empty_reviews_leaves_spec_untouched(self):
+        spec = _real_spec()
+        stamp_reviewer_verdicts(spec, reviews={})
+        for fname in ("volume", "source", "destination"):
+            assert getattr(spec.steps[0], fname).provenance.review_status == "original"
+
+    def test_orchestrator_wires_stamp_after_review(self):
+        # Wire-level test: the orchestrator's run() invokes stamp after the
+        # reviewer pass, so the spec carries reviewer state by the time the
+        # outcome is returned.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        review = ReviewResult(
+            field_path="steps[0].volume",
+            confirms_positive=False, confirms_negative=True,
+            objection="re-check needed",
+        )
+        # Suggester returns None (so no auto-accept path); user skips the gap.
+        # The stamp happens regardless of how the gap is resolved.
+        gaps = [gap("g1", field_path="steps[0].volume")]
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({})],   # no suggestion
+            reviewer=FakeReviewer({"steps[0].volume": review}),
+            handler=handler,
+            apply_resolution=default_apply_resolution,
+        )
+        orch.run(spec, context={})
+        prov = spec.steps[0].volume.provenance
+        assert prov.review_status == "reviewed_disagree"
+        assert prov.reviewer_objection == "re-check needed"
+
+
+# ============================================================================
+# default_apply_resolution stamps user-action provenance (ADR-0009)
+# ============================================================================
+
+class TestDefaultApplyStampsUserAction:
+    """default_apply_resolution writes the new value AND stamps
+    review_status from resolution.user_action_provenance onto the
+    resulting Provenance, clearing reviewer_objection in the process."""
+
+    def _suggested_volume(self, value=75.0):
+        from nl2protocol.models.spec import Provenance, ProvenancedVolume
+        return ProvenancedVolume(
+            value=value, unit="uL", exact=True,
+            provenance=Provenance(
+                source="inferred",
+                positive_reasoning="suggester proposed this",
+                why_not_in_instruction="instruction lacks the volume",
+                confidence=0.9,
+            ),
+        )
+
+    def _suggested_location(self, well="C3"):
+        from nl2protocol.models.spec import LocationRef, Provenance
+        return LocationRef(
+            description="config-found", well=well,
+            provenance=Provenance(
+                source="inferred",
+                positive_reasoning="config lookup",
+                why_not_in_instruction="instruction omits source",
+                confidence=0.9,
+            ),
+        )
+
+    def test_accept_suggestion_replaces_field_and_stamps(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        new_volume = self._suggested_volume(value=75.0)
+        g = gap("g1", field_path="steps[0].volume")
+        res = Resolution(action="accept_suggestion", new_value=new_volume,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        # Field replaced
+        assert spec.steps[0].volume.value == 75.0
+        # Provenance stamped
+        assert spec.steps[0].volume.provenance.review_status == "user_accepted_suggestion"
+        # Reviewer state cleared
+        assert spec.steps[0].volume.provenance.reviewer_objection is None
+
+    def test_edit_mutates_value_preserves_provenance_shape(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        # Capture the model identity so we can prove .value was mutated
+        # rather than the whole object replaced.
+        original_volume_obj = spec.steps[0].volume
+        g = gap("g1", field_path="steps[0].volume")
+        res = Resolution(action="edit", new_value=42.0,
+                         user_action_provenance="user_edited")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        # Same Pydantic model instance; only .value changed.
+        assert spec.steps[0].volume is original_volume_obj
+        assert spec.steps[0].volume.value == 42.0
+        # Provenance stamped
+        assert spec.steps[0].volume.provenance.review_status == "user_edited"
+
+    def test_user_action_supersedes_prior_reviewer_objection(self):
+        # If the reviewer disagreed with a value, then the user accepts/edits
+        # anyway, the resulting Provenance reflects the user's action and
+        # drops the reviewer's objection (audit trail in GapResolutionRecord).
+        from nl2protocol.gap_resolution.orchestrator import (
+            default_apply_resolution, stamp_reviewer_verdicts,
+        )
+        spec = _real_spec()
+        # First simulate the reviewer disagreeing with the volume.
+        stamp_reviewer_verdicts(spec, {
+            "steps[0].volume": ReviewResult(
+                field_path="steps[0].volume",
+                confirms_positive=False, confirms_negative=True,
+                objection="value seems off",
+            ),
+        })
+        assert spec.steps[0].volume.provenance.reviewer_objection == "value seems off"
+        # Now the user accepts the suggester's value.
+        new_volume = self._suggested_volume(value=80.0)
+        res = Resolution(action="accept_suggestion", new_value=new_volume,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(
+            spec, gap("g1", field_path="steps[0].volume"), res, suggestion=None,
+        )
+        prov = spec.steps[0].volume.provenance
+        assert prov.review_status == "user_accepted_suggestion"
+        assert prov.reviewer_objection is None
+
+    def test_subfield_write_stamps_parent_provenance(self):
+        # steps[0].destination.wells write — the wells subfield doesn't have
+        # its own provenance; the parent (LocationRef) does, and that's what
+        # the user action applies to.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        new_wells = ["B2", "B3"]
+        g = gap("g1", field_path="steps[0].destination.wells")
+        res = Resolution(action="edit", new_value=new_wells,
+                         user_action_provenance="user_edited")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        assert spec.steps[0].destination.wells == new_wells
+        assert spec.steps[0].destination.provenance.review_status == "user_edited"
+
+    def test_initial_contents_volume_writes_float_no_provenance_changes(self):
+        # initial_contents.volume_ul has no Provenance — the apply just
+        # writes a float and returns. Nothing else mutated.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, Provenance,
+            ProtocolSpec, ProvenancedVolume, WellContents,
+        )
+        spec = ProtocolSpec(
+            summary="t",
+            steps=[ExtractedStep(
+                order=1, action="comment", note="placeholder",
+                composition_provenance=CompositionProvenance(
+                    step_cited_text="t", parameters_cited_texts=["t"],
+                    parameters_reasoning="t", grounding=["instruction"],
+                    confidence=1.0,
+                ),
+            )],
+            initial_contents=[
+                WellContents(labware="rack", well="A1", substance="x", volume_ul=None),
+            ],
+        )
+        g = gap("g1", field_path="initial_contents[0].volume_ul")
+        res = Resolution(action="edit", new_value=200.0,
+                         user_action_provenance="user_edited")
+        # Should not raise (even though there's no Provenance to stamp).
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        default_apply_resolution(spec, g, res, suggestion=None)
+        assert spec.initial_contents[0].volume_ul == 200.0

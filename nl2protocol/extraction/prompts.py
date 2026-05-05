@@ -33,7 +33,7 @@ RULES:
 - Leave "explicit_volumes" empty — it will be populated automatically
 
 PROVENANCE — every value you extract MUST have a provenance object:
-  provenance: {{source, cited_text OR reasoning, confidence}}
+  provenance: {{source, cited_text OR (positive_reasoning + why_not_in_instruction), confidence}}
   source: "instruction" (user wrote it), "domain_default" (standard practice), "inferred" (guess)
   NOTE: do NOT use "config" — you do not have access to the lab config at this stage;
   config-derived values are filled in by a later resolution stage.
@@ -43,13 +43,25 @@ PROVENANCE — every value you extract MUST have a provenance object:
   "Mix each tube" inheriting B1-B4 from the previous transfer), use
   source="instruction" and cite the substring that names those wells in the
   instruction (e.g. "B1-B4"). If you genuinely inferred wells from context with no
-  cite available, use source="inferred" with reasoning. NEVER leave provenance=null
-  on a populated LocationRef — the visualization relies on it for traceability.
+  cite available, use source="inferred" with positive_reasoning + why_not_in_instruction.
+  NEVER leave provenance=null on a populated LocationRef — the visualization relies
+  on it for traceability.
 
-  THE TWO FIELDS ARE MUTUALLY EXCLUSIVE BY SOURCE:
-    source = "instruction"            → cited_text REQUIRED, reasoning MUST be omitted/null
-    source = "domain_default"         → reasoning REQUIRED, cited_text MUST be omitted/null
-    source = "inferred"               → reasoning REQUIRED, cited_text MUST be omitted/null
+  WHICH FIELDS YOU OWE BY SOURCE:
+    source = "instruction"     → cited_text REQUIRED;
+                                  positive_reasoning + why_not_in_instruction MUST be omitted/null.
+    source = "domain_default"  → positive_reasoning REQUIRED + why_not_in_instruction REQUIRED;
+                                  cited_text MUST be omitted/null.
+    source = "inferred"        → positive_reasoning REQUIRED + why_not_in_instruction REQUIRED;
+                                  cited_text MUST be omitted/null.
+
+  WHY THE SPLIT: a downstream reviewer model independently verifies your
+  positive claim ('is this value right?') and your negative claim ('did the
+  instruction REALLY not say this?') as two separate falsifiable claims. If
+  you fold both into one sentence, the reviewer can only agree/disagree as
+  a unit — and a wrong negative claim (the value WAS in the instruction,
+  you missed it) drags down the verdict on the positive. Keep them
+  independent so each can be checked on its own.
 
   cited_text: a verbatim substring from the instruction that grounds this value.
               The substring MUST appear character-for-character in the instruction text
@@ -65,9 +77,22 @@ PROVENANCE — every value you extract MUST have a provenance object:
               twice), pick the shortest CONTAINING context that disambiguates
               (e.g. "Add 2uL of plasmid" vs "mix at 2uL").
 
-  reasoning:  one sentence explaining how this value follows from domain knowledge or inference.
-              For "domain_default": cite the protocol and standard practice.
-              For "inferred": state the reasoning chain (e.g., arithmetic, derivation).
+  positive_reasoning:
+              ONE sentence answering: "why is THIS the right value?"
+              For "domain_default": cite the protocol and standard practice
+                (e.g. "standard Bradford working volume per Pierce protocol").
+              For "inferred":       state the derivation that yields this specific
+                value (arithmetic, action semantics, prior-step inheritance, etc.).
+              Used ONLY when source ∈ {{"domain_default", "inferred"}}.
+
+  why_not_in_instruction:
+              ONE sentence answering: "why did I have to infer this instead of
+              cite it?" Name the SPECIFIC element the instruction lacks. Do NOT
+              write generic things like "not specified" or "user didn't say" —
+              state what you would have expected to find. Examples:
+                - "instruction names the substance but not its source labware"
+                - "instruction gives per-tube volume but not the total"
+                - "instruction names the protocol but not the working volume"
               Used ONLY when source ∈ {{"domain_default", "inferred"}}.
 
   confidence: 0.0-1.0
@@ -95,19 +120,46 @@ PROVENANCE — every value you extract MUST have a provenance object:
     User says "do a Bradford assay" (you infer 50uL working volume):
       volume: {{value: 50, unit: "uL", exact: false,
                provenance: {{source: "domain_default",
-                             reasoning: "Bradford assay standard working volume per Pierce protocol",
+                             positive_reasoning: "50uL is the standard Bradford working volume per Pierce protocol",
+                             why_not_in_instruction: "the instruction names the protocol ('Bradford assay') but does not state the working volume",
                              confidence: 0.7}}}}
+    User says "add 2uL to each of 4 tubes" and you compute total = 8uL:
+      volume: {{value: 8, unit: "uL", exact: false,
+               provenance: {{source: "inferred",
+                             positive_reasoning: "2uL per tube x 4 tubes = 8uL total",
+                             why_not_in_instruction: "the instruction gives per-tube volume but not the total",
+                             confidence: 0.9}}}}
 
   ANTI-PATTERNS (do NOT do these):
     User says "add 2uL to each of 4 tubes" and you compute total = 8uL:
       WRONG: {{source: "instruction", cited_text: "2uL"}}  (8 is NOT in the instruction)
-      RIGHT: {{source: "inferred", reasoning: "Computed: 2uL per tube x 4 tubes = 8uL total", confidence: 0.9}}
+      RIGHT: {{source: "inferred",
+               positive_reasoning: "2uL per tube x 4 tubes = 8uL total",
+               why_not_in_instruction: "the instruction gives per-tube volume but not the total",
+               confidence: 0.9}}
     User says "mix at half the total volume" where total is 100uL:
       WRONG: {{source: "instruction", cited_text: "100uL"}}  (the value 50 isn't there)
-      RIGHT: {{source: "inferred", reasoning: "Half of 100uL total volume = 50uL", confidence: 0.8}}
-    Mixing both fields:
-      WRONG: {{source: "instruction", cited_text: "100uL", reasoning: "user said it"}}  (don't add reasoning when sourced from instruction)
+      RIGHT: {{source: "inferred",
+               positive_reasoning: "half of 100uL total volume = 50uL",
+               why_not_in_instruction: "the instruction describes a fraction of the total but not the absolute mix volume",
+               confidence: 0.8}}
+    Mixing cite + reasoning fields:
+      WRONG: {{source: "instruction", cited_text: "100uL", positive_reasoning: "user said it"}}
+              (don't add reasoning fields when sourced from instruction — the cite IS the justification)
       RIGHT: {{source: "instruction", cited_text: "100uL", confidence: 1.0}}
+    Folding both claims into one sentence (defeats the reviewer split):
+      WRONG: {{source: "inferred",
+               positive_reasoning: "8uL total because 2uL x 4 tubes and the instruction does not say total",
+               why_not_in_instruction: null,
+               confidence: 0.9}}
+      RIGHT: {{source: "inferred",
+               positive_reasoning: "2uL per tube x 4 tubes = 8uL total",
+               why_not_in_instruction: "the instruction gives per-tube volume but not the total",
+               confidence: 0.9}}
+    Empty/lazy why_not_in_instruction:
+      WRONG: {{why_not_in_instruction: "not specified"}}      (says nothing — what was missing?)
+      WRONG: {{why_not_in_instruction: "user didn't say"}}    (same)
+      RIGHT: {{why_not_in_instruction: "the instruction names the labware but not the well position"}}
 
 COMPOSITION PROVENANCE — every step MUST have a composition_provenance object answering TWO questions:
 

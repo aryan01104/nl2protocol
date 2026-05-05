@@ -117,6 +117,36 @@
     transform: translateY(1px);
   }
 
+  /* ───────── Review-lifecycle badges (ADR-0009) ─────────
+     The Provenance carries `review_status` (original / reviewed_agree /
+     reviewed_disagree / user_confirmed / user_edited /
+     user_accepted_suggestion / user_skipped). Only the two
+     attention-worthy states get an inline badge; everything else surfaces
+     in the tooltip.
+
+       reviewed_disagree → red ⚠ superscript ("the reviewer pushed back here")
+       user_edited       → blue ✎ marker     ("the user touched this value")
+
+     Other non-default states (reviewed_agree, user_accepted_suggestion,
+     user_confirmed, user_skipped) get the prov-review-* class for tooltip
+     consumers but no inline glyph — they're positive/passive states and
+     don't deserve column-scan attention. */
+  .prov-review-reviewed-disagree::after {
+    content: "⚠";
+    margin-left: 3px;
+    font-size: 10px;
+    color: var(--col-instruction);
+    vertical-align: super;
+    font-weight: 700;
+  }
+  .prov-review-user-edited::after {
+    content: "✎";
+    margin-left: 3px;
+    font-size: 11px;
+    color: #1f5fa6;
+    vertical-align: baseline;
+  }
+
   /* ───────── Per-citation palette ─────────
      `.palette-N` paints the text for both:
        - .cite-marker.cite-atomic-color in the instruction column
@@ -318,6 +348,16 @@
   #hover-tip .tip-quote.palette-5 { border-left-color: var(--palette-5); }
   #hover-tip .tip-quote.palette-6 { border-left-color: var(--palette-6); }
   #hover-tip .tip-quote.palette-7 { border-left-color: var(--palette-7); }
+  /* Reviewer-objection box uses the instruction-red bar to signal "flagged
+     concern, attention needed" — distinct from the step-blockquote palettes. */
+  #hover-tip .tip-objection {
+    margin: 8px 0 0;
+    padding: 4px 0 4px 10px;
+    border-left: 3px solid var(--col-instruction);
+    color: #ffd9c2;
+    font-style: italic;
+    line-height: 1.4;
+  }
 
   /* ───────── SVG arrow overlay ─────────
      Arrows are reserved for composite (step-existence) grounding only —
@@ -369,6 +409,8 @@
     <span><span class="swatch" style="background: var(--col-instruction)"></span>→ arrow = step decomposition (instruction phrase → spec step)</span>
     <span style="color: var(--dim); font-style: italic;">instruction-sourced atoms: per-citation hue (same hue on cite + value)</span>
     <span><span class="non-instr-marker">▴</span> non-instruction atom (filled in by model — domain default / inferred / config)</span>
+    <span style="color: var(--col-instruction); font-weight: 700;">⚠</span><span style="margin-left: 4px;"> reviewer disagreed (hover for objection)</span>
+    <span style="color: #1f5fa6;">✎</span><span style="margin-left: 4px;"> user-edited during gap resolution</span>
   </div>
 </header>
 
@@ -406,9 +448,16 @@
     {% endif %}
   </div>
 
-  <!-- ───────── Column 3: Complete Spec ───────── -->
+  <!-- ───────── Column 3: Resolved Spec ─────────
+       Renamed from "Complete Spec" per ADR-0009. This column shows the
+       spec AFTER gap resolution + labware resolution + constraint check
+       — i.e. the post-orchestrator + post-validation view, which becomes
+       CompleteProtocolSpec at the type-system level. The rename is
+       forward-compatible with the planned five-column layout (ADR-0010)
+       where this becomes column 3 of 5 ("Gap-Resolved") with a separate
+       "Validated Spec" column to its right. -->
   <div class="col">
-    <h2>Complete Spec</h2>
+    <h2>Resolved Spec</h2>
     {% if completed_steps %}
       {% for step in completed_steps %}
         <div class="step {{ step.step_class }}"
@@ -599,17 +648,49 @@
   }
 
   function tooltipHtmlForValueSpan(el) {
-    // Atomic value tooltip — uniform header regardless of source:
-    //   "SOURCE: <kind> · CONFIDENCE: <pct>"
-    // Below: cited substring (for instruction) or reasoning (for non-instruction).
+    // Atomic value tooltip:
+    //   header line:  "SOURCE: <kind> · CONFIDENCE: <pct> · REVIEW: <state-glyph>"
+    //   for instruction-sourced values: cited substring as a quoted line.
+    //   for non-instruction values: TWO labeled rows:
+    //     [WHY THIS VALUE]      positive_reasoning
+    //     [WHY NOT IN INSTR]    why_not_in_instruction
+    //   when review_status == 'reviewed_disagree': boxed reviewer objection.
     const source = el.getAttribute("data-prov-source") || "unknown";
     const conf = el.getAttribute("data-prov-confidence") || "";
     const cited = el.getAttribute("data-prov-cited");
-    const reasoning = el.getAttribute("data-prov-reasoning");
+    const positiveReasoning = el.getAttribute("data-prov-positive-reasoning")
+                              || el.getAttribute("data-prov-reasoning");
+    const whyNotInInstruction = el.getAttribute("data-prov-why-not-in-instruction");
+    const reviewStatus = el.getAttribute("data-prov-review-status") || "original";
+    const reviewerObjection = el.getAttribute("data-prov-reviewer-objection");
     const confPct = conf ? `${Math.round(parseFloat(conf) * 100)}%` : "";
-    let parts = [`<div class="tip-meta">source: ${escapeHtml(source)}${confPct ? ` · confidence: ${confPct}` : ""}</div>`];
-    if (cited) parts.push(`<div class="tip-cite">"${escapeHtml(cited)}"</div>`);
-    if (reasoning) parts.push(`<div class="tip-reasoning">${escapeHtml(reasoning)}</div>`);
+
+    // Compact glyph + label per review state. 'original' is the default
+    // state and gets no extra meta — the source/confidence pair is enough.
+    const reviewGlyph = ({
+      reviewed_agree:           "✓ reviewer agreed",
+      reviewed_disagree:        "✗ reviewer disagreed",
+      user_confirmed:           "✓ confirmed",
+      user_edited:              "✎ edited by user",
+      user_accepted_suggestion: "→ accepted suggestion",
+      user_skipped:             "↷ skipped",
+    })[reviewStatus] || "";
+
+    let parts = [
+      `<div class="tip-meta">source: ${escapeHtml(source)}${confPct ? ` · confidence: ${confPct}` : ""}${reviewGlyph ? ` · ${escapeHtml(reviewGlyph)}` : ""}</div>`,
+    ];
+    if (cited) {
+      parts.push(`<div class="tip-cite">"${escapeHtml(cited)}"</div>`);
+    }
+    if (positiveReasoning) {
+      parts.push(`<div class="tip-section"><div class="tip-meta">why this value</div><div class="tip-reasoning">${escapeHtml(positiveReasoning)}</div></div>`);
+    }
+    if (whyNotInInstruction) {
+      parts.push(`<div class="tip-section"><div class="tip-meta">why not in instruction</div><div class="tip-reasoning">${escapeHtml(whyNotInInstruction)}</div></div>`);
+    }
+    if (reviewerObjection) {
+      parts.push(`<div class="tip-section"><div class="tip-meta">reviewer objection</div><blockquote class="tip-objection">${escapeHtml(reviewerObjection)}</blockquote></div>`);
+    }
     return parts.join("");
   }
 

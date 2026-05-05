@@ -22,21 +22,47 @@ WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 # ============================================================================
 
 class Provenance(BaseModel):
-    """Per-value provenance: where a single extracted value came from.
+    """Per-value provenance: where a single extracted/inferred value came from
+    AND where it currently sits in the human-review lifecycle.
 
-    Structured cite + reasoning, separated by which question is being answered:
-      - source == "instruction"           → cited_text required (verbatim quote)
-      - source in {"domain_default",      → reasoning required (explanation)
-                   "inferred"}
+    Three orthogonal concerns on every Provenance:
 
-    'config' is NOT a valid source for extractor-emitted Provenance —
-    the extractor LLM does not have access to the lab config. See ADR-0005.
+    1. **Source attribution** — `source` + (`cited_text` | `positive_reasoning`):
+         - source == "instruction":  cited_text required (verbatim quote from
+                                     the user's instruction). The citation IS
+                                     the justification — no reasoning fields.
+         - source == "domain_default" / "inferred":
+                                     positive_reasoning required.
+                                     why_not_in_instruction strongly recommended
+                                     when an instruction exists; the
+                                     extractor/suggester boundary enforces that
+                                     since the schema cannot tell on its own.
+
+    2. **Reasoning split** (ADR-0009) — `positive_reasoning` + `why_not_in_instruction`:
+       Pre-ADR-0009 used a single `reasoning` field. The split lets the
+       independent reviewer verify two distinct claims separately
+       (positive: 'why is X right?'; negative: 'why not just cite?') and lets
+       the HTML report render them as labeled rows. Backwards compatibility:
+       legacy `reasoning="..."` input migrates into positive_reasoning via
+       `_migrate_legacy_reasoning`, and the read-only `.reasoning` property
+       returns positive_reasoning so existing read-sites keep working.
+
+    3. **Review lifecycle** (ADR-0009) — `review_status` + `reviewer_objection`:
+       Tracks how this Provenance moved through the gap-resolver loop. New
+       values default to "original"; reviewer/user actions stamp the
+       appropriate state, so the audit trail survives into the spec, the
+       JSON state dumps, and the HTML report.
+
+    'config' is NOT a valid source for Provenance — the extractor LLM does
+    not see the lab config. Suggesters that look up values from config write
+    source="inferred" with positive_reasoning that cites the config path.
+    See ADR-0005.
     """
     source: Literal["instruction", "domain_default", "inferred"] = Field(..., description=(
         "Where this value came from. "
         "'instruction' = user literally wrote it (cited_text required). "
-        "'domain_default' = standard practice for a named protocol (reasoning required). "
-        "'inferred' = reasoning or guess with no direct support (reasoning required)."
+        "'domain_default' = standard practice for a named protocol (positive_reasoning required). "
+        "'inferred' = reasoning or guess with no direct support (positive_reasoning required)."
     ))
     cited_text: Optional[str] = Field(None, description=(
         "The verbatim substring from the instruction text that grounds this value. "
@@ -45,12 +71,44 @@ class Provenance(BaseModel):
         "should contain the value (e.g., for value=100uL, cited_text might be "
         "'100uL of buffer'). Leave null when source is 'domain_default' or 'inferred'."
     ))
-    reasoning: Optional[str] = Field(None, description=(
-        "One sentence explaining how this value follows from domain knowledge or inference. "
+    positive_reasoning: Optional[str] = Field(None, description=(
+        "One sentence answering: 'why is THIS the right value?'. "
         "REQUIRED when source in {'domain_default', 'inferred'}. "
         "For 'domain_default': cite the protocol and standard practice. "
-        "For 'inferred': state the reasoning chain. "
-        "Leave null when source is 'instruction' (use cited_text instead)."
+        "For 'inferred': state the reasoning chain that yields this specific value. "
+        "Leave null when source is 'instruction' (the citation IS the justification)."
+    ))
+    why_not_in_instruction: Optional[str] = Field(None, description=(
+        "One sentence answering: 'why did I have to infer this instead of cite it?'. "
+        "Examples: 'instruction names the substance but not its source labware — "
+        "looked up via config' / 'instruction does not specify temperature for wait — "
+        "inherited from prior set_temperature step'. Leave null when source is "
+        "'instruction'. Strongly recommended (but not schema-enforced) for "
+        "'inferred'/'domain_default' when an instruction exists; the extractor and "
+        "suggesters enforce this at their boundary."
+    ))
+    review_status: Literal[
+        "original",
+        "reviewed_agree",
+        "reviewed_disagree",
+        "user_confirmed",
+        "user_edited",
+        "user_accepted_suggestion",
+        "user_skipped",
+    ] = Field("original", description=(
+        "Where this Provenance sits in the gap-resolver review lifecycle. "
+        "'original'                = just extracted or just suggested; not yet reviewed. "
+        "'reviewed_agree'          = independent reviewer confirmed the claims. "
+        "'reviewed_disagree'       = reviewer flagged a concern (see reviewer_objection). "
+        "'user_confirmed'          = user saw the value and kept it as-is. "
+        "'user_edited'             = user typed a new value. "
+        "'user_accepted_suggestion'= user took the suggester's value verbatim. "
+        "'user_skipped'            = user explicitly skipped the gap (value remains original)."
+    ))
+    reviewer_objection: Optional[str] = Field(None, description=(
+        "The independent reviewer's stated concern. REQUIRED when "
+        "review_status == 'reviewed_disagree'; FORBIDDEN otherwise. Surfaces in the "
+        "CLI prompt and HTML report so the user can see why the reviewer pushed back."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this value is correct. "
@@ -61,18 +119,60 @@ class Provenance(BaseModel):
         "Below 0.4 = not sure."
     ))
 
+    @model_validator(mode='before')
+    @classmethod
+    def _migrate_legacy_reasoning(cls, data):
+        """Migrate legacy `reasoning="..."` input to `positive_reasoning="..."`.
+
+        Pre:    Raw input passed to the Provenance constructor — typically a
+                dict (from kwargs, model_validate, or JSON deserialization).
+                May also be an already-validated Provenance instance when
+                Pydantic re-runs validation; in that case this is a no-op.
+
+        Post:   When `data` is a dict containing the legacy `reasoning` key:
+                  * Removes `reasoning` from the dict.
+                  * If the legacy value is truthy AND `positive_reasoning` is
+                    not already set, copies the legacy value into
+                    `positive_reasoning`.
+                  * If `positive_reasoning` is already set, the legacy value
+                    is dropped (positive_reasoning takes precedence).
+                Returns the (possibly mutated) `data` so subsequent validation
+                operates on the migrated input.
+                When `data` is anything else: returns it unchanged.
+
+        Side effects: Mutates the input dict in place when migration applies.
+
+        Raises: Never.
+        """
+        if isinstance(data, dict) and "reasoning" in data:
+            legacy = data.pop("reasoning")
+            if legacy and not data.get("positive_reasoning"):
+                data["positive_reasoning"] = legacy
+        return data
+
     @model_validator(mode='after')
     def require_appropriate_field_for_source(self) -> 'Provenance':
-        """Enforce: cited_text iff source == 'instruction'; reasoning iff source != 'instruction'.
+        """Enforce per-source field invariants on cite + reasoning fields.
 
         Pre:    Pydantic-validated Provenance instance.
 
-        Post:   Raises ValueError if the source/cited_text/reasoning fields
-                are inconsistent. The two fields are mutually exclusive by
-                source: instruction-sourced values must cite a substring;
-                domain/inferred values must explain reasoning.
+        Post:   Returns self when the source/cite/reasoning fields are
+                self-consistent. Specifically:
+                  * source == 'instruction'  → cited_text required;
+                                                positive_reasoning AND
+                                                why_not_in_instruction must
+                                                both be empty (the citation
+                                                IS the justification).
+                  * source != 'instruction'  → positive_reasoning required;
+                                                cited_text must be empty
+                                                (non-instruction-sourced
+                                                values cannot ground in
+                                                user-quoted text).
+                why_not_in_instruction is allowed but not required for
+                non-instruction sources at the schema layer; the extractor
+                and suggesters enforce its presence when an instruction exists.
 
-        Raises: ValueError when the conditional invariant is violated.
+        Raises: ValueError describing the offending field combination.
         """
         if self.source == "instruction":
             if not self.cited_text:
@@ -81,25 +181,80 @@ class Provenance(BaseModel):
                     "(the verbatim substring from the instruction). "
                     f"Got cited_text={self.cited_text!r}."
                 )
-            if self.reasoning:
+            if self.positive_reasoning:
                 raise ValueError(
-                    "Provenance with source='instruction' must NOT carry reasoning — "
-                    "the citation IS the justification. Move any explanation into a "
-                    "separate field or onto the parent CompositionProvenance."
+                    "Provenance with source='instruction' must NOT carry "
+                    "positive_reasoning — the citation IS the justification."
+                )
+            if self.why_not_in_instruction:
+                raise ValueError(
+                    "Provenance with source='instruction' must NOT carry "
+                    "why_not_in_instruction — the value WAS in the instruction "
+                    "(that's why source is 'instruction')."
                 )
         else:  # domain_default or inferred
-            if not self.reasoning:
+            if not self.positive_reasoning:
                 raise ValueError(
-                    f"Provenance with source='{self.source}' requires reasoning "
-                    "(an explanation of how the value follows from domain knowledge or inference). "
-                    f"Got reasoning={self.reasoning!r}."
+                    f"Provenance with source='{self.source}' requires "
+                    "positive_reasoning (an explanation of how this value follows "
+                    "from domain knowledge or inference). "
+                    f"Got positive_reasoning={self.positive_reasoning!r}."
                 )
             if self.cited_text:
                 raise ValueError(
-                    f"Provenance with source='{self.source}' must NOT carry cited_text — "
-                    "non-instruction-sourced values cannot ground in user-quoted text."
+                    f"Provenance with source='{self.source}' must NOT carry "
+                    "cited_text — non-instruction-sourced values cannot ground "
+                    "in user-quoted text."
                 )
         return self
+
+    @model_validator(mode='after')
+    def require_reviewer_objection_iff_disagree(self) -> 'Provenance':
+        """Enforce reviewer_objection ↔ review_status == 'reviewed_disagree'.
+
+        Pre:    Pydantic-validated Provenance instance.
+
+        Post:   Returns self when EITHER:
+                  * review_status == 'reviewed_disagree' AND reviewer_objection
+                    is non-empty,
+                  OR
+                  * review_status != 'reviewed_disagree' AND reviewer_objection
+                    is None.
+                Mirrors the same biconditional that
+                gap_resolution.types.ReviewResult enforces — once a
+                disagreement has been stamped onto a Provenance, the
+                objection rationale must accompany it; conversely, no other
+                review state may carry an objection.
+
+        Raises: ValueError on either side of the biconditional being violated.
+        """
+        if self.review_status == "reviewed_disagree":
+            if not self.reviewer_objection:
+                raise ValueError(
+                    "Provenance with review_status='reviewed_disagree' requires "
+                    "reviewer_objection (the reviewer's stated concern). "
+                    f"Got reviewer_objection={self.reviewer_objection!r}."
+                )
+        else:
+            if self.reviewer_objection:
+                raise ValueError(
+                    f"Provenance with review_status='{self.review_status}' must NOT "
+                    "carry reviewer_objection — only 'reviewed_disagree' carries one."
+                )
+        return self
+
+    @property
+    def reasoning(self) -> Optional[str]:
+        """DEPRECATED read-only alias for positive_reasoning.
+
+        Pre-ADR-0009 callers read `prov.reasoning`. ADR-0009 split the field
+        into positive_reasoning + why_not_in_instruction. This property keeps
+        legacy READS working (returns positive_reasoning); legacy WRITES are
+        handled by `_migrate_legacy_reasoning`. New code should read
+        `positive_reasoning` directly. NOT a Pydantic field — does not appear
+        in model_dump() output.
+        """
+        return self.positive_reasoning
 
 
 class CompositionProvenance(BaseModel):
