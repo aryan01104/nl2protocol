@@ -633,6 +633,89 @@ def _collect_resolution_arrows(events) -> list:
     return list(by_prov_id.values())
 
 
+def _lab_state_row_target_prov_ids(spec, labware: str, well: str) -> list:
+    """Find every spec cell whose source/destination LocationRef references
+    the given (labware, well) tuple. Returns a list of prov-ids the JS
+    can use to highlight the matching cells when a lab-state row is hovered.
+
+    Per ADR-0011 Phase 4 (cross-column row hover): each lab-state row
+    carries a space-separated `data-target-cells` attribute carrying these
+    prov-ids; JS toggles `.prov-active` on those cells when the row is
+    hovered.
+
+    Pre:    `spec` is a ProtocolSpec (or None). `labware` is the
+            row's labware name (config label or user description, whichever
+            the row stores). `well` is the row's well name; empty string
+            for prefilled-labware rows that cover all wells uniformly.
+    Post:   Returns a list of "s{step_idx}-{role}" strings where the step's
+            source or destination LocationRef has `resolved_label OR
+            description == labware` AND well coverage matches:
+              * empty `well` (prefilled row) → every cell on this labware matches
+              * single `ref.well == well` → match
+              * `well` in `ref.wells` list → match
+              * `ref.well_range` coverage is NOT computed in this MVP —
+                future polish; today's user case (Bradford and similar)
+                doesn't need it.
+            Empty list when spec is None.
+    Side effects: None.
+    """
+    if spec is None:
+        return []
+    matches = []
+    for step_idx, step in enumerate(getattr(spec, "steps", [])):
+        sid = f"s{step_idx}"
+        for fname in ("source", "destination"):
+            ref = getattr(step, fname, None)
+            if ref is None:
+                continue
+            ref_label = getattr(ref, "resolved_label", None) or getattr(ref, "description", "")
+            if ref_label != labware:
+                continue
+            if well == "":
+                matches.append(f"{sid}-{fname}")
+                continue
+            if getattr(ref, "well", None) == well:
+                matches.append(f"{sid}-{fname}")
+                continue
+            if well in (getattr(ref, "wells", None) or []):
+                matches.append(f"{sid}-{fname}")
+                continue
+    return matches
+
+
+def _labware_mapping_row_target_prov_ids(spec, description: str,
+                                          resolved_label: Optional[str]) -> list:
+    """Find every spec cell whose source/destination LocationRef matches
+    the given description OR resolved_label. Returns a list of prov-ids
+    for the JS to highlight on row hover.
+
+    Pre:    `spec` is a ProtocolSpec (or None). `description` is the
+            user-language wording stored on the row. `resolved_label` is
+            the config label the row resolved to (or None if unresolved).
+    Post:   Returns a list of "s{step_idx}-{role}" strings where either:
+              * `ref.description == description`, OR
+              * `resolved_label is not None AND ref.resolved_label == resolved_label`
+            Both conditions OR'd because the row links the description to
+            its label; either match identifies a cell relevant to this row.
+            Empty list when spec is None.
+    Side effects: None.
+    """
+    if spec is None:
+        return []
+    matches = []
+    for step_idx, step in enumerate(getattr(spec, "steps", [])):
+        sid = f"s{step_idx}"
+        for fname in ("source", "destination"):
+            ref = getattr(step, fname, None)
+            if ref is None:
+                continue
+            if (getattr(ref, "description", None) == description or
+                (resolved_label is not None and
+                 getattr(ref, "resolved_label", None) == resolved_label)):
+                matches.append(f"{sid}-{fname}")
+    return matches
+
+
 def _collect_lab_state_rows(spec) -> list:
     """Walk spec.initial_contents and prefilled_labware; return one row
     per pre-run lab-state entry the user should see audited.
@@ -640,18 +723,20 @@ def _collect_lab_state_rows(spec) -> list:
     Per ADR-0011 Phase 2c: the lab-state panel is the audit surface for
     "what's in the lab before the protocol runs." Replay-mode renders
     the rows static (read-only); future live-mode (Phase 3) makes the
-    same shape editable.
+    same shape editable. Phase 4 polish: each row carries
+    `target_prov_ids` for cross-column hover-highlighting.
 
     Pre:    `spec` is a ProtocolSpec or CompleteProtocolSpec, post-validation
             (the version visible in column 4). May be None when no spec
             event was captured.
     Post:   Returns a list of dicts:
               {
-                "labware":   str,
-                "well":      str,        # well name or empty for prefilled-labware rows
-                "substance": str,
-                "volume_ul": Optional[float],
-                "kind":      str,        # "well" or "prefilled" — for downstream rendering
+                "labware":          str,
+                "well":             str,        # well name or empty for prefilled-labware rows
+                "substance":        str,
+                "volume_ul":        Optional[float],
+                "kind":             str,        # "well" or "prefilled" — for downstream rendering
+                "target_prov_ids":  str,        # space-separated, for data-target-cells
               }
             Empty list when spec is None or has no initial_contents +
             prefilled_labware. Initial_contents come first (per-well rows),
@@ -668,6 +753,7 @@ def _collect_lab_state_rows(spec) -> list:
             "substance": ic.substance,
             "volume_ul": ic.volume_ul,
             "kind": "well",
+            "target_prov_ids": " ".join(_lab_state_row_target_prov_ids(spec, ic.labware, ic.well)),
         })
     for pf in getattr(spec, "prefilled_labware", []):
         rows.append({
@@ -676,6 +762,7 @@ def _collect_lab_state_rows(spec) -> list:
             "substance": pf.substance,
             "volume_ul": pf.volume_ul,
             "kind": "prefilled",
+            "target_prov_ids": " ".join(_lab_state_row_target_prov_ids(spec, pf.labware, "")),
         })
     return rows
 
@@ -687,12 +774,17 @@ def _collect_labware_mapping_rows(spec) -> list:
     Per ADR-0011 Phase 2c: the labware-mapping panel is the audit
     surface for "which config labware does each user-language description
     map to." Replays the work the legacy `_confirm_labware_assignments`
-    does today.
+    does today. Phase 4 polish: each row carries `target_prov_ids` for
+    cross-column hover-highlighting.
 
     Pre:    `spec` is a ProtocolSpec post-validation (column-4 version).
             May be None.
     Post:   Returns a list of dicts:
-              {"description": str, "resolved_label": str|None}
+              {
+                "description":     str,
+                "resolved_label":  str|None,
+                "target_prov_ids": str,         # space-separated, for data-target-cells
+              }
             Deduped by `description` (first-seen wins on resolved_label —
             in practice the resolver guarantees consistent assignment per
             description). resolved_label may be None for refs the LLM
@@ -713,7 +805,13 @@ def _collect_labware_mapping_rows(spec) -> list:
                 continue
             seen[desc] = getattr(ref, "resolved_label", None)
     return [
-        {"description": desc, "resolved_label": label}
+        {
+            "description": desc,
+            "resolved_label": label,
+            "target_prov_ids": " ".join(
+                _labware_mapping_row_target_prov_ids(spec, desc, label)
+            ),
+        }
         for desc, label in seen.items()
     ]
 

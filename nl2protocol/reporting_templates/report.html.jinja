@@ -483,6 +483,14 @@
     font-style: italic;
     padding: 4px 0;
   }
+  /* Phase 4 polish: row hover for cross-column highlighting. The row
+     becomes a hover target that lights up cells in the spec columns
+     via the existing data-prov-id system. */
+  .panel tbody tr[data-target-cells]:hover,
+  .panel tbody tr.row-active {
+    background: rgba(184, 68, 79, 0.06);
+    cursor: help;
+  }
 
   /* ───────── Footer ───────── */
   footer {
@@ -642,7 +650,7 @@
         </thead>
         <tbody>
           {% for row in lab_state_rows %}
-            <tr>
+            <tr data-target-cells="{{ row.target_prov_ids|e }}">
               <td class="col-label">{{ row.labware|e }}</td>
               <td>{{ row.well|e if row.kind == "well" else "(all wells)" }}</td>
               <td class="col-substance">{{ row.substance|e }}</td>
@@ -668,7 +676,7 @@
         </thead>
         <tbody>
           {% for row in labware_mapping_rows %}
-            <tr>
+            <tr data-target-cells="{{ row.target_prov_ids|e }}">
               <td class="col-description">"{{ row.description|e }}"</td>
               <td class="col-label">{{ row.resolved_label|e if row.resolved_label else "(unresolved)" }}</td>
             </tr>
@@ -980,6 +988,18 @@
         setQ2Active(sid, false);
         setPairActive(`${sid}-step-trigger`, false);
       }));
+    });
+
+    // Phase 4 polish: bulk-panel row hover lights up corresponding spec cells.
+    // Each row carries `data-target-cells` (space-separated prov-ids); on
+    // hover we toggle .prov-active across all cells with matching ids in
+    // the spec columns. Reuses the existing setPairActive helper that
+    // already drives the cite ↔ value pair highlight.
+    document.querySelectorAll(".panel tbody tr[data-target-cells]").forEach((rowEl) => {
+      const ids = (rowEl.getAttribute("data-target-cells") || "").split(/\s+/).filter(Boolean);
+      if (ids.length === 0) return;
+      rowEl.addEventListener("mouseenter", () => ids.forEach((id) => setPairActive(id, true)));
+      rowEl.addEventListener("mouseleave", () => ids.forEach((id) => setPairActive(id, false)));
     });
   }
 

@@ -883,6 +883,130 @@ class TestADR0011Phase2cBulkPanels:
         assert panels_idx > grid_idx
 
 
+class TestADR0011Phase4RowHover:
+    """Phase 4 polish: each panel row carries `data-target-cells` listing
+    the spec-cell prov-ids it relates to. JS toggles .prov-active on
+    those cells when the row is hovered, completing the visual loop
+    between the panels and the spec columns."""
+
+    def _spec_with_known_cells(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume, WellContents,
+        )
+        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(
+            summary="t",
+            steps=[
+                # Step 0: source = sample_rack A1, dest = assay_plate A1
+                ExtractedStep(
+                    order=1, action="transfer",
+                    volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
+                                              provenance=prov),
+                    source=LocationRef(description="rack", well="A1",
+                                        resolved_label="sample_rack",
+                                        provenance=prov),
+                    destination=LocationRef(description="plate", well="A1",
+                                             resolved_label="assay_plate",
+                                             provenance=prov),
+                    composition_provenance=comp,
+                ),
+                # Step 1: source = sample_rack A2, dest = assay_plate B1
+                ExtractedStep(
+                    order=2, action="transfer",
+                    volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
+                                              provenance=prov),
+                    source=LocationRef(description="rack", well="A2",
+                                        resolved_label="sample_rack",
+                                        provenance=prov),
+                    destination=LocationRef(description="plate", well="B1",
+                                             resolved_label="assay_plate",
+                                             provenance=prov),
+                    composition_provenance=comp,
+                ),
+            ],
+            initial_contents=[
+                WellContents(labware="sample_rack", well="A1",
+                             substance="BSA stock", volume_ul=200.0),
+            ],
+        )
+
+    def test_lab_state_target_prov_ids_for_specific_well(self):
+        from nl2protocol.reporting import _lab_state_row_target_prov_ids
+        spec = self._spec_with_known_cells()
+        # sample_rack A1 is the source on step 0 only.
+        ids = _lab_state_row_target_prov_ids(spec, "sample_rack", "A1")
+        assert ids == ["s0-source"]
+
+    def test_lab_state_target_prov_ids_no_match_returns_empty(self):
+        from nl2protocol.reporting import _lab_state_row_target_prov_ids
+        spec = self._spec_with_known_cells()
+        # sample_rack D6 is referenced by no step's source/dest in this spec.
+        ids = _lab_state_row_target_prov_ids(spec, "sample_rack", "D6")
+        assert ids == []
+
+    def test_lab_state_target_prov_ids_prefilled_covers_all_wells(self):
+        from nl2protocol.reporting import _lab_state_row_target_prov_ids
+        spec = self._spec_with_known_cells()
+        # Empty well → prefilled-labware row: should match every cell on
+        # this labware, regardless of which well the cell uses.
+        ids = sorted(_lab_state_row_target_prov_ids(spec, "sample_rack", ""))
+        # Both step-0-source and step-1-source reference sample_rack.
+        assert ids == ["s0-source", "s1-source"]
+
+    def test_labware_mapping_target_prov_ids_covers_both_steps(self):
+        from nl2protocol.reporting import _labware_mapping_row_target_prov_ids
+        spec = self._spec_with_known_cells()
+        # "rack" description / sample_rack label appears as source on
+        # steps 0 and 1 (4 cells total: s0-source, s1-source).
+        ids = sorted(_labware_mapping_row_target_prov_ids(spec, "rack", "sample_rack"))
+        assert ids == ["s0-source", "s1-source"]
+
+    def test_labware_mapping_target_prov_ids_dest_separate_from_source(self):
+        from nl2protocol.reporting import _labware_mapping_row_target_prov_ids
+        spec = self._spec_with_known_cells()
+        # "plate" / assay_plate appears as destination on steps 0 and 1.
+        ids = sorted(_labware_mapping_row_target_prov_ids(spec, "plate", "assay_plate"))
+        assert ids == ["s0-destination", "s1-destination"]
+
+    def test_lab_state_row_carries_target_cells_attribute(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL."}))
+        rep.emit(StageEvent(kind="completed_spec",
+                             data={"spec": self._spec_with_known_cells()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The lab-state row for sample_rack A1 (BSA stock) carries the
+        # data-target-cells attribute pointing at s0-source.
+        # We assert the substring exists; full-DOM assertion would need
+        # an HTML parser, overkill for this test layer.
+        assert 'data-target-cells="s0-source"' in rendered
+
+    def test_labware_mapping_row_carries_target_cells_attribute(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL."}))
+        rep.emit(StageEvent(kind="completed_spec",
+                             data={"spec": self._spec_with_known_cells()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The "rack" → sample_rack row's target cells include both step
+        # sources. Order of ids in the attr matches the spec walk order.
+        assert 'data-target-cells="s0-source s1-source"' in rendered
+        # And the "plate" → assay_plate row covers both destinations.
+        assert 'data-target-cells="s0-destination s1-destination"' in rendered
+
+
 class TestFindCitePosition:
     """Locating cited_text substrings in the instruction (case-insensitive,
     whitespace-tolerant)."""
