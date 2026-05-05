@@ -160,6 +160,31 @@ Files:
              '(instruction → spec → complete spec → script) with color-coded provenance.'
     )
 
+    # ADR-0013: live-mode server (primary user surface).
+    parser.add_argument(
+        '--serve',
+        action='store_true',
+        help='Start the live-mode FastAPI server (ADR-0013). Opens the browser, runs '
+             'the pipeline server-side, streams events over WebSocket. Phase 3a: backend '
+             'network layer + placeholder page; Phase 3b adds the real visual rendering.'
+    )
+    parser.add_argument(
+        '--serve-host',
+        default='127.0.0.1',
+        help='Host to bind the live-mode server to (default: 127.0.0.1).'
+    )
+    parser.add_argument(
+        '--serve-port',
+        type=int,
+        default=8000,
+        help='Port to bind the live-mode server to (default: 8000).'
+    )
+    parser.add_argument(
+        '--no-open-browser',
+        action='store_true',
+        help='Do not auto-open a browser tab when --serve starts (CI / headless mode).'
+    )
+
     return parser
 
 
@@ -516,6 +541,37 @@ def main(argv: list = None) -> int:
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+
+    # ADR-0013 Phase 3a: live-mode server. When --serve is set, hand off
+    # to the FastAPI server. The pipeline runs server-side; the browser
+    # is the user surface. Static-CLI mode (without --serve) remains
+    # available for non-interactive runs.
+    if args.serve:
+        # The serve path needs an instruction file path (not resolved
+        # text); the server reads the file itself in its worker thread.
+        # If the user passed literal instruction text, write it to a
+        # temp file for the server to read.
+        instruction_path = args.intent
+        if not os.path.isfile(instruction_path):
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(
+                mode='w', suffix='.txt', delete=False, encoding='utf-8',
+            )
+            tmp.write(args.intent)
+            tmp.close()
+            instruction_path = tmp.name
+        from .server import run_serve
+        try:
+            run_serve(
+                instruction_path=instruction_path,
+                config_path=args.config,
+                host=args.serve_host,
+                port=args.serve_port,
+                open_browser=not args.no_open_browser,
+            )
+        except KeyboardInterrupt:
+            print("\n  Server stopped.")
+        return 0
 
     # Resolve intent (read from file if .txt or .pdf)
     try:
