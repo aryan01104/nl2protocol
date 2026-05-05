@@ -91,10 +91,63 @@ class TestConfigLookupSuggester:
                                              context={"config": config})
         assert s is not None
         assert s.value.well == "B3"
-        assert "reagent_rack" in s.value.description
+        # PR3b bug-1 fix: description and resolved_label both equal the bare
+        # config key, so ConstraintChecker's `resolved_label or description`
+        # lookup finds a real config key and doesn't fire LABWARE_NOT_FOUND.
+        assert s.value.description == "reagent_rack"
+        assert s.value.resolved_label == "reagent_rack"
+        # resolved_label_provenance carries the substance-match reasoning
+        # (the reviewer pass reads this; the location's primary provenance
+        # describes the synthesized ref instead).
+        assert s.value.resolved_label_provenance is not None
+        assert "buffer" in s.value.resolved_label_provenance.positive_reasoning
         assert s.provenance_source == "deterministic"
         assert "buffer" in s.positive_reasoning
         assert s.confidence == 0.9
+
+    def test_suggester_output_passes_constraint_check(self):
+        """PR3b bug-1 regression: feeding the suggester's LocationRef into
+        the spec and re-running ConstraintViolationDetector must NOT emit
+        a LABWARE_NOT_FOUND gap. Pre-fix, the suggester wrote a decorated
+        description ('reagent_rack (inferred from config)') and left
+        resolved_label=None, so the constraint check fell back to the
+        decorated description and failed the config-key lookup."""
+        from nl2protocol.gap_resolution import ConstraintViolationDetector
+        spec = ProtocolSpec(summary="t", steps=[
+            ExtractedStep(
+                order=1, action="transfer",
+                substance=ProvenancedString(value="buffer", provenance=_instr_prov("buffer")),
+                volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                          provenance=_instr_prov("10uL")),
+                source=None,
+                destination=LocationRef(
+                    description="reagent_rack", well="A1",
+                    resolved_label="reagent_rack",
+                    provenance=_instr_prov("A1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+        config = {
+            "labware": {
+                "reagent_rack": {
+                    "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+                    "contents": {"B3": "buffer"},
+                }
+            },
+            "pipettes": {"left": {"model": "p20_single_gen2"}},
+        }
+        # Run the suggester: produces a LocationRef.
+        gap = _gap("steps[0].source", description="missing source for buffer")
+        s = ConfigLookupSuggester().suggest(spec=spec, gap=gap,
+                                             context={"config": config})
+        # Apply suggester output to the spec.
+        spec.steps[0].source = s.value
+        # Re-detect: constraint check should be silent on LABWARE_NOT_FOUND.
+        gaps = ConstraintViolationDetector().detect(spec, context={"config": config})
+        labware_not_found = [g for g in gaps
+                             if g.metadata.get("violation_type") == "labware_not_found"]
+        assert labware_not_found == []
 
     def test_returns_none_when_substance_not_in_config(self):
         spec = ProtocolSpec(summary="t", steps=[

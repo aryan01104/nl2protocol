@@ -736,19 +736,45 @@ class SemanticExtractor:
                     contents = lw.get("contents", {})
                     for well, content_desc in contents.items():
                         if isinstance(content_desc, str) and substance_val.lower() in content_desc.lower():
+                            # Schema-correct fill (PR3b bug-1 fix):
+                            #   description=label (bare config key — no
+                            #     user wording to preserve since the user
+                            #     didn't describe this ref).
+                            #   resolved_label=label (the SAME config key,
+                            #     filled directly so ConstraintChecker's
+                            #     `resolved_label or description` lookup
+                            #     finds a real config key on the first try).
+                            #   resolved_label_provenance carries the
+                            #     "why this label" reasoning for the
+                            #     reviewer pass.
                             step.source = LocationRef(
-                                description=f"{label} (inferred from config)",
+                                description=label,
                                 well=well,
+                                resolved_label=label,
                                 provenance=Provenance(
                                     source="inferred",
                                     positive_reasoning=(
-                                        f"Substance '{substance_val}' is listed in "
-                                        f"config labware '{label}' at well {well}."
+                                        f"Synthesized by fill_lookup_and_carryover_gaps "
+                                        f"from the substance match below; no user "
+                                        f"wording existed for this LocationRef."
                                     ),
                                     why_not_in_instruction=(
-                                        f"The instruction names a substance "
-                                        f"('{substance_val}') to transfer but does not "
-                                        f"state which labware/well it comes from."
+                                        f"Instruction names the substance "
+                                        f"('{substance_val}') but does not state any "
+                                        f"location for it — entire ref is filled in."
+                                    ),
+                                    confidence=0.9,
+                                ),
+                                resolved_label_provenance=Provenance(
+                                    source="inferred",
+                                    positive_reasoning=(
+                                        f"Config labware '{label}' lists substance "
+                                        f"'{substance_val}' at well {well}."
+                                    ),
+                                    why_not_in_instruction=(
+                                        f"Instruction names the substance "
+                                        f"('{substance_val}') but does not state "
+                                        f"which labware/well it comes from."
                                     ),
                                     confidence=0.9,
                                 ),

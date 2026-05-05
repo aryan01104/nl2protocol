@@ -82,23 +82,53 @@ class ConfigLookupSuggester:
             contents = lw.get("contents", {}) or {}
             for well, content_desc in contents.items():
                 if isinstance(content_desc, str) and substance_lower in content_desc.lower():
-                    # Mint a LocationRef value. The orchestrator writes this
-                    # back into the spec; provenance is attached via the
-                    # apply step (combining suggester source + user action).
+                    # Mint a LocationRef value. Schema-correct fill:
+                    #   * description = the bare config key (the suggester
+                    #     fills this honestly — there's no user-wording to
+                    #     preserve since the user never described this ref;
+                    #     the orchestrator writes it in to satisfy the
+                    #     LocationRef contract).
+                    #   * resolved_label = the SAME config key. Setting this
+                    #     directly is what keeps ConstraintChecker quiet
+                    #     downstream (it reads `resolved_label or description`
+                    #     to validate against config keys; we want the first
+                    #     branch to win with a real key).
+                    #   * provenance = describes the description/well decision
+                    #     (low information here — the suggester invented both,
+                    #     so source='inferred' with a brief reasoning).
+                    #   * resolved_label_provenance = describes WHY this
+                    #     particular config label was picked — the substance
+                    #     match. This is what the IndependentReviewSuggester
+                    #     reviews (per ADR-0009).
                     from nl2protocol.models.spec import LocationRef, Provenance
                     loc = LocationRef(
-                        description=f"{label} (inferred from config)",
+                        description=label,
                         well=well,
+                        resolved_label=label,
                         provenance=Provenance(
                             source="inferred",
                             positive_reasoning=(
-                                f"Config lookup: substance '{substance_val}' is "
-                                f"listed in labware '{label}' at well {well}."
+                                f"Synthesized by ConfigLookupSuggester from "
+                                f"the substance match below; no user wording "
+                                f"existed for this LocationRef."
                             ),
                             why_not_in_instruction=(
-                                f"The instruction names a substance "
-                                f"('{substance_val}') to transfer but does not "
-                                f"state which labware/well it comes from."
+                                f"Instruction names the substance "
+                                f"('{substance_val}') but does not state any "
+                                f"location for it — entire ref is suggester-filled."
+                            ),
+                            confidence=0.9,
+                        ),
+                        resolved_label_provenance=Provenance(
+                            source="inferred",
+                            positive_reasoning=(
+                                f"Config labware '{label}' lists substance "
+                                f"'{substance_val}' at well {well}."
+                            ),
+                            why_not_in_instruction=(
+                                f"Instruction names the substance "
+                                f"('{substance_val}') but does not state which "
+                                f"labware/well it comes from."
                             ),
                             confidence=0.9,
                         ),

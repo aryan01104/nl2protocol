@@ -177,12 +177,20 @@ class TestLookupGap:
         src = filled.steps[0].source
         assert src is not None
         assert src.well == "A1"
+        # PR3b bug-1 fix: description and resolved_label both equal the
+        # bare config key so ConstraintChecker passes on the first lookup.
+        assert src.description == "reagent_rack"
+        assert src.resolved_label == "reagent_rack"
         # Per ADR-0007: lookup fills MUST attach provenance — the historical
         # bug was leaving provenance=None so the renderer showed silent black text.
         assert src.provenance is not None
         assert src.provenance.source == "inferred"
-        assert "buffer" in src.provenance.reasoning
-        assert "reagent_rack" in src.provenance.reasoning
+        # PR3b bug-1 fix moved the substance-match reasoning to
+        # resolved_label_provenance (the audit slot for the resolution
+        # decision); the primary provenance describes the synthesis instead.
+        assert src.resolved_label_provenance is not None
+        assert "buffer" in src.resolved_label_provenance.reasoning
+        assert "reagent_rack" in src.resolved_label_provenance.reasoning
         assert any("buffer" in f for f in fills)
 
     def test_lookup_skips_when_no_config_match(self):
