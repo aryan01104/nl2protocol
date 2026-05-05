@@ -18,6 +18,7 @@ import pytest
 from nl2protocol.gap_resolution import (
     ConstraintViolationDetector,
     InitialContentsVolumeDetector,
+    LabwareAmbiguityDetector,
     MissingFieldsDetector,
     ProvenanceWarningDetector,
     detect_all,
@@ -439,6 +440,87 @@ class TestConstraintViolationDetector:
                    and "do not exist" in g.description)
         assert oor.metadata.get("violation_type") == "well_invalid"
         assert "invalid_wells" in oor.metadata.get("values", {})
+
+
+# ============================================================================
+# LabwareAmbiguityDetector
+# ============================================================================
+
+class TestLabwareAmbiguityDetector:
+    """Walks spec.steps[*].source/destination; emits a Gap per LocationRef
+    where resolved_label is None. Refs the resolver picked are skipped
+    (their pick is verified by the reviewer pass on
+    resolved_label_provenance, not by re-prompting)."""
+
+    def _step_with_locations(self, source_resolved=None, destination_resolved=None,
+                              source_desc="rack", destination_desc="plate"):
+        return ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                     provenance=_instr_prov()),
+            source=LocationRef(
+                description=source_desc, well="A1",
+                resolved_label=source_resolved,
+                provenance=_instr_prov("rack A1"),
+            ),
+            destination=LocationRef(
+                description=destination_desc, well="B1",
+                resolved_label=destination_resolved,
+                provenance=_instr_prov("plate B1"),
+            ),
+            composition_provenance=_comp(),
+        )
+
+    def test_all_resolved_yields_no_gaps(self):
+        spec = _spec([self._step_with_locations(
+            source_resolved="sample_rack",
+            destination_resolved="output_plate",
+        )])
+        gaps = LabwareAmbiguityDetector().detect(spec, context={})
+        assert gaps == []
+
+    def test_one_unresolved_emits_one_gap(self):
+        spec = _spec([self._step_with_locations(
+            source_resolved=None,           # ambiguous — resolver returned null
+            destination_resolved="plate1",  # resolved — skip
+        )])
+        gaps = LabwareAmbiguityDetector().detect(spec, context={})
+        assert len(gaps) == 1
+        g = gaps[0]
+        assert g.kind == "ambiguous"
+        assert g.severity == "blocker"
+        assert g.step_order == 1
+        assert g.field_path == "steps[0].source.resolved_label"
+        assert g.id == "labware.step1.source"
+        assert g.metadata == {"description": "rack", "role": "source"}
+
+    def test_both_unresolved_emit_two_gaps(self):
+        spec = _spec([self._step_with_locations(
+            source_resolved=None,
+            destination_resolved=None,
+        )])
+        gaps = LabwareAmbiguityDetector().detect(spec, context={})
+        assert len(gaps) == 2
+        ids = {g.id for g in gaps}
+        assert ids == {"labware.step1.source", "labware.step1.destination"}
+
+    def test_step_with_no_location_refs_skipped(self):
+        # A pause step has no source/destination — detector must not crash
+        # or emit spurious Gaps.
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="pause", note="hold for 5min",
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = LabwareAmbiguityDetector().detect(spec, context={})
+        assert gaps == []
+
+    def test_gap_id_is_stable_across_runs(self):
+        spec = _spec([self._step_with_locations(source_resolved=None)])
+        ids_1 = sorted(g.id for g in LabwareAmbiguityDetector().detect(spec, context={}))
+        ids_2 = sorted(g.id for g in LabwareAmbiguityDetector().detect(spec, context={}))
+        assert ids_1 == ids_2
 
 
 # ============================================================================

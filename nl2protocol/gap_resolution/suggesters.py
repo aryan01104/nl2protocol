@@ -409,7 +409,102 @@ class WellRangeClipSuggester:
 
 
 # ============================================================================
-# 6. LLMSpotSuggester — focused per-Gap LLM call
+# 6. LabwareSuggester — propose a config label for an ambiguous LocationRef
+# ============================================================================
+
+class LabwareSuggester:
+    """For an ambiguous LocationRef Gap (resolver couldn't pick a config
+    label), propose the config label whose name or load_name best
+    matches the user's description by token-overlap heuristic.
+
+    Per ADR-0008 PR3a step 3 + the user-validated design: this suggester
+    ALWAYS surfaces to the user (confidence 0.5, below the auto-accept
+    threshold) — a wrong labware mapping has physical consequences (the
+    protocol runs against the wrong container), so we never auto-accept
+    even confident heuristic matches. The user picks; the orchestrator
+    stamps user_accepted_suggestion / user_edited / user_skipped on
+    the LocationRef's resolved_label_provenance via
+    default_apply_resolution's resolved-label-aware branch.
+
+    Pre:    `gap.kind == "ambiguous"` AND `gap.metadata` carries
+            `"description"` (the user's wording for this LocationRef).
+            `context["config"]` has the lab config under "labware";
+            if absent or empty, returns None (no candidate space).
+
+    Post:   Returns a `Suggestion` whose:
+              * `value` is the top-scoring config label (a string —
+                the apply path setattr's it onto LocationRef.resolved_label).
+              * `provenance_source = "deterministic"` (token match,
+                no LLM call here).
+              * `positive_reasoning` names the picked label + load_name.
+              * `why_not_in_instruction` notes the natural-language vs
+                config-key naming gap.
+              * `confidence = 0.5` — surfaces to user, never auto-accept.
+            Returns None when:
+              * gap.kind isn't "ambiguous";
+              * config has no labware entries;
+              * no description token (≥3 chars) appears in any label name
+                or load_name (no plausible match → don't suggest noise).
+
+    Side effects: None.
+    """
+
+    def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
+        if gap.kind != "ambiguous":
+            return None
+        config = context.get("config", {})
+        labware_map = config.get("labware", {})
+        if not labware_map:
+            return None
+        description = (gap.metadata or {}).get("description", "")
+        if not description:
+            return None
+        scored = self._score_labels(description, labware_map)
+        if not scored or scored[0][1] == 0:
+            return None
+        best_label, best_score = scored[0]
+        load_name = labware_map[best_label].get("load_name", "")
+        load_hint = f" (load_name '{load_name}')" if load_name else ""
+        return Suggestion(
+            value=best_label,
+            provenance_source="deterministic",
+            positive_reasoning=(
+                f"Config label '{best_label}'{load_hint} best matches "
+                f"description '{description}' by token overlap (score {best_score})."
+            ),
+            why_not_in_instruction=(
+                f"User wrote '{description}' rather than the config key "
+                f"'{best_label}' — natural-language vs config-key gap. "
+                f"Heuristic match; please confirm."
+            ),
+            confidence=0.5,
+        )
+
+    @staticmethod
+    def _score_labels(description: str, labware_map: dict):
+        """Score each config label by token overlap with description.
+
+        Tokens: lowercased substrings of length ≥3 split on non-word chars
+        ("the tube rack" → ["the", "tube", "rack"] → ["tube", "rack"] after
+        the length filter; "the" is dropped). Each label's score is the
+        count of distinct tokens that appear as substrings in either the
+        label name or the labware entry's load_name (both lowercased).
+
+        Returns sorted [(label, score), ...] descending by score; ties
+        broken by config-dict insertion order (Python dict iteration).
+        """
+        tokens = {t for t in re.split(r"\W+", description.lower()) if len(t) >= 3}
+        scored = []
+        for label, lw in labware_map.items():
+            haystack = (label + " " + lw.get("load_name", "")).lower()
+            score = sum(1 for t in tokens if t in haystack)
+            scored.append((label, score))
+        scored.sort(key=lambda x: -x[1])
+        return scored
+
+
+# ============================================================================
+# 7. LLMSpotSuggester — focused per-Gap LLM call
 # ============================================================================
 
 class LLMSpotSuggester:
@@ -641,10 +736,19 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
 
     @staticmethod
     def _collect_claims(spec) -> list:
-        """Walk every provenanced atomic value; emit a claim for each
-        non-instruction provenance."""
+        """Walk every provenanced atomic value AND every LocationRef's
+        resolved_label_provenance; emit a claim for each non-instruction
+        provenance.
+
+        Per ADR-0008 PR3a step 3: labware-resolution claims (which config
+        labware the resolver picked for each user-language description)
+        flow through the same reviewer machinery as inferred spec values.
+        Both surfaces share the Provenance schema and the two-claim
+        verification protocol; one batched reviewer call covers both."""
         claims = []
         for step_idx, step in enumerate(spec.steps):
+            # Spec-value claims: volume / duration / temperature / substance /
+            # source / destination provenances.
             for fname in ("volume", "duration", "temperature", "substance",
                            "source", "destination"):
                 field_obj = getattr(step, fname, None)
@@ -665,6 +769,26 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
                     "why_not_in_instruction": prov.why_not_in_instruction or "",
                     "source": prov.source,
                     "confidence": prov.confidence,
+                })
+
+            # Labware-resolution claims: resolved_label_provenance on each
+            # LocationRef. Field path uses the .resolved_label suffix so the
+            # stamp helper routes verdicts to resolved_label_provenance, not
+            # the LocationRef's primary provenance.
+            for role in ("source", "destination"):
+                ref = getattr(step, role, None)
+                if ref is None:
+                    continue
+                rprov = getattr(ref, "resolved_label_provenance", None)
+                if rprov is None or rprov.source == "instruction":
+                    continue
+                claims.append({
+                    "field_path": f"steps[{step_idx}].{role}.resolved_label",
+                    "value": ref.resolved_label or "",
+                    "positive_reasoning": rprov.positive_reasoning or "",
+                    "why_not_in_instruction": rprov.why_not_in_instruction or "",
+                    "source": rprov.source,
+                    "confidence": rprov.confidence,
                 })
         return claims
 

@@ -394,6 +394,85 @@ class ConstraintViolationDetector:
 
 
 # ============================================================================
+# LabwareAmbiguityDetector — emits Gaps for unresolved LocationRefs
+# ============================================================================
+
+class LabwareAmbiguityDetector:
+    """Emits one Gap per LocationRef whose `resolved_label is None` after
+    the LabwareResolver has run.
+
+    Per ADR-0008 PR3a step 3 + the user-validated design: the LLM resolver
+    picks a config label per description; refs the resolver couldn't
+    confidently match (returned null) are the only ones surfaced to the
+    user. Refs the resolver picked are trusted (subject to the reviewer
+    pass on `resolved_label_provenance` — verified by
+    IndependentReviewSuggester downstream).
+
+    The pipeline runs LabwareResolver BEFORE the orchestrator (in the
+    use_gap_resolver branch), so this detector sees post-resolver state.
+    If the resolver hasn't run yet (legacy ordering, or LabwareResolver
+    skipped because no client), every LocationRef has `resolved_label is
+    None` and every LocationRef becomes a Gap — defensive, surfaces all
+    refs to the user rather than silently passing them through.
+
+    Pre:    `spec` is a ProtocolSpec; `context` is unused (config is read
+            by the suggester, not the detector — this stays decoupled
+            from the lab config so the detector can be tested without
+            one).
+    Post:   Returns one Gap per LocationRef where `resolved_label is None`,
+            with:
+              * `id`         = f"labware.step{N}.{role}" (stable handle
+                                so re-detect across iterations matches).
+              * `step_order` = step.order.
+              * `field_path` = f"steps[{N-1}].{role}.resolved_label"
+                                (matches default_apply_resolution's
+                                three-segment path-shape; the apply
+                                writes the chosen label string into
+                                the resolved_label subfield).
+              * `kind`       = "ambiguous".
+              * `severity`   = "blocker" — the spec cannot proceed to
+                                schema generation without a resolved
+                                config label per ref.
+              * `description`= human-readable summary including the
+                                user's description + the role + step.
+              * `metadata`   = {"description": <user wording>, "role": "source"|"destination"}.
+            Refs where `resolved_label` IS set are skipped (the resolver
+            picked something; the reviewer pass on
+            resolved_label_provenance handles second-opinion checking).
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        gaps: List[Gap] = []
+        for step in spec.steps:
+            idx = step.order - 1
+            for role in ("source", "destination"):
+                ref = getattr(step, role, None)
+                if ref is None:
+                    continue
+                if ref.resolved_label is not None:
+                    continue
+                gaps.append(Gap(
+                    id=f"labware.step{step.order}.{role}",
+                    step_order=step.order,
+                    field_path=f"steps[{idx}].{role}.resolved_label",
+                    kind="ambiguous",
+                    current_value=None,
+                    description=(
+                        f"Step {step.order} {role}: "
+                        f"'{ref.description}' did not match any single config "
+                        f"labware confidently — pick one from the available labware."
+                    ),
+                    severity="blocker",
+                    metadata={
+                        "description": ref.description,
+                        "role": role,
+                    },
+                ))
+        return gaps
+
+
+# ============================================================================
 # Adapter list for the registry
 # ============================================================================
 
@@ -420,4 +499,5 @@ def default_spec_detectors() -> List:
     return [
         InitialContentsVolumeDetector(),
         ConstraintViolationDetector(),
+        LabwareAmbiguityDetector(),
     ]

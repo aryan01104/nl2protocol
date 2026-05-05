@@ -700,3 +700,194 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         default_apply_resolution(spec, g, res, suggestion=None)
         assert spec.initial_contents[0].volume_ul == 200.0
+
+
+# ============================================================================
+# PR3a step 3: resolved_label routing in apply + reviewer + claim collection
+# ============================================================================
+
+def _real_spec_with_resolution_provenance():
+    """Spec where source/destination LocationRefs already carry a
+    resolved_label_provenance (as if the LabwareResolver picked them).
+    Used to exercise the reviewer + stamp + apply paths that route via
+    resolved_label_provenance instead of the LocationRef's primary provenance."""
+    from nl2protocol.models.spec import (
+        CompositionProvenance, ExtractedStep, LocationRef,
+        Provenance, ProtocolSpec, ProvenancedVolume,
+    )
+    instr_prov = Provenance(
+        source="instruction", cited_text="A1", confidence=1.0,
+    )
+    res_prov = Provenance(
+        source="inferred",
+        positive_reasoning="resolver picked sample_rack for description 'rack'",
+        why_not_in_instruction="user wrote 'rack' rather than 'sample_rack' literally",
+        confidence=0.85,
+    )
+    comp = CompositionProvenance(
+        step_cited_text="t", parameters_cited_texts=["t"],
+        parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+    )
+    return ProtocolSpec(summary="t", steps=[ExtractedStep(
+        order=1, action="transfer",
+        volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                  provenance=instr_prov),
+        source=LocationRef(
+            description="rack", well="A1",
+            resolved_label="sample_rack",
+            provenance=instr_prov,
+            resolved_label_provenance=res_prov,
+        ),
+        destination=LocationRef(
+            description="rack", well="B1",
+            resolved_label="sample_rack",
+            provenance=instr_prov,
+            resolved_label_provenance=res_prov,
+        ),
+        composition_provenance=comp,
+    )])
+
+
+class TestApplyResolutionForResolvedLabel:
+    """default_apply_resolution routes `*.resolved_label` writes to
+    `_stamp_resolution_action`, which stamps `resolved_label_provenance`
+    rather than the LocationRef's primary `provenance`."""
+
+    def test_user_picks_label_stamps_resolved_label_provenance(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec_with_resolution_provenance()
+        # User picked a different config label than what the resolver had.
+        g = gap("g1", field_path="steps[0].source.resolved_label")
+        res = Resolution(action="accept_suggestion",
+                         new_value="reagent_reservoir",
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        # resolved_label updated
+        assert spec.steps[0].source.resolved_label == "reagent_reservoir"
+        # resolved_label_provenance carries the user action
+        rprov = spec.steps[0].source.resolved_label_provenance
+        assert rprov.review_status == "user_accepted_suggestion"
+        # Primary provenance is NOT touched (it's about the location, not the resolution)
+        assert spec.steps[0].source.provenance.review_status == "original"
+
+    def test_user_pick_when_no_prior_resolution_provenance(self):
+        # If the resolver didn't run (no resolved_label_provenance set),
+        # the apply should construct a fresh Provenance for the user's pick.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume,
+        )
+        instr_prov = Provenance(source="instruction", cited_text="A1", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        spec = ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                      provenance=instr_prov),
+            source=LocationRef(description="rack", well="A1",
+                                provenance=instr_prov),
+            destination=LocationRef(description="plate", well="B1",
+                                     provenance=instr_prov),
+            composition_provenance=comp,
+        )])
+        g = gap("g1", field_path="steps[0].source.resolved_label")
+        res = Resolution(action="accept_suggestion",
+                         new_value="sample_rack",
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        rprov = spec.steps[0].source.resolved_label_provenance
+        assert rprov is not None
+        assert rprov.review_status == "user_accepted_suggestion"
+        assert "sample_rack" in rprov.positive_reasoning
+
+
+class TestStampReviewerVerdictsForResolvedLabel:
+    """stamp_reviewer_verdicts also walks resolved_label_provenance — labware
+    resolution claims get the same reviewer treatment as inferred spec values."""
+
+    def test_agreement_stamps_resolved_label_provenance(self):
+        spec = _real_spec_with_resolution_provenance()
+        reviews = {
+            "steps[0].source.resolved_label": ReviewResult(
+                field_path="steps[0].source.resolved_label",
+                confirms_positive=True, confirms_negative=True,
+                objection=None,
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        rprov = spec.steps[0].source.resolved_label_provenance
+        assert rprov.review_status == "reviewed_agree"
+        # Primary provenance untouched.
+        assert spec.steps[0].source.provenance.review_status == "original"
+
+    def test_disagreement_stamps_resolved_label_provenance_with_objection(self):
+        spec = _real_spec_with_resolution_provenance()
+        reviews = {
+            "steps[0].destination.resolved_label": ReviewResult(
+                field_path="steps[0].destination.resolved_label",
+                confirms_positive=True, confirms_negative=False,
+                objection="config has both sample_rack and bsa_rack — ambiguous",
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        rprov = spec.steps[0].destination.resolved_label_provenance
+        assert rprov.review_status == "reviewed_disagree"
+        assert "ambiguous" in rprov.reviewer_objection
+
+
+class TestReviewerCollectsResolutionClaims:
+    """IndependentReviewSuggester._collect_claims walks both spec-value
+    provenances AND resolved_label_provenance entries — one batched
+    review covers both surfaces."""
+
+    def test_collects_resolved_label_claim(self):
+        from nl2protocol.gap_resolution.suggesters import IndependentReviewSuggester
+        spec = _real_spec_with_resolution_provenance()
+        claims = IndependentReviewSuggester._collect_claims(spec)
+        # Two refs (source + destination) each have an inferred
+        # resolved_label_provenance → 2 resolution claims.
+        resolution_paths = [c["field_path"] for c in claims
+                            if c["field_path"].endswith(".resolved_label")]
+        assert "steps[0].source.resolved_label" in resolution_paths
+        assert "steps[0].destination.resolved_label" in resolution_paths
+
+    def test_skips_instruction_sourced_resolution_provenance(self):
+        # If a resolved_label_provenance happens to be instruction-sourced
+        # (defensive — the resolver never produces this), don't review it.
+        from nl2protocol.gap_resolution.suggesters import IndependentReviewSuggester
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume,
+        )
+        instr_prov = Provenance(source="instruction", cited_text="A1", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        spec = ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                      provenance=instr_prov),
+            source=LocationRef(
+                description="rack", well="A1",
+                resolved_label="sample_rack",
+                provenance=instr_prov,
+                resolved_label_provenance=Provenance(
+                    source="instruction", cited_text="sample_rack", confidence=1.0,
+                ),
+            ),
+            destination=LocationRef(
+                description="plate", well="B1",
+                provenance=instr_prov,
+            ),
+            composition_provenance=comp,
+        )])
+        claims = IndependentReviewSuggester._collect_claims(spec)
+        # No resolution claim emitted — instruction-sourced provenance is
+        # by definition trusted (cited_text in the instruction).
+        resolution_paths = [c["field_path"] for c in claims
+                            if c["field_path"].endswith(".resolved_label")]
+        assert resolution_paths == []

@@ -434,6 +434,16 @@ class LocationRef(BaseModel):
         "use source='instruction' and cite the substring naming those wells. If genuinely inferred "
         "from context with no cite, use source='inferred' with reasoning."
     ))
+    resolved_label_provenance: Optional[Provenance] = Field(None, description=(
+        "How the resolved_label was picked from the lab config. Distinct from "
+        "`provenance` (which is about how the user described the location). "
+        "Filled by the labware resolver when it picks a config label; left null "
+        "during extraction. Carries the resolver's positive_reasoning / "
+        "why_not_in_instruction so the IndependentReviewSuggester can verify "
+        "the pick — same reviewer machinery as inferred spec values per ADR-0009. "
+        "Subject to the same review_status lifecycle (reviewed_agree / "
+        "reviewed_disagree / user_confirmed / user_edited)."
+    ))
 
 
 class PostAction(BaseModel):

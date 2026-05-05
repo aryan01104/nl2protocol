@@ -301,32 +301,47 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             ReviewResult is well-formed (objection set iff disagreed) — that
             invariant is enforced upstream by ReviewResult.__post_init__.
 
-    Post:   For each Provenance attached to a step field whose field_path is
-            in `reviews`:
+    Post:   For each Provenance whose field_path appears in `reviews`:
               * If review.confirms_positive AND review.confirms_negative:
                   review_status      -> "reviewed_agree"
                   reviewer_objection -> None
               * Otherwise:
                   review_status      -> "reviewed_disagree"
                   reviewer_objection -> review.objection (verbatim)
-            The stamp covers per-step value fields (volume, duration,
-            temperature, substance, source, destination); LocationRef
-            provenance on source/destination is reached via attribute
-            traversal. Provenances whose field_path isn't in `reviews` are
-            left untouched — their review_status keeps its existing value
-            (typically "original" on the first reviewer pass).
+            Two slots are walked:
+              * Per-step value fields (volume / duration / temperature /
+                substance / source / destination) — stamps the field's
+                primary `provenance`.
+              * LocationRef.resolved_label — when the field_path ends in
+                `.resolved_label`, the stamp goes to the LocationRef's
+                `resolved_label_provenance` slot, NOT the primary
+                provenance. This is the same separation
+                `_stamp_resolution_action` enforces on the user-action
+                side (PR3a step 3 + ADR-0009 audit-trail symmetry).
+            Provenances whose field_path isn't in `reviews` are left
+            untouched.
 
-    Side effects: Mutates the spec in place — replaces `field_obj.provenance`
-            with a re-validated Provenance carrying the new state. Re-validation
-            re-runs Provenance's invariants (positive_reasoning required for
-            non-instruction sources; reviewer_objection iff reviewed_disagree).
+    Side effects: Mutates the spec in place — replaces
+            `field_obj.provenance` (or `loc_ref.resolved_label_provenance`)
+            with a re-validated Provenance carrying the new state.
+            Re-validation re-runs Provenance's invariants
+            (positive_reasoning required for non-instruction sources;
+            reviewer_objection iff reviewed_disagree).
 
     Raises: pydantic.ValidationError if the resulting Provenance somehow
             violates schema invariants — should not happen by construction.
     """
     from nl2protocol.models.spec import Provenance
 
+    def _verdict_updates(review):
+        agreed = review.confirms_positive and review.confirms_negative
+        return {
+            "review_status": "reviewed_agree" if agreed else "reviewed_disagree",
+            "reviewer_objection": None if agreed else review.objection,
+        }
+
     for step_idx, step in enumerate(spec.steps):
+        # Spec-value field provenances.
         for fname in ("volume", "duration", "temperature", "substance",
                        "source", "destination"):
             field_obj = getattr(step, fname, None)
@@ -338,13 +353,23 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             review = reviews.get(f"steps[{step_idx}].{fname}")
             if review is None:
                 continue
-            agreed = review.confirms_positive and review.confirms_negative
-            updates = {
-                "review_status": "reviewed_agree" if agreed else "reviewed_disagree",
-                "reviewer_objection": None if agreed else review.objection,
-            }
             field_obj.provenance = Provenance.model_validate({
-                **prov.model_dump(), **updates,
+                **prov.model_dump(), **_verdict_updates(review),
+            })
+
+        # Labware-resolution provenances on LocationRefs (PR3a step 3).
+        for role in ("source", "destination"):
+            ref = getattr(step, role, None)
+            if ref is None:
+                continue
+            rprov = getattr(ref, "resolved_label_provenance", None)
+            if rprov is None:
+                continue
+            review = reviews.get(f"steps[{step_idx}].{role}.resolved_label")
+            if review is None:
+                continue
+            ref.resolved_label_provenance = Provenance.model_validate({
+                **rprov.model_dump(), **_verdict_updates(review),
             })
 
 
@@ -387,6 +412,70 @@ def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
     from nl2protocol.models.spec import Provenance
     field_obj.provenance = Provenance.model_validate({
         **prov.model_dump(),
+        "review_status": user_action_provenance,
+        "reviewer_objection": None,
+    })
+
+
+def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> None:
+    """Stamp `loc_ref.resolved_label_provenance.review_status` after the
+    user picks (or edits) a config labware label for an ambiguous
+    LocationRef.
+
+    Why this is separate from `_stamp_user_action`: a LocationRef has
+    TWO Provenance slots — `provenance` (about the location/wells the
+    user described) and `resolved_label_provenance` (about which config
+    labware the description maps to). When the user resolves an
+    ambiguity Gap, the action affects the resolution decision, not the
+    user's location-description. Stamping the wrong slot would corrupt
+    the audit trail.
+
+    Pre:    `loc_ref` is a LocationRef whose `resolved_label` was just
+            written (by `default_apply_resolution`'s subfield branch).
+            `user_action_provenance` is one of the user_* review_status
+            values. `label` is the config-labware string the user
+            picked — used as fallback when the resolver hadn't yet
+            written a resolved_label_provenance (e.g. the resolver
+            skipped this ref because the LLM returned null).
+
+    Post:   When `loc_ref.resolved_label_provenance` exists:
+              * It is REPLACED with a re-validated copy whose
+                review_status equals user_action_provenance and whose
+                reviewer_objection is None.
+            When `loc_ref.resolved_label_provenance` is None (no prior
+            resolver attempt):
+              * A fresh Provenance is constructed with source='inferred',
+                positive_reasoning naming the user's pick, why_not_in_instruction
+                noting the description-vs-config-key gap, review_status set
+                to user_action_provenance, confidence 1.0 (the user is the
+                authority).
+
+    Side effects: Mutates `loc_ref.resolved_label_provenance` in place.
+
+    Raises: pydantic.ValidationError if the resulting Provenance violates
+            its invariants — should not happen by construction.
+    """
+    from nl2protocol.models.spec import Provenance
+    existing = getattr(loc_ref, "resolved_label_provenance", None)
+    description = getattr(loc_ref, "description", "")
+    if existing is None:
+        loc_ref.resolved_label_provenance = Provenance(
+            source="inferred",
+            positive_reasoning=(
+                f"User picked config label '{label}' for description "
+                f"'{description}'."
+            ),
+            why_not_in_instruction=(
+                f"Description '{description}' did not uniquely identify "
+                f"a config labware via automatic matching; user resolved "
+                f"the ambiguity directly."
+            ),
+            review_status=user_action_provenance,
+            confidence=1.0,
+        )
+        return
+    loc_ref.resolved_label_provenance = Provenance.model_validate({
+        **existing.model_dump(),
         "review_status": user_action_provenance,
         "reviewer_objection": None,
     })
@@ -474,13 +563,22 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
             setattr(spec.steps[idx], fname, new_value)
         return
 
-    # steps[N].<field>.<subfield> (e.g. steps[0].destination.wells)
+    # steps[N].<field>.<subfield> (e.g. steps[0].destination.wells,
+    # steps[0].source.resolved_label)
     m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w+)$", path)
     if m:
         idx, fname, subfield = int(m.group(1)), m.group(2), m.group(3)
         target = getattr(spec.steps[idx], fname)
         if target is not None:
             setattr(target, subfield, new_value)
+            # PR3a step 3: when the subfield IS resolved_label, the
+            # provenance for that decision lives in resolved_label_provenance,
+            # not the LocationRef's primary provenance (which describes the
+            # location/wells). Stamp the right slot so the audit trail
+            # captures the resolution action, not the location reading.
+            if subfield == "resolved_label":
+                _stamp_resolution_action(target, user_action, new_value)
+                return
             # Stamp the parent's provenance — the subfield change is a
             # user action on the same logical value (e.g., editing the
             # well list under destination is editing destination).

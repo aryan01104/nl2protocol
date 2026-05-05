@@ -17,6 +17,7 @@ from nl2protocol.gap_resolution import Gap
 from nl2protocol.gap_resolution.suggesters import (
     CarryoverSuggester,
     ConfigLookupSuggester,
+    LabwareSuggester,
     RegexFromNoteSuggester,
     WellCapacitySuggester,
     WellRangeClipSuggester,
@@ -367,3 +368,91 @@ class TestWellRangeClipSuggester:
                   description="some other constraint problem",
                   severity="blocker")
         assert WellRangeClipSuggester().suggest(spec=spec, gap=gap, context={}) is None
+
+
+# ============================================================================
+# LabwareSuggester (PR3a step 3)
+# ============================================================================
+
+class TestLabwareSuggester:
+    """Proposes the config label whose name or load_name best matches the
+    user's description by token overlap. Confidence stays at 0.5 — never
+    auto-accept; user always confirms."""
+
+    _CONFIG = {
+        "labware": {
+            "sample_rack": {"load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap"},
+            "reagent_reservoir": {"load_name": "nest_12_reservoir_15ml"},
+            "output_plate": {"load_name": "opentrons_96_wellplate_200ul"},
+        },
+    }
+
+    def _ambiguous_gap(self, description: str, role: str = "source") -> Gap:
+        return Gap(
+            id=f"labware.step1.{role}",
+            step_order=1,
+            field_path=f"steps[0].{role}.resolved_label",
+            kind="ambiguous",
+            current_value=None,
+            description=f"Step 1 {role}: '{description}' did not match — pick one.",
+            severity="blocker",
+            metadata={"description": description, "role": role},
+        )
+
+    def _empty_spec(self):
+        return ProtocolSpec(summary="t", steps=[
+            ExtractedStep(order=1, action="comment", note="x",
+                          composition_provenance=_comp())
+        ])
+
+    def test_returns_none_for_non_ambiguous_gap(self):
+        gap = _gap("steps[0].volume", kind="missing")
+        s = LabwareSuggester().suggest(
+            gap=gap, spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s is None
+
+    def test_returns_none_when_no_config(self):
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("tube rack"),
+            spec=self._empty_spec(), context={})
+        assert s is None
+
+    def test_returns_none_when_no_token_matches(self):
+        # "widget" matches nothing in any config label or load_name.
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("widget"),
+            spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s is None
+
+    def test_picks_best_token_match_via_load_name(self):
+        # "tube rack" → "tube" appears in tuberack load_name → sample_rack wins.
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("tube rack"),
+            spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s is not None
+        assert s.value == "sample_rack"
+
+    def test_picks_best_token_match_via_label(self):
+        # "the reservoir" → "reservoir" appears in label name AND load_name → wins.
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("the reservoir"),
+            spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s is not None
+        assert s.value == "reagent_reservoir"
+
+    def test_confidence_is_below_auto_accept_threshold(self):
+        # 0.5 is below the orchestrator's 0.85 default threshold — by design
+        # so the user always confirms (a wrong labware mapping has physical
+        # consequences; we never auto-accept).
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("tube rack"),
+            spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s.confidence == 0.5
+
+    def test_carries_both_reasoning_claims(self):
+        s = LabwareSuggester().suggest(
+            gap=self._ambiguous_gap("tube rack"),
+            spec=self._empty_spec(), context={"config": self._CONFIG})
+        assert s.positive_reasoning  # non-empty
+        assert s.why_not_in_instruction  # non-empty
+        assert "sample_rack" in s.positive_reasoning

@@ -27,7 +27,19 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
         self.model_name = model_name
 
     def resolve(self, spec: ProtocolSpec) -> ProtocolSpec:
-        """Walk all LocationRefs in spec and fill resolved_label via LLM."""
+        """Walk all LocationRefs in spec and fill resolved_label via LLM.
+
+        Per ADR-0009 + PR3a step 3, when the resolver picks a config label
+        for a LocationRef, it ALSO writes `resolved_label_provenance` with
+        positive_reasoning + why_not_in_instruction. This lets the
+        IndependentReviewSuggester verify the pick using the same
+        two-claim review machinery as inferred spec values, and lets the
+        orchestrator's LabwareAmbiguityDetector skip refs the resolver
+        confidently picked (only `resolved_label is None` cases become
+        Gaps).
+        """
+        from nl2protocol.models.spec import Provenance
+
         spec = spec.model_copy(deep=True)
 
         all_refs = self._collect_refs(spec)
@@ -42,11 +54,19 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
 
         resolved = self._llm_resolve(unique_descs, spec)
 
-        # Apply resolutions
+        # Apply resolutions to LocationRef objects, attaching resolution
+        # provenance so the reviewer + orchestrator can audit the pick.
         for ref in all_refs:
             if ref.description in resolved:
-                ref.resolved_label = resolved[ref.description]
+                label = resolved[ref.description]
+                ref.resolved_label = label
+                ref.resolved_label_provenance = self._build_resolution_provenance(
+                    description=ref.description,
+                    label=label,
+                )
 
+        # initial_contents and prefilled_labware just store labware as a
+        # string (not LocationRef) — no provenance slot, just rewrite.
         for wc in spec.initial_contents:
             if wc.labware in resolved:
                 wc.labware = resolved[wc.labware]
@@ -56,6 +76,40 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
                 pf.labware = resolved[pf.labware]
 
         return spec
+
+    def _build_resolution_provenance(self, description: str, label: str):
+        """Build the Provenance stamped onto LocationRef.resolved_label_provenance
+        when this resolver successfully picks a config label.
+
+        Pre:    `description` is the user's wording (LocationRef.description);
+                `label` is the config labware key the LLM picked.
+
+        Post:   Returns a Provenance with source='inferred', a positive_reasoning
+                naming the matched config entry, a why_not_in_instruction
+                explaining the description-vs-config-key gap, confidence 0.85,
+                and review_status='original'. The orchestrator's reviewer pass
+                can then verify both reasoning claims; user actions in the
+                whole-mapping panel (deferred) update review_status downstream.
+
+        Side effects: None.
+        """
+        from nl2protocol.models.spec import Provenance
+        load_name = self.config.get("labware", {}).get(label, {}).get("load_name", "")
+        load_hint = f" (load_name '{load_name}')" if load_name else ""
+        return Provenance(
+            source="inferred",
+            positive_reasoning=(
+                f"User-language description '{description}' resolved to config "
+                f"labware '{label}'{load_hint} based on description text + "
+                f"step usage context (well names, action role)."
+            ),
+            why_not_in_instruction=(
+                f"The user wrote '{description}' rather than the config key "
+                f"'{label}' literally — natural-language vs config-key naming "
+                f"gap is expected and requires resolution."
+            ),
+            confidence=0.85,
+        )
 
     def _collect_refs(self, spec: ProtocolSpec) -> List[LocationRef]:
         """Gather all LocationRef objects from spec steps."""

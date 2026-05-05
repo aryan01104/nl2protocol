@@ -952,18 +952,32 @@ class ProtocolAgent:
         _stage("[Stage 3/8] Validating and completing specification...")
 
         if self.use_gap_resolver:
-            # Experimental path (ADR-0008 PR2). Runs the unified orchestrator
-            # in place of the legacy verify/fill/refine block.
+            # Experimental path (ADR-0008 PR2 + PR3a). Runs the unified
+            # orchestrator in place of the legacy verify/fill/refine block.
             from .gap_resolution import (
                 Orchestrator, CLIConfirmationHandler, default_apply_resolution,
                 MissingFieldsDetector, ProvenanceWarningDetector,
                 InitialContentsVolumeDetector, ConstraintViolationDetector,
+                LabwareAmbiguityDetector,
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
-                WellRangeClipSuggester, LLMSpotSuggester,
+                WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
                 IndependentReviewSuggester,
             )
             _log(f"  {C.dim('[experimental] using gap-resolver orchestrator (ADR-0008)')}")
+
+            # PR3a step 3: run LabwareResolver BEFORE the orchestrator so
+            # the orchestrator's LabwareAmbiguityDetector sees post-resolver
+            # state — only refs the resolver couldn't pick land as Gaps.
+            # The resolver writes resolved_label_provenance on each pick so
+            # the IndependentReviewSuggester can second-opinion the choice.
+            # Stage 3.5's redundant resolver call is gated below.
+            from .extraction import LabwareResolver as _EarlyLabwareResolver
+            spec = _EarlyLabwareResolver(
+                config=self.config_loader.config,
+                client=extractor.client,
+                model_name=extractor.model_name,
+            ).resolve(spec)
             # Reviewer: smaller / different model than the extractor's, per ADR-0008's
             # bias-mitigation rationale. Haiku is cheap, fast, and sufficiently
             # capable for the structured two-claim verification task.
@@ -987,6 +1001,15 @@ class ProtocolAgent:
                     # observes the now-empty result if the user accepted
                     # the clip suggestion.
                     ConstraintViolationDetector(),
+                    # PR3a step 3: LocationRefs the resolver couldn't pick
+                    # become Gaps. LabwareSuggester proposes a token-match
+                    # config label; user always confirms (low confidence,
+                    # never auto-accept — wrong labware mappings have
+                    # physical consequences). The orchestrator's apply
+                    # writes the chosen label into resolved_label and
+                    # stamps resolved_label_provenance with the user
+                    # action.
+                    LabwareAmbiguityDetector(),
                 ],
                 suggesters=[
                     # Deterministic first (correct-or-empty, no LLM cost):
@@ -995,6 +1018,7 @@ class ProtocolAgent:
                     WellCapacitySuggester(),
                     RegexFromNoteSuggester(),
                     WellRangeClipSuggester(),
+                    LabwareSuggester(),
                     # LLM spot last in chain — bounded per-Gap call before
                     # falling through to the user. Replaces the old wholesale
                     # `refine` (no silent overwrites, no token-truncation).
@@ -1134,13 +1158,19 @@ class ProtocolAgent:
 
         # Stage 3.5: Resolve labware references (description → config label)
         _stage("[Stage 3.5/8] Resolving labware references...")
-        from .extraction import LabwareResolver
-        resolver = LabwareResolver(
-            config=self.config_loader.config,
-            client=extractor.client,
-            model_name=extractor.model_name,
-        )
-        spec = resolver.resolve(spec)
+        # PR3a step 3: when use_gap_resolver is on, the resolver already
+        # ran early (pre-orchestrator) — skip the redundant LLM call here.
+        # Stage 3.5's _confirm_labware_assignments still runs as the legacy
+        # whole-mapping panel until ADR-0009's whole-mapping-panel piece
+        # lands separately.
+        if not self.use_gap_resolver:
+            from .extraction import LabwareResolver
+            resolver = LabwareResolver(
+                config=self.config_loader.config,
+                client=extractor.client,
+                model_name=extractor.model_name,
+            )
+            spec = resolver.resolve(spec)
 
         state_log["stage_3.5_resolution"] = {
             ref.description: ref.resolved_label
