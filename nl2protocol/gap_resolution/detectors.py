@@ -286,47 +286,51 @@ class InitialContentsVolumeDetector:
 
 class ConstraintViolationDetector:
     """Wraps `ConstraintChecker.check_all` to emit Gaps for ERROR-severity
-    violations.
+    violations, deduped by (violation_type, offending value).
 
-    Per ADR-0008 PR3a, lifts today's stage-4 hard-block (the "proceed anyway?"
-    interactive prompt with no suggester support) into the orchestrator's
-    uniform Gap → Suggester loop. ERROR violations become Gaps with
-    kind="constraint_violation", severity="blocker"; `WellRangeClipSuggester`
-    proposes a clipped well-list for the `WELL_INVALID` (list) case;
-    other violation types (pipette capacity, labware-not-found, etc.) emit
-    Gaps but no suggester fires — they fall through to the user.
+    Per ADR-0008 PR3a + bug-2 (PR3b follow-up): lifts today's stage-4
+    hard-block (the "proceed anyway?" interactive prompt with no suggester
+    support) into the orchestrator's uniform Gap → Suggester loop. ERROR
+    violations become Gaps with kind="constraint_violation",
+    severity="blocker". One Gap per LOGICAL problem, not per affected
+    step — when the same broken labware reference (or out-of-range well
+    set, or oversized volume) shows up in N steps, the user sees one
+    prompt; on accept, the resolution is written to ALL affected steps.
+    `WellRangeClipSuggester` proposes a clipped well-list for the
+    `WELL_INVALID` (list) case; other violation types (pipette capacity,
+    labware-not-found, etc.) emit Gaps but no suggester fires — they fall
+    through to the user.
 
-    WARNING-severity violations are NOT emitted (informational only — same
-    as today's pipeline behavior).
+    WARNING-severity violations are NOT emitted (informational only —
+    same as today's pipeline behavior).
 
     Pre:    `spec` is a ProtocolSpec; `context["config"]` is the lab config
             dict — required, since ConstraintChecker needs it. If absent,
             returns [] (defensive — orchestrator-with-no-config simply
             skips constraint detection).
-    Post:   Returns one Gap per ERROR-severity ConstraintViolation. Each Gap:
-              * `id`          = f"constraint.step{step}.{violation_type}"
-                                (stable across re-detect iterations).
-              * `step_order`  = violation.step.
-              * `field_path`  = violation-type-specific. For WELL_INVALID
-                                with a `wells` list, walks `spec.steps[N]`
-                                to determine whether the offending wells
-                                are on source or destination, returning
-                                `steps[{N-1}].source.wells` or
-                                `steps[{N-1}].destination.wells` so the
-                                eventual apply lands on the right ref.
-                                Fallback for other types: a generic
-                                `steps[{N-1}].constraint` placeholder
-                                (apply path-shape match: no-op write,
-                                safe — the user must edit the upstream
-                                config to fix these classes of violation).
-              * `kind`        = "constraint_violation".
-              * `severity`    = "blocker".
-              * `description` = `{what}. {suggestion}` (combined so the
-                                WellRangeClipSuggester's regex finds both
-                                the offending-wells list and the valid range).
-              * `metadata`    = {"violation_type": str, "values": dict}
-                                (machine-readable details from the
-                                underlying ConstraintViolation).
+    Post:   Returns one Gap per (violation_type, dedupe key) group of
+            ERROR-severity violations. Each Gap:
+              * `id`             = f"constraint.{violation_type}.{key_hash}"
+                                   (stable across re-detect iterations;
+                                   does NOT embed step order so a regrouped
+                                   set of affected steps still maps to the
+                                   same gap).
+              * `step_order`     = the FIRST affected step (representative —
+                                   used by topo-sort).
+              * `field_path`     = the FIRST affected step's field path
+                                   (representative — apply path uses
+                                   metadata["affected_paths"] when present).
+              * `kind`           = "constraint_violation".
+              * `severity`       = "blocker".
+              * `description`    = `{what}. {suggestion}`. When the group
+                                   has >1 affected step, prefixed with
+                                   `[Affects N steps: [orders]] `.
+              * `metadata`       = {
+                  "violation_type":  str,
+                  "values":          dict (representative — first violation),
+                  "affected_steps":  [step_orders, ...],  # for display
+                  "affected_paths":  [field_paths, ...],  # for apply
+                }
     Side effects: None (read-only).
     """
 
@@ -336,26 +340,88 @@ class ConstraintViolationDetector:
         if not config:
             return []
         result = ConstraintChecker(config).check_all(spec)
-        gaps: List[Gap] = []
+        # Group ERROR-severity violations by (violation_type, dedupe key).
+        # Insertion order preserved (dict in Python 3.7+) so the first
+        # violation in each group is the representative — its step order
+        # becomes the Gap's step_order, its field_path becomes the
+        # representative path.
+        groups = {}  # (violation_type, key) -> list of violations
         for v in result.violations:
             if v.severity != Severity.ERROR:
                 continue
-            description = f"{v.what}. {v.suggestion}"
-            gap_id = f"constraint.step{v.step}.{v.violation_type.value}"
+            key = self._dedupe_key(v)
+            groups.setdefault((v.violation_type, key), []).append(v)
+
+        gaps: List[Gap] = []
+        for (vt, key), vs in groups.items():
+            v0 = vs[0]
+            affected_paths = [self._field_path_for(v, spec) for v in vs]
+            affected_steps = [v.step for v in vs]
+            description = f"{v0.what}. {v0.suggestion}"
+            if len(vs) > 1:
+                description = (
+                    f"[Affects {len(vs)} steps {affected_steps}] " + description
+                )
+            # Stable id: violation_type + a deterministic hash of the
+            # dedupe key. Across re-detect iterations the same logical
+            # problem hashes the same.
+            key_hash = hash(repr(key)) & 0xffffffff
+            gap_id = f"constraint.{vt.value}.{key_hash:08x}"
             gaps.append(Gap(
                 id=gap_id,
-                step_order=v.step,
-                field_path=self._field_path_for(v, spec),
+                step_order=v0.step,
+                field_path=affected_paths[0],
                 kind="constraint_violation",
                 current_value=None,
                 description=description,
                 severity="blocker",
                 metadata={
-                    "violation_type": v.violation_type.value,
-                    "values": dict(v.values),
+                    "violation_type": vt.value,
+                    "values": dict(v0.values),
+                    "affected_steps": affected_steps,
+                    "affected_paths": affected_paths,
                 },
             ))
         return gaps
+
+    @staticmethod
+    def _dedupe_key(v):
+        """Return what makes two violations "the same logical problem."
+
+        Dedupe keys are tuples that include EVERY axis the user's fix
+        depends on. Two violations with the same key are guaranteed to
+        accept the same answer; two with different keys do not.
+
+        - LABWARE_NOT_FOUND: keyed on the unresolvable description.
+          Five steps whose source.description is the same broken string
+          → one group, one user prompt, the chosen config label
+          propagates to all five.
+
+        - WELL_INVALID: keyed on (labware, offending wells). Including
+          labware is critical — two steps asking for well A7 on different
+          racks (one 24-tube, one 96-well) have different fixes and
+          must NOT be grouped.
+
+        - PIPETTE_CAPACITY: keyed on the requested volume. Same volume
+          across steps means same fix (add a bigger pipette to config
+          OR reduce the volume) regardless of which step demanded it.
+
+        - All other violation types: id(v) — never dedupe; surface every
+          instance. Conservative default; types we haven't reasoned
+          through stay one-Gap-per-step.
+        """
+        from nl2protocol.validation.constraints import ViolationType
+        if v.violation_type == ViolationType.LABWARE_NOT_FOUND:
+            return ("description", v.values.get("description", ""))
+        if v.violation_type == ViolationType.WELL_INVALID:
+            labware = v.values.get("labware", "")
+            wells = v.values.get("invalid_wells")
+            if wells:
+                return ("wells", labware, tuple(sorted(wells)))
+            return ("well", labware, v.values.get("well", ""))
+        if v.violation_type == ViolationType.PIPETTE_CAPACITY:
+            return ("volume", v.values.get("requested_volume", 0))
+        return ("instance", id(v))
 
     @staticmethod
     def _field_path_for(v, spec) -> str:

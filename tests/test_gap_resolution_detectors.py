@@ -441,6 +441,172 @@ class TestConstraintViolationDetector:
         assert oor.metadata.get("violation_type") == "well_invalid"
         assert "invalid_wells" in oor.metadata.get("values", {})
 
+    # --- Bug-2 dedupe contract ---
+
+    def _spec_two_steps_same_oor_wells(self):
+        # Two transfer steps both asking for A7+A8 on the same 24-tube rack —
+        # same logical problem (rack only has A1-D6); should produce ONE Gap
+        # covering both steps.
+        return _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(
+                    description="sample_rack",
+                    wells=["A1", "A7", "A8"],
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("A1, A7, A8"),
+                ),
+                destination=LocationRef(
+                    description="sample_rack", well="B1",
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+            ExtractedStep(
+                order=2, action="transfer",
+                volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(
+                    description="sample_rack",
+                    wells=["A2", "A7", "A8"],
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("A2, A7, A8"),
+                ),
+                destination=LocationRef(
+                    description="sample_rack", well="B2",
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("B2"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+
+    def test_dedupes_identical_well_invalid_across_steps(self):
+        # Bug-2: two steps with the same out-of-range wells on the same
+        # labware → ONE Gap (not two). The user answers once.
+        spec = self._spec_two_steps_same_oor_wells()
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG})
+        well_gaps = [g for g in gaps
+                     if g.metadata.get("violation_type") == "well_invalid"]
+        assert len(well_gaps) == 1
+        # affected_steps lists both source steps.
+        assert sorted(well_gaps[0].metadata["affected_steps"]) == [1, 2]
+        # affected_paths lists both source.wells paths.
+        assert len(well_gaps[0].metadata["affected_paths"]) == 2
+        # Description includes the multi-step prefix.
+        assert "Affects 2 steps" in well_gaps[0].description
+
+    def test_does_not_dedupe_different_labware_with_same_wells(self):
+        # False-dupe defense: two steps with the same offending well names
+        # but on DIFFERENT labware are different problems (different valid
+        # ranges, different fixes). Must NOT be grouped.
+        # We use well A20 which is well-name-pattern valid (row A, col 20)
+        # but invalid on both a 24-tube rack (max col 6) AND a 96-plate
+        # (max col 12), so the same offending wells list ["A20"] surfaces
+        # on both labware — different labware key, so two Gaps.
+        config_two = {
+            "pipettes": {"left": {"model": "p300_single_gen2"}},
+            "labware": {
+                "sample_rack": {
+                    "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+                    "deck_slot": "1",
+                },
+                "wide_plate": {
+                    "load_name": "opentrons_96_wellplate_200ul_pcr_full_skirt",
+                    "deck_slot": "2",
+                },
+            },
+        }
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(
+                    description="sample_rack", wells=["A20"],
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("A20"),
+                ),
+                destination=LocationRef(
+                    description="sample_rack", well="B1",
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+            ExtractedStep(
+                order=2, action="transfer",
+                volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(
+                    description="wide_plate", wells=["A20"],
+                    resolved_label="wide_plate",
+                    provenance=_instr_prov("A20"),
+                ),
+                destination=LocationRef(
+                    description="wide_plate", well="B1",
+                    resolved_label="wide_plate",
+                    provenance=_instr_prov("B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": config_two})
+        well_gaps = [g for g in gaps
+                     if g.metadata.get("violation_type") == "well_invalid"]
+        # Two distinct labware → two Gaps (the labware key in _dedupe_key
+        # keeps them separate even though invalid_wells is identical).
+        assert len(well_gaps) == 2
+
+    def test_dedupes_labware_not_found_by_description(self):
+        # Two steps both reference a labware whose description isn't in
+        # config → one Gap covering both steps.
+        bad_config = {
+            "pipettes": {"left": {"model": "p300_single_gen2"}},
+            "labware": {
+                "real_rack": {
+                    "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+                    "deck_slot": "1",
+                },
+            },
+        }
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(description="ghost_rack", well="A1",
+                                    provenance=_instr_prov("A1")),
+                destination=LocationRef(description="real_rack", well="B1",
+                                         resolved_label="real_rack",
+                                         provenance=_instr_prov("B1")),
+                composition_provenance=_comp(),
+            ),
+            ExtractedStep(
+                order=2, action="transfer",
+                volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(description="ghost_rack", well="A2",
+                                    provenance=_instr_prov("A2")),
+                destination=LocationRef(description="real_rack", well="B2",
+                                         resolved_label="real_rack",
+                                         provenance=_instr_prov("B2")),
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": bad_config})
+        labware_gaps = [g for g in gaps
+                        if g.metadata.get("violation_type") == "labware_not_found"]
+        # Two steps reference 'ghost_rack' as source → ONE Gap.
+        assert len(labware_gaps) == 1
+        assert sorted(labware_gaps[0].metadata["affected_steps"]) == [1, 2]
+
 
 # ============================================================================
 # LabwareAmbiguityDetector

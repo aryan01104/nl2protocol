@@ -521,9 +521,24 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
     Raises: pydantic.ValidationError on invariant violation in the resulting
             Provenance.
     """
+    # Bug-2 (PR3b follow-up): when a Gap's metadata carries
+    # `affected_paths` (deduped constraint-violation Gap covering N steps),
+    # apply the resolution to ALL affected paths, not just the
+    # representative gap.field_path. The user answered once; their answer
+    # propagates to every step the same logical problem hit.
+    affected_paths = (gap.metadata or {}).get("affected_paths") if hasattr(gap, "metadata") else None
+    if affected_paths and len(affected_paths) > 1:
+        for path in affected_paths:
+            _apply_at_path(spec, path, resolution)
+        return
+    _apply_at_path(spec, gap.field_path, resolution)
+
+
+def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
+    """Single-path apply — extracted from default_apply_resolution so
+    deduped Gaps can call it once per affected path."""
     import re
 
-    path = gap.field_path
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
 
