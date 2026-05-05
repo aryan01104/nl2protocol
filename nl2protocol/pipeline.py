@@ -957,6 +957,7 @@ class ProtocolAgent:
             from .gap_resolution import (
                 Orchestrator, CLIConfirmationHandler, default_apply_resolution,
                 MissingFieldsDetector, ProvenanceWarningDetector,
+                InitialContentsVolumeDetector, ConstraintViolationDetector,
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
                 WellRangeClipSuggester, LLMSpotSuggester,
@@ -971,6 +972,21 @@ class ProtocolAgent:
                 detectors=[
                     MissingFieldsDetector(),
                     ProvenanceWarningDetector(extractor),  # only fabrications post-fix
+                    # PR3a: initial-contents null volumes routed through the
+                    # uniform Gap → Suggester loop. WellCapacitySuggester
+                    # proposes the labware capacity; CLIConfirmationHandler
+                    # prompts the user. The legacy `_build_initial_volume_queue`
+                    # downstream observes the now-filled fields and no-ops.
+                    InitialContentsVolumeDetector(),
+                    # PR3a: ERROR-severity hardware constraints become Gaps.
+                    # WellRangeClipSuggester proposes a clipped well-list for
+                    # the WELL_INVALID case; other violation types (pipette
+                    # capacity, labware-not-found, etc.) fall through to the
+                    # user. The legacy stage-4 "proceed anyway?" prompt
+                    # downstream still runs but its `has_errors` check
+                    # observes the now-empty result if the user accepted
+                    # the clip suggestion.
+                    ConstraintViolationDetector(),
                 ],
                 suggesters=[
                     # Deterministic first (correct-or-empty, no LLM cost):

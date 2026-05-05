@@ -16,6 +16,8 @@ from __future__ import annotations
 import pytest
 
 from nl2protocol.gap_resolution import (
+    ConstraintViolationDetector,
+    InitialContentsVolumeDetector,
     MissingFieldsDetector,
     ProvenanceWarningDetector,
     detect_all,
@@ -252,6 +254,191 @@ class TestProvenanceWarningDetector:
         for g in gaps:
             if g.step_order == 2:
                 assert "steps[1]" in g.field_path
+
+
+# ============================================================================
+# InitialContentsVolumeDetector
+# ============================================================================
+
+class TestInitialContentsVolumeDetector:
+    """Emits one Gap per WellContents entry with null volume_ul.
+    Spec-level gaps (step_order=None); field_path matches
+    WellCapacitySuggester's regex AND default_apply_resolution's
+    initial_contents path-shape."""
+
+    def _spec_with_initial_contents(self, contents):
+        from nl2protocol.models.spec import WellContents
+        spec = _spec([
+            ExtractedStep(order=1, action="comment", note="placeholder",
+                          composition_provenance=_comp())
+        ])
+        spec.initial_contents = [
+            WellContents(**c) for c in contents
+        ]
+        return spec
+
+    def test_no_initial_contents_yields_no_gaps(self):
+        spec = _spec([
+            ExtractedStep(order=1, action="comment", note="hi",
+                          composition_provenance=_comp())
+        ])
+        gaps = InitialContentsVolumeDetector().detect(spec, context={})
+        assert gaps == []
+
+    def test_all_volumes_set_yields_no_gaps(self):
+        spec = self._spec_with_initial_contents([
+            {"labware": "rack", "well": "A1", "substance": "x", "volume_ul": 100.0},
+            {"labware": "rack", "well": "A2", "substance": "y", "volume_ul": 200.0},
+        ])
+        gaps = InitialContentsVolumeDetector().detect(spec, context={})
+        assert gaps == []
+
+    def test_one_null_volume_emits_one_gap(self):
+        spec = self._spec_with_initial_contents([
+            {"labware": "rack", "well": "A1", "substance": "buffer", "volume_ul": None},
+        ])
+        gaps = InitialContentsVolumeDetector().detect(spec, context={})
+        assert len(gaps) == 1
+        g = gaps[0]
+        assert g.id == "initial_contents[0]"
+        assert g.field_path == "initial_contents[0].volume_ul"
+        assert g.step_order is None
+        assert g.kind == "missing"
+        assert g.severity == "blocker"
+        assert "buffer" in g.description
+        assert "A1" in g.description
+
+    def test_multiple_null_volumes_emit_multiple_gaps_with_correct_indices(self):
+        # Ensure field_path indices match the position in initial_contents,
+        # not the position among null entries.
+        spec = self._spec_with_initial_contents([
+            {"labware": "rack", "well": "A1", "substance": "x", "volume_ul": 100.0},  # idx 0, set
+            {"labware": "rack", "well": "A2", "substance": "y", "volume_ul": None},   # idx 1, null
+            {"labware": "rack", "well": "A3", "substance": "z", "volume_ul": 50.0},   # idx 2, set
+            {"labware": "rack", "well": "A4", "substance": "w", "volume_ul": None},   # idx 3, null
+        ])
+        gaps = InitialContentsVolumeDetector().detect(spec, context={})
+        assert len(gaps) == 2
+        ids = sorted(g.id for g in gaps)
+        assert ids == ["initial_contents[1]", "initial_contents[3]"]
+
+    def test_gap_id_is_stable_across_runs(self):
+        spec = self._spec_with_initial_contents([
+            {"labware": "rack", "well": "A1", "substance": "buffer", "volume_ul": None},
+        ])
+        gaps_1 = InitialContentsVolumeDetector().detect(spec, context={})
+        gaps_2 = InitialContentsVolumeDetector().detect(spec, context={})
+        assert sorted(g.id for g in gaps_1) == sorted(g.id for g in gaps_2)
+
+
+# ============================================================================
+# ConstraintViolationDetector
+# ============================================================================
+
+class TestConstraintViolationDetector:
+    """Wraps ConstraintChecker.check_all. ERROR-severity violations
+    become Gaps with kind=constraint_violation, severity=blocker;
+    WARNING/INFO severity is dropped (informational only)."""
+
+    # Minimal lab config sufficient for ConstraintChecker to run. The
+    # check_well_validity path needs a labware with a known load_name so
+    # `get_well_info` can compare wells against the labware's geometry.
+    _CONFIG = {
+        "pipettes": {
+            "left": {"model": "p300_single_gen2"},
+        },
+        "labware": {
+            "sample_rack": {
+                "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+                "deck_slot": "1",
+            },
+        },
+    }
+
+    def _spec_with_oor_wells(self):
+        # 24-tube rack is 4 rows x 6 cols (A1..D6). A7+ are out of range.
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                source=LocationRef(
+                    description="sample_rack",
+                    wells=["A1", "A2", "A7", "A8"],
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("A1, A2, A7, A8"),
+                ),
+                destination=LocationRef(
+                    description="sample_rack",
+                    well="B1",
+                    resolved_label="sample_rack",
+                    provenance=_instr_prov("B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+        return spec
+
+    def test_no_config_in_context_yields_no_gaps(self):
+        # Defensive: orchestrator-with-no-config simply skips constraint
+        # detection rather than crashing.
+        spec = _spec([
+            ExtractedStep(order=1, action="comment", note="hi",
+                          composition_provenance=_comp())
+        ])
+        gaps = ConstraintViolationDetector().detect(spec, context={})
+        assert gaps == []
+
+    def test_clean_spec_yields_no_gaps(self):
+        spec = _spec([
+            ExtractedStep(order=1, action="comment", note="hi",
+                          composition_provenance=_comp())
+        ])
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG})
+        assert gaps == []
+
+    def test_well_invalid_emits_constraint_violation_gap(self):
+        spec = self._spec_with_oor_wells()
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG})
+        # WellRangeClipSuggester relies on the description containing both the
+        # offending wells and the valid range — pin both.
+        assert any(g.kind == "constraint_violation" for g in gaps)
+        oor = next(g for g in gaps if g.kind == "constraint_violation"
+                   and "do not exist" in g.description)
+        assert oor.severity == "blocker"
+        assert oor.step_order == 1
+        assert "A7" in oor.description or "A8" in oor.description
+        assert "Valid well range" in oor.description
+
+    def test_well_invalid_field_path_targets_offending_ref(self):
+        # The detector walks the step to determine which ref carries the
+        # invalid wells, so default_apply_resolution lands on the right side.
+        spec = self._spec_with_oor_wells()
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG})
+        oor = next(g for g in gaps if g.kind == "constraint_violation"
+                   and "do not exist" in g.description)
+        # Source carries A7/A8 (the violation); destination is B1 (valid).
+        assert oor.field_path == "steps[0].source.wells"
+
+    def test_gap_id_is_stable_across_runs(self):
+        spec = self._spec_with_oor_wells()
+        ids_1 = sorted(g.id for g in ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG}))
+        ids_2 = sorted(g.id for g in ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG}))
+        assert ids_1 == ids_2
+
+    def test_metadata_carries_violation_type_and_values(self):
+        spec = self._spec_with_oor_wells()
+        gaps = ConstraintViolationDetector().detect(
+            spec, context={"config": self._CONFIG})
+        oor = next(g for g in gaps if g.kind == "constraint_violation"
+                   and "do not exist" in g.description)
+        assert oor.metadata.get("violation_type") == "well_invalid"
+        assert "invalid_wells" in oor.metadata.get("values", {})
 
 
 # ============================================================================

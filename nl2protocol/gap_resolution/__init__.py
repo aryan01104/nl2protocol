@@ -23,9 +23,12 @@ from nl2protocol.gap_resolution.protocols import (
     ConfirmationHandler,
 )
 from nl2protocol.gap_resolution.detectors import (
+    ConstraintViolationDetector,
+    InitialContentsVolumeDetector,
     MissingFieldsDetector,
     ProvenanceWarningDetector,
     default_extractor_detectors,
+    default_spec_detectors,
 )
 from nl2protocol.gap_resolution.suggesters import (
     CarryoverSuggester,
@@ -62,9 +65,12 @@ __all__ = [
     "GapDetector",
     "Suggester",
     "ConfirmationHandler",
+    "ConstraintViolationDetector",
+    "InitialContentsVolumeDetector",
     "MissingFieldsDetector",
     "ProvenanceWarningDetector",
     "default_extractor_detectors",
+    "default_spec_detectors",
     "detect_all",
     "ConfigLookupSuggester",
     "CarryoverSuggester",

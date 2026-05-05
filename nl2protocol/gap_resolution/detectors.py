@@ -227,16 +227,197 @@ class ProvenanceWarningDetector:
 
 
 # ============================================================================
+# InitialContentsVolumeDetector — emits Gaps for null volume_ul entries
+# ============================================================================
+
+class InitialContentsVolumeDetector:
+    """Emits one Gap per `WellContents` entry whose `volume_ul` is null.
+
+    Per ADR-0008 PR3a, replaces today's `_build_initial_volume_queue` (which
+    builds an ad-hoc legacy-CLI queue post-stage-4). The same data flows
+    through the orchestrator's uniform Gap → Suggester → Resolution loop:
+    `WellCapacitySuggester` (already in suggesters.py) proposes the
+    labware's capacity as a default; the user accepts, edits, or skips
+    via the unified ConfirmationHandler.
+
+    Pre:    `spec` is a ProtocolSpec; `spec.initial_contents` may have
+            entries with null `volume_ul` (the LLM extracted "well X has
+            substance Y" without stating a volume). `context` is unused.
+    Post:   Returns one Gap per null-volume entry, with:
+              * `id`          = f"initial_contents[{N}]" (stable handle so
+                                re-detect across iterations matches).
+              * `field_path`  = f"initial_contents[{N}].volume_ul" (matches
+                                WellCapacitySuggester's regex AND
+                                default_apply_resolution's path-shape).
+              * `step_order`  = None (this is a spec-level gap, not tied
+                                to any step).
+              * `kind`        = "missing".
+              * `severity`    = "blocker" — codegen needs the volume for
+                                initial-state tracking and well-capacity
+                                bookkeeping.
+            Entries whose volume_ul is set are skipped silently.
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        gaps: List[Gap] = []
+        for idx, ic in enumerate(spec.initial_contents):
+            if ic.volume_ul is not None:
+                continue
+            gaps.append(Gap(
+                id=f"initial_contents[{idx}]",
+                step_order=None,
+                field_path=f"initial_contents[{idx}].volume_ul",
+                kind="missing",
+                current_value=None,
+                description=(
+                    f"Initial contents entry {idx}: well {ic.well} of "
+                    f"'{ic.labware}' contains '{ic.substance}' but no "
+                    f"volume is stated."
+                ),
+                severity="blocker",
+            ))
+        return gaps
+
+
+# ============================================================================
+# ConstraintViolationDetector — wraps ConstraintChecker
+# ============================================================================
+
+class ConstraintViolationDetector:
+    """Wraps `ConstraintChecker.check_all` to emit Gaps for ERROR-severity
+    violations.
+
+    Per ADR-0008 PR3a, lifts today's stage-4 hard-block (the "proceed anyway?"
+    interactive prompt with no suggester support) into the orchestrator's
+    uniform Gap → Suggester loop. ERROR violations become Gaps with
+    kind="constraint_violation", severity="blocker"; `WellRangeClipSuggester`
+    proposes a clipped well-list for the `WELL_INVALID` (list) case;
+    other violation types (pipette capacity, labware-not-found, etc.) emit
+    Gaps but no suggester fires — they fall through to the user.
+
+    WARNING-severity violations are NOT emitted (informational only — same
+    as today's pipeline behavior).
+
+    Pre:    `spec` is a ProtocolSpec; `context["config"]` is the lab config
+            dict — required, since ConstraintChecker needs it. If absent,
+            returns [] (defensive — orchestrator-with-no-config simply
+            skips constraint detection).
+    Post:   Returns one Gap per ERROR-severity ConstraintViolation. Each Gap:
+              * `id`          = f"constraint.step{step}.{violation_type}"
+                                (stable across re-detect iterations).
+              * `step_order`  = violation.step.
+              * `field_path`  = violation-type-specific. For WELL_INVALID
+                                with a `wells` list, walks `spec.steps[N]`
+                                to determine whether the offending wells
+                                are on source or destination, returning
+                                `steps[{N-1}].source.wells` or
+                                `steps[{N-1}].destination.wells` so the
+                                eventual apply lands on the right ref.
+                                Fallback for other types: a generic
+                                `steps[{N-1}].constraint` placeholder
+                                (apply path-shape match: no-op write,
+                                safe — the user must edit the upstream
+                                config to fix these classes of violation).
+              * `kind`        = "constraint_violation".
+              * `severity`    = "blocker".
+              * `description` = `{what}. {suggestion}` (combined so the
+                                WellRangeClipSuggester's regex finds both
+                                the offending-wells list and the valid range).
+              * `metadata`    = {"violation_type": str, "values": dict}
+                                (machine-readable details from the
+                                underlying ConstraintViolation).
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        from nl2protocol.validation.constraints import ConstraintChecker, Severity
+        config = context.get("config", {})
+        if not config:
+            return []
+        result = ConstraintChecker(config).check_all(spec)
+        gaps: List[Gap] = []
+        for v in result.violations:
+            if v.severity != Severity.ERROR:
+                continue
+            description = f"{v.what}. {v.suggestion}"
+            gap_id = f"constraint.step{v.step}.{v.violation_type.value}"
+            gaps.append(Gap(
+                id=gap_id,
+                step_order=v.step,
+                field_path=self._field_path_for(v, spec),
+                kind="constraint_violation",
+                current_value=None,
+                description=description,
+                severity="blocker",
+                metadata={
+                    "violation_type": v.violation_type.value,
+                    "values": dict(v.values),
+                },
+            ))
+        return gaps
+
+    @staticmethod
+    def _field_path_for(v, spec) -> str:
+        """Best-effort dotted path for a ConstraintViolation. Used by
+        `default_apply_resolution` to land the value when a Suggestion
+        is accepted; for violation types with no suggester, the path is
+        just informational (the user reads the description, edits config,
+        and re-runs)."""
+        from nl2protocol.validation.constraints import ViolationType
+        idx = max(0, v.step - 1)
+        if idx >= len(spec.steps):
+            return f"steps[{idx}].constraint"
+        step = spec.steps[idx]
+        if v.violation_type == ViolationType.WELL_INVALID:
+            invalid = set(v.values.get("invalid_wells", []))
+            single = v.values.get("well")
+            # Single-well violation: target the .well subfield.
+            if single is not None:
+                if step.source and step.source.well == single:
+                    return f"steps[{idx}].source.well"
+                if step.destination and step.destination.well == single:
+                    return f"steps[{idx}].destination.well"
+                return f"steps[{idx}].source.well"
+            # List-well violation: locate which ref carries the offending wells.
+            if step.source and step.source.wells and any(w in invalid for w in step.source.wells):
+                return f"steps[{idx}].source.wells"
+            if step.destination and step.destination.wells and any(w in invalid for w in step.destination.wells):
+                return f"steps[{idx}].destination.wells"
+            return f"steps[{idx}].source.wells"
+        if v.violation_type == ViolationType.LABWARE_NOT_FOUND:
+            role = v.values.get("role")
+            return f"steps[{idx}].{role}" if role in ("source", "destination") else f"steps[{idx}].constraint"
+        if v.violation_type == ViolationType.PIPETTE_CAPACITY:
+            return f"steps[{idx}].volume"
+        return f"steps[{idx}].constraint"
+
+
+# ============================================================================
 # Adapter list for the registry
 # ============================================================================
 
 def default_extractor_detectors(extractor) -> List:
     """Return the PR1-implemented detectors that wrap extractor functions.
 
-    The registry (registry.py) uses this as one of its sources. PR2 adds
-    constraint, initial-volume, and labware-ambiguity detectors.
+    The registry (registry.py) uses this as one of its sources. PR3a adds
+    spec-walking detectors (InitialContentsVolume, ConstraintViolation,
+    LabwareAmbiguity) — those don't need an extractor and so live in
+    `default_spec_detectors()` below.
     """
     return [
         MissingFieldsDetector(),
         ProvenanceWarningDetector(extractor),
+    ]
+
+
+def default_spec_detectors() -> List:
+    """Return the PR3a detectors that walk the spec directly (no extractor
+    or LLM dependency). Composed with `default_extractor_detectors` to
+    form the full detector chain. ConstraintViolationDetector reads
+    `context["config"]` for the lab config it needs; the orchestrator
+    threads it through automatically."""
+    return [
+        InitialContentsVolumeDetector(),
+        ConstraintViolationDetector(),
     ]
