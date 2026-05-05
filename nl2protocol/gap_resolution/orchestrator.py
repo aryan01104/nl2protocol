@@ -157,10 +157,17 @@ class Orchestrator:
         apply_resolution: Callable[[Any, Gap, Resolution, Optional[Suggestion]], None],
         auto_accept_threshold: float = DEFAULT_AUTO_ACCEPT_THRESHOLD,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
+        reporter: Optional[Any] = None,
     ):
         """`apply_resolution` writes a Resolution back into the spec.
         Externalized so the orchestrator stays test-friendly without
         tying it to specific spec/Provenance internals.
+
+        `reporter` (ADR-0011 Phase 1) is an optional Reporter that
+        receives storytelling events (gap_iteration_*, gap_detected,
+        gap_resolved) as the loop progresses. Defaults to None — the
+        orchestrator no-ops on emission. Live mode (Phase 3) passes a
+        WebSocketReporter so the surface streams the loop in real time.
         """
         self._detectors = detectors
         self._suggesters = suggesters
@@ -169,6 +176,25 @@ class Orchestrator:
         self._apply = apply_resolution
         self._threshold = auto_accept_threshold
         self._max_iterations = max_iterations
+        self._reporter = reporter
+
+    def _emit(self, kind: str, data: dict, stage_name: Optional[str] = None) -> None:
+        """Emit a storytelling event if a reporter is wired, else no-op.
+
+        Pre:    `kind` is one of the EventKind literals defined in
+                nl2protocol.reporting; `data` is the kind-specific dict.
+        Post:   When `self._reporter is not None`: a `StageEvent` is
+                constructed and passed to `self._reporter.emit(...)`.
+                When None: silent no-op (test fakes that don't pass
+                a reporter run through the loop unchanged).
+        Side effects: Calls reporter.emit which may have I/O (CLI writes,
+                WebSocket sends, in-memory buffering — depends on the
+                Reporter implementation).
+        """
+        if self._reporter is None:
+            return
+        from nl2protocol.reporting import StageEvent
+        self._reporter.emit(StageEvent(kind=kind, data=data, stage_name=stage_name))
 
     def run(self, spec: Any, context: dict) -> OrchestratorOutcome:
         from nl2protocol.gap_resolution.registry import detect_all
@@ -186,11 +212,30 @@ class Orchestrator:
                 return OrchestratorOutcome(spec=spec, iterations=iterations,
                                             aborted=False, converged=True)
 
+            # ADR-0011 Phase 1: announce iteration start with the gap-set
+            # snapshot the iteration is about to operate on.
+            self._emit("gap_iteration_start",
+                       {"iteration": i, "gap_count": len(gaps)},
+                       stage_name="stage_3_gap_resolver")
+
             iter_result = IterationResult(iteration=i)
             iterations.append(iter_result)
 
             # TOPOLOGICAL SORT (so dependent gaps get upstream values in this iteration)
             gaps = topo_sort_gaps(gaps)
+
+            # ADR-0011 Phase 1: per-gap detection event (one per gap, in
+            # topological order — the renderer can reflect priority by
+            # event arrival order).
+            for gap in gaps:
+                self._emit("gap_detected", {
+                    "gap_id": gap.id,
+                    "gap_kind": gap.kind,
+                    "field_path": gap.field_path,
+                    "step_order": gap.step_order,
+                    "description": gap.description,
+                    "severity": gap.severity,
+                }, stage_name="stage_3_gap_resolver")
 
             # SUGGEST: try suggesters in registry order; first non-None wins.
             suggestions: dict = {}
@@ -209,6 +254,7 @@ class Orchestrator:
                     stamp_reviewer_verdicts(spec, reviews)
 
             # CLASSIFY + PRESENT + APPLY
+            resolved_in_iteration = 0
             for gap in gaps:
                 suggestion = suggestions.get(gap.id)
                 review = reviews.get(gap.field_path)
@@ -225,6 +271,8 @@ class Orchestrator:
                         resolution=resolution, auto_accepted=True,
                     ))
                     self._apply(spec, gap, resolution, suggestion)
+                    self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=True)
+                    resolved_in_iteration += 1
                     continue
 
                 # Present to user.
@@ -236,14 +284,30 @@ class Orchestrator:
 
                 if resolution.action == "abort":
                     iter_result.aborted = True
+                    self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
+                    self._emit("gap_iteration_end", {
+                        "iteration": i,
+                        "resolved_count": resolved_in_iteration,
+                        "remaining": len(gaps) - resolved_in_iteration - 1,
+                        "aborted": True,
+                    }, stage_name="stage_3_gap_resolver")
                     return OrchestratorOutcome(spec=spec, iterations=iterations,
                                                 aborted=True, converged=False)
                 if resolution.action == "skip":
+                    self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                     continue
                 # accept_suggestion or edit → apply
                 self._apply(spec, gap, resolution, suggestion)
+                self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
+                resolved_in_iteration += 1
 
             # End of iteration; loop top will re-detect.
+            self._emit("gap_iteration_end", {
+                "iteration": i,
+                "resolved_count": resolved_in_iteration,
+                "remaining": len(gaps) - resolved_in_iteration,
+                "aborted": False,
+            }, stage_name="stage_3_gap_resolver")
 
         # Hit iteration cap without converging.
         # Final detect to know if anything remains.
@@ -255,6 +319,47 @@ class Orchestrator:
             aborted=False,
             converged=(not final_gaps),
         )
+
+    def _emit_gap_resolved(self, gap: Gap, resolution: Resolution,
+                            suggestion: Optional[Suggestion], auto_accepted: bool) -> None:
+        """Emit a gap_resolved event with resolution_kind matching the
+        Provenance.review_status taxonomy.
+
+        Pre:    `gap` is the Gap that was just resolved, skipped, or aborted;
+                `resolution` is the Resolution returned by the handler (or
+                synthesized for auto-accept); `suggestion` is the matching
+                Suggestion when one existed; `auto_accepted` distinguishes
+                orchestrator auto-accept from handler-driven resolution.
+        Post:   Emits a "gap_resolved" StageEvent whose data carries the
+                gap id + the resolution_kind:
+                  * "auto_accepted" when auto_accepted=True
+                  * else mirrors resolution.user_action_provenance
+                    ("user_accepted_suggestion" / "user_edited" /
+                    "user_skipped" / "user_aborted" / "user_confirmed")
+                Plus field_path / step_order for the renderer's spec
+                cell-anchoring, and a value_repr for compact display.
+        Side effects: Same as `_emit` — reporter.emit may do I/O.
+        """
+        if auto_accepted:
+            kind = "auto_accepted"
+        else:
+            kind = resolution.user_action_provenance
+        # Compact value display: prefer the suggestion's value (deterministic
+        # case) or the user's typed value; fall back to current_value or
+        # placeholder for skip/abort.
+        value = resolution.new_value if resolution.new_value is not None else gap.current_value
+        try:
+            value_repr = repr(value) if value is not None else ""
+        except Exception:
+            value_repr = "<unrepresentable>"
+        self._emit("gap_resolved", {
+            "gap_id": gap.id,
+            "resolution_kind": kind,
+            "value_repr": value_repr[:200],   # cap noise — tooltip can show full value
+            "auto_accepted": auto_accepted,
+            "field_path": gap.field_path,
+            "step_order": gap.step_order,
+        }, stage_name="stage_3_gap_resolver")
 
     def _first_suggestion(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
         """Suggester precedence: first to return non-None wins for this Gap."""

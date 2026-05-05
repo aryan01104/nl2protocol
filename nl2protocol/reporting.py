@@ -41,6 +41,18 @@ EventKind = Literal[
     "warning",              # data = {"message": "...", "context": "..."}
     "error",                # data = {"message": "...", "stage": "..."}
     "info",                 # data = {"message": "..."}  — short status notes
+    # ADR-0011 Phase 1 — orchestrator + pipeline storytelling events.
+    # The existing HTMLReporter ignores these; Phase 2 renders them. They
+    # are emitted by the orchestrator (gap_iteration_*, gap_detected,
+    # gap_resolved) and the pipeline (labware_resolution_done,
+    # constraint_check_done) at the points where the user-visible spec
+    # transforms.
+    "gap_iteration_start",  # data = {"iteration": int, "gap_count": int}
+    "gap_iteration_end",    # data = {"iteration": int, "resolved_count": int, "remaining": int}
+    "gap_detected",         # data = {"gap_id": str, "gap_kind": str, "field_path": str, "step_order": Optional[int], "description": str}
+    "gap_resolved",         # data = {"gap_id": str, "resolution_kind": str, "value_repr": str, "auto_accepted": bool, "field_path": str, "step_order": Optional[int]}
+    "labware_resolution_done",  # data = {"resolutions": {description: resolved_label, ...}}
+    "constraint_check_done",    # data = {"violation_count": int, "warnings": [str, ...]}
 ]
 
 

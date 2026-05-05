@@ -735,6 +735,22 @@ class ProtocolAgent:
             model_name=extractor.model_name,
         ).resolve(spec)
 
+        # ADR-0011 Phase 1: emit labware_resolution_done so column 4
+        # (validated spec) can populate with the description→label
+        # mapping when rendered.
+        self.reporter.emit(StageEvent(
+            kind="labware_resolution_done",
+            data={
+                "resolutions": {
+                    ref.description: ref.resolved_label
+                    for step in spec.steps
+                    for ref in [step.source, step.destination]
+                    if ref and ref.resolved_label
+                },
+            },
+            stage_name="stage_3_labware_resolver",
+        ))
+
         # Reviewer: smaller / different model than the extractor's per ADR-0008's
         # bias-mitigation rationale. Haiku is cheap, fast, and sufficient for
         # the structured two-claim verification task.
@@ -766,6 +782,10 @@ class ProtocolAgent:
             ),
             handler=CLIConfirmationHandler(cm=self.cm, log=_log),
             apply_resolution=default_apply_resolution,
+            # ADR-0011 Phase 1: orchestrator emits storytelling events
+            # (gap_iteration_*, gap_detected, gap_resolved) into the same
+            # reporter that handles stage events.
+            reporter=self.reporter,
         )
         outcome = orch.run(spec, context={
             "instruction": prompt,
@@ -871,6 +891,20 @@ class ProtocolAgent:
             "errors": [str(v) for v in constraint_result.errors],
             "warnings": [str(w) for w in constraint_result.warnings],
         }
+
+        # ADR-0011 Phase 1: emit constraint_check_done so column 4
+        # (validated spec) can show whether the spec passed constraint
+        # checks cleanly. Most ERROR violations should already be 0
+        # (orchestrator's ConstraintViolationDetector resolved them);
+        # this event captures the residual + any WARNING-severity items.
+        self.reporter.emit(StageEvent(
+            kind="constraint_check_done",
+            data={
+                "violation_count": len(constraint_result.errors),
+                "warnings": [str(w) for w in constraint_result.warnings],
+            },
+            stage_name="stage_4_constraints",
+        ))
 
         if constraint_result.warnings:
             for w in constraint_result.warnings:

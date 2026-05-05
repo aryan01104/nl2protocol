@@ -838,6 +838,201 @@ class TestStampReviewerVerdictsForResolvedLabel:
         assert "ambiguous" in rprov.reviewer_objection
 
 
+# ============================================================================
+# ADR-0011 Phase 1: orchestrator emits storytelling events
+# ============================================================================
+
+class TestOrchestratorEmitsStorytellingEvents:
+    """When a Reporter is wired, the orchestrator emits gap_iteration_start,
+    gap_detected (one per gap, in topo order), gap_resolved (one per gap,
+    with resolution_kind reflecting the resolution), and gap_iteration_end
+    (with resolved_count + remaining)."""
+
+    def _capturing(self):
+        from nl2protocol.reporting import CapturingReporter
+        return CapturingReporter()
+
+    def test_emits_iteration_start_with_gap_count(self):
+        spec = make_spec()
+        reporter = self._capturing()
+        gaps = [gap("g1"), gap("g2")]
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": good_suggestion(0.95),
+                                        "g2": good_suggestion(0.95)})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        starts = reporter.events_of_kind("gap_iteration_start")
+        assert len(starts) == 1
+        assert starts[0].data["iteration"] == 1
+        assert starts[0].data["gap_count"] == 2
+
+    def test_emits_gap_detected_per_gap_in_topo_order(self):
+        spec = make_spec()
+        reporter = self._capturing()
+        # Two gaps; topo_sort_gaps puts .temperature (priority 0) before
+        # .source (priority 1). Detected order should reflect topo order.
+        gaps = [
+            gap("a", field_path="steps[0].source"),
+            gap("b", field_path="steps[0].temperature"),
+        ]
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"a": good_suggestion(0.95),
+                                        "b": good_suggestion(0.95)})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        detected = reporter.events_of_kind("gap_detected")
+        ids_in_order = [e.data["gap_id"] for e in detected]
+        # Temperature first (priority 0), then source (priority 1).
+        assert ids_in_order == ["b", "a"]
+        # Each carries the right metadata.
+        assert detected[0].data["field_path"] == "steps[0].temperature"
+        assert detected[0].data["gap_kind"] == "missing"
+        assert detected[0].data["severity"] == "blocker"
+
+    def test_gap_resolved_kind_auto_accepted_when_orchestrator_skips_handler(self):
+        spec = make_spec()
+        reporter = self._capturing()
+        gaps = [gap("g1")]
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": good_suggestion(0.95)})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        resolved = reporter.events_of_kind("gap_resolved")
+        assert len(resolved) == 1
+        assert resolved[0].data["resolution_kind"] == "auto_accepted"
+        assert resolved[0].data["auto_accepted"] is True
+        assert resolved[0].data["gap_id"] == "g1"
+
+    def test_gap_resolved_kind_user_accepted_when_user_takes_suggestion(self):
+        spec = make_spec()
+        reporter = self._capturing()
+        gaps = [gap("g1")]
+        handler = FakeHandler([
+            Resolution(action="accept_suggestion", new_value="filled",
+                       user_action_provenance="user_accepted_suggestion"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": good_suggestion(confidence=0.5)})],
+            reviewer=None,
+            handler=handler,
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        resolved = reporter.events_of_kind("gap_resolved")
+        assert len(resolved) == 1
+        assert resolved[0].data["resolution_kind"] == "user_accepted_suggestion"
+        assert resolved[0].data["auto_accepted"] is False
+
+    def test_gap_resolved_kind_user_skipped_does_not_count_as_resolved(self):
+        # Skipping leaves the gap unresolved; the gap_iteration_end event's
+        # resolved_count reflects skipped gaps as not-resolved.
+        spec = make_spec()
+        reporter = self._capturing()
+        gaps = [gap("g1"), gap("g2")]
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        # Use FakeDetector with 4 batches so re-detect after skip doesn't
+        # crash on iterating past the cap.
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, gaps, gaps, gaps])],
+            suggesters=[FakeSuggester({})],
+            reviewer=None,
+            handler=handler,
+            apply_resolution=fake_apply,
+            reporter=reporter,
+            max_iterations=1,
+        )
+        orch.run(spec, context={})
+        resolved = reporter.events_of_kind("gap_resolved")
+        # Two gaps both surface and both get skipped; both fire gap_resolved
+        # with kind=user_skipped.
+        assert len(resolved) == 2
+        assert all(e.data["resolution_kind"] == "user_skipped" for e in resolved)
+        # gap_iteration_end records 0 resolved, 2 remaining.
+        ends = reporter.events_of_kind("gap_iteration_end")
+        assert ends[0].data["resolved_count"] == 0
+        assert ends[0].data["remaining"] == 2
+
+    def test_emits_iteration_end_aborted_on_user_abort(self):
+        spec = make_spec()
+        reporter = self._capturing()
+        gaps = [gap("g1"), gap("g2")]
+        handler = FakeHandler([
+            Resolution(action="abort", new_value=None,
+                       user_action_provenance="user_aborted"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps])],
+            suggesters=[FakeSuggester({"g1": good_suggestion(confidence=0.5)})],
+            reviewer=None,
+            handler=handler,
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        ends = reporter.events_of_kind("gap_iteration_end")
+        assert len(ends) == 1
+        assert ends[0].data["aborted"] is True
+
+    def test_no_reporter_means_no_emission(self):
+        # Default behavior: orchestrator runs without a reporter and emits
+        # nothing. Pre-Phase-1 callers that don't pass reporter still work.
+        spec = make_spec()
+        gaps = [gap("g1")]
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": good_suggestion(0.95)})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            # reporter=None (default)
+        )
+        # Should not raise. Outcome unchanged.
+        outcome = orch.run(spec, context={})
+        assert outcome.converged is True
+
+    def test_no_iteration_events_on_already_clean_spec(self):
+        # Pre-iteration detect returns empty → orchestrator returns
+        # immediately without emitting gap_iteration_start. The renderer
+        # should NOT see fake "iteration 1" events for a spec that was
+        # already clean post-extraction.
+        spec = make_spec()
+        reporter = self._capturing()
+        orch = Orchestrator(
+            detectors=[FakeDetector([[]])],   # empty from the start
+            suggesters=[FakeSuggester({})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            reporter=reporter,
+        )
+        orch.run(spec, context={})
+        assert reporter.events_of_kind("gap_iteration_start") == []
+        assert reporter.events_of_kind("gap_detected") == []
+        assert reporter.events_of_kind("gap_resolved") == []
+
+
 class TestReviewerCollectsResolutionClaims:
     """IndependentReviewSuggester._collect_claims walks both spec-value
     provenances AND resolved_label_provenance entries — one batched
