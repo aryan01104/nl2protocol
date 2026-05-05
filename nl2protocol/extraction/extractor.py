@@ -734,14 +734,53 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
-    def fill_gaps(spec: ProtocolSpec, config: dict) -> Tuple[ProtocolSpec, List[str]]:
-        """Fill missing parameters with inferred defaults from config.
-        Returns (filled_spec, list of descriptions of what was filled)."""
+    def fill_lookup_and_carryover_gaps(spec: ProtocolSpec, config: dict) -> Tuple[ProtocolSpec, List[str]]:
+        """Fill exactly two kinds of deterministic gaps the LLM tends to leave.
+
+        Per ADR-0006, this function is INTENTIONALLY narrow. It is NOT a
+        general-purpose gap filler. It handles only the two patterns where
+        the missing value is *forced by context already in the system* —
+        not heuristically guessed. Adding a third case requires a new ADR
+        with its own justification.
+
+        The two patterns:
+
+        1. **Lookup gaps** (substance → source location).
+           When a step has a `substance` but no `source`, search the
+           config's labware contents for a well that lists this substance.
+           This is a config lookup keyed on substance name. Filled with
+           `Provenance(source="inferred", reasoning="<config path>",
+           confidence=0.9)`.
+
+        2. **Carryover gaps** (wait_for_temperature → prior set_temperature).
+           A `wait_for_temperature` action with no `temperature` value is
+           semantically forced — "wait until the module reaches its target"
+           can only refer to the most recent `set_temperature` in the same
+           protocol. Filled with `Provenance(source="inferred", reasoning=
+           "Inherited from prior set_temperature step (X°C)...", confidence=0.95)`.
+
+        Both kinds get inferred provenance attached so the report's ▴
+        marker + tooltip surface what was filled and why.
+
+        Pre:    `spec` is a ProtocolSpec post-extraction; some steps may
+                have null `source` (with substance set) or null
+                `temperature` (on wait_for_temperature actions).
+        Post:   Returns (filled_spec, fills) where filled_spec is a deep
+                copy of spec with applicable gaps populated. fills is a
+                list of human-readable strings describing each fill.
+                Steps the function CANNOT fill (no config match, no prior
+                set_temperature) are left untouched — the strict
+                CompleteProtocolSpec validator will catch them later.
+        Side effects: None on the input spec (deep-copied).
+        Raises: Never.
+        """
+        from ..models.spec import Provenance, ProvenancedTemperature
+
         filled = copy.deepcopy(spec)
         fills = []
 
+        # ---- (1) Lookup gaps: substance → source location via config ----
         for step in filled.steps:
-            # Try to resolve source from config labware contents
             if step.source is None and step.substance and "labware" in config:
                 substance_val = step.substance.value
                 for label, lw in config["labware"].items():
@@ -750,12 +789,49 @@ Output the corrected specification.
                         if isinstance(content_desc, str) and substance_val.lower() in content_desc.lower():
                             step.source = LocationRef(
                                 description=f"{label} (inferred from config)",
-                                well=well
+                                well=well,
+                                provenance=Provenance(
+                                    source="inferred",
+                                    reasoning=(
+                                        f"Substance '{substance_val}' found in config labware "
+                                        f"'{label}' at well {well}. The instruction did not "
+                                        f"explicitly name the source for this transfer."
+                                    ),
+                                    confidence=0.9,
+                                ),
                             )
                             fills.append(f"Step {step.order}: '{substance_val}' source → {label} well {well}")
                             break
                     if step.source:
                         break
+
+        # ---- (2) Carryover gaps: wait_for_temperature inherits from set_temperature ----
+        last_set_temp_celsius = None
+        for step in filled.steps:
+            if step.action == "set_temperature" and step.temperature is not None:
+                last_set_temp_celsius = step.temperature.value
+            elif step.action == "wait_for_temperature" and step.temperature is None:
+                if last_set_temp_celsius is None:
+                    # No prior set_temperature to inherit from. Leave the
+                    # gap; the strict CompleteProtocolSpec validator will
+                    # surface a clear error to the user.
+                    continue
+                step.temperature = ProvenancedTemperature(
+                    value=last_set_temp_celsius,
+                    provenance=Provenance(
+                        source="inferred",
+                        reasoning=(
+                            f"Inherited from prior set_temperature step "
+                            f"({last_set_temp_celsius}°C). The instruction did not "
+                            f"re-state the target temperature for this wait."
+                        ),
+                        confidence=0.95,
+                    ),
+                )
+                fills.append(
+                    f"Step {step.order}: wait_for_temperature target → "
+                    f"{last_set_temp_celsius}°C (inherited from prior set_temperature)"
+                )
 
         return filled, fills
 

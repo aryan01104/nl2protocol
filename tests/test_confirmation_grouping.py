@@ -28,6 +28,15 @@ def _prov():
     return Provenance(source="instruction", cited_text="t", confidence=1.0)
 
 
+def _loc(**kwargs):
+    """LocationRef with default test provenance — added when LocationRef.provenance
+    became required at the field level (ADR-0007). Lets pre-existing test
+    fixtures construct LocationRefs without each call having to spell out
+    a fresh provenance object."""
+    kwargs.setdefault("provenance", _prov())
+    return LocationRef(**kwargs)
+
+
 def _comp():
     return CompositionProvenance(
         step_cited_text="t",
@@ -47,8 +56,8 @@ def _spec(initial_contents=None):
         summary="test",
         steps=[ExtractedStep(
             order=1, action="transfer", volume=_vol(2.0),
-            source=LocationRef(description="src", well="A1"),
-            destination=LocationRef(description="dst", well="A1"),
+            source=_loc(description="src", well="A1"),
+            destination=_loc(description="dst", well="A1"),
             composition_provenance=_comp(),
         )],
         initial_contents=initial_contents or [],

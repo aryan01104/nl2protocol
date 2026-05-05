@@ -970,9 +970,13 @@ class ProtocolAgent:
             _log(f"  Gaps found: {len(gaps)}")
             for g in gaps:
                 _log(f"    - {g}")
-            spec, fills = extractor.fill_gaps(spec, self.config_loader.config)
+            # TODO(ADR-0006 deferred): surface fill count + distinguish
+            # deterministic gap-fills from LLM-inferred values in the
+            # HTML report. Today both share source="inferred"; future work
+            # carves out a "filled by lookup/carryover" sub-marker.
+            spec, fills = extractor.fill_lookup_and_carryover_gaps(spec, self.config_loader.config)
             if fills:
-                _log(f"  Filled from config:")
+                _log(f"  Filled deterministically (lookup + carryover):")
                 for f in fills:
                     _log(f"    - {f}")
             remaining_gaps = extractor.missing_fields(spec)

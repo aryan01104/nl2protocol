@@ -33,6 +33,15 @@ def _prov():
     return Provenance(source="instruction", cited_text="test cited text", confidence=1.0)
 
 
+def _loc(**kwargs):
+    """LocationRef with default test provenance — added when LocationRef.provenance
+    became required at the field level (ADR-0007). Lets pre-existing test
+    fixtures construct LocationRefs without each call having to spell out
+    a fresh provenance object."""
+    kwargs.setdefault("provenance", _prov())
+    return LocationRef(**kwargs)
+
+
 def _comp():
     return CompositionProvenance(
         step_cited_text="test step",
@@ -86,9 +95,9 @@ class TestInferredTipStrategy:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="A1-A4",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
@@ -112,10 +121,10 @@ class TestInferredTipStrategy:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate",
+                source=_loc(description="source_plate",
                                    well_range="A1-A3",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B3",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
@@ -135,10 +144,10 @@ class TestInferredTipStrategy:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate",
+                source=_loc(description="source_plate",
                                    well_range="A1-A2",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B6",
                                         resolved_label="dest_plate"),
                 replicates=3,
@@ -161,9 +170,9 @@ class TestInferredTipStrategy:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B3",
                                         resolved_label="dest_plate"),
                 post_actions=[PostAction(action="mix", repetitions=3,
@@ -195,18 +204,18 @@ class TestCrossStepTipOptimization:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B2",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B3-B4",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
@@ -228,18 +237,18 @@ class TestCrossStepTipOptimization:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B2",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A2",
+                source=_loc(description="source_plate", well="A2",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B3-B4",
                                         resolved_label="dest_plate"),
                 composition_provenance=_comp(),
@@ -269,9 +278,9 @@ class TestTipStrategyFieldIgnored:
         schema = _get_schema([
             ExtractedStep(
                 order=1, action="transfer", volume=_vol(50),
-                source=LocationRef(description="source_plate", well="A1",
+                source=_loc(description="source_plate", well="A1",
                                    resolved_label="source_plate"),
-                destination=LocationRef(description="dest_plate",
+                destination=_loc(description="dest_plate",
                                         well_range="B1-B4",
                                         resolved_label="dest_plate"),
                 tip_strategy="new_tip_each",

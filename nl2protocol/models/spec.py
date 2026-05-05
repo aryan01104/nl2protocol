@@ -271,8 +271,13 @@ class LocationRef(BaseModel):
     resolved_label: Optional[str] = Field(None, description=(
         "Config labware key. Filled automatically by the labware resolver — leave null during extraction."
     ))
-    provenance: Optional[Provenance] = Field(None, description=(
-        "How this location reference was determined. Covers the labware + well(s) as a unit."
+    provenance: Provenance = Field(..., description=(
+        "How this location reference was determined. Covers the labware + well(s) as a unit. "
+        "REQUIRED — every populated LocationRef must carry provenance, matching the field-level "
+        "requirement on every other provenance-carrying value (volume/duration/temperature/substance). "
+        "If the wells were derived from a prior step (e.g. 'Mix each tube' inheriting B1-B4), "
+        "use source='instruction' and cite the substring naming those wells. If genuinely inferred "
+        "from context with no cite, use source='inferred' with reasoning."
     ))
 
 
@@ -457,28 +462,42 @@ class CompleteProtocolSpec(ProtocolSpec):
 
     @model_validator(mode='after')
     def validate_completeness(self) -> 'CompleteProtocolSpec':
-        """Require every step to have all fields its action needs for codegen.
+        """Require every step to carry the fields codegen consumes for its action.
+
+        Per ADR-0006, this contract MATCHES the type's name: every action
+        defined in ActionType has an explicit per-action rule based on what
+        the schema builder actually reads. Steps not listed in any rule
+        (engage_magnets, disengage_magnets, deactivate) impose no
+        per-action requirements — those module commands take only their
+        target module label, not a parameter value.
 
         Pre:    CompleteProtocolSpec instance with `self.steps` populated.
                 `validate_step_ordering` (inherited from ProtocolSpec) has
                 already passed.
 
         Post:   For each step, action-specific completeness rules apply:
-                  * "Liquid" actions {transfer, distribute, consolidate,
+                  * Liquid-handling actions {transfer, distribute, consolidate,
                     aspirate, dispense, mix, serial_dilution} require
                     `step.volume` to be non-None.
-                  * "Transfer-like" actions {transfer, distribute,
+                  * Transfer-like actions {transfer, distribute,
                     serial_dilution, consolidate} additionally require
                     BOTH `step.source` and `step.destination` to be non-None.
-                  * Other actions (e.g. delay, set_temperature) impose no
-                    completeness requirements.
+                  * `set_temperature` and `wait_for_temperature` require
+                    `step.temperature` to be non-None.
+                  * `delay` requires `step.duration` to be non-None.
+                  * `pause` requires `step.duration` OR `step.note`
+                    (one or the other — timed pauses populate duration,
+                    user-driven pauses populate note explaining the
+                    user action).
+                  * `comment` requires `step.note` to be non-None.
+                  * Other actions impose no per-action requirements.
                 If every step satisfies its rules: returns self unchanged.
                 Otherwise: collects ALL issues across ALL steps (does not
                 short-circuit on the first), then raises a single ValueError
                 whose message starts with "Spec is incomplete (N issue(s)):"
                 followed by issues joined by "; ". When `step.substance`
-                is set, the issue message includes a `for 'X'` substance
-                hint where X is `step.substance.value`.
+                is set, liquid-action issue messages include a `for 'X'`
+                substance hint where X is `step.substance.value`.
 
         Side effects: None. Read-only validation.
 
@@ -489,6 +508,7 @@ class CompleteProtocolSpec(ProtocolSpec):
         liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
                           "dispense", "mix", "serial_dilution"}
         transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
+        temperature_actions = {"set_temperature", "wait_for_temperature"}
 
         for step in self.steps:
             prefix = f"Step {step.order} ({step.action})"
@@ -502,6 +522,18 @@ class CompleteProtocolSpec(ProtocolSpec):
                     errors.append(f"{prefix}: no source for '{step.substance.value}' — add it to your config" if step.substance else f"{prefix}: missing source location")
                 if step.destination is None:
                     errors.append(f"{prefix}: missing destination location{substance_hint}")
+
+            if step.action in temperature_actions and step.temperature is None:
+                errors.append(f"{prefix}: missing temperature target")
+
+            if step.action == "delay" and step.duration is None:
+                errors.append(f"{prefix}: missing duration")
+
+            if step.action == "pause" and step.duration is None and not step.note:
+                errors.append(f"{prefix}: pause requires either duration (timed) or note (user-driven)")
+
+            if step.action == "comment" and not step.note:
+                errors.append(f"{prefix}: missing note")
 
         if errors:
             raise ValueError(

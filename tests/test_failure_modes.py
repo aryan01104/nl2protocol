@@ -65,6 +65,15 @@ def _prov(source="instruction", text="test cited text", confidence=1.0):
     return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
+def _loc(**kwargs):
+    """LocationRef with default test provenance — added when LocationRef.provenance
+    became required at the field level (ADR-0007). Lets pre-existing test
+    fixtures construct LocationRefs without each call having to spell out
+    a fresh provenance object."""
+    kwargs.setdefault("provenance", _prov())
+    return LocationRef(**kwargs)
+
+
 def _comp(grounding=None, label="test step", confidence=1.0):
     """Shorthand for test composition provenance."""
     grounding = grounding or ["instruction"]
@@ -118,15 +127,15 @@ class TestPipetteInsufficient:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(5.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="B1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="B1"),
                 composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer",
                 volume=_vol(500.0),
-                source=LocationRef(description="reservoir", well="A1"),
-                destination=LocationRef(description="dest_plate", well="B1"),
+                source=_loc(description="reservoir", well="A1"),
+                destination=_loc(description="dest_plate", well="B1"),
                 composition_provenance=_comp(),
             ),
         ])
@@ -152,8 +161,8 @@ class TestLabwareMissing:
                 ExtractedStep(
                     order=1, action="distribute",
                     volume=_vol(50.0),
-                    source=LocationRef(description="reagent_reservoir", well="A1"),
-                    destination=LocationRef(description="assay_plate_384", well_range="A1-P24"),
+                    source=_loc(description="reagent_reservoir", well="A1"),
+                    destination=_loc(description="assay_plate_384", well_range="A1-P24"),
                     composition_provenance=_comp(),
                 )
             ],
@@ -175,8 +184,8 @@ class TestModuleMissing:
             ExtractedStep(
                 order=2, action="distribute",
                 volume=_vol(200.0),
-                source=LocationRef(description="reservoir", well="A1"),
-                destination=LocationRef(description="culture_plate", well_range="A1-H12"),
+                source=_loc(description="reservoir", well="A1"),
+                destination=_loc(description="culture_plate", well_range="A1-H12"),
                 composition_provenance=_comp(),
             ),
         ])
@@ -204,7 +213,7 @@ class TestCombinedConfigGaps:
                 ExtractedStep(
                     order=3, action="aspirate",
                     volume=_vol(150.0),
-                    source=LocationRef(description="deep_well_plate", well_range="A1-H1"),
+                    source=_loc(description="deep_well_plate", well_range="A1-H1"),
                     composition_provenance=_comp(),
                 ),
             ],
@@ -291,8 +300,8 @@ class TestMismatchedProtocol:
             ExtractedStep(
                 order=1, action="serial_dilution",
                 volume=_vol(100.0),
-                source=LocationRef(description="drug_stock"),
-                destination=LocationRef(description="96_well_plate", well_range="A1-A12"),
+                source=_loc(description="drug_stock"),
+                destination=_loc(description="96_well_plate", well_range="A1-A12"),
                 post_actions=[PostAction(action="mix", repetitions=5,
                                          volume=_vol(100.0))],
                 composition_provenance=_comp(),

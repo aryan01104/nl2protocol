@@ -38,6 +38,14 @@ PROVENANCE — every value you extract MUST have a provenance object:
   NOTE: do NOT use "config" — you do not have access to the lab config at this stage;
   config-derived values are filled in by a later resolution stage.
 
+  THIS APPLIES TO LOCATION REFS TOO: every populated source/destination LocationRef
+  MUST carry a provenance object. If the wells were derived from a prior step (e.g.
+  "Mix each tube" inheriting B1-B4 from the previous transfer), use
+  source="instruction" and cite the substring that names those wells in the
+  instruction (e.g. "B1-B4"). If you genuinely inferred wells from context with no
+  cite available, use source="inferred" with reasoning. NEVER leave provenance=null
+  on a populated LocationRef — the visualization relies on it for traceability.
+
   THE TWO FIELDS ARE MUTUALLY EXCLUSIVE BY SOURCE:
     source = "instruction"            → cited_text REQUIRED, reasoning MUST be omitted/null
     source = "domain_default"         → reasoning REQUIRED, cited_text MUST be omitted/null
@@ -48,6 +56,14 @@ PROVENANCE — every value you extract MUST have a provenance object:
               (case-insensitive, whitespace-normalized). For numbers, the cited substring
               should contain the value as written (e.g., "100uL of buffer" cites "100uL").
               Used ONLY when source = "instruction".
+
+              VERBATIM IS NON-NEGOTIABLE. Do NOT paraphrase, summarize, or reword.
+              Pick the SHORTEST substring that uniquely grounds the value — long
+              cites overlap badly with neighbors. Good: "100uL". Bad:
+              "transfer 100uL from source to destination". If the same substring
+              appears multiple times with different intents (e.g. "2uL" cited
+              twice), pick the shortest CONTAINING context that disambiguates
+              (e.g. "Add 2uL of plasmid" vs "mix at 2uL").
 
   reasoning:  one sentence explaining how this value follows from domain knowledge or inference.
               For "domain_default": cite the protocol and standard practice.
@@ -114,6 +130,14 @@ COMPOSITION PROVENANCE — every step MUST have a composition_provenance object 
   RULES:
     - step_cited_text MUST appear verbatim in the instruction.
     - parameters_cited_texts MUST each appear verbatim in the instruction.
+    - Keep step_cited_text TIGHT to this step's semantics. When one sentence
+      decomposes into multiple steps, each step cites ONLY its own clause —
+      not the shared sentence. Example:
+        Instruction: "Set temperature module to 4°C and wait for it to stabilize"
+        → set_temperature step: step_cited_text = "Set temperature module to 4°C"
+        → wait_for_temperature step: step_cited_text = "wait for it to stabilize"
+      WRONG: both steps citing the full sentence — they overlap and the
+      visualization can't tell which step came from which clause.
     - grounding MUST include "instruction" — every step traces back to something the user asked for.
       Do NOT add steps with grounding=["domain_default"] alone — that's a hallucination, REJECTED at parse time.
     - When grounding includes "domain_default", step_reasoning is REQUIRED — explain how the cited

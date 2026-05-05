@@ -232,8 +232,8 @@ class TestValidateCompleteness:
             _step(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="src", well="A1"),
-                destination=LocationRef(description="dst", well="A1"),
+                source=LocationRef(description="src", well="A1", provenance=_prov()),
+                destination=LocationRef(description="dst", well="A1", provenance=_prov()),
             ),
         ])
 
@@ -244,7 +244,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    destination=LocationRef(description="dst", well="A1"),
+                    destination=LocationRef(description="dst", well="A1", provenance=_prov()),
                 ),
             ])
         msg = str(exc_info.value)
@@ -257,7 +257,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    source=LocationRef(description="src", well="A1"),
+                    source=LocationRef(description="src", well="A1", provenance=_prov()),
                 ),
             ])
         assert "missing destination" in str(exc_info.value)
@@ -294,3 +294,43 @@ class TestValidateCompleteness:
                 _step(order=1, action="mix", substance=_pstr("buffer")),
             ])
         assert "for 'buffer'" in str(exc_info.value)
+
+
+# ============================================================================
+# LocationRef.provenance — required at the field level (ADR-0007)
+# ============================================================================
+
+class TestLocationRefProvenanceRequired:
+    """Per ADR-0007, every populated LocationRef must carry provenance —
+    field-level enforced by Pydantic. This closes the schema gap where
+    LocationRef.provenance was historically Optional, allowing silent
+    null-provenance values to pass parse and disappear into downstream
+    rendering / confirmation logic."""
+
+    def test_locationref_without_provenance_raises_at_construction(self):
+        # The point of moving from Optional to required is parse-time rejection.
+        with pytest.raises(ValidationError) as exc_info:
+            LocationRef(description="tube rack", well="A1")
+        msg = str(exc_info.value)
+        assert "provenance" in msg.lower()
+
+    def test_locationref_with_provenance_constructs_cleanly(self):
+        # Sanity check: providing provenance succeeds.
+        ref = LocationRef(
+            description="tube rack",
+            well="A1",
+            provenance=_prov(source="instruction", text="from A1"),
+        )
+        assert ref.provenance is not None
+        assert ref.provenance.source == "instruction"
+
+    def test_inferred_provenance_acceptable_for_locationref(self):
+        # The required-field rule doesn't constrain the SOURCE — inferred
+        # provenance from gap-filling (e.g. fill_lookup_and_carryover_gaps)
+        # is just as valid as instruction-sourced provenance.
+        ref = LocationRef(
+            description="reagent_rack (inferred from config)",
+            well="A1",
+            provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
+        )
+        assert ref.provenance.source == "inferred"

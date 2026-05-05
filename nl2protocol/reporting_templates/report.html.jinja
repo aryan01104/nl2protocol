@@ -7,15 +7,29 @@
 <style>
   /* ───────── Layout ───────── */
   :root {
-    --col-instruction: #e63946;   /* red-coral */
-    --col-config:      #9d4edd;   /* purple */
+    --col-instruction: #e63946;   /* vivid red, arrow color */
+    --col-config:      #9d4edd;   /* purple, reserved for labware-resolver viz */
     --col-domain:      #ffb703;   /* gold */
     --col-inferred:    #fb8500;   /* orange */
-    --bg:              #fdf6e3;   /* warm off-white (matches sketch) */
+    --bg:              #fdf6e3;   /* warm off-white */
     --panel:           #ffffff;
     --ink:             #1a1a1a;
     --dim:             #6b6b6b;
     --grid:            #e5e0d4;
+
+    /* Per-citation palette (8 vivid, distinguishable hues). Each unique
+       cited_text in the instruction hashes to one slot; both the cite
+       span (instruction column) and the atomic value span (spec column)
+       share the hue. Saturated for legibility against the off-white
+       background — designed to be picked out at a glance. */
+    --palette-0: #c1272d;   /* deep red */
+    --palette-1: #e76f1c;   /* burnt orange */
+    --palette-2: #c79100;   /* mustard */
+    --palette-3: #4f8a2b;   /* leaf green */
+    --palette-4: #168a8a;   /* teal */
+    --palette-5: #1f5fa6;   /* deep blue */
+    --palette-6: #5d3fa8;   /* indigo */
+    --palette-7: #b62f7a;   /* magenta */
   }
   * { box-sizing: border-box; }
   body {
@@ -73,11 +87,65 @@
     padding-bottom: 8px;
   }
 
-  /* ───────── Provenance color spans ───────── */
-  .prov-instruction    { color: var(--col-instruction); font-weight: 500; cursor: help; }
-  .prov-config         { color: var(--col-config);      font-weight: 500; cursor: help; }
-  .prov-domain_default { color: var(--col-domain);      font-weight: 500; cursor: help; background: rgba(255, 183, 3, 0.12); padding: 0 3px; border-radius: 2px; }
-  .prov-inferred       { color: var(--col-inferred);    font-weight: 500; cursor: help; background: rgba(251, 133, 0, 0.12); padding: 0 3px; border-radius: 2px; }
+  /* ───────── Provenance color spans ─────────
+     Two visual languages must NOT compete:
+       - per-citation color → atomic instruction-sourced values; the same
+                              hue lights both the cite span in the instruction
+                              and the value span in the spec, so readers
+                              connect them by hue rather than by arrow.
+       - dotted underline   → values filled in by the model (domain_default
+                              / inferred / config). Color stays categorical
+                              by source kind. The underline tells readers
+                              "this isn't a literal lift from the user."
+       - arrow              → composite (step-existence) grounding only. */
+  .prov-instruction    { font-weight: 500; cursor: help; /* hue comes from .palette-N */ }
+  .prov-config         { color: var(--col-config);      font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .prov-domain_default { color: var(--col-domain);      font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .prov-inferred       { color: var(--col-inferred);    font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+  /* ▴ marker prepended to non-instruction atomic values, repeated in the
+     legend. Visual at-a-glance shorthand: "this value isn't a literal lift
+     from the user — the model filled it in." Sized large enough to spot
+     at column-scan distance, colored with --col-inferred so it reads as
+     "model-filled" without any palette context. */
+  .non-instr-marker {
+    display: inline-block;
+    margin-right: 4px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--col-inferred);
+    transform: translateY(1px);
+  }
+
+  /* ───────── Per-citation palette ─────────
+     `.palette-N` paints the text for both:
+       - .cite-marker.cite-atomic-color in the instruction column
+       - .prov-instruction value spans in the spec column
+     Same hue on both sides == same cited_text on both sides. */
+  .palette-0 { color: var(--palette-0); }
+  .palette-1 { color: var(--palette-1); }
+  .palette-2 { color: var(--palette-2); }
+  .palette-3 { color: var(--palette-3); }
+  .palette-4 { color: var(--palette-4); }
+  .palette-5 { color: var(--palette-5); }
+  .palette-6 { color: var(--palette-6); }
+  .palette-7 { color: var(--palette-7); }
+
+  /* Hover-flip: when a cite-marker becomes "cite-active" (because the
+     reader is hovering its matching value-span in the spec column), the
+     cite span fills with its palette color and the text flips to a
+     hardcoded contrast shade (white for dark hues, ink for light hues).
+     The flip is done by overriding text color and adding a strong bg
+     of the same palette hue. Per-palette contrast is hardcoded — chosen
+     once for legibility, not computed. */
+  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: #1a1a1a; }
+  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: #fff; }
 
   /* ───────── Instruction column ───────── */
   .instruction-text {
@@ -116,16 +184,20 @@
     color: #333;
   }
   .step-detail .label { color: var(--dim); margin-right: 4px; }
-  .step-cohesion {
-    margin-top: 8px;
-    padding-top: 6px;
+  /* Footnote inside a step block — used for the `note` field on
+     pause/comment steps so the body isn't empty. Small, dim, italic. */
+  .step-note {
+    margin-top: 6px;
+    padding-top: 5px;
     border-top: 1px dashed var(--grid);
-    color: var(--dim);
     font-size: 11px;
+    font-style: italic;
+    color: var(--dim);
     line-height: 1.4;
-    cursor: help;
   }
-  .step-cohesion em { color: var(--ink); font-style: italic; }
+  /* Step blocks are themselves hoverable — the JS tooltip surfaces
+     the justification + optional domain expansion. */
+  .step { cursor: help; }
 
   /* ───────── Code column ───────── */
   pre.code {
@@ -136,6 +208,138 @@
     white-space: pre;
     overflow-x: auto;
     color: #1a1a1a;
+  }
+
+  /* ───────── Cite markers in instruction ─────────
+     Three cite kinds, three treatments:
+       composite-step  → arrow ANCHOR. Subtle underline (muted red) at
+                         rest, brightens on hover; pairs with the SVG
+                         arrow into the step block. Multiple step cites
+                         can share one anchor (fan-out arrows).
+       atomic-color    → COLOR MATCH. The .palette-N class on the same
+                         span paints the substring the same hue as the
+                         atomic value in the spec column — no arrow.
+       q2-cohesion     → ON-HOVER hint. Invisible at rest; tints when
+                         its step block is hovered, showing which
+                         instruction fragments answer "why these
+                         parameters cohere as one step." */
+  .cite-marker {
+    cursor: pointer;
+    padding: 0 1px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .cite-composite-step {
+    background: rgba(184, 68, 79, 0.05);
+    border-bottom: 2px solid rgba(184, 68, 79, 0.45);
+  }
+  .cite-composite-step:hover,
+  .cite-composite-step.cite-active {
+    background: rgba(184, 68, 79, 0.18);
+    border-bottom-color: rgba(184, 68, 79, 0.85);
+  }
+  .cite-atomic-color {
+    /* color comes from the .palette-N class on the same span */
+    font-weight: 500;
+  }
+  .cite-atomic-color:hover,
+  .cite-atomic-color.cite-active {
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 2px;
+  }
+  .cite-q2-cohesion {
+    /* deliberately unstyled at rest — reads as plain prose */
+    transition: background 0.15s;
+  }
+  .cite-q2-cohesion.q2-active {
+    background: rgba(184, 68, 79, 0.10);
+    border-radius: 2px;
+  }
+  .step.step-active {
+    background: rgba(184, 68, 79, 0.06);
+    border-left-color: var(--col-instruction);
+  }
+  span[data-prov-id]:hover,
+  span[data-prov-id].prov-active {
+    outline: 1px solid currentColor;
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+
+  /* ───────── JS hover tooltip (replaces native title=) ───────── */
+  #hover-tip {
+    position: fixed;
+    z-index: 100;
+    max-width: 360px;
+    padding: 10px 12px;
+    background: #2a2a2a;
+    color: #f5f5f5;
+    font-size: 12px;
+    line-height: 1.45;
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    white-space: normal;
+  }
+  #hover-tip.visible { opacity: 1; }
+  #hover-tip .tip-meta {
+    color: #b8b8b8;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  #hover-tip .tip-cite {
+    font-style: italic;
+    color: #ffd9c2;
+    margin-bottom: 6px;
+  }
+  #hover-tip .tip-reasoning { color: #f0f0f0; }
+  #hover-tip .tip-section { margin-top: 8px; }
+  /* Indented blockquote of the step's cited text. The left bar uses the
+     step-trigger color (vivid red for instruction grounding) so readers
+     see "this is the literal phrase that triggered the step" without
+     needing the inline cite-id attr. */
+  #hover-tip .tip-quote {
+    margin: 8px 0 0;
+    padding: 4px 0 4px 10px;
+    border-left: 3px solid var(--col-instruction);
+    color: #ffd9c2;
+    font-style: italic;
+    line-height: 1.4;
+  }
+  /* When step_palette_class is set, the left bar takes that hue. */
+  #hover-tip .tip-quote.palette-0 { border-left-color: var(--palette-0); }
+  #hover-tip .tip-quote.palette-1 { border-left-color: var(--palette-1); }
+  #hover-tip .tip-quote.palette-2 { border-left-color: var(--palette-2); }
+  #hover-tip .tip-quote.palette-3 { border-left-color: var(--palette-3); }
+  #hover-tip .tip-quote.palette-4 { border-left-color: var(--palette-4); }
+  #hover-tip .tip-quote.palette-5 { border-left-color: var(--palette-5); }
+  #hover-tip .tip-quote.palette-6 { border-left-color: var(--palette-6); }
+  #hover-tip .tip-quote.palette-7 { border-left-color: var(--palette-7); }
+
+  /* ───────── SVG arrow overlay ─────────
+     Arrows are reserved for composite (step-existence) grounding only —
+     they show the high-level decomposition from instruction phrase to step
+     block. Atomic value provenance is conveyed by color, not arrows. */
+  #arrow-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 50;
+  }
+  #arrow-overlay path {
+    fill: none;
+    stroke: var(--col-instruction);
+    stroke-opacity: 0.32;
+    stroke-width: 2.5;
+    transition: stroke-opacity 0.12s, stroke-width 0.12s;
+  }
+  #arrow-overlay path.arrow-active {
+    stroke-opacity: 0.9;
+    stroke-width: 3.5;
   }
 
   /* ───────── Footer ───────── */
@@ -157,12 +361,14 @@
   <div class="meta">
     Generated {{ timestamp }} ·
     Status: {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+    {% if prov_stats and prov_stats.total %}
+      · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
+    {% endif %}
   </div>
   <div class="legend">
-    <span><span class="swatch" style="background: var(--col-instruction)"></span>from instruction</span>
-    <span><span class="swatch" style="background: var(--col-config)"></span>from config</span>
-    <span><span class="swatch" style="background: var(--col-domain)"></span>domain default</span>
-    <span><span class="swatch" style="background: var(--col-inferred)"></span>inferred</span>
+    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ arrow = step decomposition (instruction phrase → spec step)</span>
+    <span style="color: var(--dim); font-style: italic;">instruction-sourced atoms: per-citation hue (same hue on cite + value)</span>
+    <span><span class="non-instr-marker">▴</span> non-instruction atom (filled in by model — domain default / inferred / config)</span>
   </div>
 </header>
 
@@ -171,29 +377,28 @@
   <!-- ───────── Column 1: Instruction ───────── -->
   <div class="col">
     <h2>Instruction</h2>
-    <div class="instruction-text">{{ instruction }}</div>
+    <div class="instruction-text">{{ instruction_html|safe }}</div>
   </div>
 
-  <!-- ───────── Column 2: Extracted Spec ───────── -->
-  <div class="col">
+  <!-- ───────── Column 2: Extracted Spec ─────────
+       Step blocks no longer print "triggered by:" — the arrow communicates
+       the same thing. Hover the block for justification + reasoning. -->
+  <div class="col col-extracted-spec">
     <h2>Extracted Spec</h2>
     {% if spec_steps %}
       {% for step in spec_steps %}
-        <div class="step {{ step.step_class }}">
-          <div class="step-header"
-               title="Q1: step triggered by &quot;{{ step.step_cited_text|e }}&quot;{% if step.step_reasoning %}; expanded via domain knowledge: {{ step.step_reasoning|e }}{% endif %} (confidence {{ step.confidence }})">
-            triggered by: <em>"{{ step.step_cited_text }}"</em>
-            {% if step.step_reasoning %}<br><small>↳ domain expansion: {{ step.step_reasoning }}</small>{% endif %}
-          </div>
+        <div class="step {{ step.step_class }}"
+             data-prov-id="{{ step.step_trigger_prov_id }}"
+             data-step-cited="{{ step.step_cited_text|e }}"
+             data-step-palette="{{ step.step_palette_class }}"
+             {% if step.step_reasoning %}data-step-reasoning="{{ step.step_reasoning|e }}"{% endif %}
+             data-params-reasoning="{{ step.parameters_reasoning|e }}"
+             data-confidence="{{ step.confidence }}">
           <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
           {% for line in step.detail_lines %}
             <div class="step-detail">{{ line|safe }}</div>
           {% endfor %}
-          <div class="step-cohesion" title="Q2: how the parameters cohere as one step">
-            <small><em>parameters from:</em>
-            {% for cite in step.parameters_cited_texts %}"{{ cite }}"{% if not loop.last %}, {% endif %}{% endfor %}
-            — {{ step.parameters_reasoning }}</small>
-          </div>
+          {% if step.note_line %}{{ step.note_line|safe }}{% endif %}
         </div>
       {% endfor %}
     {% else %}
@@ -206,14 +411,17 @@
     <h2>Complete Spec</h2>
     {% if completed_steps %}
       {% for step in completed_steps %}
-        <div class="step {{ step.step_class }}">
-          <div class="step-header" title="{{ step.justification|e }} (confidence {{ step.confidence }})">
-            {% if step.is_orphan %}⚠ {% endif %}{{ step.justification }}
-          </div>
+        <div class="step {{ step.step_class }}"
+             data-step-cited="{{ step.step_cited_text|e }}"
+             data-step-palette="{{ step.step_palette_class }}"
+             {% if step.step_reasoning %}data-step-reasoning="{{ step.step_reasoning|e }}"{% endif %}
+             data-params-reasoning="{{ step.parameters_reasoning|e }}"
+             data-confidence="{{ step.confidence }}">
           <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
           {% for line in step.detail_lines %}
             <div class="step-detail">{{ line|safe }}</div>
           {% endfor %}
+          {% if step.note_line %}{{ step.note_line|safe }}{% endif %}
         </div>
       {% endfor %}
     {% else %}
@@ -235,8 +443,284 @@
 
 <footer>
   <span>nl2protocol · provenance-traced protocol generation</span>
-  <span>Hover any colored value or step header for the original reasoning.</span>
+  <span>Hover any colored value or step block for the original cite + reasoning.</span>
 </footer>
+
+<!-- JS hover tooltip — replaces native title= for richer formatting and fade. -->
+<div id="hover-tip" role="tooltip"></div>
+
+<!-- SVG overlay for arrows from instruction-cite spans to spec-step blocks.
+     The clipPath is rebuilt on every render to match the spec column's
+     visible rect — arrows that would extend above/below the column box
+     are clipped, preserving their bezier shape but hiding the overflow. -->
+<svg id="arrow-overlay" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="arrow-clip"><rect id="arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
+  </defs>
+  <g clip-path="url(#arrow-clip)" id="arrow-paths"></g>
+</svg>
+
+<script>
+(function () {
+  // Visual wiring for the report:
+  //   1. Composite-step arrows — one SVG bezier per (step, anchor) pair.
+  //      A single instruction cite-span can carry MULTIPLE step-trigger
+  //      ids (space-separated in data-cite-id) when two step cites
+  //      overlap; in that case we draw N arrows fanning out from the
+  //      same anchor, producing the "<"-shaped attribution.
+  //   2. Hover emphasis — hovering a cite OR a prov target outlines the
+  //      pair across all DOM segments sharing the id, and brightens the
+  //      matching arrow(s).
+  //   3. Q2 cohesion hover — hovering a step block tints every
+  //      .cite-q2-cohesion span tagged with that step's id; lit-up
+  //      state is the only time Q2 cites become visible.
+  //   4. Hover tooltip — replaces native title=. Reads provenance from
+  //      data-prov-* attrs on value spans and data-step-* / data-params-*
+  //      on step blocks; positions near the cursor with a fade.
+
+  const overlay = document.getElementById("arrow-overlay");
+  const tip = document.getElementById("hover-tip");
+  if (!overlay) return;
+
+  // Token-match selector: a span's data-cite-id may carry multiple
+  // ids ("s0-step-trigger s1-step-trigger") so use the ~= attribute
+  // selector for whitespace-separated tokens.
+  const sel = (attr, token) => `[${attr}~="${CSS.escape(token)}"]`;
+
+  function bezierPath(srcRect, dstRect) {
+    // Right edge of source → left edge of destination, smooth horizontal sweep.
+    const x1 = srcRect.right;
+    const y1 = srcRect.top + srcRect.height / 2;
+    const x2 = dstRect.left;
+    const y2 = dstRect.top + dstRect.height / 2;
+    const dx = Math.max(40, (x2 - x1) * 0.5);
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  }
+
+  function renderArrows() {
+    const arrowGroup = document.getElementById("arrow-paths");
+    if (arrowGroup) {
+      while (arrowGroup.firstChild) arrowGroup.removeChild(arrowGroup.firstChild);
+    }
+    // Update the clip-path rect to match the spec column's visible bounds.
+    // Arrows that would extend above/below the column get clipped without
+    // changing their bezier shape.
+    const specCol = document.querySelector(".col-extracted-spec");
+    const clipRect = document.getElementById("arrow-clip-rect");
+    if (specCol && clipRect) {
+      const r = specCol.getBoundingClientRect();
+      // Extend left toward the instruction column so the arrow's starting
+      // bezier sweep remains visible — only the destination side needs clipping.
+      const leftExtend = window.innerWidth;
+      clipRect.setAttribute("x", String(r.left - leftExtend));
+      clipRect.setAttribute("y", String(r.top));
+      clipRect.setAttribute("width", String(r.right - r.left + leftExtend));
+      clipRect.setAttribute("height", String(r.bottom - r.top));
+    }
+    // Dedupe by step-trigger id: one arrow per (cite-anchor, step) pair.
+    // When the same step-trigger id appears across multiple DOM segments
+    // (because of overlap segmentation), pick the leftmost segment as anchor.
+    const anchorByStepId = new Map();
+    document.querySelectorAll(".cite-composite-step[data-cite-id]").forEach((citeEl) => {
+      const ids = (citeEl.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
+      const r = citeEl.getBoundingClientRect();
+      if (!r.width) return;
+      ids.forEach((id) => {
+        if (!id.endsWith("-step-trigger")) return;
+        const prev = anchorByStepId.get(id);
+        if (!prev || r.left < prev.rect.left) {
+          anchorByStepId.set(id, { rect: r });
+        }
+      });
+    });
+    anchorByStepId.forEach(({ rect: srcRect }, id) => {
+      const target = document.querySelector(`.step${sel("data-prov-id", id)}`);
+      if (!target) return;
+      const dstRect = target.getBoundingClientRect();
+      if (!dstRect.width) return;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", bezierPath(srcRect, dstRect));
+      path.dataset.citeId = id;
+      (arrowGroup || overlay).appendChild(path);
+    });
+  }
+
+  function setPairActive(id, active) {
+    // Toggle highlight on every cite-segment, prov-target, and arrow sharing one id.
+    document.querySelectorAll(sel("data-cite-id", id)).forEach((e) =>
+      e.classList.toggle("cite-active", active)
+    );
+    document.querySelectorAll(sel("data-prov-id", id)).forEach((e) => {
+      if (e.classList.contains("step")) {
+        e.classList.toggle("step-active", active);
+      } else {
+        e.classList.toggle("prov-active", active);
+      }
+    });
+    overlay.querySelectorAll(`path[data-cite-id="${CSS.escape(id)}"]`).forEach((p) =>
+      p.classList.toggle("arrow-active", active)
+    );
+  }
+
+  function setQ2Active(stepId, active) {
+    document.querySelectorAll(sel("data-q2-step-id", stepId)).forEach((e) =>
+      e.classList.toggle("q2-active", active)
+    );
+  }
+
+  // ────────── Hover tooltip ──────────
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  function showTip(html, evt) {
+    if (!tip) return;
+    tip.innerHTML = html;
+    tip.classList.add("visible");
+    moveTip(evt);
+  }
+  function hideTip() {
+    if (!tip) return;
+    tip.classList.remove("visible");
+  }
+  function moveTip(evt) {
+    if (!tip || !tip.classList.contains("visible")) return;
+    const pad = 14;
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    let x = evt.clientX + pad;
+    let y = evt.clientY + pad;
+    if (x + w > window.innerWidth - 8) x = evt.clientX - pad - w;
+    if (y + h > window.innerHeight - 8) y = evt.clientY - pad - h;
+    tip.style.left = `${Math.max(8, x)}px`;
+    tip.style.top = `${Math.max(8, y)}px`;
+  }
+
+  function tooltipHtmlForValueSpan(el) {
+    // Atomic value tooltip — uniform header regardless of source:
+    //   "SOURCE: <kind> · CONFIDENCE: <pct>"
+    // Below: cited substring (for instruction) or reasoning (for non-instruction).
+    const source = el.getAttribute("data-prov-source") || "unknown";
+    const conf = el.getAttribute("data-prov-confidence") || "";
+    const cited = el.getAttribute("data-prov-cited");
+    const reasoning = el.getAttribute("data-prov-reasoning");
+    const confPct = conf ? `${Math.round(parseFloat(conf) * 100)}%` : "";
+    let parts = [`<div class="tip-meta">source: ${escapeHtml(source)}${confPct ? ` · confidence: ${confPct}` : ""}</div>`];
+    if (cited) parts.push(`<div class="tip-cite">"${escapeHtml(cited)}"</div>`);
+    if (reasoning) parts.push(`<div class="tip-reasoning">${escapeHtml(reasoning)}</div>`);
+    return parts.join("");
+  }
+
+  function tooltipHtmlForStepBlock(el) {
+    // Step block tooltip:
+    //   header: "WHY THIS STEP, WITH THESE PARAMS? · <confidence>"
+    //   reasoning paragraph (parameters_reasoning)
+    //   indented blockquote of step_cited_text with palette-colored left bar
+    //   optional "DOMAIN EXPANSION" section when step_reasoning is present
+    const cited = el.getAttribute("data-step-cited") || "";
+    const paletteCls = el.getAttribute("data-step-palette") || "";
+    const stepReasoning = el.getAttribute("data-step-reasoning");
+    const paramsReasoning = el.getAttribute("data-params-reasoning");
+    const conf = el.getAttribute("data-confidence") || "";
+    let parts = [`<div class="tip-meta">why this step, with these params?${conf ? ` · ${escapeHtml(conf)}` : ""}</div>`];
+    if (paramsReasoning) {
+      parts.push(`<div class="tip-reasoning">${escapeHtml(paramsReasoning)}</div>`);
+    }
+    if (cited) {
+      parts.push(`<blockquote class="tip-quote ${escapeHtml(paletteCls)}">${escapeHtml(cited)}</blockquote>`);
+    }
+    if (stepReasoning) {
+      parts.push(`<div class="tip-section"><div class="tip-meta">domain expansion</div><div class="tip-reasoning">${escapeHtml(stepReasoning)}</div></div>`);
+    }
+    return parts.join("");
+  }
+
+  function wireHover() {
+    // Cite ↔ prov pair highlight + cite-segment tooltip (if cite carries
+    // any prov metadata via the value side, which it doesn't directly —
+    // tooltip wiring lives on prov-id targets and step blocks below).
+    document.querySelectorAll("[data-cite-id]").forEach((el) => {
+      const ids = (el.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
+      el.addEventListener("mouseenter", () => ids.forEach((id) => setPairActive(id, true)));
+      el.addEventListener("mouseleave", () => ids.forEach((id) => setPairActive(id, false)));
+    });
+
+    // Atomic value spans (carry data-prov-source) — pair highlight + tooltip.
+    document.querySelectorAll("[data-prov-source]").forEach((el) => {
+      const id = el.getAttribute("data-prov-id");
+      el.addEventListener("mouseenter", (e) => {
+        if (id) setPairActive(id, true);
+        showTip(tooltipHtmlForValueSpan(el), e);
+      });
+      el.addEventListener("mousemove", moveTip);
+      el.addEventListener("mouseleave", () => {
+        if (id) setPairActive(id, false);
+        hideTip();
+      });
+    });
+
+    // Step blocks — Q2 cohesion lighting + step-trigger pair highlight + tooltip.
+    document.querySelectorAll(".step[data-prov-id]").forEach((stepEl) => {
+      const provId = stepEl.getAttribute("data-prov-id");
+      const stepId = provId.replace(/-step-trigger$/, "");
+      stepEl.addEventListener("mouseenter", (e) => {
+        setPairActive(provId, true);
+        setQ2Active(stepId, true);
+        showTip(tooltipHtmlForStepBlock(stepEl), e);
+      });
+      stepEl.addEventListener("mousemove", moveTip);
+      stepEl.addEventListener("mouseleave", () => {
+        setPairActive(provId, false);
+        setQ2Active(stepId, false);
+        hideTip();
+      });
+    });
+
+    // Complete-spec column step blocks (no data-prov-id but still hover tooltip).
+    document.querySelectorAll(".step:not([data-prov-id])[data-step-cited]").forEach((stepEl) => {
+      stepEl.addEventListener("mouseenter", (e) => showTip(tooltipHtmlForStepBlock(stepEl), e));
+      stepEl.addEventListener("mousemove", moveTip);
+      stepEl.addEventListener("mouseleave", hideTip);
+    });
+
+    // Reverse Q2 wiring: hovering a Q2 cite-span surfaces its step.
+    document.querySelectorAll(".cite-q2-cohesion[data-q2-step-id]").forEach((citeEl) => {
+      const stepIds = (citeEl.getAttribute("data-q2-step-id") || "").split(/\s+/).filter(Boolean);
+      citeEl.addEventListener("mouseenter", () => stepIds.forEach((sid) => {
+        setQ2Active(sid, true);
+        setPairActive(`${sid}-step-trigger`, true);
+      }));
+      citeEl.addEventListener("mouseleave", () => stepIds.forEach((sid) => {
+        setQ2Active(sid, false);
+        setPairActive(`${sid}-step-trigger`, false);
+      }));
+    });
+  }
+
+  function scheduleRender() {
+    requestAnimationFrame(renderArrows);
+  }
+
+  function init() {
+    renderArrows();
+    wireHover();
+    // Re-render on every layout-affecting event so arrows track their anchors.
+    window.addEventListener("resize", scheduleRender);
+    window.addEventListener("scroll", scheduleRender, { passive: true });
+    document.querySelectorAll(".col").forEach((c) =>
+      c.addEventListener("scroll", scheduleRender, { passive: true })
+    );
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
 
 </body>
 </html>

@@ -56,6 +56,15 @@ def _prov(source="instruction", text="test cited text", confidence=1.0):
     return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
+def _loc(**kwargs):
+    """LocationRef with default test provenance — added when LocationRef.provenance
+    became required at the field level (ADR-0007). Lets pre-existing test
+    fixtures construct LocationRefs without each call having to spell out
+    a fresh provenance object."""
+    kwargs.setdefault("provenance", _prov())
+    return LocationRef(**kwargs)
+
+
 def _comp(grounding=None, label="test step", confidence=1.0):
     """Shorthand for test composition provenance."""
     grounding = grounding or ["instruction"]
@@ -395,8 +404,8 @@ class TestCheckAllOrchestration:
         return ExtractedStep(
             order=1, action="transfer",
             volume=_vol(100.0),  # within p300 range
-            source=LocationRef(description="source_plate", well="A1", resolved_label="source_plate"),
-            destination=LocationRef(description="dest_plate", well="A1", resolved_label="dest_plate"),
+            source=_loc(description="source_plate", well="A1", resolved_label="source_plate"),
+            destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp(),
         )
 
@@ -419,14 +428,14 @@ class TestCheckAllOrchestration:
         # Two steps, each requesting a volume that exceeds the only pipette
         bad_step_1 = ExtractedStep(
             order=1, action="transfer", volume=_vol(50000.0),  # 50mL — exceeds anything
-            source=LocationRef(description="source_plate", well="A1"),
-            destination=LocationRef(description="dest_plate", well="A1"),
+            source=_loc(description="source_plate", well="A1"),
+            destination=_loc(description="dest_plate", well="A1"),
             composition_provenance=_comp(),
         )
         bad_step_2 = ExtractedStep(
             order=2, action="transfer", volume=_vol(50000.0),
-            source=LocationRef(description="source_plate", well="B1"),
-            destination=LocationRef(description="dest_plate", well="B1"),
+            source=_loc(description="source_plate", well="B1"),
+            destination=_loc(description="dest_plate", well="B1"),
             composition_provenance=_comp(),
         )
         spec = make_spec([bad_step_1, bad_step_2])
@@ -440,8 +449,8 @@ class TestCheckAllOrchestration:
     def test_every_violation_has_all_structured_fields(self, simple_config):
         bad_step = ExtractedStep(
             order=1, action="transfer", volume=_vol(50000.0),
-            source=LocationRef(description="source_plate", well="A1"),
-            destination=LocationRef(description="dest_plate", well="A1"),
+            source=_loc(description="source_plate", well="A1"),
+            destination=_loc(description="dest_plate", well="A1"),
             composition_provenance=_comp(),
         )
         result = ConstraintChecker(simple_config).check_all(make_spec([bad_step]))
@@ -495,8 +504,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(10.0),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 post_actions=[PostAction(action="mix", repetitions=5,
                                          volume=_vol(50.0))],
                 tip_strategy="new_tip_each",
@@ -519,8 +528,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="A1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -535,8 +544,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(1500.0),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -552,8 +561,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(1500.0, source="inferred"),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -577,8 +586,8 @@ class TestLabwareResolution:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(10.0),
-                source=LocationRef(description="centrifuge_vial", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="centrifuge_vial", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -595,8 +604,8 @@ class TestLabwareResolution:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="A1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -652,8 +661,8 @@ class TestTipSufficiency:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", wells=[f"A{i}" for i in range(1, 13)]),
-                destination=LocationRef(description="dest_plate", wells=[f"A{i}" for i in range(1, 13)]),
+                source=_loc(description="source_plate", wells=[f"A{i}" for i in range(1, 13)]),
+                destination=_loc(description="dest_plate", wells=[f"A{i}" for i in range(1, 13)]),
                 replicates=9,
                 tip_strategy="new_tip_each",
                 composition_provenance=_comp(),
@@ -985,8 +994,8 @@ class TestVolumeValidation:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well="A1"),
+                    source=_loc(description="reservoir", well="A1"),
+                    destination=_loc(description="plate", well="A1"),
                     composition_provenance=_comp(),
                 )
             ],
@@ -1009,8 +1018,8 @@ class TestVolumeValidation:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(10.0),
-                    source=LocationRef(description="reagent_tube_rack", well="A1"),
-                    destination=LocationRef(description="dilution_strip", well="A1"),
+                    source=_loc(description="reagent_tube_rack", well="A1"),
+                    destination=_loc(description="dilution_strip", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
                                              volume=_vol(50.0, source="inferred"))],
                     composition_provenance=_comp(),
@@ -1048,8 +1057,8 @@ class TestSerialDilution:
                 ExtractedStep(
                     order=1, action="serial_dilution",
                     volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well_range="A1-A6"),
+                    source=_loc(description="reservoir", well="A1"),
+                    destination=_loc(description="plate", well_range="A1-A6"),
                     tip_strategy="new_tip_each",
                     composition_provenance=_comp(),
                 )
@@ -1089,8 +1098,8 @@ class TestSerialDilution:
                 ExtractedStep(
                     order=1, action="serial_dilution",
                     volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well_range="A1-A6"),
+                    source=_loc(description="reservoir", well="A1"),
+                    destination=_loc(description="plate", well_range="A1-A6"),
                     tip_strategy="new_tip_each",
                     composition_provenance=_comp(),
                 )
@@ -1122,8 +1131,8 @@ class TestProvenance:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0, source="inferred"),
-                source=LocationRef(description="plate_a", well="A1"),
-                destination=LocationRef(description="plate_b", well="A1"),
+                source=_loc(description="plate_a", well="A1"),
+                destination=_loc(description="plate_b", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -1140,8 +1149,8 @@ class TestProvenance:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    source=LocationRef(description="plate_a", well="A1"),
-                    destination=LocationRef(description="plate_b", well="A1"),
+                    source=_loc(description="plate_a", well="A1"),
+                    destination=_loc(description="plate_b", well="A1"),
                     composition_provenance=_comp(),
                 )
             ],
@@ -1161,8 +1170,8 @@ class TestProvenance:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(10.0),
-                    source=LocationRef(description="plate_a", well="A1"),
-                    destination=LocationRef(description="plate_b", well="A1"),
+                    source=_loc(description="plate_a", well="A1"),
+                    destination=_loc(description="plate_b", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
                                              volume=_vol(50.0, source="domain_default", exact=False))],
                     composition_provenance=_comp(),
@@ -1186,8 +1195,8 @@ class TestProvenance:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(2.0),
-                    source=LocationRef(description="src", well="A1"),
-                    destination=LocationRef(description="dst", well="A1"),
+                    source=_loc(description="src", well="A1"),
+                    destination=_loc(description="dst", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=3,
                                              volume=_vol(10.0))],
                     composition_provenance=_comp(),
@@ -1210,8 +1219,8 @@ class TestProvenance:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(2.0),
-                    source=LocationRef(description="src", well="A1"),
-                    destination=LocationRef(description="dst", well="A1"),
+                    source=_loc(description="src", well="A1"),
+                    destination=_loc(description="dst", well="A1"),
                     tip_strategy="new_tip_each",
                     composition_provenance=_comp(),
                 )
