@@ -138,9 +138,12 @@ class MissingFieldsDetector:
 
 _SEVERITY_MAP = {
     # underlying severity → (Gap.kind, Gap.severity)
+    # Per ADR-0008 PR2 lessons: only fabrications become Gaps under the new
+    # architecture. Confidence gating happens at the orchestrator's classify
+    # step (auto_accept_threshold + ALWAYS_CONFIRM), not at detect time —
+    # otherwise auto-filled inferred values get re-flagged on the next
+    # iteration, creating a circular detection loop.
     "fabrication":     ("fabricated",     "blocker"),
-    "low_confidence":  ("low_confidence", "suggestion"),
-    "unverified":      ("low_confidence", "quality"),
 }
 
 
@@ -201,10 +204,12 @@ class ProvenanceWarningDetector:
             severity_str = w.get("severity", "unverified")
             mapped = _SEVERITY_MAP.get(severity_str)
             if mapped is None:
-                # Unknown severity: keep as quality-level flag rather than dropping.
-                kind, gap_severity = "unverifiable", "quality"
-            else:
-                kind, gap_severity = mapped
+                # Non-fabrication warnings (low_confidence, unverified) are
+                # intentionally NOT emitted as Gaps under the new architecture
+                # (see _SEVERITY_MAP comment). Drop them — confidence gating
+                # is the orchestrator's job at classify time.
+                continue
+            kind, gap_severity = mapped
             gaps.append(Gap(
                 id=_warning_id(w),
                 step_order=w.get("step") if w.get("step", 0) > 0 else None,

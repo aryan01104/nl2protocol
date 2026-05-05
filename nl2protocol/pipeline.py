@@ -385,7 +385,8 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json",
                  confirmation_manager=None,
-                 reporter=None):
+                 reporter=None,
+                 use_gap_resolver: bool = False):
         """
         Args:
             config_path: path to lab_config.json
@@ -398,6 +399,12 @@ class ProtocolAgent:
                 to ConsoleReporter, which preserves the existing CLI banners.
                 Tests pass CapturingReporter to inspect the structured event
                 stream without I/O. Future HTML/TUI sinks plug in here.
+            use_gap_resolver: experimental flag (ADR-0008 PR2). When True,
+                the post-extraction stage 3 logic (verify/fill/refine/confirm)
+                is replaced with the unified gap-resolution orchestrator.
+                Default False — existing pipeline behavior is unchanged.
+                The new path is opt-in until validated against the existing
+                one in real runs (PR3 flips the default).
         """
         from nl2protocol.confirmation import InteractiveCM
         from nl2protocol.reporting import ConsoleReporter
@@ -405,6 +412,7 @@ class ProtocolAgent:
         self.config_loader = ConfigLoader(config_path=config_path)
         self.cm = confirmation_manager or InteractiveCM()
         self.reporter = reporter or ConsoleReporter()
+        self.use_gap_resolver = use_gap_resolver
 
     @staticmethod
     def _summarize_well_list(wells: list) -> str:
@@ -943,72 +951,141 @@ class ProtocolAgent:
         # Stage 3: Validate extraction + check sufficiency + fill gaps
         _stage("[Stage 3/8] Validating and completing specification...")
 
-        # Provenance verification — check instruction/config claims
-        provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.config_loader.config)
-        fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
+        if self.use_gap_resolver:
+            # Experimental path (ADR-0008 PR2). Runs the unified orchestrator
+            # in place of the legacy verify/fill/refine block.
+            from .gap_resolution import (
+                Orchestrator, CLIConfirmationHandler, default_apply_resolution,
+                MissingFieldsDetector, ProvenanceWarningDetector,
+                ConfigLookupSuggester, CarryoverSuggester,
+                WellCapacitySuggester, RegexFromNoteSuggester,
+                WellRangeClipSuggester, LLMSpotSuggester,
+                IndependentReviewSuggester,
+            )
+            _log(f"  {C.dim('[experimental] using gap-resolver orchestrator (ADR-0008)')}")
+            # Reviewer: smaller / different model than the extractor's, per ADR-0008's
+            # bias-mitigation rationale. Haiku is cheap, fast, and sufficiently
+            # capable for the structured two-claim verification task.
+            reviewer_model = "claude-haiku-4-5"
+            orch = Orchestrator(
+                detectors=[
+                    MissingFieldsDetector(),
+                    ProvenanceWarningDetector(extractor),  # only fabrications post-fix
+                ],
+                suggesters=[
+                    # Deterministic first (correct-or-empty, no LLM cost):
+                    ConfigLookupSuggester(),
+                    CarryoverSuggester(),
+                    WellCapacitySuggester(),
+                    RegexFromNoteSuggester(),
+                    WellRangeClipSuggester(),
+                    # LLM spot last in chain — bounded per-Gap call before
+                    # falling through to the user. Replaces the old wholesale
+                    # `refine` (no silent overwrites, no token-truncation).
+                    LLMSpotSuggester(client=extractor.client,
+                                      model_name=extractor.model_name),
+                ],
+                reviewer=IndependentReviewSuggester(
+                    client=extractor.client,
+                    model_name=reviewer_model,
+                ),
+                handler=CLIConfirmationHandler(cm=self.cm, log=_log),
+                apply_resolution=default_apply_resolution,
+            )
+            outcome = orch.run(spec, context={
+                "instruction": prompt,
+                "config": self.config_loader.config,
+            })
+            state_log["stage_3_gap_resolver"] = {
+                "converged": outcome.converged,
+                "aborted": outcome.aborted,
+                "iterations": [
+                    {
+                        "iteration": it.iteration,
+                        "gap_count": len(it.records),
+                        "auto_accepted": sum(1 for r in it.records if r.auto_accepted),
+                    }
+                    for it in outcome.iterations
+                ],
+            }
+            if outcome.aborted:
+                _log(f"  {C.error('Gap resolution aborted.')}")
+                _save_state_log("stage_3_gap_resolver")
+                return None
+            if not outcome.converged:
+                _log(f"  {C.error('Gap resolution hit iteration cap without converging.')}")
+                _save_state_log("stage_3_gap_resolver")
+                return None
+            _log(f"  {C.success('Gap resolution converged.')}")
+            spec = outcome.spec
+            non_fabrications = []  # already handled by the orchestrator
+        else:
+            # Legacy path — verify/missing/fill/refine inline.
+            provenance_warnings = extractor.verify_provenance_claims(spec, prompt, self.config_loader.config)
+            fabrications = [w for w in provenance_warnings if w["severity"] == "fabrication"]
 
-        state_log["stage_3_provenance"] = provenance_warnings
+            state_log["stage_3_provenance"] = provenance_warnings
 
-        if fabrications:
-            _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
-            for w in fabrications:
-                _log(f"    {C.error('!')} {w['message']}")
-            _log(f"\n  The LLM put values in wrong fields or misattributed their source.")
-            _log(f"  This usually means temperatures ended up in volume fields, or")
-            _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
-            _log(f"  Re-run, or try a more explicit instruction.")
-            _save_state_log("stage_3_provenance")
-            return None
+            if fabrications:
+                _log(f"\n  {C.error(f'{len(fabrications)} fabrication error(s) detected:')}")
+                for w in fabrications:
+                    _log(f"    {C.error('!')} {w['message']}")
+                _log(f"\n  The LLM put values in wrong fields or misattributed their source.")
+                _log(f"  This usually means temperatures ended up in volume fields, or")
+                _log(f"  the LLM computed a derived value and tagged it as 'from instruction'.")
+                _log(f"  Re-run, or try a more explicit instruction.")
+                _save_state_log("stage_3_provenance")
+                return None
 
-        non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
-        if non_fabrications:
-            _log(f"  {C.dim(f'{len(non_fabrications)} provenance note(s) — will review during confirmation.')}")
+            non_fabrications = [w for w in provenance_warnings if w["severity"] != "fabrication"]
+            if non_fabrications:
+                _log(f"  {C.dim(f'{len(non_fabrications)} provenance note(s) — will review during confirmation.')}")
 
-        # Sufficiency check
-        gaps = extractor.missing_fields(spec)
-        if gaps:
-            _log(f"  Gaps found: {len(gaps)}")
-            for g in gaps:
-                _log(f"    - {g}")
-            # TODO(ADR-0006 deferred): surface fill count + distinguish
-            # deterministic gap-fills from LLM-inferred values in the
-            # HTML report. Today both share source="inferred"; future work
-            # carves out a "filled by lookup/carryover" sub-marker.
-            spec, fills = extractor.fill_lookup_and_carryover_gaps(spec, self.config_loader.config)
-            if fills:
-                _log(f"  Filled deterministically (lookup + carryover):")
-                for f in fills:
-                    _log(f"    - {f}")
-            remaining_gaps = extractor.missing_fields(spec)
-            if remaining_gaps:
-                _log(f"  Could not fill all gaps from config:")
-                for g in remaining_gaps:
+            # Sufficiency check
+            gaps = extractor.missing_fields(spec)
+            if gaps:
+                _log(f"  Gaps found: {len(gaps)}")
+                for g in gaps:
                     _log(f"    - {g}")
-                _log("  Attempting self-refinement (re-reasoning with gap feedback)...")
-                refined = extractor.refine(spec, remaining_gaps, prompt, self.config_loader.config)
-                if refined:
-                    spec = refined
-                    final_gaps = extractor.missing_fields(spec)
-                    if final_gaps:
-                        _log(f"  Refinement could not resolve all gaps:")
-                        for g in final_gaps:
-                            _log(f"    - {g}")
-                        _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
-                        state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "after_refine": final_gaps}
+                # TODO(ADR-0006 deferred): surface fill count + distinguish
+                # deterministic gap-fills from LLM-inferred values in the
+                # HTML report. Today both share source="inferred"; future work
+                # carves out a "filled by lookup/carryover" sub-marker.
+                spec, fills = extractor.fill_lookup_and_carryover_gaps(spec, self.config_loader.config)
+                if fills:
+                    _log(f"  Filled deterministically (lookup + carryover):")
+                    for f in fills:
+                        _log(f"    - {f}")
+                remaining_gaps = extractor.missing_fields(spec)
+                if remaining_gaps:
+                    _log(f"  Could not fill all gaps from config:")
+                    for g in remaining_gaps:
+                        _log(f"    - {g}")
+                    _log("  Attempting self-refinement (re-reasoning with gap feedback)...")
+                    refined = extractor.refine(spec, remaining_gaps, prompt, self.config_loader.config)
+                    if refined:
+                        spec = refined
+                        final_gaps = extractor.missing_fields(spec)
+                        if final_gaps:
+                            _log(f"  Refinement could not resolve all gaps:")
+                            for g in final_gaps:
+                                _log(f"    - {g}")
+                            _log("  Try: add the missing details to your instruction (volumes, wells, labware).")
+                            state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "after_refine": final_gaps}
+                            _save_state_log("stage_3_gaps")
+                            return None
+                        _log("  Refinement resolved all gaps.")
+                    else:
+                        _log("  Self-refinement did not produce a valid specification.")
+                        _log("  The LLM could not fill the gaps listed above even after retrying.")
+                        _log("  Try: add more detail to your instruction, or simplify the protocol.")
+                        state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "refine_failed": True}
                         _save_state_log("stage_3_gaps")
                         return None
-                    _log("  Refinement resolved all gaps.")
                 else:
-                    _log("  Self-refinement did not produce a valid specification.")
-                    _log("  The LLM could not fill the gaps listed above even after retrying.")
-                    _log("  Try: add more detail to your instruction, or simplify the protocol.")
-                    state_log["stage_3_gaps"] = {"initial": gaps, "after_fill": remaining_gaps, "refine_failed": True}
-                    _save_state_log("stage_3_gaps")
-                    return None
+                    _log("  Gaps filled from config.")
             else:
-                _log("  Gaps filled from config.")
-        else:
-            _log(f"  {C.dim('Specification is complete.')}")
+                _log(f"  {C.dim('Specification is complete.')}")
 
         if spec.explicit_volumes:
             _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")

@@ -27,6 +27,27 @@ from nl2protocol.gap_resolution.detectors import (
     ProvenanceWarningDetector,
     default_extractor_detectors,
 )
+from nl2protocol.gap_resolution.suggesters import (
+    CarryoverSuggester,
+    ConfigLookupSuggester,
+    IndependentReviewSuggester,
+    LLMSpotSuggester,
+    RegexFromNoteSuggester,
+    WellCapacitySuggester,
+    WellRangeClipSuggester,
+)
+from nl2protocol.gap_resolution.handlers import CLIConfirmationHandler
+from nl2protocol.gap_resolution.orchestrator import (
+    Orchestrator,
+    OrchestratorOutcome,
+    IterationResult,
+    GapResolutionRecord,
+    default_apply_resolution,
+    DEFAULT_AUTO_ACCEPT_THRESHOLD,
+    DEFAULT_MAX_ITERATIONS,
+    ALWAYS_CONFIRM_KINDS,
+    topo_sort_gaps,
+)
 from nl2protocol.gap_resolution.registry import detect_all
 
 __all__ = [
@@ -44,4 +65,21 @@ __all__ = [
     "ProvenanceWarningDetector",
     "default_extractor_detectors",
     "detect_all",
+    "ConfigLookupSuggester",
+    "CarryoverSuggester",
+    "WellCapacitySuggester",
+    "RegexFromNoteSuggester",
+    "WellRangeClipSuggester",
+    "LLMSpotSuggester",
+    "IndependentReviewSuggester",
+    "CLIConfirmationHandler",
+    "Orchestrator",
+    "OrchestratorOutcome",
+    "IterationResult",
+    "GapResolutionRecord",
+    "default_apply_resolution",
+    "DEFAULT_AUTO_ACCEPT_THRESHOLD",
+    "DEFAULT_MAX_ITERATIONS",
+    "ALWAYS_CONFIRM_KINDS",
+    "topo_sort_gaps",
 ]

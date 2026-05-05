@@ -198,9 +198,14 @@ class TestProvenanceWarningDetector:
         for g in fabrications:
             assert g.severity == "blocker"
 
-    def test_low_confidence_inferred_emits_suggestion_severity(self, extractor):
-        # Inferred volume → underlying severity="low_confidence" →
-        # adapter Gap severity="suggestion".
+    def test_low_confidence_inferred_does_not_emit_gap(self, extractor):
+        # Per ADR-0008 PR2 architectural correction: low_confidence /
+        # unverified warnings from _flag_uncertain_claims are NOT emitted
+        # as Gaps. Confidence gating happens at the orchestrator's classify
+        # step (auto_accept_threshold + ALWAYS_CONFIRM rules), not at
+        # detect time. Emitting these as Gaps caused circular re-detection
+        # — suggesters write inferred provenance, detector immediately
+        # re-flagged it as a gap, ad infinitum.
         spec = _spec([
             ExtractedStep(
                 order=1, action="mix",
@@ -217,9 +222,9 @@ class TestProvenanceWarningDetector:
             spec,
             context={"instruction": "Mix at half the total volume of 100uL.", "config": {}},
         )
-        low_conf = [g for g in gaps if g.kind == "low_confidence"]
-        assert len(low_conf) >= 1
-        assert all(g.severity in ("suggestion", "quality") for g in low_conf)
+        # Inferred values produce NO gaps — confidence is the orchestrator's
+        # concern, not the detector's.
+        assert all(g.kind != "low_confidence" for g in gaps)
 
     def test_field_path_includes_step_index(self, extractor):
         # Two-step spec — order must be consecutive. The detector should
