@@ -565,6 +565,16 @@
       · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
     {% endif %}
   </div>
+  {% if live_mode %}
+  <!-- ADR-0013 Phase 3b-1: live-mode control bar. Only shown when the
+       template renders for the FastAPI server's GET /. The static
+       HTMLReporter path doesn't set live_mode so this stays hidden. -->
+  <div class="live-controls" style="margin-top: 10px; display: flex; gap: 12px; align-items: center;">
+    <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #c0c0c0; background: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
+    <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
+    <span style="color: var(--dim); font-size: 12px; font-style: italic;">live mode · events stream as the pipeline runs · static report archived to <code>output/</code> at end-of-run</span>
+  </div>
+  {% endif %}
   <div class="legend">
     <span><span class="swatch" style="background: var(--col-instruction)"></span>→ arrow = step decomposition (instruction phrase → spec step)</span>
     <span style="color: var(--dim); font-style: italic;">instruction-sourced atoms: per-citation hue (same hue on cite + value)</span>
@@ -1122,6 +1132,146 @@
     document.addEventListener("DOMContentLoaded", init);
   } else {
     init();
+  }
+
+  // ────────── ADR-0013 Phase 3b-1: live-mode WebSocket consumer ──────────
+  // When the server renders this template with `live_mode=True`, this
+  // block opens a WebSocket to /events and dispatches incoming events
+  // to DOM-update handlers. Static HTMLReporter renders don't include
+  // the live-controls div above, so this code's getElementById calls
+  // simply find no button and the WebSocket never opens.
+  function initLiveMode() {
+    const startBtn = document.getElementById("live-start-btn");
+    const status = document.getElementById("live-status");
+    if (!startBtn || !status) return;   // not in live mode
+
+    function setStatus(text, bg, fg) {
+      status.textContent = text;
+      status.style.background = bg;
+      status.style.color = fg;
+    }
+
+    function appendStepBlocks(colSelector, stepDicts) {
+      // Replace the column's "(stage not reached)" placeholder with
+      // step blocks. Mirrors the Jinja loop's HTML structure exactly
+      // so all existing CSS + hover JS apply unchanged.
+      const col = document.querySelector(colSelector);
+      if (!col || !stepDicts) return;
+      // Drop any "(...) not reached" placeholder paragraph.
+      col.querySelectorAll("p").forEach((p) => p.remove());
+      // Drop any existing step blocks (so re-runs don't duplicate).
+      col.querySelectorAll(".step").forEach((s) => s.remove());
+      stepDicts.forEach((step) => {
+        const div = document.createElement("div");
+        div.className = "step " + (step.step_class || "");
+        div.dataset.stepCited = step.step_cited_text || "";
+        div.dataset.stepPalette = step.step_palette_class || "";
+        if (step.step_reasoning) div.dataset.stepReasoning = step.step_reasoning;
+        if (step.parameters_reasoning) div.dataset.paramsReasoning = step.parameters_reasoning;
+        if (step.confidence) div.dataset.confidence = step.confidence;
+        if (step.step_trigger_prov_id) div.dataset.provId = step.step_trigger_prov_id;
+        let html = `<div class="step-action">Step ${step.order}: ${escapeHtml(step.action || "")}</div>`;
+        (step.detail_lines || []).forEach((line) => {
+          html += `<div class="step-detail">${line}</div>`;
+        });
+        if (step.note_line) html += step.note_line;
+        div.innerHTML = html;
+        col.appendChild(div);
+      });
+      // Re-wire hover handlers so newly-added cells get listeners.
+      // The existing wireHover function is idempotent at the listener
+      // level for our use case (extra mouseenter listeners on the same
+      // element are harmless cosmetically; minor memory overhead is
+      // acceptable for v1 — Phase 3b-2 can refactor to event delegation).
+      try { wireHover(); } catch (e) { /* defensive */ }
+    }
+
+    function handleEvent(e) {
+      switch (e.kind) {
+        case "raw_instruction":
+          // Update the instruction column from "(loading)" placeholder.
+          // Phase 3b-2 will add full cite-mark rendering of the
+          // instruction text; for now we just plain-text it.
+          const instrCol = document.querySelector(".col .instruction-text");
+          if (instrCol && e.data && e.data.instruction) {
+            instrCol.textContent = e.data.instruction;
+          }
+          break;
+        case "extracted_spec":
+          appendStepBlocks(".col-extracted-spec", e.data && e.data.steps);
+          break;
+        case "resolved_spec":
+          appendStepBlocks(".col-resolved-spec", e.data && e.data.steps);
+          break;
+        case "completed_spec":
+          appendStepBlocks(".col-validated-spec", e.data && e.data.steps);
+          break;
+        case "generated_script":
+          // Replace the placeholder paragraph in column 5 with a <pre>.
+          const codeCol = document.querySelectorAll(".col")[4];
+          if (codeCol && e.data && e.data.script) {
+            codeCol.querySelectorAll("p").forEach((p) => p.remove());
+            codeCol.querySelectorAll("pre.code").forEach((p) => p.remove());
+            const pre = document.createElement("pre");
+            pre.className = "code";
+            pre.textContent = e.data.script;
+            codeCol.appendChild(pre);
+          }
+          break;
+        case "pipeline_done":
+          setStatus("done", "#d4edda", "#155724");
+          startBtn.disabled = false;
+          break;
+        case "error":
+          setStatus("error", "#f8d7da", "#721c24");
+          break;
+      }
+      // After any DOM mutation, re-render arrows so existing red
+      // composite-step arrows track their new anchors.
+      try { scheduleRender(); } catch (err) { /* defensive */ }
+    }
+
+    function connectWS() {
+      const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const url = proto + "//" + window.location.host + "/events";
+      const ws = new WebSocket(url);
+      ws.onopen = () => { /* connection established; no-op */ };
+      ws.onmessage = (msg) => {
+        try {
+          handleEvent(JSON.parse(msg.data));
+        } catch (err) { /* parse error — skip */ }
+      };
+      ws.onerror = () => { setStatus("ws error", "#f8d7da", "#721c24"); };
+      ws.onclose = () => { /* leave status as last known state */ };
+    }
+
+    startBtn.addEventListener("click", async () => {
+      startBtn.disabled = true;
+      setStatus("starting...", "#fff3cd", "#856404");
+      try {
+        const r = await fetch("/start", { method: "POST" });
+        const j = await r.json();
+        if (j.status === "started") {
+          setStatus("running", "#fff3cd", "#856404");
+        } else if (j.status === "already_running") {
+          setStatus("already running", "#fff3cd", "#856404");
+        } else {
+          setStatus("start failed", "#f8d7da", "#721c24");
+          startBtn.disabled = false;
+        }
+      } catch (err) {
+        setStatus("network error", "#f8d7da", "#721c24");
+        startBtn.disabled = false;
+      }
+    });
+
+    connectWS();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLiveMode);
+  } else {
+    initLiveMode();
   }
 })();
 </script>

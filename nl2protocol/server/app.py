@@ -1,16 +1,21 @@
 """
 LiveModeApp — FastAPI app + per-run state for `nl2protocol serve`.
 
-Per ADR-0013 Phase 3a: backend network layer only. GET / serves a
-placeholder page that opens a WebSocket and logs events; the real
-five-column rendering that consumes events incrementally lands in
-Phase 3b. WS /events streams pipeline events to the browser. POST
-/start kicks off the pipeline in a worker thread.
+Per ADR-0013 Phase 3a + 3b-1:
+  - 3a: backend network layer. WS /events streams pipeline events to
+    the browser; POST /start kicks off the pipeline in a worker thread.
+  - 3b-1: GET / renders the existing Jinja template with empty data +
+    a `live_mode=True` flag. The page loads with the full 5-column
+    structure + bulk-panel containers + SVG arrow overlay (all empty);
+    the live-mode JS at the end of the template handles WebSocket
+    events and inserts step blocks as they arrive. Server pre-renders
+    step dicts via `_step_to_render_dict` and includes them in spec
+    event payloads so the JS just sets innerHTML.
 
-The browser-facing JS for incremental rendering is deliberately stubbed
-in this phase — Phase 3a's value is the network plumbing being
-verifiable end-to-end (open browser, watch events arrive in DevTools
-console as the pipeline runs).
+3b-2/3 will add dynamic resolution-arrow drawing and bulk-panel
+population (today the panels stay at their empty-state placeholders
+during the run; the static HTMLReporter still writes the full
+artifact at end-of-run for archive).
 """
 
 from __future__ import annotations
@@ -33,10 +38,13 @@ from nl2protocol.server.reporter import (
 )
 
 
-# Embedded placeholder page for Phase 3a. Connects to /events on load,
-# logs each incoming JSON message to a visible <pre>. Phase 3b replaces
-# this with the real five-column rendering.
-_PLACEHOLDER_PAGE = """<!DOCTYPE html>
+# DEPRECATED in Phase 3b-1. Kept for backwards-compat only — the
+# Phase 3a placeholder page that just logs WebSocket events as a
+# styled <pre>. New live-mode renders the full Jinja template via
+# `LiveModeApp._render_live_page()` instead. If we ever want to fall
+# back to a debugging-friendly raw-event log, this string is still
+# servable as `HTMLResponse(_PLACEHOLDER_PAGE_LEGACY)`.
+_PLACEHOLDER_PAGE_LEGACY = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -191,6 +199,46 @@ def _safe_data(data: Any) -> Any:
     return str(data)
 
 
+def _enrich_spec_event_data(event_kind: str, raw_data: Any,
+                             instruction: str) -> dict:
+    """For spec events (extracted/resolved/completed), pre-render the
+    step blocks server-side using the existing `_step_to_render_dict`
+    helper and include them in the payload.
+
+    Per ADR-0013 Phase 3b-1: the browser-side JS just inserts the
+    pre-rendered HTML strings instead of duplicating the rendering
+    logic. Reuses 100% of the existing Python rendering path.
+
+    Pre:    `event_kind` is one of "extracted_spec" / "resolved_spec" /
+            "completed_spec". `raw_data` is the event's data dict
+            (carries `spec`). `instruction` is the most recent
+            raw_instruction text (used by `_render_provenanced_value`
+            to decide cite recoverability per cell).
+
+    Post:   Returns a dict suitable for JSON serialization with:
+              "steps":      list of step render dicts (dicts shape from
+                            `_step_to_render_dict`)
+              "spec":       _safe_data(spec)  — keeps the raw spec for
+                            tools that want it
+            On any error, falls back to plain `_safe_data(raw_data)`.
+    """
+    spec = raw_data.get("spec") if isinstance(raw_data, dict) else None
+    if spec is None or not hasattr(spec, "steps"):
+        return _safe_data(raw_data)
+    try:
+        from nl2protocol.reporting import _step_to_render_dict
+        step_dicts = [
+            _step_to_render_dict(s, idx, instruction)
+            for idx, s in enumerate(spec.steps)
+        ]
+        return {
+            "steps": step_dicts,
+            "spec": _safe_data(spec),
+        }
+    except Exception:
+        return _safe_data(raw_data)
+
+
 class LiveModeApp:
     """FastAPI app + per-run pipeline state. One instance per
     `nl2protocol serve` invocation.
@@ -200,10 +248,16 @@ class LiveModeApp:
             artifact will land at end-of-run.
 
     Post:   `self.app` is a FastAPI instance with three routes wired:
-              GET /        → placeholder HTML page (Phase 3a)
+              GET /        → live-mode HTML page (Phase 3b-1: full
+                             5-column template with empty data +
+                             live-mode JS that consumes WebSocket
+                             events and inserts step blocks as they
+                             arrive)
               POST /start  → kicks off pipeline in a worker thread
               WS /events   → streams events from the pipeline thread
-                             to the browser via the queue bridge
+                             to the browser via the queue bridge,
+                             with spec-event payloads enriched with
+                             pre-rendered step dicts (Phase 3b-1)
 
             The pipeline thread runs `ProtocolAgent.run_pipeline` with
             a CompositeReporter that fans events out to BOTH the
@@ -220,12 +274,55 @@ class LiveModeApp:
         self._config_path = config_path
         self._output_dir = output_dir
         self._html_report_path: Optional[str] = None
+        # Phase 3b-1: track the most recent raw_instruction text so spec
+        # events can be enriched with pre-rendered step dicts (which need
+        # the instruction for cite-recoverability decisions).
+        self._instruction_text: str = ""
         self._setup_routes()
+
+    def _render_live_page(self) -> str:
+        """Render the existing Jinja template with empty data + live_mode
+        flag. The page loads with the 5-column skeleton, all CSS,
+        and the live-mode JS that consumes WebSocket events.
+
+        Per ADR-0013 Phase 3b-1: same template Phase 2's static path
+        uses; the only difference is `live_mode=True` toggles in extra
+        JS at the end. Server-render-once + client-update-as-events-
+        arrive is the simplest path that reuses 100% of existing CSS
+        and 95% of existing JS (hover, arrows, panel-row hover).
+        """
+        from datetime import datetime
+        from pathlib import Path
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+        # Locate the template file.
+        template_dir = Path(__file__).parent.parent / "reporting_templates"
+        env = Environment(
+            loader=FileSystemLoader(str(template_dir)),
+            autoescape=select_autoescape(["html"]),
+        )
+        template = env.get_template("report.html.jinja")
+
+        return template.render(
+            instruction="",
+            instruction_html="<em style='color:#6b6b6b'>(loading — pipeline starts when you click ▶ Start)</em>",
+            spec_steps=[],
+            resolved_steps=[],
+            validated_steps=[],
+            generated_script="",
+            success=False,
+            prov_stats={"total": 0, "non_instr": 0, "non_instr_pct": 0.0},
+            resolution_arrows_json="[]",
+            lab_state_rows=[],
+            labware_mapping_rows=[],
+            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            live_mode=True,
+        )
 
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
-            return HTMLResponse(_PLACEHOLDER_PAGE)
+            return HTMLResponse(self._render_live_page())
 
         @self.app.post("/start")
         async def start_pipeline():
@@ -253,9 +350,22 @@ class LiveModeApp:
                     if event is PIPELINE_DONE_SENTINEL:
                         await websocket.send_json({"kind": "pipeline_done"})
                         break
+                    # Phase 3b-1: track instruction + enrich spec events.
+                    if event.kind == "raw_instruction":
+                        self._instruction_text = (
+                            event.data.get("instruction", "") if isinstance(event.data, dict) else ""
+                        )
+                        data = _safe_data(event.data)
+                    elif event.kind in ("extracted_spec", "resolved_spec",
+                                          "completed_spec"):
+                        data = _enrich_spec_event_data(
+                            event.kind, event.data, self._instruction_text,
+                        )
+                    else:
+                        data = _safe_data(event.data)
                     payload = {
                         "kind": event.kind,
-                        "data": _safe_data(event.data),
+                        "data": data,
                         "stage_name": event.stage_name,
                         "timestamp": event.timestamp.isoformat(),
                     }
