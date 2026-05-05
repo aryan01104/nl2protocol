@@ -633,6 +633,91 @@ def _collect_resolution_arrows(events) -> list:
     return list(by_prov_id.values())
 
 
+def _collect_lab_state_rows(spec) -> list:
+    """Walk spec.initial_contents and prefilled_labware; return one row
+    per pre-run lab-state entry the user should see audited.
+
+    Per ADR-0011 Phase 2c: the lab-state panel is the audit surface for
+    "what's in the lab before the protocol runs." Replay-mode renders
+    the rows static (read-only); future live-mode (Phase 3) makes the
+    same shape editable.
+
+    Pre:    `spec` is a ProtocolSpec or CompleteProtocolSpec, post-validation
+            (the version visible in column 4). May be None when no spec
+            event was captured.
+    Post:   Returns a list of dicts:
+              {
+                "labware":   str,
+                "well":      str,        # well name or empty for prefilled-labware rows
+                "substance": str,
+                "volume_ul": Optional[float],
+                "kind":      str,        # "well" or "prefilled" — for downstream rendering
+              }
+            Empty list when spec is None or has no initial_contents +
+            prefilled_labware. Initial_contents come first (per-well rows),
+            then prefilled_labware (whole-labware uniform rows).
+    Side effects: None.
+    """
+    if spec is None:
+        return []
+    rows = []
+    for ic in getattr(spec, "initial_contents", []):
+        rows.append({
+            "labware": ic.labware,
+            "well": ic.well,
+            "substance": ic.substance,
+            "volume_ul": ic.volume_ul,
+            "kind": "well",
+        })
+    for pf in getattr(spec, "prefilled_labware", []):
+        rows.append({
+            "labware": pf.labware,
+            "well": "",                  # prefilled = uniform across labware; no specific well
+            "substance": pf.substance,
+            "volume_ul": pf.volume_ul,
+            "kind": "prefilled",
+        })
+    return rows
+
+
+def _collect_labware_mapping_rows(spec) -> list:
+    """Walk all LocationRefs in `spec.steps` and return the unique
+    description → resolved_label mappings.
+
+    Per ADR-0011 Phase 2c: the labware-mapping panel is the audit
+    surface for "which config labware does each user-language description
+    map to." Replays the work the legacy `_confirm_labware_assignments`
+    does today.
+
+    Pre:    `spec` is a ProtocolSpec post-validation (column-4 version).
+            May be None.
+    Post:   Returns a list of dicts:
+              {"description": str, "resolved_label": str|None}
+            Deduped by `description` (first-seen wins on resolved_label —
+            in practice the resolver guarantees consistent assignment per
+            description). resolved_label may be None for refs the LLM
+            resolver couldn't pick AND the orchestrator's
+            LabwareAmbiguityDetector somehow didn't catch — should be
+            rare; surfaced for visibility.
+    Side effects: None.
+    """
+    if spec is None:
+        return []
+    seen = {}
+    for step in getattr(spec, "steps", []):
+        for ref in (getattr(step, "source", None), getattr(step, "destination", None)):
+            if ref is None:
+                continue
+            desc = getattr(ref, "description", None)
+            if not desc or desc in seen:
+                continue
+            seen[desc] = getattr(ref, "resolved_label", None)
+    return [
+        {"description": desc, "resolved_label": label}
+        for desc, label in seen.items()
+    ]
+
+
 def _atomic_provenance_stats(spec) -> dict:
     """Walk every atomic provenanced value across the spec and tally
     instruction-sourced vs non-instruction-sourced. Surfaced in the report
@@ -855,6 +940,13 @@ class HTMLReporter(CapturingReporter):
         import json as _json
         resolution_arrows_json = _json.dumps(_collect_resolution_arrows(self.events))
 
+        # ADR-0011 Phase 2c: bulk-defaults panels — read-only audit
+        # summaries below the column grid. Lab-state walks the validated
+        # spec's initial_contents (+ prefilled_labware); labware-mapping
+        # walks all LocationRefs and dedupes by description.
+        lab_state_rows = _collect_lab_state_rows(cspec or rspec)
+        labware_mapping_rows = _collect_labware_mapping_rows(cspec or rspec)
+
         rendered = template.render(
             instruction=instruction,                # raw text (for any text-only fallback)
             instruction_html=instruction_html,      # marked-up HTML with cite spans
@@ -865,6 +957,8 @@ class HTMLReporter(CapturingReporter):
             success=success,
             prov_stats=prov_stats,
             resolution_arrows_json=resolution_arrows_json,
+            lab_state_rows=lab_state_rows,
+            labware_mapping_rows=labware_mapping_rows,
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 

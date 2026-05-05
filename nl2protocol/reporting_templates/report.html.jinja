@@ -418,6 +418,72 @@
   #arrow-overlay path.res-user_edited              { stroke: #1f5fa6; }  /* deep blue */
   #arrow-overlay path.res-user_confirmed           { stroke: #6b6b6b; }  /* dim gray */
 
+  /* ───────── ADR-0011 Phase 2c: confirmation summary panels ─────────
+     Two read-only audit tables rendered below the 5-col grid:
+       Lab state  (initial_contents + prefilled_labware as a flat table)
+       Labware    (description → resolved_label deduped mapping)
+     Replay-mode static surfaces. Live mode (Phase 3) replaces these
+     with the editable bottom-right floating panel; same data shape,
+     different positioning + interactivity. */
+  .panels {
+    padding: 0 32px 24px;
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .panel h3 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    border-bottom: 1px solid var(--grid);
+    padding-bottom: 6px;
+  }
+  .panel table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .panel th, .panel td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px dotted var(--grid);
+  }
+  .panel th {
+    color: var(--dim);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .panel td.col-volume {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    text-align: right;
+    color: #1a1a1a;
+  }
+  .panel td.col-substance,
+  .panel td.col-description {
+    font-style: italic;
+    color: #1a1a1a;
+  }
+  .panel td.col-label {
+    font-weight: 500;
+    color: #1a1a1a;
+  }
+  .panel .empty {
+    color: var(--dim);
+    font-style: italic;
+    padding: 4px 0;
+  }
+
   /* ───────── Footer ───────── */
   footer {
     padding: 16px 32px 24px;
@@ -553,6 +619,67 @@
   </div>
 
 </div>
+
+<!-- ───────── ADR-0011 Phase 2c: confirmation summary panels ─────────
+     Two read-only audit tables — what was confirmed during the run.
+     The lab-state panel surfaces initial_contents + prefilled_labware
+     (today's sequential CLI prompts collapsed into one bulk panel per
+     ADR-0011's surface unification of CLI surfaces 1+2). The labware
+     panel surfaces description → resolved_label assignments (today's
+     surface 3). Both render only when their underlying data exists. -->
+<section class="panels">
+  <div class="panel">
+    <h3>Lab state before run</h3>
+    {% if lab_state_rows %}
+      <table>
+        <thead>
+          <tr>
+            <th>labware</th>
+            <th>well</th>
+            <th>substance</th>
+            <th>volume</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in lab_state_rows %}
+            <tr>
+              <td class="col-label">{{ row.labware|e }}</td>
+              <td>{{ row.well|e if row.kind == "well" else "(all wells)" }}</td>
+              <td class="col-substance">{{ row.substance|e }}</td>
+              <td class="col-volume">{{ row.volume_ul|round(0)|int ~ " uL" if row.volume_ul is not none else "—" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty">(no initial-state entries)</div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h3>Labware assignments</h3>
+    {% if labware_mapping_rows %}
+      <table>
+        <thead>
+          <tr>
+            <th>user wording</th>
+            <th>config label</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in labware_mapping_rows %}
+            <tr>
+              <td class="col-description">"{{ row.description|e }}"</td>
+              <td class="col-label">{{ row.resolved_label|e if row.resolved_label else "(unresolved)" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty">(no labware references)</div>
+    {% endif %}
+  </div>
+</section>
 
 <footer>
   <span>nl2protocol · provenance-traced protocol generation</span>

@@ -759,6 +759,130 @@ class TestADR0011Phase2bResolutionArrows:
         assert ">[]<" in rendered or '">[]</script>' in rendered
 
 
+class TestADR0011Phase2cBulkPanels:
+    """Phase 2c renders two static panels below the 5-col grid: lab-state
+    (initial_contents + prefilled_labware) and labware-mapping
+    (description→resolved_label). Read-only summaries, replay-mode only;
+    live mode (Phase 3) replaces with editable floating panel."""
+
+    def _spec_with_initial_contents_and_labware(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LabwarePrefill,
+            LocationRef, Provenance, ProtocolSpec, ProvenancedVolume,
+            WellContents,
+        )
+        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(
+            summary="t",
+            steps=[
+                ExtractedStep(
+                    order=1, action="transfer",
+                    volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
+                                              provenance=prov),
+                    source=LocationRef(description="tube rack", well="A1",
+                                        resolved_label="sample_rack",
+                                        provenance=prov),
+                    destination=LocationRef(description="96-well plate", well="A1",
+                                             resolved_label="assay_plate",
+                                             provenance=prov),
+                    composition_provenance=comp,
+                ),
+            ],
+            initial_contents=[
+                WellContents(labware="sample_rack", well="A1",
+                             substance="BSA stock", volume_ul=200.0),
+                WellContents(labware="sample_rack", well="A2",
+                             substance="unknown sample", volume_ul=None),
+            ],
+            prefilled_labware=[
+                LabwarePrefill(labware="cell_plate", substance="media",
+                               volume_ul=100.0),
+            ],
+        )
+
+    def test_lab_state_rows_includes_initial_contents_and_prefilled(self):
+        from nl2protocol.reporting import _collect_lab_state_rows
+        spec = self._spec_with_initial_contents_and_labware()
+        rows = _collect_lab_state_rows(spec)
+        # 2 initial_contents + 1 prefilled_labware = 3 rows.
+        assert len(rows) == 3
+        # initial_contents first, prefilled_labware after.
+        assert [r["kind"] for r in rows] == ["well", "well", "prefilled"]
+        # Volumes preserved (None stays None for the unknown-sample row).
+        vols = [r["volume_ul"] for r in rows]
+        assert vols == [200.0, None, 100.0]
+
+    def test_lab_state_rows_handles_empty_spec(self):
+        from nl2protocol.reporting import _collect_lab_state_rows
+        assert _collect_lab_state_rows(None) == []
+
+    def test_labware_mapping_rows_dedupes_by_description(self):
+        from nl2protocol.reporting import _collect_labware_mapping_rows
+        spec = self._spec_with_initial_contents_and_labware()
+        rows = _collect_labware_mapping_rows(spec)
+        # Two unique descriptions across the step's source + destination.
+        descriptions = sorted(r["description"] for r in rows)
+        assert descriptions == ["96-well plate", "tube rack"]
+
+    def test_labware_mapping_rows_carries_resolved_label(self):
+        from nl2protocol.reporting import _collect_labware_mapping_rows
+        spec = self._spec_with_initial_contents_and_labware()
+        rows = _collect_labware_mapping_rows(spec)
+        by_desc = {r["description"]: r["resolved_label"] for r in rows}
+        assert by_desc["tube rack"] == "sample_rack"
+        assert by_desc["96-well plate"] == "assay_plate"
+
+    def test_renders_lab_state_panel_in_html(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL from A1 to B1."}))
+        rep.emit(StageEvent(kind="completed_spec",
+                             data={"spec": self._spec_with_initial_contents_and_labware()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Panel section + headers exist.
+        assert 'class="panels"' in rendered
+        assert "<h3>Lab state before run</h3>" in rendered
+        assert "<h3>Labware assignments</h3>" in rendered
+        # Lab-state values appear.
+        assert "BSA stock" in rendered
+        assert "unknown sample" in rendered
+        # Volume cells render correctly: 200uL formatted, None as em-dash.
+        assert "200 uL" in rendered
+        # Labware mapping cells appear.
+        assert "tube rack" in rendered
+        assert "sample_rack" in rendered
+        assert "assay_plate" in rendered
+
+    def test_empty_initial_contents_renders_empty_placeholder(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Both panels render their empty-state placeholder.
+        assert "(no initial-state entries)" in rendered
+        assert "(no labware references)" in rendered
+
+    def test_panels_rendered_below_grid(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The panels section appears AFTER the column grid in document order.
+        grid_idx = rendered.index('<div class="grid">')
+        panels_idx = rendered.index('<section class="panels">')
+        assert panels_idx > grid_idx
+
+
 class TestFindCitePosition:
     """Locating cited_text substrings in the instruction (case-insensitive,
     whitespace-tolerant)."""
