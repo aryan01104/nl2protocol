@@ -213,6 +213,28 @@ Five principles drive this ordering.
 
 **Bounded loop:** if the user's edit introduces a new Gap, which their next edit fixes but introduces a third, we could loop forever. Cap at 3 iterations; on overflow, surface "couldn't reach a clean spec — review remaining issues and accept-as-is or abort."
 
+### Gap dependencies — batched resolution with topological ordering
+
+Most gaps are independent: fabrication detection on step 3 doesn't affect step 7; low-confidence inferred volume on step 5 has no bearing on step 6's substance. For the independent majority, the SUGGEST stage processes them in any order and the user sees them as one batch.
+
+A bounded set of gap kinds genuinely depend on each other:
+
+- **Carryover chain.** `wait_for_temperature.temperature` reads the prior `set_temperature.temperature`. If both are gaps, the dependent (wait) cannot be suggested until the upstream (set) resolves.
+- **Labware-before-constraint.** Constraint detection (well-out-of-range, capacity-exceeded) reads `LocationRef.resolved_label`. If labware resolution is itself a gap, the constraint check uses whatever current resolved_label is or emits conditionally — neither is correct until labware is fixed.
+- **Substance-before-source.** A user edit of `substance` invalidates the suggested `source` (since source was looked up by substance name).
+
+These dependencies are handled by **two mechanisms working together**:
+
+1. **Topological-sorted SUGGEST stage.** Within each iteration, the orchestrator builds a dependency graph over the current Gap set and processes suggesters in topological order. set_temperature before wait_for_temperature; labware resolution before constraint checks; substance before source. This maximizes the work done in iteration 1: dependent gaps see upstream values when their suggester runs, so they get a meaningful suggestion the user can accept in the same batch.
+
+2. **Re-detect loop catches what topological ordering missed.** Cases where the dependency only fires AFTER user resolution (e.g. user EDITED set_temperature in iteration 1, which changes what wait_for_temperature should inherit) surface in iteration 2 as a freshly-detected gap with a now-correct suggestion.
+
+The combination keeps the architecture batch-by-default (which is correct for the independent majority and cheaper UX) while preserving correctness for the dependent minority (which the re-detect loop covers regardless).
+
+**Optional sequential mode.** A flag (`--sequential-confirmation`) reduces batch size to 1 between resolutions: detect, suggest, present one gap, resolve, re-detect, repeat. Slower and more typing, but no batched-blind-spot — the user sees each gap with full information from all prior resolutions. Default off; on for users who want maximum visibility into cascading edits.
+
+**Grouped presentation as a presenter concern.** The orchestrator emits per-Gap items into the resolution queue. The `ConfirmationHandler` is free to group visually — "steps 1 + 2 are linked via temperature carryover: pick 4°C for both, or set them separately." CLI handler can use simple per-Gap prompts; HTML handler can render richer grouped UI. Same data flows through both; presentation differences don't propagate into the architecture.
+
 ## Worked example: Bradford instruction under this architecture
 
 Initial state from Stage 2 extraction: 14 steps, instruction underspecifies water source.
