@@ -35,8 +35,9 @@ EventKind = Literal[
     "stage_complete",       # data = {"stage": "Stage 2/7", "summary": "..."}
     "stage_failed",         # data = {"stage": "Stage 2/7", "reason": "..."}
     "raw_instruction",      # data = {"instruction": "..."}
-    "extracted_spec",       # data = {"spec": ProtocolSpec}
-    "completed_spec",       # data = {"spec": CompleteProtocolSpec}
+    "extracted_spec",       # data = {"spec": ProtocolSpec}        — column 2 (post-extraction, immutable LLM output)
+    "resolved_spec",        # data = {"spec": ProtocolSpec}        — column 3 (post-orchestrator gap resolution; ADR-0011 Phase 2a)
+    "completed_spec",       # data = {"spec": CompleteProtocolSpec} — column 4 (post-validation: labware confirm + constraint check)
     "generated_script",     # data = {"script": "..."}
     "warning",              # data = {"message": "...", "context": "..."}
     "error",                # data = {"message": "...", "stage": "..."}
@@ -700,8 +701,15 @@ class HTMLReporter(CapturingReporter):
         template = env.get_template("report.html.jinja")
 
         # Pull the load-bearing data out of the captured events.
+        # ADR-0011 Phase 2a: three spec snapshots feed three columns.
+        #   spec_event       → column 2 (extracted, post-LLM)
+        #   resolved_event   → column 3 (resolved, post-orchestrator)
+        #   completed_event  → column 4 (validated, post-CompleteProtocolSpec promotion)
+        # Resolved or completed missing → render the columns empty; downstream
+        # tests check both column headers exist regardless.
         instruction_event = self.first_of_kind("raw_instruction")
         spec_event = self.first_of_kind("extracted_spec")
+        resolved_spec_event = self.first_of_kind("resolved_spec")
         completed_spec_event = self.first_of_kind("completed_spec")
         script_event = self.first_of_kind("generated_script")
 
@@ -712,15 +720,22 @@ class HTMLReporter(CapturingReporter):
         if spec:
             spec_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(spec.steps)]
 
-        completed_steps = []
+        resolved_steps = []
+        rspec = resolved_spec_event.data.get("spec") if resolved_spec_event else None
+        if rspec:
+            resolved_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(rspec.steps)]
+
+        validated_steps = []
         cspec = completed_spec_event.data.get("spec") if completed_spec_event else None
         if cspec:
-            completed_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(cspec.steps)]
+            validated_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(cspec.steps)]
 
-        # Phase 3: Build the marked-up instruction HTML with <span data-cite-id="...">
-        # wrappers for arrow rendering. Use the spec (or completed_spec as fallback)
-        # to collect the cited_text targets.
-        spec_for_marks = spec or cspec
+        # Build the marked-up instruction HTML with <span data-cite-id="...">
+        # wrappers for arrow rendering. Use the most-resolved spec available
+        # (validated > resolved > extracted) so cite-position resolution sees
+        # the most accurate value set; cite spans themselves don't change
+        # across snapshots since they reference instruction text only.
+        spec_for_marks = cspec or rspec or spec
         if spec_for_marks and instruction:
             arrow_targets = _collect_arrow_targets(spec_for_marks)
             instruction_html = _render_instruction_with_marks(instruction, arrow_targets)
@@ -733,16 +748,17 @@ class HTMLReporter(CapturingReporter):
 
         success = bool(script_event)  # if we got to script generation, the run succeeded
 
-        # Atomic-provenance stats (use the extracted spec when present,
-        # else the completed spec). Surfaced in the header.
-        stats_spec = spec or cspec
+        # Atomic-provenance stats use the most-resolved spec available.
+        # Surfaced in the header.
+        stats_spec = cspec or rspec or spec
         prov_stats = _atomic_provenance_stats(stats_spec) if stats_spec else {"total": 0, "non_instr": 0, "non_instr_pct": 0.0}
 
         rendered = template.render(
             instruction=instruction,                # raw text (for any text-only fallback)
             instruction_html=instruction_html,      # marked-up HTML with cite spans
             spec_steps=spec_steps,
-            completed_steps=completed_steps,
+            resolved_steps=resolved_steps,
+            validated_steps=validated_steps,
             generated_script=generated_script,
             success=success,
             prov_stats=prov_stats,

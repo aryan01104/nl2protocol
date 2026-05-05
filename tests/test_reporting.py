@@ -509,6 +509,118 @@ class TestResolvedSpecColumnRename:
         assert "<h2>Complete Spec</h2>" not in rendered
 
 
+class TestADR0011FiveColumnLayout:
+    """ADR-0011 Phase 2a expands the report from 4 columns to 5: instruction,
+    extracted spec, resolved spec (post-orchestrator), validated spec
+    (post-stage-5 promotion), generated python. The new resolved_spec event
+    feeds column 3; the existing completed_spec event feeds column 4."""
+
+    def _make_minimal_spec(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, Provenance,
+            ProtocolSpec, ProvenancedVolume, LocationRef,
+        )
+        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(summary="t", steps=[
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
+                                          provenance=prov),
+                source=LocationRef(description="src", well="A1",
+                                    provenance=prov),
+                destination=LocationRef(description="dst", well="B1",
+                                         provenance=prov),
+                composition_provenance=comp,
+            ),
+        ])
+
+    def test_renders_validated_spec_column_header(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        assert "<h2>Validated Spec</h2>" in rendered
+
+    def test_renders_all_five_column_headers(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        for header in ("<h2>Instruction</h2>",
+                        "<h2>Extracted Spec</h2>",
+                        "<h2>Resolved Spec</h2>",
+                        "<h2>Validated Spec</h2>",
+                        "<h2>Generated Python</h2>"):
+            assert header in rendered, f"missing column header: {header}"
+
+    def test_resolved_spec_event_populates_resolved_column(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL from A1 to B1."}))
+        rep.emit(StageEvent(kind="resolved_spec",
+                             data={"spec": self._make_minimal_spec()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Resolved spec column shows the step.
+        assert "Step 1: transfer" in rendered
+        # Without a completed_spec event, validated column shows the
+        # not-reached placeholder.
+        assert "(validation stage not reached)" in rendered
+
+    def test_completed_spec_event_populates_validated_column(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL from A1 to B1."}))
+        rep.emit(StageEvent(kind="completed_spec",
+                             data={"spec": self._make_minimal_spec()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Validated column shows the step.
+        assert "Step 1: transfer" in rendered
+        # Resolved column without an event shows the not-reached placeholder.
+        assert "(orchestrator stage not reached)" in rendered
+
+    def test_both_events_populate_their_columns_independently(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 100uL from A1 to B1."}))
+        rep.emit(StageEvent(kind="resolved_spec",
+                             data={"spec": self._make_minimal_spec()}))
+        rep.emit(StageEvent(kind="completed_spec",
+                             data={"spec": self._make_minimal_spec()}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Both columns populated; neither shows the placeholder.
+        assert "(orchestrator stage not reached)" not in rendered
+        assert "(validation stage not reached)" not in rendered
+        # The step rendering appears at least twice (once per column).
+        assert rendered.count("Step 1: transfer") >= 2
+
+    def test_grid_template_columns_is_five(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The CSS rule for the grid declares five columns. We assert on a
+        # substring pattern that's unique to our 5-col grid declaration to
+        # avoid coupling the test to specific fr ratios.
+        assert "1fr 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
+
+
 class TestFindCitePosition:
     """Locating cited_text substrings in the instruction (case-insensitive,
     whitespace-tolerant)."""

@@ -814,6 +814,15 @@ class ProtocolAgent:
         _log(f"  {C.success('Gap resolution converged.')}")
         spec = outcome.spec
 
+        # ADR-0011 Phase 2a: emit resolved_spec so column 3 (post-orchestrator)
+        # can render. Distinct from completed_spec which is emitted later
+        # (post-stage-5 CompleteProtocolSpec promotion); column 4 reads that.
+        self.reporter.emit(StageEvent(
+            kind="resolved_spec",
+            data={"spec": spec},
+            stage_name="stage_3_gap_resolver",
+        ))
+
         if spec.explicit_volumes:
             _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")
 

@@ -60,11 +60,21 @@
     border-radius: 2px; margin-right: 6px; vertical-align: middle;
   }
 
-  /* ───────── 4-column grid ───────── */
+  /* ───────── 5-column grid ─────────
+     Per ADR-0011 Phase 2a, the report renders five columns matching the
+     pipeline's user-visible transformation milestones:
+       1. Instruction
+       2. Extracted Spec (post-extraction, immutable LLM output)
+       3. Resolved Spec  (post-orchestrator gap resolution)
+       4. Validated Spec (post-stage-5 CompleteProtocolSpec promotion)
+       5. Generated Python
+     Column 3 + column 4 are visually similar — both render provenanced
+     spec values — but encode different stages of the pipeline. Phase 2b
+     adds cross-column arrows showing each value's resolution journey. */
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1.3fr 1.3fr 1.4fr;
-    gap: 16px;
+    grid-template-columns: 1fr 1.15fr 1.15fr 1.15fr 1.4fr;
+    gap: 14px;
     padding: 24px 32px;
     min-height: calc(100vh - 200px);
   }
@@ -448,18 +458,17 @@
     {% endif %}
   </div>
 
-  <!-- ───────── Column 3: Resolved Spec ─────────
-       Renamed from "Complete Spec" per ADR-0009. This column shows the
-       spec AFTER gap resolution + labware resolution + constraint check
-       — i.e. the post-orchestrator + post-validation view, which becomes
-       CompleteProtocolSpec at the type-system level. The rename is
-       forward-compatible with the planned five-column layout (ADR-0010)
-       where this becomes column 3 of 5 ("Gap-Resolved") with a separate
-       "Validated Spec" column to its right. -->
+  <!-- ───────── Column 3: Resolved Spec (post-orchestrator) ─────────
+       The spec AFTER the orchestrator's gap-resolution loop converges.
+       Every Gap that was resolvable is filled; every Provenance carries
+       the review_status from ADR-0009. Distinct from column 4 (Validated
+       Spec) — column 3 is the orchestrator's output; column 4 is the
+       same spec after stage-3.5's labware confirmation panel + stage-4's
+       constraint check pass. ADR-0011 Phase 2a introduces the split. -->
   <div class="col">
     <h2>Resolved Spec</h2>
-    {% if completed_steps %}
-      {% for step in completed_steps %}
+    {% if resolved_steps %}
+      {% for step in resolved_steps %}
         <div class="step {{ step.step_class }}"
              data-step-cited="{{ step.step_cited_text|e }}"
              data-step-palette="{{ step.step_palette_class }}"
@@ -474,11 +483,40 @@
         </div>
       {% endfor %}
     {% else %}
-      <p style="color: var(--dim)">(complete-spec stage not reached)</p>
+      <p style="color: var(--dim)">(orchestrator stage not reached)</p>
     {% endif %}
   </div>
 
-  <!-- ───────── Column 4: Generated Code ───────── -->
+  <!-- ───────── Column 4: Validated Spec (post-CompleteProtocolSpec) ─────────
+       The spec after the stage-3.5 labware-confirm panel (legacy
+       _confirm_labware_assignments still serves this until ADR-0011
+       Phase 5) AND the stage-4 ConstraintChecker.check_all pass. This
+       is the spec that becomes CompleteProtocolSpec at the type-system
+       level. Visually similar to column 3 today; Phase 2b's arrows will
+       show what changed (labware re-mappings + any constraint clips). -->
+  <div class="col">
+    <h2>Validated Spec</h2>
+    {% if validated_steps %}
+      {% for step in validated_steps %}
+        <div class="step {{ step.step_class }}"
+             data-step-cited="{{ step.step_cited_text|e }}"
+             data-step-palette="{{ step.step_palette_class }}"
+             {% if step.step_reasoning %}data-step-reasoning="{{ step.step_reasoning|e }}"{% endif %}
+             data-params-reasoning="{{ step.parameters_reasoning|e }}"
+             data-confidence="{{ step.confidence }}">
+          <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
+          {% for line in step.detail_lines %}
+            <div class="step-detail">{{ line|safe }}</div>
+          {% endfor %}
+          {% if step.note_line %}{{ step.note_line|safe }}{% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p style="color: var(--dim)">(validation stage not reached)</p>
+    {% endif %}
+  </div>
+
+  <!-- ───────── Column 5: Generated Code ───────── -->
   <div class="col">
     <h2>Generated Python</h2>
     {% if generated_script %}
