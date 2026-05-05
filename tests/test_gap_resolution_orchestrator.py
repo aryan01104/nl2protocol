@@ -1086,3 +1086,145 @@ class TestReviewerCollectsResolutionClaims:
         resolution_paths = [c["field_path"] for c in claims
                             if c["field_path"].endswith(".resolved_label")]
         assert resolution_paths == []
+
+
+# ============================================================================
+# ADR-0012: fabrication override path
+# ============================================================================
+
+class TestADR0012FabricationOverride:
+    """ADR-0012: action='override' keeps the existing fabricated value
+    AS-IS but stamps user_overrode_fabrication on the audit trail.
+    Combined with the CLIConfirmationHandler's [o]verride option for
+    fabrication gaps, this gives the user a working escape hatch when
+    the verifier flags a value the user knows is correct (synonym /
+    paraphrase recovery)."""
+
+    def _spec_with_fabricated_volume(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume,
+        )
+        # The "fabricated" detection is downstream of this test — for the
+        # apply-side test we just construct a Provenanced* whose
+        # cited_text IS in the spec but whose review_status will be
+        # mutated by the override action.
+        instr_prov = Provenance(
+            source="instruction", cited_text="50uL of sample", confidence=1.0,
+        )
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                      provenance=instr_prov),
+            source=LocationRef(description="rack", well="A1",
+                                provenance=instr_prov),
+            destination=LocationRef(description="plate", well="B1",
+                                     provenance=instr_prov),
+            composition_provenance=comp,
+        )])
+
+    def test_override_action_does_not_modify_value(self):
+        # ADR-0012: the existing value stays; only review_status updates.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_volume()
+        original_volume_obj = spec.steps[0].volume
+        original_value = spec.steps[0].volume.value
+        g = gap("g1", field_path="steps[0].volume", kind="fabricated")
+        res = Resolution(action="override", new_value=None,
+                         user_action_provenance="user_overrode_fabrication")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        # Same Pydantic model instance; value unchanged.
+        assert spec.steps[0].volume is original_volume_obj
+        assert spec.steps[0].volume.value == original_value
+
+    def test_override_action_stamps_user_overrode_fabrication(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_volume()
+        g = gap("g1", field_path="steps[0].volume", kind="fabricated")
+        res = Resolution(action="override", new_value=None,
+                         user_action_provenance="user_overrode_fabrication")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        prov = spec.steps[0].volume.provenance
+        assert prov.review_status == "user_overrode_fabrication"
+
+    def test_review_status_literal_accepts_user_overrode_fabrication(self):
+        # Schema-level: Provenance.review_status accepts the new value.
+        from nl2protocol.models.spec import Provenance
+        prov = Provenance(
+            source="instruction", cited_text="100uL",
+            confidence=1.0, review_status="user_overrode_fabrication",
+        )
+        assert prov.review_status == "user_overrode_fabrication"
+
+    def test_resolution_action_literal_accepts_override(self):
+        # Schema-level: Resolution.action accepts the new value.
+        res = Resolution(action="override", new_value=None,
+                         user_action_provenance="user_overrode_fabrication")
+        assert res.action == "override"
+        assert res.user_action_provenance == "user_overrode_fabrication"
+
+
+class TestCLIConfirmationHandlerOverride:
+    """CLIConfirmationHandler shows [o]verride only for fabrication gaps,
+    and `o` / `override` input produces the right Resolution."""
+
+    def _make_handler_with_input(self, response_text):
+        from nl2protocol.gap_resolution.handlers import CLIConfirmationHandler
+
+        class StubCM:
+            def __init__(self, value):
+                self._value = value
+            def prompt(self, _text):
+                return self._value
+
+        captured = []
+
+        def capture_log(msg):
+            captured.append(msg)
+
+        return CLIConfirmationHandler(cm=StubCM(response_text), log=capture_log), captured
+
+    def _gap(self, kind="fabricated"):
+        return Gap(
+            id="g1", step_order=1, field_path="steps[0].volume",
+            kind=kind, current_value="50uL",
+            description="claims '50uL of sample' but not in instruction",
+            severity="blocker",
+        )
+
+    def test_fabrication_gap_prompt_includes_override(self):
+        handler, _ = self._make_handler_with_input("o")
+        prompt_text = handler._action_prompt(suggestion=None,
+                                              gap=self._gap("fabricated"))
+        assert "[o]verride" in prompt_text
+
+    def test_non_fabrication_gap_prompt_omits_override(self):
+        handler, _ = self._make_handler_with_input("a")
+        prompt_text = handler._action_prompt(suggestion=None,
+                                              gap=self._gap("missing"))
+        assert "[o]verride" not in prompt_text
+
+    def test_user_typing_o_on_fabrication_returns_override_resolution(self):
+        handler, _ = self._make_handler_with_input("o")
+        res = handler.present(self._gap("fabricated"), suggestion=None)
+        assert res.action == "override"
+        assert res.user_action_provenance == "user_overrode_fabrication"
+        assert res.new_value is None
+
+    def test_user_typing_override_long_form_also_works(self):
+        handler, _ = self._make_handler_with_input("override")
+        res = handler.present(self._gap("fabricated"), suggestion=None)
+        assert res.action == "override"
+
+    def test_user_typing_o_on_non_fabrication_falls_through_to_skip(self):
+        # Defensive: if somehow the override option appears for a non-
+        # fabrication gap, the handler treats it as skip.
+        handler, log = self._make_handler_with_input("o")
+        res = handler.present(self._gap("missing"), suggestion=None)
+        assert res.action == "skip"
+        assert any("override only valid for fabrication" in msg for msg in log)

@@ -95,15 +95,21 @@ class Provenance(BaseModel):
         "user_edited",
         "user_accepted_suggestion",
         "user_skipped",
+        "user_overrode_fabrication",
     ] = Field("original", description=(
         "Where this Provenance sits in the gap-resolver review lifecycle. "
-        "'original'                = just extracted or just suggested; not yet reviewed. "
-        "'reviewed_agree'          = independent reviewer confirmed the claims. "
-        "'reviewed_disagree'       = reviewer flagged a concern (see reviewer_objection). "
-        "'user_confirmed'          = user saw the value and kept it as-is. "
-        "'user_edited'             = user typed a new value. "
-        "'user_accepted_suggestion'= user took the suggester's value verbatim. "
-        "'user_skipped'            = user explicitly skipped the gap (value remains original)."
+        "'original'                  = just extracted or just suggested; not yet reviewed. "
+        "'reviewed_agree'            = independent reviewer confirmed the claims. "
+        "'reviewed_disagree'         = reviewer flagged a concern (see reviewer_objection). "
+        "'user_confirmed'            = user saw the value and kept it as-is. "
+        "'user_edited'               = user typed a new value. "
+        "'user_accepted_suggestion'  = user took the suggester's value verbatim. "
+        "'user_skipped'              = user explicitly skipped the gap (value remains original). "
+        "'user_overrode_fabrication' = system flagged the value's cited_text as fabricated, "
+        "                              the FabricationRetrySuggester couldn't resolve it, and "
+        "                              the user chose to commit the value anyway (ADR-0012). "
+        "                              Audit-visible flag: this value is ungrounded by the "
+        "                              verifier but the user has accepted responsibility."
     ))
     reviewer_objection: Optional[str] = Field(None, description=(
         "The independent reviewer's stated concern. REQUIRED when "

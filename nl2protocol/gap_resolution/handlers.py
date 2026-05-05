@@ -54,7 +54,7 @@ class CLIConfirmationHandler:
 
     def present(self, gap: Gap, suggestion: Optional[Suggestion]) -> Resolution:
         self._render_gap(gap, suggestion)
-        prompt_text = self._action_prompt(suggestion)
+        prompt_text = self._action_prompt(suggestion, gap)
         response = self._cm.prompt(prompt_text).strip().lower()
         return self._interpret_response(response, gap, suggestion)
 
@@ -73,10 +73,18 @@ class CLIConfirmationHandler:
             self._log(f"    why not from instruction: {suggestion.why_not_in_instruction}")
         self._log(f"    confidence: {suggestion.confidence:.0%}")
 
-    def _action_prompt(self, suggestion: Optional[Suggestion]) -> str:
+    def _action_prompt(self, suggestion: Optional[Suggestion],
+                        gap: Optional[Gap] = None) -> str:
+        # ADR-0012: fabrication gaps add an [o]verride option — keeps the
+        # current value as-is but stamps user_overrode_fabrication on the
+        # audit trail. Rare path (most fabrications get fixed by LLMSpot
+        # or edited by the user); option only appears when the gap is
+        # actually a fabrication so other gap kinds aren't confused.
+        is_fabrication = gap is not None and gap.kind == "fabricated"
+        override_segment = ", [o]verride (keep current value)" if is_fabrication else ""
         if suggestion is None:
-            return "[e]dit (type value), [s]kip, [q]uit: "
-        return "[a]ccept suggestion, [e]dit, [s]kip, [q]uit: "
+            return f"[e]dit (type value){override_segment}, [s]kip, [q]uit: "
+        return f"[a]ccept suggestion, [e]dit{override_segment}, [s]kip, [q]uit: "
 
     def _interpret_response(
         self,
@@ -113,6 +121,18 @@ class CLIConfirmationHandler:
                                   user_action_provenance="user_skipped")
             return Resolution(action="edit", new_value=value,
                               user_action_provenance="user_edited")
+        # ADR-0012: override path. Only valid for fabrication gaps. Keeps
+        # the current value and stamps the audit trail with
+        # user_overrode_fabrication. Defensive: silently treat as skip
+        # if the gap isn't a fabrication (option shouldn't have been
+        # presented in that case anyway).
+        if response in ("o", "override"):
+            if gap.kind == "fabricated":
+                return Resolution(action="override", new_value=None,
+                                  user_action_provenance="user_overrode_fabrication")
+            self._log(f"    override only valid for fabrication gaps; skipping.")
+            return Resolution(action="skip", new_value=None,
+                              user_action_provenance="user_skipped")
         # Anything else: treat as skip (defensive).
         self._log(f"    unrecognized response; skipping.")
         return Resolution(action="skip", new_value=None,

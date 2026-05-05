@@ -647,6 +647,18 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
 
+    # ADR-0012: action="override" means the user kept the existing value
+    # AS-IS but committed to it despite a fabrication flag. Don't write
+    # the value (it's already correct from the user's perspective); just
+    # stamp the existing field's provenance with the override marker.
+    if resolution.action == "override":
+        m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
+        if m:
+            idx, fname = int(m.group(1)), m.group(2)
+            existing = getattr(spec.steps[idx], fname, None)
+            _stamp_user_action(existing, user_action)
+        return
+
     # initial_contents[N].volume_ul (primitive — no Provenance to stamp)
     m = re.match(r"initial_contents\[(\d+)\]\.volume_ul$", path)
     if m:

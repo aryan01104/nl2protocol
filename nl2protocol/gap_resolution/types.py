@@ -204,4 +204,5 @@ class Resolution:
         "user_accepted_suggestion",                         # accepted the suggester's value
         "user_skipped",                                     # left unresolved (severity=quality only)
         "user_aborted",                                     # halted the pipeline
+        "user_overrode_fabrication",                        # ADR-0012: kept fabricated value as-is
     ]
