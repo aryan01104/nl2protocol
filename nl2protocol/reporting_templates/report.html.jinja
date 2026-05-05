@@ -370,9 +370,14 @@
   }
 
   /* ───────── SVG arrow overlay ─────────
-     Arrows are reserved for composite (step-existence) grounding only —
-     they show the high-level decomposition from instruction phrase to step
-     block. Atomic value provenance is conveyed by color, not arrows. */
+     The overlay hosts TWO arrow categories:
+       - Composite-step arrows (instruction → extracted spec block).
+         Reserved for step-existence grounding; existing pre-Phase-2b
+         language. Default red (--col-instruction).
+       - Resolution arrows (extracted spec atomic value → resolved
+         spec atomic value). One per gap_resolved event with a
+         drawable resolution_kind. Per ADR-0011 Phase 2b. Color-coded
+         per resolution kind. */
   #arrow-overlay {
     position: fixed;
     top: 0; left: 0;
@@ -391,6 +396,27 @@
     stroke-opacity: 0.9;
     stroke-width: 3.5;
   }
+
+  /* Resolution arrows (extracted → resolved column).
+     Color encodes how the gap was resolved:
+       auto_accepted             → subtle green   (no human attention needed)
+       user_accepted_suggestion  → gray-green     (human confirmed the suggester)
+       user_edited               → blue           (human typed a new value)
+       user_confirmed            → soft gray      (human confirmed without change)
+     Stroke width slightly thinner than composite-step arrows so the
+     two categories visually separate. */
+  #arrow-overlay path.resolution-arrow {
+    stroke-width: 2;
+    stroke-opacity: 0.35;
+  }
+  #arrow-overlay path.resolution-arrow.arrow-active {
+    stroke-opacity: 0.9;
+    stroke-width: 3;
+  }
+  #arrow-overlay path.res-auto_accepted            { stroke: #4f8a2b; }  /* leaf green */
+  #arrow-overlay path.res-user_accepted_suggestion { stroke: #6b8e3d; }  /* gray-green */
+  #arrow-overlay path.res-user_edited              { stroke: #1f5fa6; }  /* deep blue */
+  #arrow-overlay path.res-user_confirmed           { stroke: #6b6b6b; }  /* dim gray */
 
   /* ───────── Footer ───────── */
   footer {
@@ -465,7 +491,7 @@
        Spec) — column 3 is the orchestrator's output; column 4 is the
        same spec after stage-3.5's labware confirmation panel + stage-4's
        constraint check pass. ADR-0011 Phase 2a introduces the split. -->
-  <div class="col">
+  <div class="col col-resolved-spec">
     <h2>Resolved Spec</h2>
     {% if resolved_steps %}
       {% for step in resolved_steps %}
@@ -494,7 +520,7 @@
        is the spec that becomes CompleteProtocolSpec at the type-system
        level. Visually similar to column 3 today; Phase 2b's arrows will
        show what changed (labware re-mappings + any constraint clips). -->
-  <div class="col">
+  <div class="col col-validated-spec">
     <h2>Validated Spec</h2>
     {% if validated_steps %}
       {% for step in validated_steps %}
@@ -544,8 +570,20 @@
   <defs>
     <clipPath id="arrow-clip"><rect id="arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
   </defs>
+  <!-- Composite-step arrows (instruction → extracted spec). Clipped to the
+       extracted-spec column so off-screen segments don't visually escape. -->
   <g clip-path="url(#arrow-clip)" id="arrow-paths"></g>
+  <!-- Resolution arrows (extracted → resolved spec, ADR-0011 Phase 2b).
+       NOT clipped — the relevant region spans columns 2 and 3, both
+       always in view at desktop widths. -->
+  <g id="resolution-arrow-paths"></g>
 </svg>
+
+<!-- ADR-0011 Phase 2b: resolution-arrow data embedded as JSON.
+     One entry per drawable gap_resolved event. The JS at the end of
+     this document parses this on init + on every layout-affecting
+     event, then draws an SVG path per entry. -->
+<script id="resolution-arrows-data" type="application/json">{{ resolution_arrows_json|default('[]')|safe }}</script>
 
 <script>
 (function () {
@@ -818,12 +856,62 @@
     });
   }
 
+  // ────────── ADR-0011 Phase 2b: resolution arrows ──────────
+  // Read the embedded JSON, draw one bezier path per drawable
+  // gap_resolved event from extracted-spec column to resolved-spec
+  // column. Color encodes resolution_kind via CSS class.
+  function readResolutionArrowData() {
+    const el = document.getElementById("resolution-arrows-data");
+    if (!el) return [];
+    try {
+      const data = JSON.parse(el.textContent || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function renderResolutionArrows() {
+    const group = document.getElementById("resolution-arrow-paths");
+    if (!group) return;
+    while (group.firstChild) group.removeChild(group.firstChild);
+    const arrows = readResolutionArrowData();
+    if (arrows.length === 0) return;
+    const extractedCol = document.querySelector(".col-extracted-spec");
+    const resolvedCol  = document.querySelector(".col-resolved-spec");
+    if (!extractedCol || !resolvedCol) return;
+    arrows.forEach((arrow) => {
+      const pid = arrow.prov_id;
+      // Source: the value cell in the extracted-spec column with the
+      // matching data-prov-id. Destination: the value cell in the
+      // resolved-spec column with the same id. Per-column scoping
+      // keeps the cross-column lookup unambiguous (same prov_id appears
+      // once per column).
+      const src = extractedCol.querySelector(sel("data-prov-id", pid));
+      const dst = resolvedCol.querySelector(sel("data-prov-id", pid));
+      if (!src || !dst) return;
+      const srcRect = src.getBoundingClientRect();
+      const dstRect = dst.getBoundingClientRect();
+      if (!srcRect.width || !dstRect.width) return;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", bezierPath(srcRect, dstRect));
+      path.setAttribute("class", `resolution-arrow res-${arrow.resolution_kind}`);
+      path.dataset.provId = pid;
+      path.dataset.resolutionKind = arrow.resolution_kind;
+      group.appendChild(path);
+    });
+  }
+
   function scheduleRender() {
-    requestAnimationFrame(renderArrows);
+    requestAnimationFrame(() => {
+      renderArrows();
+      renderResolutionArrows();
+    });
   }
 
   function init() {
     renderArrows();
+    renderResolutionArrows();
     wireHover();
     // Re-render on every layout-affecting event so arrows track their anchors.
     window.addEventListener("resize", scheduleRender);

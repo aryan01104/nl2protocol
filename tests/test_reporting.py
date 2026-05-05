@@ -621,6 +621,144 @@ class TestADR0011FiveColumnLayout:
         assert "1fr 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
 
 
+class TestADR0011Phase2bResolutionArrows:
+    """Phase 2b draws one cross-column arrow per drawable gap_resolved
+    event from extracted-spec to resolved-spec. Color encodes resolution_kind.
+    Skipped/aborted resolutions and unmappable field paths are filtered out."""
+
+    def test_field_path_to_prov_id_top_level(self):
+        from nl2protocol.reporting import _field_path_to_prov_id
+        assert _field_path_to_prov_id("steps[0].volume") == "s0-volume"
+        assert _field_path_to_prov_id("steps[5].source") == "s5-source"
+        assert _field_path_to_prov_id("steps[12].destination") == "s12-destination"
+
+    def test_field_path_to_prov_id_subfield_collapses_to_parent(self):
+        # PR3a step 3: subfield writes (e.g., resolved_label) update the
+        # parent ref's primary cell; the prov_id maps to the parent.
+        from nl2protocol.reporting import _field_path_to_prov_id
+        assert _field_path_to_prov_id("steps[0].source.resolved_label") == "s0-source"
+        assert _field_path_to_prov_id("steps[2].destination.wells") == "s2-destination"
+
+    def test_field_path_to_prov_id_unmappable_returns_none(self):
+        from nl2protocol.reporting import _field_path_to_prov_id
+        # initial_contents and constraint placeholders don't have
+        # prov-id-bearing cells today; Phase 2b skips them.
+        assert _field_path_to_prov_id("initial_contents[0].volume_ul") is None
+        assert _field_path_to_prov_id("steps[0].constraint") is None
+        assert _field_path_to_prov_id("garbage") is None
+
+    def test_collect_resolution_arrows_filters_undrawable_kinds(self):
+        from nl2protocol.reporting import _collect_resolution_arrows, StageEvent
+        events = [
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[0].volume",
+                "resolution_kind": "auto_accepted",
+                "step_order": 1, "value_repr": "100uL",
+            }),
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[1].source",
+                "resolution_kind": "user_skipped",
+                "step_order": 2, "value_repr": "",
+            }),
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[2].volume",
+                "resolution_kind": "user_aborted",
+                "step_order": 3, "value_repr": "",
+            }),
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[3].destination",
+                "resolution_kind": "user_edited",
+                "step_order": 4, "value_repr": "B5",
+            }),
+        ]
+        arrows = _collect_resolution_arrows(events)
+        # auto_accepted + user_edited drawable; user_skipped + user_aborted filtered.
+        kinds = sorted(a["resolution_kind"] for a in arrows)
+        assert kinds == ["auto_accepted", "user_edited"]
+
+    def test_collect_resolution_arrows_filters_unmappable_paths(self):
+        from nl2protocol.reporting import _collect_resolution_arrows, StageEvent
+        events = [
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "initial_contents[0].volume_ul",
+                "resolution_kind": "auto_accepted",
+                "step_order": None, "value_repr": "1500.0",
+            }),
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[0].volume",
+                "resolution_kind": "auto_accepted",
+                "step_order": 1, "value_repr": "100uL",
+            }),
+        ]
+        arrows = _collect_resolution_arrows(events)
+        # Only the steps[0].volume entry survives — initial_contents has no
+        # prov-id-bearing cell to anchor an arrow at.
+        assert len(arrows) == 1
+        assert arrows[0]["prov_id"] == "s0-volume"
+
+    def test_collect_resolution_arrows_dedupes_to_latest_per_prov_id(self):
+        # Same gap resolved twice across iterations → keep only the LAST
+        # resolution (the final state visible in the resolved column).
+        from nl2protocol.reporting import _collect_resolution_arrows, StageEvent
+        events = [
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[0].volume",
+                "resolution_kind": "auto_accepted",
+                "step_order": 1, "value_repr": "100uL",
+            }),
+            StageEvent(kind="gap_resolved", data={
+                "field_path": "steps[0].volume",
+                "resolution_kind": "user_edited",
+                "step_order": 1, "value_repr": "150uL",
+            }),
+        ]
+        arrows = _collect_resolution_arrows(events)
+        assert len(arrows) == 1
+        assert arrows[0]["resolution_kind"] == "user_edited"
+        assert arrows[0]["value_repr"] == "150uL"
+
+    def test_renders_resolution_arrows_json_into_template(self, tmp_path):
+        # End-to-end: emit a few gap_resolved events to an HTMLReporter and
+        # assert the rendered HTML contains the corresponding JSON blob the
+        # JS will parse.
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="gap_resolved", data={
+            "field_path": "steps[0].volume",
+            "resolution_kind": "auto_accepted",
+            "step_order": 1, "value_repr": "100uL",
+        }))
+        rep.emit(StageEvent(kind="gap_resolved", data={
+            "field_path": "steps[2].source",
+            "resolution_kind": "user_edited",
+            "step_order": 3, "value_repr": "B5",
+        }))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The embedded JSON should contain both arrows.
+        assert '"prov_id": "s0-volume"' in rendered
+        assert '"prov_id": "s2-source"' in rendered
+        assert '"resolution_kind": "auto_accepted"' in rendered
+        assert '"resolution_kind": "user_edited"' in rendered
+        # The resolution-arrow SVG group exists in the overlay.
+        assert 'id="resolution-arrow-paths"' in rendered
+        # Per-resolution-kind CSS classes are defined.
+        assert "res-auto_accepted" in rendered
+        assert "res-user_edited" in rendered
+
+    def test_empty_resolution_events_renders_empty_json_array(self, tmp_path):
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # The script block exists with an empty array — JS reads it, finds
+        # nothing to draw, gracefully no-ops.
+        assert 'id="resolution-arrows-data"' in rendered
+        assert ">[]<" in rendered or '">[]</script>' in rendered
+
+
 class TestFindCitePosition:
     """Locating cited_text substrings in the instruction (case-insensitive,
     whitespace-tolerant)."""

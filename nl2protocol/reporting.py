@@ -539,6 +539,100 @@ def _format_location(loc) -> str:
     return text
 
 
+_PROV_ID_RENDERABLE_FIELDS = {
+    "volume", "duration", "temperature", "substance", "source", "destination",
+}
+
+
+def _field_path_to_prov_id(field_path: str) -> Optional[str]:
+    """Map a Gap.field_path to the matching `data-prov-id` used in the
+    rendered spec columns — but only for fields the renderer actually
+    emits as prov-id-bearing cells.
+
+    Pre:    `field_path` is a dotted path like `steps[N].volume`,
+            `steps[N].source`, `steps[N].source.resolved_label`,
+            `initial_contents[N].volume_ul`, or `steps[N].constraint`.
+
+    Post:   Returns `s{N}-{field}` only when:
+              * The path matches `steps[N].<field>` or
+                `steps[N].<field>.<subfield>` (subfield writes update
+                the parent ref's primary cell — same prov_id as the
+                top-level write).
+              * `<field>` is in `_PROV_ID_RENDERABLE_FIELDS` — the six
+                fields the spec-column renderer attaches data-prov-id
+                to (volume, duration, temperature, substance, source,
+                destination).
+            Returns None otherwise — `initial_contents[N].volume_ul`
+            (no prov-id-bearing cell), `steps[N].constraint` (placeholder
+            field; not rendered as a cell), unknown shapes. Callers
+            downstream skip None paths since they can't anchor an arrow.
+
+    Side effects: None.
+    """
+    import re
+    m = re.match(r"steps\[(\d+)\]\.(\w+)(?:\.\w+)?$", field_path)
+    if m and m.group(2) in _PROV_ID_RENDERABLE_FIELDS:
+        return f"s{m.group(1)}-{m.group(2)}"
+    return None
+
+
+def _collect_resolution_arrows(events) -> list:
+    """Build the list of arrows to draw from extracted-spec to resolved-spec.
+
+    Per ADR-0011 Phase 2b: each `gap_resolved` event becomes one arrow IF
+    (a) the resolution committed a value (skipped/aborted are not drawn —
+    no destination cell change to encode), and (b) the field_path maps to
+    a `data-prov-id` the renderer exposes (steps[N].field shapes only —
+    initial_contents and constraint paths don't have prov-id-bearing cells
+    today).
+
+    Pre:    `events` is the captured event list from a CapturingReporter
+            (or an HTMLReporter, since it inherits). Order matters only
+            for tie-breaking when the same field gets resolved multiple
+            times across iterations — the LAST resolution wins.
+
+    Post:   Returns a list of dicts ready to embed in the template as JSON:
+              {
+                "prov_id":            str,    # data-prov-id shared across columns
+                "resolution_kind":    str,    # auto_accepted / user_accepted_suggestion / user_edited / user_confirmed
+                "field_path":         str,    # for tooltip / debug surface
+                "step_order":         Optional[int],
+                "value_repr":         str,    # already capped at 200 chars by orchestrator
+              }
+            Drawable resolution_kinds: auto_accepted, user_accepted_suggestion,
+            user_edited, user_confirmed. Other kinds (user_skipped,
+            user_aborted) are filtered out. The same prov_id resolved across
+            iterations keeps only the LAST resolution (the final state the
+            user sees in the resolved column).
+
+    Side effects: None.
+    """
+    drawable_kinds = {
+        "auto_accepted",
+        "user_accepted_suggestion",
+        "user_edited",
+        "user_confirmed",
+    }
+    by_prov_id = {}  # prov_id -> dict (latest wins)
+    for event in events:
+        if event.kind != "gap_resolved":
+            continue
+        kind = event.data.get("resolution_kind", "")
+        if kind not in drawable_kinds:
+            continue
+        prov_id = _field_path_to_prov_id(event.data.get("field_path", ""))
+        if prov_id is None:
+            continue
+        by_prov_id[prov_id] = {
+            "prov_id": prov_id,
+            "resolution_kind": kind,
+            "field_path": event.data.get("field_path", ""),
+            "step_order": event.data.get("step_order"),
+            "value_repr": event.data.get("value_repr", ""),
+        }
+    return list(by_prov_id.values())
+
+
 def _atomic_provenance_stats(spec) -> dict:
     """Walk every atomic provenanced value across the spec and tally
     instruction-sourced vs non-instruction-sourced. Surfaced in the report
@@ -753,6 +847,14 @@ class HTMLReporter(CapturingReporter):
         stats_spec = cspec or rspec or spec
         prov_stats = _atomic_provenance_stats(stats_spec) if stats_spec else {"total": 0, "non_instr": 0, "non_instr_pct": 0.0}
 
+        # ADR-0011 Phase 2b: resolution arrows for the storytelling layer.
+        # Embedded as JSON so the template's JS can iterate them at render
+        # time and draw an SVG path per arrow (extracted column → resolved
+        # column). Skipped/aborted resolutions and unmappable field paths
+        # are filtered out by _collect_resolution_arrows.
+        import json as _json
+        resolution_arrows_json = _json.dumps(_collect_resolution_arrows(self.events))
+
         rendered = template.render(
             instruction=instruction,                # raw text (for any text-only fallback)
             instruction_html=instruction_html,      # marked-up HTML with cite spans
@@ -762,6 +864,7 @@ class HTMLReporter(CapturingReporter):
             generated_script=generated_script,
             success=success,
             prov_stats=prov_stats,
+            resolution_arrows_json=resolution_arrows_json,
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 
