@@ -318,11 +318,15 @@ class TestPaletteClass:
 
 
 class TestGracefulDegradeNoDataProvId:
-    """When a cited_text cannot be located in the instruction, the spec
-    value span MUST omit data-prov-id — promising a hover link we can't
-    deliver is the bug we're avoiding."""
+    """ADR-0011 Phase 2b/4 polish (2026-05-05) changed the semantic of
+    data-prov-id: it's now a UNIVERSAL cell identifier for arrows +
+    panel hover, not a "cite-link is available" flag. The cite ↔ value
+    pair-highlight that drove the old behavior is now signaled by the
+    palette-N class (only added when the cite is recoverable). JS
+    pair-highlight no-ops gracefully when no matching cite span exists
+    in the instruction column. These tests pin the new contract."""
 
-    def test_unrecoverable_cite_omits_data_prov_id(self):
+    def test_unrecoverable_cite_keeps_data_prov_id_drops_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
         from nl2protocol.models.spec import Provenance
         # cited_text is NOT in the instruction.
@@ -331,8 +335,11 @@ class TestGracefulDegradeNoDataProvId:
             "100 uL", prov, prov_id="s0-volume",
             instruction="Transfer 100uL from A1 to B1.",
         )
-        assert "data-prov-id" not in out
-        # But the value is still rendered with provenance metadata for the tooltip.
+        # NEW contract: data-prov-id ALWAYS emitted (cell identifier).
+        assert 'data-prov-id="s0-volume"' in out
+        # But the palette class is dropped (no cite to color-match with).
+        assert "palette-" not in out
+        # And the value still rendered with provenance metadata.
         assert "data-prov-source=\"instruction\"" in out
 
     def test_recoverable_cite_emits_data_prov_id_and_palette(self):
@@ -347,7 +354,7 @@ class TestGracefulDegradeNoDataProvId:
         # Recoverable instruction-sourced cites get a palette class.
         assert "palette-" in out
 
-    def test_non_instruction_source_skips_palette(self):
+    def test_non_instruction_source_emits_data_prov_id_drops_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
         from nl2protocol.models.spec import Provenance
         prov = Provenance(
@@ -361,8 +368,9 @@ class TestGracefulDegradeNoDataProvId:
         # Categorical class only — no palette, dotted underline comes from CSS.
         assert "prov-domain_default" in out
         assert "palette-" not in out
-        # No data-prov-id — this value isn't sourced from the instruction.
-        assert "data-prov-id" not in out
+        # NEW contract: non-instruction sources STILL get data-prov-id
+        # (cell identifier for resolution arrows + panel hover).
+        assert 'data-prov-id="s0-duration"' in out
 
 
 class TestADR0009Rendering:
@@ -1005,6 +1013,156 @@ class TestADR0011Phase4RowHover:
         assert 'data-target-cells="s0-source s1-source"' in rendered
         # And the "plate" → assay_plate row covers both destinations.
         assert 'data-target-cells="s0-destination s1-destination"' in rendered
+
+
+class TestADR0011NullFieldPlaceholders:
+    """Phase 2b/4 polish: when a tracked field is null on a step but
+    expected by the action, emit a ✗ placeholder cell carrying the
+    matching data-prov-id. This gives resolution arrows their origin
+    anchors AND gives panel-row hover a target in the extracted column."""
+
+    def _step_with_null_source(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProvenancedString, ProvenancedVolume,
+        )
+        prov = Provenance(source="instruction", cited_text="5uL", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        # Transfer step where the LLM extracted volume + substance + dest
+        # but not source — the case the orchestrator would later resolve
+        # via ConfigLookupSuggester.
+        return ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
+                                      provenance=prov),
+            substance=ProvenancedString(value="water",
+                                         provenance=Provenance(
+                                             source="instruction",
+                                             cited_text="water",
+                                             confidence=1.0)),
+            source=None,
+            destination=LocationRef(description="plate", well="B12",
+                                     provenance=prov),
+            composition_provenance=comp,
+        )
+
+    def test_step_with_null_source_emits_placeholder_with_prov_id(self):
+        # Render the step → detail_lines should include a ✗ placeholder
+        # for the missing source carrying the right data-prov-id.
+        from nl2protocol.reporting import _step_to_render_dict
+        step = self._step_with_null_source()
+        d = _step_to_render_dict(step, step_idx=0)
+        joined = " ".join(d["detail_lines"])
+        assert 'data-prov-id="s0-source"' in joined
+        assert "✗" in joined
+        assert "(not extracted)" in joined
+
+    def test_extracted_and_resolved_columns_both_carry_source_prov_id(self, tmp_path):
+        # End-to-end: a transfer step with source=None in extracted spec
+        # and source=filled in resolved spec produces a `data-prov-id="s0-source"`
+        # span in BOTH columns. The arrow JS finds matching anchors.
+        from nl2protocol.reporting import HTMLReporter, StageEvent
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedString, ProvenancedVolume,
+        )
+        prov = Provenance(source="instruction", cited_text="5uL", confidence=1.0)
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        # Extracted spec: source is None.
+        extracted = ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
+                                      provenance=prov),
+            substance=ProvenancedString(value="water",
+                                         provenance=Provenance(
+                                             source="instruction",
+                                             cited_text="water",
+                                             confidence=1.0)),
+            source=None,
+            destination=LocationRef(description="plate", well="B12",
+                                     provenance=prov),
+            composition_provenance=comp,
+        )])
+        # Resolved spec: source is filled in.
+        resolved = ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
+                                      provenance=prov),
+            substance=ProvenancedString(value="water",
+                                         provenance=Provenance(
+                                             source="instruction",
+                                             cited_text="water",
+                                             confidence=1.0)),
+            source=LocationRef(
+                description="reagent_reservoir", well="A2",
+                resolved_label="reagent_reservoir",
+                provenance=Provenance(
+                    source="inferred",
+                    positive_reasoning="config lookup found water at A2",
+                    why_not_in_instruction="instruction omits source",
+                    confidence=0.9,
+                ),
+            ),
+            destination=LocationRef(description="plate", well="B12",
+                                     provenance=prov),
+            composition_provenance=comp,
+        )])
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.emit(StageEvent(kind="raw_instruction",
+                             data={"instruction": "Transfer 5uL water to B12."}))
+        rep.emit(StageEvent(kind="extracted_spec", data={"spec": extracted}))
+        rep.emit(StageEvent(kind="resolved_spec", data={"spec": resolved}))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Two occurrences of data-prov-id="s0-source": once per column.
+        # Without Phase 2b/4 polish, the extracted column would skip
+        # source entirely (only one occurrence in the resolved column).
+        assert rendered.count('data-prov-id="s0-source"') >= 2
+
+    def test_pause_step_does_not_emit_placeholder_clutter(self):
+        # Pause steps don't expect volume/source/destination/etc. — the
+        # null fields should be SKIPPED, not rendered as ✗ placeholders.
+        from nl2protocol.reporting import _step_to_render_dict
+        from nl2protocol.models.spec import CompositionProvenance, ExtractedStep
+        step = ExtractedStep(
+            order=1, action="pause", note="incubate 5 min",
+            composition_provenance=CompositionProvenance(
+                step_cited_text="incubate 5 min",
+                parameters_cited_texts=["incubate 5 min"],
+                parameters_reasoning="cited",
+                grounding=["instruction"], confidence=1.0,
+            ),
+        )
+        d = _step_to_render_dict(step)
+        joined = " ".join(d["detail_lines"])
+        # No tracked-field placeholders for pause's empty volume/source/etc.
+        assert "✗" not in joined
+
+    def test_hover_flip_css_rules_present(self, tmp_path):
+        # The new hover-flip rules for value cells exist in the rendered
+        # template's <style> block. Per-palette + per-source rules.
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        rep = HTMLReporter(str(out_path))
+        rep.finalize()
+        rendered = out_path.read_text()
+        # Per-palette flip on .prov-active.
+        assert "span.palette-0.prov-active" in rendered
+        assert "background: var(--palette-0)" in rendered
+        # Per-source flip on .prov-active.
+        assert "span.prov-inferred.prov-active" in rendered
+        assert "background: var(--col-inferred)" in rendered
+        # Empty-cell styling defined.
+        assert ".cell-empty" in rendered
 
 
 class TestFindCitePosition:

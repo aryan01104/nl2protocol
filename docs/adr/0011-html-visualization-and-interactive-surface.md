@@ -341,3 +341,50 @@ Phases 1, 2 land first as a self-contained replay improvement. Phase 3 is its ow
 - `nl2protocol/reporting.py` — existing HTML report; this ADR extends it.
 - `nl2protocol/reporting_templates/report.html.jinja` — existing template; phase 2 replaces it.
 - Smoke test record: Bradford run, 2026-05-05, output at `output/report_20260505_055634.html` — the run that surfaced the confirmation-form-factor problem this ADR addresses.
+
+## Addendum: Phase 2b/4 polish (2026-05-05, post-smoke)
+
+Two bugs surfaced in the first user-visible smoke of the five-column report. Documenting the fixes here as an addendum rather than a new ADR — they're refinements within ADR-0011's surface, not architectural decisions.
+
+### Bug 1: resolution arrows had no origin anchor
+
+**Symptom**: Bradford smoke produced 5 resolution arrows in the embedded JSON (one per auto-resolved water-source via `ConfigLookupSuggester`), but ZERO drew on the page. Visual inspection by user.
+
+**Root cause**: `_step_to_render_dict` skipped null fields entirely when building per-column `detail_lines`. For Bradford's water transfers, the LLM extracted `step.source = None` — the renderer omitted the source line in column 2 (Extracted Spec) entirely. The orchestrator filled the source via `ConfigLookupSuggester`, so column 3 (Resolved Spec) had a populated source cell. Resolution arrows need BOTH endpoint cells with matching `data-prov-id`; column 2's missing cell meant `extractedCol.querySelector(...)` returned null, and the JS bailed before drawing.
+
+A second related issue: `_render_provenanced_value` only emitted `data-prov-id` when the cited_text was recoverable in the instruction (the cite ↔ value pair-link semantic). For non-instruction sources (the orchestrator's auto-fills), no `data-prov-id` was emitted on the value cell — so even when both columns rendered the cell, only column 2 might have the id.
+
+**Fix**:
+
+1. **Action-aware placeholder rendering**: introduced `_ACTION_EXPECTED_FIELDS` mapping each action to the set of tracked fields it expects (e.g. `transfer` expects `{volume, source, destination, substance}`; `pause` expects `{}`). For each tracked field on each step, the renderer now:
+   - Emits a value cell when non-null (existing behavior)
+   - Emits a `✗ (not extracted)` placeholder cell when null AND the field is in the action's expected set (new — gives arrows their origin)
+   - Skips entirely when null AND not expected by the action (avoids cluttering pause/comment/module-command step blocks with irrelevant ✗ rows)
+2. **Universal `data-prov-id`**: changed `_render_provenanced_value` to ALWAYS emit `data-prov-id` when `prov_id` is provided, regardless of cite recoverability. The cite ↔ value pair-link semantic now lives in the palette-N class (only added when the cite is recoverable); the JS pair-highlight no-ops gracefully when no matching cite span exists.
+
+After the fix: Bradford's 5 water-source resolutions render as 5 leaf-green arrows from `✗` placeholders in column 2 to filled cells in column 3. The visual story works.
+
+### Bug 2: hover highlight was too subtle
+
+**Symptom**: hovering a panel row produced a thin same-color outline around target cells. User wanted "the highlight around it is of the same color and bright, and the text becomes black or white, whichever is more visually recommended."
+
+**Root cause**: the existing `.prov-active` CSS rule was a generic `outline: 1px solid currentColor`. Same currentColor as the text means a same-hue outline against same-hue text — visible but not popping.
+
+**Fix**: per-palette and per-source `.prov-active` (and `:hover`) rules that fill with the cell's own color and flip text to white or near-black for contrast. Mirrors the existing `cite-flip` pattern that already runs on instruction-column cite spans (e.g., `.cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: #fff; }`). The value-side now has the same affordance — when you hover or panel-row-target a cell, it FILLS with its color and the text becomes high-contrast.
+
+Per-palette text-contrast pairing (chosen by visual-contrast against each palette hue):
+
+| Palette  | Background hex | Text color |
+|----------|----------------|------------|
+| `palette-0` (deep red)        | `#c1272d` | white   |
+| `palette-1` (burnt orange)    | `#e76f1c` | white   |
+| `palette-2` (mustard)         | `#c79100` | dark    |
+| `palette-3` (leaf green)      | `#4f8a2b` | white   |
+| `palette-4` (teal)            | `#168a8a` | white   |
+| `palette-5` (deep blue)       | `#1f5fa6` | white   |
+| `palette-6` (indigo)          | `#5d3fa8` | white   |
+| `palette-7` (magenta)         | `#b62f7a` | white   |
+
+Plus categorical sources without a palette (`prov-config` purple, `prov-domain_default` gold/dark, `prov-inferred` orange/white, `prov-instruction` red/white as fallback when cite isn't recoverable).
+
+The `.cell-empty` placeholder has its own subdued hover treatment — a dim red outline + light tint — so it still feels like a hover target without the loud color-fill (the cell's content is just `✗`; nothing to color-flip on).

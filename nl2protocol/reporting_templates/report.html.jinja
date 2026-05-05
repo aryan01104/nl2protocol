@@ -305,6 +305,56 @@
     border-radius: 2px;
   }
 
+  /* ───────── ADR-0011 Phase 2b/4 polish: hover-flip on value cells ─────────
+     Mirrors the cite-side `.cite-marker.cite-atomic-color.palette-N.cite-active`
+     pattern from above. When a value cell is hovered (or panel-row hover
+     marks it .prov-active), the cell fills with its color and the text
+     flips to white/black for contrast. Same visual language on both
+     sides of the cite ↔ value pair. */
+  span.palette-0.prov-active, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-1.prov-active, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-2.prov-active, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: #1a1a1a;  outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-3.prov-active, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-4.prov-active, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-5.prov-active, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-6.prov-active, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-7.prov-active, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+
+  /* Non-instruction sources without palette: use their categorical hue. */
+  span.prov-config.prov-active,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-domain_default.prov-active, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: #1a1a1a; outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-inferred.prov-active,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+
+  /* Instruction-sourced spans WITHOUT a palette (cite not recoverable):
+     fall back to instruction-red. Spans WITH a palette take the palette
+     rules above (later in the cascade with the same specificity, so
+     palette wins by source order). */
+  span.prov-instruction.prov-active,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+
+  /* ───────── ADR-0011 Phase 2b/4 polish: ✗ placeholder cells ─────────
+     For action-expected fields that are null on the step, the renderer
+     emits a placeholder carrying a matching data-prov-id. This gives
+     resolution arrows their origin anchor (extracted column has the ✗,
+     resolved column has the filled value, arrow draws between them)
+     and gives panel-row hover a target in both columns. */
+  .cell-empty {
+    color: var(--dim);
+    font-style: italic;
+    font-size: 11px;
+    cursor: help;
+    padding: 0 2px;
+  }
+  .cell-empty em {
+    font-size: 10px;
+  }
+  .cell-empty.prov-active,
+  .cell-empty[data-prov-id]:hover {
+    background: rgba(184, 68, 79, 0.08);
+    border-radius: 2px;
+    outline: 1px solid rgba(184, 68, 79, 0.35);
+    outline-offset: 1px;
+  }
+
   /* ───────── JS hover tooltip (replaces native title=) ───────── */
   #hover-tip {
     position: fixed;

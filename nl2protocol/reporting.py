@@ -223,11 +223,16 @@ def _render_provenanced_value(
         user_confirmed, user_skipped) get the class but no inline badge —
         their state is surfaced in the tooltip only.
 
-    Linkage rules (graceful degrade for unrecoverable cites):
-      - data-prov-id is emitted ONLY when an instruction-sourced cited_text
-        was actually located in `instruction`. If the LLM produced a cite
-        that doesn't appear verbatim, we DON'T promise a hover link we
-        cannot deliver — the value still gets its color but no data-prov-id.
+    Linkage rules:
+      - data-prov-id is ALWAYS emitted when prov_id is provided. Per
+        ADR-0011 Phase 2b/4 polish, the data-prov-id is a CELL IDENTIFIER
+        used by resolution arrows (extracted column → resolved column)
+        AND panel-row hover (lab-state / labware panel rows light up
+        matching cells). The cite ↔ value pair-highlight (the original
+        use of data-prov-id) only fires for spans whose cite is
+        recoverable in the instruction column — but the JS pair-highlight
+        already no-ops gracefully when no matching cite span exists,
+        so universal emission doesn't break that path.
     """
     import html
     source = getattr(prov, "source", "inferred")
@@ -260,9 +265,13 @@ def _render_provenanced_value(
 
     rendered_value = html.escape(str(value))
 
-    # data-prov-id ONLY when we can actually link to a cite span.
+    # data-prov-id ALWAYS emitted when prov_id is provided. Per ADR-0011
+    # Phase 2b/4 polish, the attribute is the cell's identity for arrow
+    # anchoring + panel-row hover; the cite ↔ value pair-highlight (the
+    # original use) is a separate concern that no-ops gracefully when
+    # no matching cite span exists in the instruction column.
     extra_attrs = ""
-    if prov_id and cite_recoverable:
+    if prov_id:
         extra_attrs = f' data-prov-id="{html.escape(prov_id, quote=True)}"'
 
     # Stash provenance fields on the element so the JS tooltip can read them
@@ -839,6 +848,68 @@ def _atomic_provenance_stats(spec) -> dict:
     return {"total": total, "non_instr": non_instr, "non_instr_pct": pct}
 
 
+_TRACKED_FIELDS_ORDER = (
+    "volume", "source", "destination", "substance", "duration", "temperature",
+)
+
+# Per-action expectation: which tracked fields the action EXPECTS to use.
+# When a step's field is null AND the field is in this set, the renderer
+# emits a ✗ placeholder cell carrying the field's data-prov-id (so
+# resolution arrows have an origin anchor and panel-row hover has a
+# target). Fields not in the set are skipped entirely when null — that
+# avoids cluttering pause/comment/module-command step blocks with N
+# unrelated ✗ rows.
+_ACTION_EXPECTED_FIELDS = {
+    "transfer":             {"volume", "source", "destination", "substance"},
+    "distribute":           {"volume", "source", "destination", "substance"},
+    "consolidate":          {"volume", "source", "destination", "substance"},
+    "serial_dilution":      {"volume", "source", "destination", "substance"},
+    "mix":                  {"volume"},
+    "aspirate":             {"volume", "source"},
+    "dispense":             {"volume", "destination"},
+    "blow_out":             {"destination"},
+    "touch_tip":            {"destination"},
+    "delay":                {"duration"},
+    "pause":                set(),  # duration OR note — neither rendered as a tracked cell
+    "comment":              set(),
+    "set_temperature":      {"temperature"},
+    "wait_for_temperature": {"temperature"},
+    "engage_magnets":       set(),
+    "disengage_magnets":    set(),
+    "deactivate":           set(),
+}
+
+
+def _empty_field_cell(prov_id: str, label: str) -> str:
+    """Render a ✗ placeholder cell for a tracked field that's null on
+    this step but expected by the action.
+
+    Per ADR-0011 Phase 2b/4 polish (2026-05-05): the placeholder carries
+    a matching data-prov-id so resolution arrows can anchor at this DOM
+    position when the field gets filled in by the orchestrator (extracted
+    column has the ✗, resolved column has the value, arrow draws between
+    them). It also gives panel-row hover a target in the extracted column
+    so highlighting works symmetrically across both spec snapshots.
+
+    Pre:    `prov_id` matches what the value cell would carry on the same
+            field (e.g., "s2-source"). `label` is the field name shown
+            to the user (e.g., "source").
+
+    Post:   Returns an HTML fragment for the step-detail row. Same shape
+            as a value-bearing line (`<span class="label">...:</span>
+            <span ...>...</span>`) so the template's loop can render it
+            uniformly.
+
+    Side effects: None.
+    """
+    return (
+        f'<span class="label">{label}:</span> '
+        f'<span class="cell-empty" data-prov-id="{prov_id}">'
+        f'✗ <em>(not extracted)</em>'
+        f'</span>'
+    )
+
+
 def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = None) -> dict:
     """Convert an ExtractedStep into the dict shape the template expects.
 
@@ -846,12 +917,23 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     whether each cited_text is actually recoverable. If a cite isn't
     present in the instruction we degrade gracefully — color the value
     but omit `data-prov-id` so we don't promise a broken hover link.
+
+    Per ADR-0011 Phase 2b/4 polish (2026-05-05): for each action,
+    `_ACTION_EXPECTED_FIELDS` enumerates which tracked fields a step
+    *should* have. For each tracked field:
+      * non-null     → render the value cell (existing behavior)
+      * null + expected by action → render ✗ placeholder with matching prov_id
+      * null + NOT expected → skip entirely (no clutter)
+    This keeps the extracted-spec column and resolved-spec column
+    structurally parallel for fields the orchestrator might fill in,
+    enabling resolution arrows + cross-column hover.
     """
     comp = step.composition_provenance
     grounding = list(getattr(comp, "grounding", []))
     sid = f"s{step_idx}"
 
     detail_lines = []
+    expected = _ACTION_EXPECTED_FIELDS.get(step.action, set())
 
     if step.volume is not None:
         v = _render_provenanced_value(
@@ -861,6 +943,8 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             instruction=instruction,
         )
         detail_lines.append(f'<span class="label">volume:</span> {v}')
+    elif "volume" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-volume", "volume"))
 
     if step.source is not None:
         loc_text = _format_location(step.source)
@@ -870,6 +954,8 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             import html as _html
             v = _html.escape(loc_text)
         detail_lines.append(f'<span class="label">source:</span> {v}')
+    elif "source" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-source", "source"))
 
     if step.destination is not None:
         loc_text = _format_location(step.destination)
@@ -879,10 +965,14 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             import html as _html
             v = _html.escape(loc_text)
         detail_lines.append(f'<span class="label">destination:</span> {v}')
+    elif "destination" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-destination", "destination"))
 
     if step.substance is not None:
         v = _render_provenanced_value(step.substance.value, step.substance.provenance, prov_id=f"{sid}-substance", instruction=instruction)
         detail_lines.append(f'<span class="label">substance:</span> {v}')
+    elif "substance" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-substance", "substance"))
 
     if step.duration is not None:
         v = _render_provenanced_value(
@@ -892,6 +982,8 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             instruction=instruction,
         )
         detail_lines.append(f'<span class="label">duration:</span> {v}')
+    elif "duration" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-duration", "duration"))
 
     if step.temperature is not None:
         v = _render_provenanced_value(
@@ -901,6 +993,8 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             instruction=instruction,
         )
         detail_lines.append(f'<span class="label">temperature:</span> {v}')
+    elif "temperature" in expected:
+        detail_lines.append(_empty_field_cell(f"{sid}-temperature", "temperature"))
 
     if step.replicates is not None:
         detail_lines.append(f'<span class="label">replicates:</span> {step.replicates}×')
