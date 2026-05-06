@@ -385,7 +385,10 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 class ProtocolAgent:
     def __init__(self, config_path: str = "lab_config.json",
                  confirmation_manager=None,
-                 reporter=None):
+                 reporter=None,
+                 confirmation_handler=None,
+                 assignments_handler=None,
+                 binary_confirm_handler=None):
         """
         Args:
             config_path: path to lab_config.json
@@ -398,6 +401,29 @@ class ProtocolAgent:
                 to ConsoleReporter, which preserves the existing CLI banners.
                 Tests pass CapturingReporter to inspect the structured event
                 stream without I/O. Future HTML/TUI sinks plug in here.
+            confirmation_handler: optional ConfirmationHandler for the
+                gap-resolution orchestrator (see nl2protocol.gap_resolution).
+                Defaults to None — `run_pipeline` then constructs a
+                CLIConfirmationHandler that drives stdin via `cm`. Live mode
+                (ADR-0013 Phase 3c) injects an HTMLConfirmationHandler that
+                blocks the worker thread until the browser posts a response
+                over the WebSocket.
+            assignments_handler: optional handler with a
+                `confirm(table) -> Optional[dict]` method for labware
+                description→label confirmation. Defaults to None — the
+                CLI loop in `_confirm_labware_assignments` runs as before.
+                Live mode (ADR-0013 Phase 3d) injects an
+                HTMLAssignmentsHandler that pops a center modal in the
+                browser and blocks the worker thread until the user
+                confirms or aborts.
+            binary_confirm_handler: optional handler with a
+                `confirm(title, items, yes_label, no_label) -> bool`
+                method used for stand-alone Y/N prompts (inferred-source
+                acknowledgement, hardware-error proceed). Defaults to
+                None — pipeline falls back to the existing TTY-gated
+                `cm.prompt`. Live mode (ADR-0013 Phase 3e) injects an
+                HTMLBinaryConfirmHandler that pops a small popup in the
+                browser.
         """
         from nl2protocol.confirmation import InteractiveCM
         from nl2protocol.reporting import ConsoleReporter
@@ -405,6 +431,9 @@ class ProtocolAgent:
         self.config_loader = ConfigLoader(config_path=config_path)
         self.cm = confirmation_manager or InteractiveCM()
         self.reporter = reporter or ConsoleReporter()
+        self.confirmation_handler = confirmation_handler
+        self.assignments_handler = assignments_handler
+        self.binary_confirm_handler = binary_confirm_handler
 
     @staticmethod
     def _infer_source_containers(spec) -> list:
@@ -470,6 +499,41 @@ class ProtocolAgent:
             results.append((labware, well, substance))
 
         return results
+
+    def _confirm_labware_assignments_via_handler(self, spec) -> Optional[dict]:
+        """Browser-bridged variant of `_confirm_labware_assignments`.
+
+        Builds the same description→label table the CLI loop displays,
+        then delegates to `self.assignments_handler.confirm(table)`.
+        The handler blocks until the browser submits, returns either
+        the confirmed dict or None on abort/timeout.
+
+        Pre:    `spec.steps` carries LocationRefs whose `description`
+                and `resolved_label` (possibly None) drive the table.
+                `self.assignments_handler` is non-None (caller checks).
+                `self.config_loader.config["labware"]` lists the
+                available config labels the user can pick from.
+        Post:   Returns dict {description: confirmed_label} or None
+                (None means user aborted or browser timed out).
+                Empty dict when there were no LocationRefs to confirm
+                (handler short-circuits).
+        """
+        config_labels = list(
+            self.config_loader.config.get("labware", {}).keys()
+        )
+        seen = set()
+        table = []
+        for step in spec.steps:
+            for ref in [step.source, step.destination]:
+                if ref is None or ref.description in seen:
+                    continue
+                seen.add(ref.description)
+                table.append({
+                    "description": ref.description,
+                    "suggested_label": ref.resolved_label,
+                    "candidates": config_labels,
+                })
+        return self.assignments_handler.confirm(table)
 
     def _confirm_labware_assignments(self, spec) -> Optional[dict]:
         """Interactive confirmation of labware description → config label assignments.
@@ -780,7 +844,7 @@ class ProtocolAgent:
                 client=extractor.client,
                 model_name=reviewer_model,
             ),
-            handler=CLIConfirmationHandler(cm=self.cm, log=_log),
+            handler=self.confirmation_handler or CLIConfirmationHandler(cm=self.cm, log=_log),
             apply_resolution=default_apply_resolution,
             # ADR-0011 Phase 1: orchestrator emits storytelling events
             # (gap_iteration_*, gap_detected, gap_resolved) into the same
@@ -830,17 +894,33 @@ class ProtocolAgent:
         # dispensed into must be pre-filled by the scientist.
         source_only = self._infer_source_containers(spec)
         if source_only:
-            _log("\n  Inferred source containers (pre-filled by you before running):")
+            items = []
             for labware, well, substance in source_only:
                 sub = f" ({substance})" if substance else ""
-                _log(f"    - {labware} well {well}{sub}")
-            if sys.stdin.isatty():
+                items.append(f"{labware} well {well}{sub}")
+            _log("\n  Inferred source containers (pre-filled by you before running):")
+            for line in items:
+                _log(f"    - {line}")
+            # Live mode → browser handler; CLI/TTY → stdin prompt; non-TTY
+            # automated runs → skip the prompt and accept (existing
+            # behavior — the CLI block was already gated on isatty()).
+            user_aborted = False
+            if self.binary_confirm_handler is not None:
+                ok = self.binary_confirm_handler.confirm(
+                    title="Confirm inferred source containers",
+                    items=items,
+                    yes_label="Yes, these are correct",
+                    no_label="No, abort",
+                )
+                user_aborted = not ok
+            elif sys.stdin.isatty():
                 response = self.cm.prompt("Is this correct? [Y/n]: ").lower()
-                if response in ('n', 'no'):
-                    _log("  Aborted. Adjust your instruction to clarify source containers.")
-                    state_log["stage_3_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
-                    _save_state_log("stage_3_sources")
-                    return None
+                user_aborted = response in ('n', 'no')
+            if user_aborted:
+                _log("  Aborted. Adjust your instruction to clarify source containers.")
+                state_log["stage_3_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
+                _save_state_log("stage_3_sources")
+                return None
             # Add confirmed sources to initial_contents so well tracker doesn't warn
             from .extraction import WellContents
             for labware, well, substance in source_only:
@@ -864,12 +944,24 @@ class ProtocolAgent:
             if ref
         }
 
-        # Confirm tentative assignments with user (includes unresolved refs)
-        if sys.stdin.isatty():
+        # Confirm tentative assignments with user. Two paths:
+        #   - Live mode (server) injects `assignments_handler` →
+        #     pop a center modal in the browser and block until the
+        #     user confirms or aborts. Runs regardless of TTY so the
+        #     server thread always reaches it.
+        #   - CLI mode (no handler) → run the existing TTY-gated
+        #     stdin loop. Non-TTY runs (CI, scripted tests) skip
+        #     confirmation entirely; LLM picks stand.
+        confirmed = None
+        if self.assignments_handler is not None:
+            confirmed = self._confirm_labware_assignments_via_handler(spec)
+        elif sys.stdin.isatty():
             confirmed = self._confirm_labware_assignments(spec)
-            if confirmed is None:
-                _save_state_log("stage_3.5_resolution")
-                return None
+        if confirmed is None and (self.assignments_handler is not None
+                                    or sys.stdin.isatty()):
+            _save_state_log("stage_3.5_resolution")
+            return None
+        if confirmed:
             for step in spec.steps:
                 for ref in [step.source, step.destination]:
                     if ref and ref.description in confirmed:
@@ -922,22 +1014,35 @@ class ProtocolAgent:
         if constraint_result.has_errors:
             _log(f"\n  {C.error('HARDWARE CONFLICTS DETECTED')} ({len(constraint_result.errors)}):")
             _log("  " + "-" * 56)
-            for v in constraint_result.errors:
+            error_items = [str(v) for v in constraint_result.errors]
+            for v in error_items:
                 _log(f"  {v}")
                 _log()
 
-            if sys.stdin.isatty():
+            # Live mode → browser handler; CLI/TTY → stdin prompt;
+            # non-TTY → halt (existing behavior). Default action is
+            # NO/abort here (CLI prompt was [y/N]) so the user has to
+            # explicitly opt in to a known-broken protocol.
+            proceed = False
+            if self.binary_confirm_handler is not None:
+                _log("  These conflicts mean the protocol may not execute correctly.")
+                proceed = self.binary_confirm_handler.confirm(
+                    title="Hardware conflicts detected",
+                    items=error_items,
+                    yes_label="Proceed anyway",
+                    no_label="Abort",
+                )
+            elif sys.stdin.isatty():
                 _log("  These conflicts mean the protocol may not execute correctly.")
                 response = self.cm.prompt("Proceed anyway? [y/N]: ").lower()
-                if response not in ('y', 'yes'):
-                    _log("  Aborted. Fix your config or instruction and retry.")
-                    _save_state_log("stage_4_constraints")
-                    return None
-                _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
+                proceed = response in ('y', 'yes')
             else:
                 _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
+            if not proceed:
+                _log("  Aborted. Fix your config or instruction and retry.")
                 _save_state_log("stage_4_constraints")
                 return None
+            _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
         else:
             _log(f"  {C.success('All constraints satisfied.')}")
 

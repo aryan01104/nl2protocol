@@ -146,3 +146,20 @@ CLI mode (`nl2protocol -i ...` writing a static HTML report) stays as a non-inte
 - `nl2protocol/reporting.py` — `Reporter` protocol that `WebSocketReporter` implements
 - `nl2protocol/gap_resolution/handlers.py` — `ConfirmationHandler` protocol that `HTMLConfirmationHandler` will implement (Phase 3c)
 - `nl2protocol/server/` — new module landing in Phase 3a
+
+## Addendum (post-implementation phase note)
+
+The roadmap above split into more sub-phases as it shipped. Recording the actual breakdown so the doc isn't stale:
+
+- **Phase 3a** — backend network (FastAPI app + `WebSocketReporter` + `nl2protocol --serve` CLI flag).
+- **Phase 3b-1** — live column rendering (server pre-renders step blocks via `_step_to_render_dict`; browser swaps innerHTML on spec events).
+- **Phase 3b-2** — live arrows (server pre-renders cite-marked instruction HTML via `_render_instruction_with_marks`; tracks cumulative `gap_resolved` events and ships the running `_collect_resolution_arrows` set with each one).
+- **Phase 3c** — per-Gap interactive prompts (`PendingRequest` primitive + `HTMLConfirmationHandler` + bottom-right modal). CLI parity audit landed alongside (severity literals, kind literals, keyboard shortcuts, edit input with field_path label, reviewer-objection display).
+- **Phase 3d** — labware-assignments confirmation (`AssignmentsConfirmation` primitive + `HTMLAssignmentsHandler` + center-screen modal with editable description→config-label dropdowns).
+- **Phase 3e** — stand-alone binary Y/N prompts for inferred-source acknowledgement and hardware-error proceed (`BinaryConfirmation` primitive + `HTMLBinaryConfirmHandler` + small Y/N modal).
+
+Three parallel primitives instead of one generic confirmation type: each prompt shape carries different payload + different button semantics, and keeping them parallel made the CLI ↔ browser parity audit tractable (one CLI prompt format per primitive). The thread-bridge mechanism (sync `threading.Event` + per-request dict on `LiveModeApp`, drained by an `asyncio` WebSocket receiver coroutine) is identical across all three.
+
+The original "Phase 3d — polish" slot (reconnect window, auto-open browser, error messages) reshuffled: auto-open browser shipped in 3a; reconnect-with-replay-of-outstanding-requests shipped in 3c; the rest stays under polish/follow-up.
+
+Live mode is now functionally equivalent to CLI mode end-to-end.

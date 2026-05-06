@@ -241,6 +241,85 @@ class TestAutoAccept:
         orch.run(spec, context={})
         assert handler.calls  # reviewer objection forced to user
 
+    def test_reviewer_objection_stamped_into_gap_metadata_before_present(self):
+        # Reviewer disagreement → orchestrator copies the objection text into
+        # gap.metadata["reviewer_objection"] before handing the gap to the
+        # handler, so both the CLI and HTML handlers can render the
+        # falsifier alongside the suggestion.
+        spec = make_spec()
+        gaps = [gap("g1")]
+        sug = good_suggestion(confidence=0.95)
+        review = ReviewResult(
+            field_path=gaps[0].field_path,
+            confirms_positive=False, confirms_negative=True,
+            objection="instruction line 5 says X",
+        )
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": sug})],
+            reviewer=FakeReviewer({gaps[0].field_path: review}),
+            handler=handler,
+            apply_resolution=fake_apply,
+        )
+        orch.run(spec, context={})
+        seen_gap, _ = handler.calls[0]
+        assert seen_gap.metadata.get("reviewer_objection") == "instruction line 5 says X"
+
+    def test_reviewer_agreement_leaves_metadata_clean(self):
+        # When the reviewer confirms both claims, no objection exists,
+        # nothing should be stamped onto gap.metadata. Even if auto-accept
+        # would have fired (it does here for confidence ≥ threshold), the
+        # gap never reaches present(); but if it did the metadata should
+        # be empty.
+        spec = make_spec()
+        gaps = [gap("g1")]
+        sug = good_suggestion(confidence=0.5)  # below auto-accept threshold
+        review = ReviewResult(
+            field_path=gaps[0].field_path,
+            confirms_positive=True, confirms_negative=True,
+            objection=None,
+        )
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": sug})],
+            reviewer=FakeReviewer({gaps[0].field_path: review}),
+            handler=handler,
+            apply_resolution=fake_apply,
+        )
+        orch.run(spec, context={})
+        seen_gap, _ = handler.calls[0]
+        assert "reviewer_objection" not in seen_gap.metadata
+
+    def test_no_reviewer_means_no_objection_metadata(self):
+        # Defensive: when no reviewer is configured, nothing should land
+        # in gap.metadata under reviewer_objection. The orchestrator's
+        # stamp pass should be a no-op.
+        spec = make_spec()
+        gaps = [gap("g1", severity="quality")]
+        sug = good_suggestion(confidence=0.5)
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps, []])],
+            suggesters=[FakeSuggester({"g1": sug})],
+            reviewer=None,
+            handler=handler,
+            apply_resolution=fake_apply,
+        )
+        orch.run(spec, context={})
+        seen_gap, _ = handler.calls[0]
+        assert "reviewer_objection" not in seen_gap.metadata
+
 
 # ============================================================================
 # Loop convergence + abort

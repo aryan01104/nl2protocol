@@ -26,11 +26,20 @@ import queue
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
+from nl2protocol.server.handlers import (
+    AssignmentsConfirmation,
+    BinaryConfirmation,
+    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    HTMLAssignmentsHandler,
+    HTMLBinaryConfirmHandler,
+    HTMLConfirmationHandler,
+    PendingRequest,
+)
 from nl2protocol.server.reporter import (
     CompositeReporter,
     PIPELINE_DONE_SENTINEL,
@@ -203,11 +212,19 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
                              instruction: str) -> dict:
     """For spec events (extracted/resolved/completed), pre-render the
     step blocks server-side using the existing `_step_to_render_dict`
-    helper and include them in the payload.
+    helper and include them in the payload, plus the cite-marked
+    instruction HTML so column 1's anchors update with each new spec
+    snapshot.
 
     Per ADR-0013 Phase 3b-1: the browser-side JS just inserts the
     pre-rendered HTML strings instead of duplicating the rendering
     logic. Reuses 100% of the existing Python rendering path.
+
+    Per ADR-0013 Phase 3b-2: also emit `instruction_html` (the cite-
+    marked version) so step-trigger arrows have anchor spans to point
+    from. Built using the SAME `_render_instruction_with_marks` +
+    `_collect_arrow_targets` the static HTMLReporter uses, so the live
+    column is byte-equivalent to the static archive.
 
     Pre:    `event_kind` is one of "extracted_spec" / "resolved_spec" /
             "completed_spec". `raw_data` is the event's data dict
@@ -216,25 +233,38 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
             to decide cite recoverability per cell).
 
     Post:   Returns a dict suitable for JSON serialization with:
-              "steps":      list of step render dicts (dicts shape from
-                            `_step_to_render_dict`)
-              "spec":       _safe_data(spec)  — keeps the raw spec for
-                            tools that want it
+              "steps":             list of step render dicts (dicts shape from
+                                   `_step_to_render_dict`)
+              "instruction_html":  cite-marked HTML for column 1 (only
+                                   when both spec and instruction are
+                                   available)
+              "spec":              _safe_data(spec)  — keeps the raw
+                                   spec for tools that want it
             On any error, falls back to plain `_safe_data(raw_data)`.
     """
     spec = raw_data.get("spec") if isinstance(raw_data, dict) else None
     if spec is None or not hasattr(spec, "steps"):
         return _safe_data(raw_data)
     try:
-        from nl2protocol.reporting import _step_to_render_dict
+        from nl2protocol.reporting import (
+            _collect_arrow_targets,
+            _render_instruction_with_marks,
+            _step_to_render_dict,
+        )
         step_dicts = [
             _step_to_render_dict(s, idx, instruction)
             for idx, s in enumerate(spec.steps)
         ]
-        return {
+        out: Dict[str, Any] = {
             "steps": step_dicts,
             "spec": _safe_data(spec),
         }
+        if instruction:
+            arrow_targets = _collect_arrow_targets(spec)
+            out["instruction_html"] = _render_instruction_with_marks(
+                instruction, arrow_targets,
+            )
+        return out
     except Exception:
         return _safe_data(raw_data)
 
@@ -278,6 +308,28 @@ class LiveModeApp:
         # events can be enriched with pre-rendered step dicts (which need
         # the instruction for cite-recoverability decisions).
         self._instruction_text: str = ""
+        # Phase 3b-2: accumulate gap_resolved events so we can attach the
+        # cumulative resolution-arrow set to each gap_resolved event the
+        # browser receives. Browser replaces the embedded arrows JSON +
+        # re-renders the SVG layer on each update. List grows for the
+        # whole run; same as the static path's _collect_resolution_arrows
+        # walking the captured event list.
+        self._gap_resolved_events: list = []
+        # Phase 3c: shared dict between the worker thread (writes when
+        # HTMLConfirmationHandler.present is called) and the WebSocket
+        # receiver coroutine (reads + signals when panel_response arrives).
+        # Keyed by request_id; values are PendingRequest records. Both
+        # readers and writers operate on distinct keys so no lock is
+        # needed beyond Python's dict-level atomicity.
+        self._pending_requests: Dict[str, PendingRequest] = {}
+        # Phase 3d: same pattern for labware-assignments confirmation —
+        # one in-flight request at a time, but a dict keeps the API
+        # symmetric with `_pending_requests` and lets the receiver use
+        # the same lookup-by-rid pattern.
+        self._pending_assignments: Dict[str, AssignmentsConfirmation] = {}
+        # Phase 3e: stand-alone Y/N prompts (source containers,
+        # hardware-error proceed). Same dict-by-rid pattern.
+        self._pending_binary_confirms: Dict[str, BinaryConfirmation] = {}
         self._setup_routes()
 
     def _render_live_page(self) -> str:
@@ -340,45 +392,204 @@ class LiveModeApp:
         @self.app.websocket("/events")
         async def stream_events(websocket: WebSocket):
             await websocket.accept()
-            loop = asyncio.get_event_loop()
+            # Re-deliver any panel_requests that were outstanding when
+            # the previous WS dropped. New tab / reconnect should never
+            # silently strand a gap.
+            self._replay_pending_requests()
+            sender = asyncio.create_task(self._ws_sender(websocket))
+            receiver = asyncio.create_task(self._ws_receiver(websocket))
             try:
-                while True:
-                    # Drain the queue without blocking the event loop.
-                    # run_in_executor schedules the blocking get() in
-                    # the default thread pool.
-                    event = await loop.run_in_executor(None, self._event_queue.get)
-                    if event is PIPELINE_DONE_SENTINEL:
-                        await websocket.send_json({"kind": "pipeline_done"})
-                        break
-                    # Phase 3b-1: track instruction + enrich spec events.
-                    if event.kind == "raw_instruction":
-                        self._instruction_text = (
-                            event.data.get("instruction", "") if isinstance(event.data, dict) else ""
-                        )
-                        data = _safe_data(event.data)
-                    elif event.kind in ("extracted_spec", "resolved_spec",
-                                          "completed_spec"):
-                        data = _enrich_spec_event_data(
-                            event.kind, event.data, self._instruction_text,
-                        )
-                    else:
-                        data = _safe_data(event.data)
-                    payload = {
-                        "kind": event.kind,
-                        "data": data,
-                        "stage_name": event.stage_name,
-                        "timestamp": event.timestamp.isoformat(),
-                    }
-                    await websocket.send_json(payload)
+                # When EITHER side finishes (pipeline_done from sender, or
+                # WebSocketDisconnect from receiver), tear down the other.
+                done, pending = await asyncio.wait(
+                    {sender, receiver},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
             except WebSocketDisconnect:
                 # Browser closed the tab. Per ADR-0013, the pipeline
                 # keeps running; the static HTMLReporter will still
                 # write its artifact at end-of-run.
-                pass
+                sender.cancel()
+                receiver.cancel()
+
+    async def _ws_sender(self, websocket: WebSocket) -> None:
+        """Drain the event queue, forward each item to the browser as JSON.
+
+        Pre:    `websocket` is an accepted WebSocket. The pipeline thread
+                pushes StageEvents (and the PIPELINE_DONE_SENTINEL) onto
+                `self._event_queue`. Panel-request envelopes arrive as
+                StageEvents with kind="panel_request" — same code path,
+                same enrichment skip.
+        Post:   Sends each event as `{kind, data, stage_name, timestamp}`
+                JSON until the sentinel arrives, at which point sends
+                `{kind: "pipeline_done"}` and returns. Spec events are
+                enriched with pre-rendered step dicts via
+                `_enrich_spec_event_data` so the browser doesn't duplicate
+                rendering logic.
+        """
+        loop = asyncio.get_event_loop()
+        while True:
+            event = await loop.run_in_executor(None, self._event_queue.get)
+            if event is PIPELINE_DONE_SENTINEL:
+                await websocket.send_json({"kind": "pipeline_done"})
+                return
+            if event.kind == "raw_instruction":
+                self._instruction_text = (
+                    event.data.get("instruction", "")
+                    if isinstance(event.data, dict) else ""
+                )
+                data = _safe_data(event.data)
+            elif event.kind in ("extracted_spec", "resolved_spec",
+                                "completed_spec"):
+                data = _enrich_spec_event_data(
+                    event.kind, event.data, self._instruction_text,
+                )
+            elif event.kind == "gap_resolved":
+                # Phase 3b-2: track for cumulative arrow set.
+                self._gap_resolved_events.append(event)
+                data = _safe_data(event.data) or {}
+                if not isinstance(data, dict):
+                    data = {"_raw": data}
+                try:
+                    from nl2protocol.reporting import _collect_resolution_arrows
+                    data["resolution_arrows"] = _collect_resolution_arrows(
+                        self._gap_resolved_events,
+                    )
+                except Exception:
+                    pass
+            else:
+                data = _safe_data(event.data)
+            payload = {
+                "kind": event.kind,
+                "data": data,
+                "stage_name": event.stage_name,
+                "timestamp": event.timestamp.isoformat(),
+            }
+            await websocket.send_json(payload)
+
+    async def _ws_receiver(self, websocket: WebSocket) -> None:
+        """Read panel_response messages from the browser and signal the
+        matching PendingRequest so the pipeline thread unblocks.
+
+        Pre:    `websocket` is accepted. Browser sends JSON of shape
+                `{"kind": "panel_response", "request_id": "<rid>",
+                  "action": "accept"|"edit"|"skip"|"override"|"abort",
+                  "new_value": "<raw text>"  # only for action="edit"
+                 }`.
+        Post:   Each well-formed panel_response with a known request_id
+                triggers `PendingRequest.set_response_from_action`, which
+                builds the Resolution and signals the pipeline thread.
+                Unknown request_ids and malformed payloads are silently
+                dropped. Any unexpected receive error closes the
+                receiver cleanly (pipeline keeps running; on browser
+                reconnect, outstanding pending requests are re-emitted).
+        """
+        while True:
+            try:
+                msg = await websocket.receive_json()
+            except (WebSocketDisconnect, RuntimeError):
+                return
+            except Exception:
+                # Defensive: malformed frame, JSON decode error, etc.
+                continue
+            if not isinstance(msg, dict):
+                continue
+            kind = msg.get("kind")
+            rid = msg.get("request_id")
+            action = msg.get("action")
+            if not rid or not action:
+                continue
+            if kind == "panel_response":
+                pending = self._pending_requests.get(rid)
+                if pending is None:
+                    continue
+                pending.set_response_from_action(action, msg.get("new_value"))
+            elif kind == "labware_assignments_response":
+                pending_asgn = self._pending_assignments.get(rid)
+                if pending_asgn is None:
+                    continue
+                pending_asgn.set_response(action, msg.get("assignments"))
+            elif kind == "binary_confirm_response":
+                pending_bc = self._pending_binary_confirms.get(rid)
+                if pending_bc is None:
+                    continue
+                pending_bc.set_response(action)
+
+    def _replay_pending_requests(self) -> None:
+        """When the browser reconnects mid-run, re-emit a panel_request
+        envelope for every outstanding PendingRequest. The pipeline's
+        original push to the queue was drained by the now-dead WS, so
+        without re-emission the user would see a blank report and the
+        pipeline would block forever on a gap.
+
+        Pre:    Called from the WS coroutine right after `accept()`.
+                `self._pending_requests` may be empty (clean reconnect)
+                or carry one+ in-flight gaps.
+        Post:   For each pending entry, pushes a panel_request StageEvent
+                onto the outbound queue. The new sender drains naturally.
+                Request IDs are preserved so the receiver still maps
+                responses correctly.
+        """
+        from nl2protocol.server.handlers import _serialize_gap, _serialize_suggestion
+        for rid, pending in list(self._pending_requests.items()):
+            self._send_panel_request({
+                "request_id": rid,
+                "gap": _serialize_gap(pending.gap),
+                "suggestion": _serialize_suggestion(pending.suggestion),
+            })
+
+    def _send_binary_confirm_request(self, payload: Dict[str, Any]) -> None:
+        """Push a binary_confirm_request envelope onto the outbound queue."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="binary_confirm_request",
+                data=payload,
+                stage_name="binary_confirm",
+            ))
+        except queue.Full:
+            pass
+
+    def _send_assignments_request(self, payload: Dict[str, Any]) -> None:
+        """Push a labware_assignments_request envelope onto the outbound
+        queue. Wrapped as a synthetic StageEvent the existing WS sender
+        path handles transparently."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="labware_assignments_request",
+                data=payload,
+                stage_name="stage_3.5_assignments",
+            ))
+        except queue.Full:
+            pass
+
+    def _send_panel_request(self, payload: Dict[str, Any]) -> None:
+        """Push a panel_request envelope onto the outbound event queue.
+
+        Wrapped as a synthetic StageEvent (kind="panel_request") so the
+        existing WS sender path handles it without special-casing.
+        Called by HTMLConfirmationHandler from the pipeline thread; the
+        queue is thread-safe.
+        """
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="panel_request",
+                data=payload,
+                stage_name="gap_resolver",
+            ))
+        except queue.Full:
+            # Drop silently — same defensive policy as WebSocketReporter.
+            # The handler will time out and abort gracefully.
+            pass
 
     def _run_pipeline(self):
         """Worker-thread entry point. Reads instruction, builds reporters,
         runs the pipeline, finalizes."""
+        from nl2protocol.confirmation import AutoConfirmCM
         from nl2protocol.pipeline import ProtocolAgent
         from nl2protocol.reporting import HTMLReporter
 
@@ -386,7 +597,6 @@ class LiveModeApp:
             with open(self._instruction_path) as f:
                 instruction = f.read()
         except Exception as e:
-            # Push an error event onto the queue so the browser sees it.
             self._event_queue.put_nowait(_make_error_event(
                 f"Failed to read instruction file: {e}",
             ))
@@ -401,10 +611,35 @@ class LiveModeApp:
         html_reporter = HTMLReporter(self._html_report_path)
         composite = CompositeReporter(ws_reporter, html_reporter)
 
+        # Phase 3c: gap-resolver prompts route through the browser.
+        # Phase 3d: labware-assignments confirmation also routes through
+        # the browser. Source-container Y/n and constraint-error proceed
+        # still auto-accept via AutoConfirmCM — wiring those through the
+        # browser is a follow-up.
+        confirmation_handler = HTMLConfirmationHandler(
+            send_panel_request=self._send_panel_request,
+            pending_requests=self._pending_requests,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
+        assignments_handler = HTMLAssignmentsHandler(
+            send_request=self._send_assignments_request,
+            pending_assignments=self._pending_assignments,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
+        binary_confirm_handler = HTMLBinaryConfirmHandler(
+            send_request=self._send_binary_confirm_request,
+            pending_confirms=self._pending_binary_confirms,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
+
         try:
             agent = ProtocolAgent(
                 config_path=self._config_path,
+                confirmation_manager=AutoConfirmCM(),
                 reporter=composite,
+                confirmation_handler=confirmation_handler,
+                assignments_handler=assignments_handler,
+                binary_confirm_handler=binary_confirm_handler,
             )
             agent.run_pipeline(instruction)
         except Exception as e:

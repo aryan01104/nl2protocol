@@ -275,6 +275,16 @@ class Orchestrator:
                     resolved_in_iteration += 1
                     continue
 
+                # If the reviewer disagreed with the suggestion, surface the
+                # objection text to the user so they have a falsifier in
+                # hand when deciding accept/edit/skip. `Gap` is frozen
+                # but `gap.metadata` is a mutable dict — stamp in place.
+                # Auto-accept already requires both confirms_* to be True,
+                # so a gap that reaches present() is exactly the set where
+                # an objection (if any) is load-bearing for the decision.
+                if review is not None and getattr(review, "objection", None):
+                    gap.metadata["reviewer_objection"] = review.objection
+
                 # Present to user.
                 resolution = self._handler.present(gap, suggestion)
                 iter_result.records.append(GapResolutionRecord(

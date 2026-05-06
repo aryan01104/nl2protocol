@@ -574,6 +574,61 @@
     <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
     <span style="color: var(--dim); font-size: 12px; font-style: italic;">live mode · events stream as the pipeline runs · static report archived to <code>output/</code> at end-of-run</span>
   </div>
+  <!-- ADR-0013 Phase 3e: small Y/N modal for stand-alone binary
+       confirmations (inferred-source containers, hardware-error
+       proceed). Center-screen overlay, but visually lighter than the
+       assignments modal — typically just a list + 2 buttons. -->
+  <div id="live-binary-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.30); z-index: 1050; align-items: center; justify-content: center;">
+    <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 10px 32px rgba(0,0,0,0.22); width: min(520px, 92vw); max-height: 80vh; overflow-y: auto; font-size: 13px;">
+      <div id="live-binary-title" style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;"></div>
+      <div id="live-binary-body" style="padding: 14px 18px;"></div>
+      <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="live-binary-no" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">No</button>
+        <button id="live-binary-yes" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Yes</button>
+      </div>
+    </div>
+  </div>
+  <!-- ADR-0013 Phase 3d: labware-assignments confirmation modal.
+       Hidden until a labware_assignments_request arrives. Center-screen
+       overlay (different from the per-Gap bottom-right panel) — the
+       table can be tall (one row per unique LocationRef description)
+       and benefits from being the user's only focus.
+       JS in initLiveMode wires up populate + submit. -->
+  <div id="live-assignments-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
+    <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+        Confirm labware assignments
+        <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">change any row, or confirm to accept all</span>
+      </div>
+      <div id="live-assignments-body" style="padding: 14px 18px;"></div>
+      <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="live-assignments-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-assignments-confirm" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+      </div>
+    </div>
+  </div>
+  <!-- ADR-0013 Phase 3c: gap-prompt modal. Hidden until a panel_request
+       arrives over the WebSocket. Anchored bottom-right per ADR-0013. -->
+  <div id="live-panel" style="display: none; position: fixed; right: 24px; bottom: 24px; width: 380px; max-height: 70vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 1000; font-size: 13px;">
+    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+      <span id="live-panel-title">Confirm gap</span>
+      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: #f0e6d2; color: var(--dim); font-weight: 500;"></span>
+    </div>
+    <div style="padding: 12px 14px;">
+      <div id="live-panel-description" style="margin-bottom: 8px;"></div>
+      <div id="live-panel-current" style="margin-bottom: 8px; color: var(--dim); font-size: 12px;"></div>
+      <div id="live-panel-suggestion" style="margin-bottom: 10px;"></div>
+      <div id="live-panel-reasoning" style="font-size: 12px; color: var(--dim); font-style: italic; margin-bottom: 10px;"></div>
+      <!-- Reviewer objection. Populated by showPanel() when the
+           gap.metadata.reviewer_objection field is non-empty. Orange-tinted
+           to match the legend's "⚠ reviewer disagreed" marker. Hidden by
+           default; showPanel toggles display. -->
+      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--col-instruction); background: #fff4e6; font-size: 12px;"></div>
+    </div>
+    <div id="live-panel-buttons" style="padding: 10px 14px; border-top: 1px solid var(--grid); display: flex; gap: 8px; flex-wrap: wrap;">
+      <!-- buttons injected per-gap by JS (accept / skip / override / abort) -->
+    </div>
+  </div>
   {% endif %}
   <div class="legend">
     <span><span class="swatch" style="background: var(--col-instruction)"></span>→ arrow = step decomposition (instruction phrase → spec step)</span>
@@ -1145,10 +1200,230 @@
     const status = document.getElementById("live-status");
     if (!startBtn || !status) return;   // not in live mode
 
+    let activeWS = null;   // populated by connectWS so panel button clicks can reach it
+
     function setStatus(text, bg, fg) {
       status.textContent = text;
       status.style.background = bg;
       status.style.color = fg;
+    }
+
+    // ADR-0013 Phase 3c: gap-prompt modal helpers.
+    // Mirrors CLIConfirmationHandler._render_gap + _action_prompt — same
+    // information density, same action options, same severity labels.
+    const panel = document.getElementById("live-panel");
+    let activeReq = null;       // the currently-shown panel_request (drives keyboard)
+    let activeKeyHandler = null;
+
+    // Severity → (label, bg, fg). Keys must match GapSeverity literals
+    // ("blocker"/"suggestion"/"quality"); CLI maps these same three.
+    const SEVERITY_TAG = {
+      "blocker":    { label: "BLOCKER",     bg: "#f8d7da", fg: "#721c24" },
+      "suggestion": { label: "needs review", bg: "#fff3cd", fg: "#856404" },
+      "quality":    { label: "optional",    bg: "#f0e6d2", fg: "#6b6b6b" },
+    };
+
+    function showPanel(req) {
+      if (!panel) return;
+      activeReq = req;
+      const gap = req.gap || {};
+      const sug = req.suggestion;
+      document.getElementById("live-panel-title").textContent =
+        gap.kind ? "Gap: " + gap.kind : "Confirm gap";
+      const sev = document.getElementById("live-panel-severity");
+      const sevTag = SEVERITY_TAG[gap.severity]
+                     || { label: gap.severity || "", bg: "#f0e6d2", fg: "#6b6b6b" };
+      sev.textContent = sevTag.label;
+      sev.style.background = sevTag.bg;
+      sev.style.color = sevTag.fg;
+      document.getElementById("live-panel-description").textContent =
+        gap.description || "";
+      const cur = document.getElementById("live-panel-current");
+      cur.textContent = gap.current_value
+        ? "Current: " + gap.current_value : "";
+      // Suggestion block: value + provenance_source + reasoning +
+      // why_not_in_instruction + confidence (CLI _render_gap parity).
+      const sugDiv = document.getElementById("live-panel-suggestion");
+      const reasoningDiv = document.getElementById("live-panel-reasoning");
+      if (sug) {
+        sugDiv.innerHTML = '<strong>Suggested:</strong> '
+          + escapeHtml(String(sug.value_repr || ""))
+          + (sug.provenance_source
+              ? ' <span style="color:var(--dim);font-size:11px">('
+                + escapeHtml(sug.provenance_source) + ')</span>'
+              : "");
+        let r = "";
+        if (sug.positive_reasoning) {
+          r += '<div><strong>Reasoning:</strong> '
+            + escapeHtml(sug.positive_reasoning) + '</div>';
+        }
+        if (sug.why_not_in_instruction) {
+          r += '<div style="margin-top:4px"><strong>Why not from instruction:</strong> '
+            + escapeHtml(sug.why_not_in_instruction) + '</div>';
+        }
+        if (typeof sug.confidence === "number") {
+          r += '<div style="margin-top:4px"><strong>Confidence:</strong> '
+            + Math.round(sug.confidence * 100) + '%</div>';
+        }
+        reasoningDiv.innerHTML = r;
+        reasoningDiv.style.fontStyle = "normal";
+      } else {
+        sugDiv.innerHTML = '<em style="color:var(--dim)">(no suggestion available)</em>';
+        reasoningDiv.innerHTML = "";
+      }
+      // Reviewer objection. Stamped onto gap.metadata by the orchestrator
+      // after the reviewer pass; populated only when the reviewer
+      // disagreed with the suggester. Mirrors the CLI handler line
+      // "reviewer pushed back: <objection>".
+      const objDiv = document.getElementById("live-panel-objection");
+      const objection = gap.metadata && gap.metadata.reviewer_objection;
+      if (objection) {
+        objDiv.innerHTML = '<strong style="color:var(--col-instruction)">⚠ reviewer pushed back:</strong> '
+          + escapeHtml(String(objection));
+        objDiv.style.display = "block";
+      } else {
+        objDiv.style.display = "none";
+      }
+      // Build the per-gap button row. Mirrors CLI _action_prompt:
+      //   - Accept only when a suggestion exists (default action — Enter).
+      //   - Edit always shown.
+      //   - Override only on kind="fabricated" (ADR-0012).
+      //   - Skip only on severity="quality".
+      //   - Quit always shown.
+      // Keyboard shortcut letters in parens match CLI single-key tokens.
+      const btnRow = document.getElementById("live-panel-buttons");
+      btnRow.innerHTML = "";
+      const buttons = [];
+      if (sug) buttons.push({ label: "Accept (a)", action: "accept", primary: true, key: "a" });
+      buttons.push({ label: "Edit (e)", action: "edit", key: "e" });
+      if (gap.kind === "fabricated") buttons.push({ label: "Override (o)", action: "override", key: "o" });
+      if (gap.severity === "quality") buttons.push({ label: "Skip (s)", action: "skip", key: "s" });
+      buttons.push({ label: "Quit (q)", action: "abort", key: "q" });
+      buttons.forEach((b) => {
+        const el = document.createElement("button");
+        el.textContent = b.label;
+        el.style.cssText = b.primary
+          ? "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;"
+          : "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+        el.addEventListener("click", () => triggerAction(b.action));
+        btnRow.appendChild(el);
+      });
+      panel.style.display = "block";
+      installKeyboardHandler(buttons, !!sug);
+    }
+    function triggerAction(action) {
+      if (!activeReq) return;
+      if (action === "edit") {
+        showEditInput(activeReq);
+      } else {
+        sendPanelResponse(activeReq.request_id, action);
+      }
+    }
+    function installKeyboardHandler(buttons, hasSuggestion) {
+      // Single-keystroke shortcuts. Enter = accept (CLI default action)
+      // when a suggestion exists. Listener is rebound per-gap so the
+      // available shortcuts always match the visible buttons.
+      removeKeyboardHandler();
+      const allowed = new Set(buttons.map((b) => b.key));
+      activeKeyHandler = (ev) => {
+        // Don't hijack typing inside the edit input.
+        const tag = (ev.target && ev.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        const k = ev.key.toLowerCase();
+        if (k === "enter" && hasSuggestion && allowed.has("a")) {
+          ev.preventDefault();
+          triggerAction("accept");
+          return;
+        }
+        const match = buttons.find((b) => b.key === k);
+        if (match) {
+          ev.preventDefault();
+          triggerAction(match.action);
+        }
+      };
+      document.addEventListener("keydown", activeKeyHandler);
+    }
+    function removeKeyboardHandler() {
+      if (activeKeyHandler) {
+        document.removeEventListener("keydown", activeKeyHandler);
+        activeKeyHandler = null;
+      }
+    }
+    function showEditInput(req) {
+      // Mirrors CLI sub-prompt: "  new value for <field_path>: ".
+      // Shows the field_path so the user knows what they're editing.
+      // Pre-fills the suggestion (or current value) for cheap small tweaks.
+      // Detach the gap-level keyboard handler — the input owns keyboard
+      // until the user submits or cancels.
+      removeKeyboardHandler();
+      const btnRow = document.getElementById("live-panel-buttons");
+      btnRow.innerHTML = "";
+      btnRow.style.flexDirection = "column";
+      btnRow.style.alignItems = "stretch";
+      const sug = req.suggestion;
+      const gap = req.gap || {};
+      const initial = (sug && sug.value_repr) || gap.current_value || "";
+      const label = document.createElement("div");
+      label.textContent = "new value for " + (gap.field_path || "<field>") + ":";
+      label.style.cssText = "font-size:11px;color:var(--dim);margin-bottom:4px;";
+      const inputRow = document.createElement("div");
+      inputRow.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = String(initial);
+      input.style.cssText = "flex:1;min-width:0;padding:6px 8px;border:1px solid #c0c0c0;border-radius:4px;font-size:13px;";
+      const save = document.createElement("button");
+      save.textContent = "Save";
+      save.style.cssText = "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;";
+      const cancel = document.createElement("button");
+      cancel.textContent = "Cancel";
+      cancel.style.cssText = "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+      function submit() {
+        if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
+        activeWS.send(JSON.stringify({
+          kind: "panel_response",
+          request_id: req.request_id,
+          action: "edit",
+          new_value: input.value,
+        }));
+        // Restore button row layout for the next gap before hiding.
+        btnRow.style.flexDirection = "row";
+        btnRow.style.alignItems = "";
+        hidePanel();
+      }
+      function restore() {
+        // Bring the button row back without losing the panel.
+        btnRow.style.flexDirection = "row";
+        btnRow.style.alignItems = "";
+        showPanel(req);
+      }
+      save.addEventListener("click", submit);
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") { ev.preventDefault(); submit(); }
+        if (ev.key === "Escape") { ev.preventDefault(); restore(); }
+      });
+      cancel.addEventListener("click", restore);
+      inputRow.appendChild(input);
+      inputRow.appendChild(save);
+      inputRow.appendChild(cancel);
+      btnRow.appendChild(label);
+      btnRow.appendChild(inputRow);
+      input.focus();
+      input.select();
+    }
+    function hidePanel() {
+      if (panel) panel.style.display = "none";
+      activeReq = null;
+      removeKeyboardHandler();
+    }
+    function sendPanelResponse(requestId, action) {
+      if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
+      activeWS.send(JSON.stringify({
+        kind: "panel_response",
+        request_id: requestId,
+        action: action,
+      }));
+      hidePanel();
     }
 
     function appendStepBlocks(colSelector, stepDicts) {
@@ -1186,12 +1461,161 @@
       try { wireHover(); } catch (e) { /* defensive */ }
     }
 
+    // ────────── ADR-0013 Phase 3e: binary-confirm modal ──────────
+    let activeBinaryRid = null;
+    function showBinaryModal(req) {
+      const overlay = document.getElementById("live-binary-overlay");
+      const title = document.getElementById("live-binary-title");
+      const body = document.getElementById("live-binary-body");
+      const yes = document.getElementById("live-binary-yes");
+      const no = document.getElementById("live-binary-no");
+      if (!overlay || !title || !body || !yes || !no) return;
+      activeBinaryRid = req.request_id;
+      title.textContent = req.title || "Confirm";
+      body.innerHTML = "";
+      const ul = document.createElement("ul");
+      ul.style.cssText = "margin: 0 0 4px 0; padding-left: 18px;";
+      (req.items || []).forEach((item) => {
+        const li = document.createElement("li");
+        li.style.cssText = "margin: 2px 0;";
+        li.textContent = String(item);
+        ul.appendChild(li);
+      });
+      body.appendChild(ul);
+      yes.textContent = req.yes_label || "Yes";
+      no.textContent = req.no_label || "No";
+      overlay.style.display = "flex";
+    }
+    function hideBinaryModal() {
+      const overlay = document.getElementById("live-binary-overlay");
+      if (overlay) overlay.style.display = "none";
+      activeBinaryRid = null;
+    }
+    function sendBinaryResponse(action) {
+      if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
+      if (!activeBinaryRid) return;
+      activeWS.send(JSON.stringify({
+        kind: "binary_confirm_response",
+        request_id: activeBinaryRid,
+        action: action,
+      }));
+      hideBinaryModal();
+    }
+
+    // ────────── ADR-0013 Phase 3d: labware-assignments modal ──────────
+    // Single in-flight request per pipeline run, so this just tracks the
+    // current request_id + a {description: <select-element>} map for
+    // reading user picks at submit time.
+    let activeAssignmentsRid = null;
+    let activeAssignmentsSelects = null;
+
+    function showAssignmentsModal(req) {
+      const overlay = document.getElementById("live-assignments-overlay");
+      const body = document.getElementById("live-assignments-body");
+      if (!overlay || !body) return;
+      activeAssignmentsRid = req.request_id;
+      activeAssignmentsSelects = {};
+      body.innerHTML = "";
+      const table = document.createElement("table");
+      table.style.cssText = "width: 100%; border-collapse: collapse;";
+      const thead = document.createElement("thead");
+      thead.innerHTML = '<tr style="text-align: left; border-bottom: 1px solid var(--grid);">'
+        + '<th style="padding: 6px 8px; font-weight: 600;">Description (from instruction)</th>'
+        + '<th style="padding: 6px 8px; font-weight: 600;">Config label</th>'
+        + '</tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      (req.assignments || []).forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom: 1px solid var(--grid);";
+        const descCell = document.createElement("td");
+        descCell.style.cssText = "padding: 8px 8px; vertical-align: top;";
+        descCell.textContent = row.description;
+        const labelCell = document.createElement("td");
+        labelCell.style.cssText = "padding: 6px 8px; vertical-align: top;";
+        const select = document.createElement("select");
+        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid #c0c0c0; border-radius: 4px;";
+        // Empty option for unresolved; only used when no candidates match.
+        if (!row.suggested_label) {
+          const opt = document.createElement("option");
+          opt.value = "";
+          opt.textContent = "??? (no match)";
+          opt.selected = true;
+          select.appendChild(opt);
+        }
+        (row.candidates || []).forEach((label) => {
+          const opt = document.createElement("option");
+          opt.value = label;
+          opt.textContent = label;
+          if (label === row.suggested_label) opt.selected = true;
+          select.appendChild(opt);
+        });
+        labelCell.appendChild(select);
+        tr.appendChild(descCell);
+        tr.appendChild(labelCell);
+        tbody.appendChild(tr);
+        activeAssignmentsSelects[row.description] = select;
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+      overlay.style.display = "flex";
+    }
+    function hideAssignmentsModal() {
+      const overlay = document.getElementById("live-assignments-overlay");
+      if (overlay) overlay.style.display = "none";
+      activeAssignmentsRid = null;
+      activeAssignmentsSelects = null;
+    }
+    function sendAssignmentsResponse(action) {
+      if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
+      if (!activeAssignmentsRid) return;
+      const assignments = {};
+      if (action === "confirm" && activeAssignmentsSelects) {
+        // Block confirm if any row is still unresolved (empty value).
+        for (const [desc, sel] of Object.entries(activeAssignmentsSelects)) {
+          if (!sel.value) {
+            alert("Assign every row before confirming. \"" + desc + "\" is unresolved.");
+            return;
+          }
+          assignments[desc] = sel.value;
+        }
+      }
+      activeWS.send(JSON.stringify({
+        kind: "labware_assignments_response",
+        request_id: activeAssignmentsRid,
+        action: action,
+        assignments: assignments,
+      }));
+      hideAssignmentsModal();
+    }
+
+    function updateInstructionColumn(html) {
+      // Phase 3b-2: replace the instruction column's content with the
+      // server-rendered cite-marked HTML. Anchor spans (data-cite-id)
+      // are now in the DOM so step-trigger arrows have something to
+      // point from. Re-wires hover handlers since we mutated the
+      // listeners' targets.
+      const el = document.querySelector(".col .instruction-text");
+      if (!el || !html) return;
+      el.innerHTML = html;
+      try { wireHover(); } catch (e) { /* defensive */ }
+    }
+
+    function updateResolutionArrows(arrows) {
+      // Phase 3b-2: replace the embedded JSON the static path uses so
+      // the existing renderResolutionArrows() reads the new set on the
+      // next scheduleRender() tick.
+      const el = document.getElementById("resolution-arrows-data");
+      if (!el || !Array.isArray(arrows)) return;
+      el.textContent = JSON.stringify(arrows);
+    }
+
     function handleEvent(e) {
       switch (e.kind) {
         case "raw_instruction":
-          // Update the instruction column from "(loading)" placeholder.
-          // Phase 3b-2 will add full cite-mark rendering of the
-          // instruction text; for now we just plain-text it.
+          // Plain-text preview while we wait for the first spec event.
+          // Once the spec arrives, updateInstructionColumn replaces this
+          // with the cite-marked HTML.
           const instrCol = document.querySelector(".col .instruction-text");
           if (instrCol && e.data && e.data.instruction) {
             instrCol.textContent = e.data.instruction;
@@ -1199,12 +1623,26 @@
           break;
         case "extracted_spec":
           appendStepBlocks(".col-extracted-spec", e.data && e.data.steps);
+          if (e.data && e.data.instruction_html) {
+            updateInstructionColumn(e.data.instruction_html);
+          }
           break;
         case "resolved_spec":
           appendStepBlocks(".col-resolved-spec", e.data && e.data.steps);
+          if (e.data && e.data.instruction_html) {
+            updateInstructionColumn(e.data.instruction_html);
+          }
           break;
         case "completed_spec":
           appendStepBlocks(".col-validated-spec", e.data && e.data.steps);
+          if (e.data && e.data.instruction_html) {
+            updateInstructionColumn(e.data.instruction_html);
+          }
+          break;
+        case "gap_resolved":
+          if (e.data && Array.isArray(e.data.resolution_arrows)) {
+            updateResolutionArrows(e.data.resolution_arrows);
+          }
           break;
         case "generated_script":
           // Replace the placeholder paragraph in column 5 with a <pre>.
@@ -1218,9 +1656,19 @@
             codeCol.appendChild(pre);
           }
           break;
+        case "panel_request":
+          if (e.data) showPanel(e.data);
+          break;
+        case "labware_assignments_request":
+          if (e.data) showAssignmentsModal(e.data);
+          break;
+        case "binary_confirm_request":
+          if (e.data) showBinaryModal(e.data);
+          break;
         case "pipeline_done":
           setStatus("done", "#d4edda", "#155724");
           startBtn.disabled = false;
+          hidePanel();
           break;
         case "error":
           setStatus("error", "#f8d7da", "#721c24");
@@ -1235,6 +1683,7 @@
       const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
       const url = proto + "//" + window.location.host + "/events";
       const ws = new WebSocket(url);
+      activeWS = ws;
       ws.onopen = () => { /* connection established; no-op */ };
       ws.onmessage = (msg) => {
         try {
@@ -1242,8 +1691,20 @@
         } catch (err) { /* parse error — skip */ }
       };
       ws.onerror = () => { setStatus("ws error", "#f8d7da", "#721c24"); };
-      ws.onclose = () => { /* leave status as last known state */ };
+      ws.onclose = () => { activeWS = null; };
     }
+
+    // Assignments-modal button handlers (set up once; the buttons live
+    // for the lifetime of the page).
+    const assignConfirm = document.getElementById("live-assignments-confirm");
+    const assignAbort = document.getElementById("live-assignments-abort");
+    if (assignConfirm) assignConfirm.addEventListener("click", () => sendAssignmentsResponse("confirm"));
+    if (assignAbort) assignAbort.addEventListener("click", () => sendAssignmentsResponse("abort"));
+    // Binary-confirm button handlers (also set up once).
+    const binYes = document.getElementById("live-binary-yes");
+    const binNo = document.getElementById("live-binary-no");
+    if (binYes) binYes.addEventListener("click", () => sendBinaryResponse("yes"));
+    if (binNo) binNo.addEventListener("click", () => sendBinaryResponse("no"));
 
     startBtn.addEventListener("click", async () => {
       startBtn.disabled = true;

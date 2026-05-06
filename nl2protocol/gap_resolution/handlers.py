@@ -64,14 +64,20 @@ class CLIConfirmationHandler:
         self._log(f"\n  [{sev_tag}] {gap.description}")
         if gap.current_value is not None:
             self._log(f"    current: {gap.current_value!r}")
-        if suggestion is None:
+        if suggestion is not None:
+            self._log(f"    suggested: {self._format_value(suggestion.value)}")
+            self._log(f"    reasoning: {suggestion.positive_reasoning}")
+            if suggestion.why_not_in_instruction:
+                self._log(f"    why not from instruction: {suggestion.why_not_in_instruction}")
+            self._log(f"    confidence: {suggestion.confidence:.0%}")
+        else:
             self._log(f"    (no suggestion available)")
-            return
-        self._log(f"    suggested: {self._format_value(suggestion.value)}")
-        self._log(f"    reasoning: {suggestion.positive_reasoning}")
-        if suggestion.why_not_in_instruction:
-            self._log(f"    why not from instruction: {suggestion.why_not_in_instruction}")
-        self._log(f"    confidence: {suggestion.confidence:.0%}")
+        # Reviewer objection, if any. Stamped onto gap.metadata by the
+        # orchestrator after the reviewer pass; populated only when
+        # confirms_positive or confirms_negative was False.
+        objection = gap.metadata.get("reviewer_objection") if gap.metadata else None
+        if objection:
+            self._log(f"    reviewer pushed back: {objection}")
 
     def _action_prompt(self, suggestion: Optional[Suggestion],
                         gap: Optional[Gap] = None) -> str:
