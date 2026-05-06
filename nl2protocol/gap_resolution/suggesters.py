@@ -618,9 +618,11 @@ Output ONLY the JSON object, no preamble.
     def _build_prompt(self, gap: Gap, spec, context: dict) -> str:
         instruction = context.get("instruction", "")
         config = context.get("config", {})
-        # Focused instruction snippet: pull a window around any step-cited
-        # text; if not found, use the full instruction (small specs only).
-        instruction_snippet = instruction[:600]
+        # Pass the full instruction. A 600-char window dropped late lines
+        # like "Mix each well gently 3 times at 100uL", so the suggester
+        # invented values that were actually in the instruction. Typical
+        # specs are <2KB; trim only if absurdly long.
+        instruction_snippet = instruction[:4000]
         # Focused config slice: just the labware section, abbreviated.
         import json as _json
         config_slice = _json.dumps(
