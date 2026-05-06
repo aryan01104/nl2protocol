@@ -520,47 +520,83 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
 # ============================================================================
 
 def _stamp_spotlight_prov_ids(gap: Gap, spec) -> None:
-    """For gaps whose decision affects a cross-column anchor (today:
-    initial-contents volume gaps), stamp the prov-ids of every spec cell
-    that references the underlying (labware, well) onto
-    `gap.metadata["spotlight_prov_ids"]`.
+    """Stamp `gap.metadata["spotlight_prov_ids"]` with the prov-ids of
+    spec cells the user's decision will land on. The HTML gap modal
+    reads this and (a) anchors itself near the first target cell with
+    dotted arrows to all targets (#73), (b) pulses cells via
+    `.prov-spotlight` while the prompt is open.
 
-    The HTML modal reads this out and pulses those cells (.prov-spotlight
-    class) while the prompt is open. Static-CLI runs ignore the metadata
-    — no rendering surface for it.
+    Three gap shapes get handled:
+    1. `initial_contents[N].volume_ul` (rare in live mode now that
+       the IC batch handles these) — find every step whose source/
+       destination references that (labware, well) and stamp those
+       step cells.
+    2. `steps[N].<field>` for field in volume/substance/duration/
+       temperature/source/destination — stamp the cell directly
+       ("s{N}-<field>"). Covers missing-field, fabrication, and
+       most constraint-violation gaps.
+    3. `steps[N].<field>.<subfield>` (LocationRef sub-fields like
+       resolved_label) — stamp the parent cell since that's where
+       the value renders.
 
-    Pre:    `gap` is the gap about to be presented to the user.
-            `gap.metadata` is the mutable dict on the (frozen) gap.
-            `spec` is the current ProtocolSpec.
-    Post:   When `gap.field_path` matches `initial_contents[N].volume_ul`
-            AND `spec.initial_contents[N]` is reachable AND any spec cell
-            references that (labware, well), `gap.metadata["spotlight_prov_ids"]`
-            holds a space-separated string of "s{step_idx}-{role}" prov-ids.
-            On any structural mismatch the helper is a silent no-op (it
-            shouldn't break the resolution flow if the spec shape drifts).
+    Constraint-violation gaps with `metadata.affected_paths` (dedupe)
+    expand to all affected step cells.
+
+    Pre:    `gap` is the gap about to be presented. `gap.metadata` is
+            the mutable dict on the (frozen) gap. `spec` is the current
+            ProtocolSpec.
+    Post:   When at least one cell matches, `gap.metadata["spotlight_prov_ids"]`
+            holds a space-separated string of "s{step_idx}-{field}" prov-ids
+            (deduped, order-preserving). Helper is a silent no-op on
+            shape mismatches — it's a UX hint, not load-bearing.
     """
     import re as _re
+    pids: list = []
     field_path = getattr(gap, "field_path", "") or ""
-    m = _re.match(r"initial_contents\[(\d+)\]", field_path)
-    if not m:
-        return
-    try:
-        from nl2protocol.reporting import _lab_state_row_target_prov_ids
-        idx = int(m.group(1))
-        ic_list = getattr(spec, "initial_contents", None) or []
-        if idx >= len(ic_list):
-            return
-        ic = ic_list[idx]
-        labware = getattr(ic, "labware", None)
-        well = getattr(ic, "well", None)
-        if not labware:
-            return
-        pids = _lab_state_row_target_prov_ids(spec, labware, well or "")
-        if pids:
-            gap.metadata["spotlight_prov_ids"] = " ".join(pids)
-    except Exception:
-        # Defensive: this is a UX hint, not a load-bearing decision.
-        return
+
+    # Constraint dedupe: affected_paths (a list of dotted field paths)
+    # lets one gap stand for resolutions across many cells. Spotlight
+    # all of them.
+    affected = (gap.metadata or {}).get("affected_paths") if gap.metadata else None
+    paths_to_walk = list(affected) if isinstance(affected, list) else [field_path]
+
+    # Cells the renderer actually exposes as data-prov-id="s{N}-{field}".
+    _RENDERABLE_FIELDS = {"volume", "substance", "duration", "temperature",
+                            "source", "destination"}
+
+    for path in paths_to_walk:
+        if not path:
+            continue
+        sm = _re.match(r"steps\[(\d+)\]\.(\w+)(?:\.\w+)?$", path)
+        if sm:
+            step_idx, field = int(sm.group(1)), sm.group(2)
+            if field in _RENDERABLE_FIELDS:
+                pids.append(f"s{step_idx}-{field}")
+
+    # Initial-contents shape: spotlight every step cell that touches
+    # the same (labware, well).
+    ic_match = _re.match(r"initial_contents\[(\d+)\]", field_path)
+    if ic_match:
+        try:
+            from nl2protocol.reporting import _lab_state_row_target_prov_ids
+            idx = int(ic_match.group(1))
+            ic_list = getattr(spec, "initial_contents", None) or []
+            if idx < len(ic_list):
+                ic = ic_list[idx]
+                labware = getattr(ic, "labware", None)
+                well = getattr(ic, "well", None)
+                if labware:
+                    pids.extend(_lab_state_row_target_prov_ids(spec, labware, well or ""))
+        except Exception:
+            pass
+
+    if pids:
+        seen, deduped = set(), []
+        for p in pids:
+            if p not in seen:
+                seen.add(p)
+                deduped.append(p)
+        gap.metadata["spotlight_prov_ids"] = " ".join(deduped)
 
 
 def _stamp_user_action(field_obj, user_action_provenance: str) -> None:

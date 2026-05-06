@@ -331,9 +331,10 @@ class TestAutoAccept:
         _stamp_spotlight_prov_ids(g, spec)
         assert "s0-source" in g.metadata.get("spotlight_prov_ids", "")
 
-    def test_non_initial_contents_gap_no_spotlight(self):
-        # Defensive: spotlight stamping must not fire on gap shapes that
-        # don't carry a labware/well anchor (steps[N].volume etc).
+    def test_step_level_gap_stamps_matching_cell_prov_id(self):
+        # Phase 3j (#73): step-level gaps now spotlight their target
+        # cell directly so the gap modal can anchor + draw attach
+        # arrows. Field path "steps[N].volume" → prov-id "sN-volume".
         from types import SimpleNamespace as _NS
         from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
 
@@ -343,6 +344,46 @@ class TestAutoAccept:
             field_path="steps[0].volume",
             kind="missing", current_value=None,
             description="vol missing", severity="blocker", metadata={},
+        )
+        _stamp_spotlight_prov_ids(g, spec)
+        assert g.metadata.get("spotlight_prov_ids") == "s0-volume"
+
+    def test_constraint_gap_with_affected_paths_stamps_all(self):
+        # Phase 3j (#73): constraint-violation gaps carry affected_paths
+        # in metadata (per dedupe — ADR-0010). Spotlight expands to
+        # every affected step cell so the modal's dotted arrows reach
+        # all of them.
+        from types import SimpleNamespace as _NS
+        from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
+
+        spec = _NS(initial_contents=[], steps=[])
+        g = Gap(
+            id="cap", step_order=None,
+            field_path="constraints.pipette_capacity",
+            kind="constraint_violation", current_value=None,
+            description="exceeds capacity", severity="blocker",
+            metadata={"affected_paths": [
+                "steps[2].volume", "steps[5].volume", "steps[7].volume",
+            ]},
+        )
+        _stamp_spotlight_prov_ids(g, spec)
+        got = g.metadata.get("spotlight_prov_ids", "").split()
+        assert got == ["s2-volume", "s5-volume", "s7-volume"]
+
+    def test_unrenderable_field_path_no_spotlight(self):
+        # Defensive: field_path matching steps[N].<thing> where <thing>
+        # isn't a renderer-exposed cell (e.g., steps[0].action) is a
+        # silent no-op — no spotlight rather than a stamp pointing at
+        # nothing.
+        from types import SimpleNamespace as _NS
+        from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
+
+        spec = _NS(initial_contents=[], steps=[])
+        g = Gap(
+            id="s0a", step_order=0,
+            field_path="steps[0].action",
+            kind="missing", current_value=None,
+            description="action missing", severity="blocker", metadata={},
         )
         _stamp_spotlight_prov_ids(g, spec)
         assert "spotlight_prov_ids" not in g.metadata

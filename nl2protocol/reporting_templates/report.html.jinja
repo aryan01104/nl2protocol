@@ -261,6 +261,25 @@
     overflow-x: auto;
     color: #1a1a1a;
   }
+  /* Phase 3i (#72): per-line spans inside <pre.code>. Each <span> ends
+     in a literal newline so the <pre> still wraps line-by-line. The
+     spans get [data-script-step="s{idx}"] when their line was emitted
+     by a spec step's command — these participate in the hover-pair
+     handler. Lines with no step tag (prelude — module/labware loads)
+     stay neutral. */
+  pre.code .code-line {
+    display: inline;
+    transition: background 0.12s ease;
+  }
+  pre.code .code-line[data-script-step]:hover,
+  pre.code .code-line.is-script-linked {
+    background: rgba(184, 68, 79, 0.10);
+  }
+  /* Validated-spec block highlight when matching code lines are hovered. */
+  .col-validated-spec .step.is-script-linked {
+    background: rgba(184, 68, 79, 0.06);
+    border-left-color: var(--col-instruction);
+  }
 
   /* ───────── Cite markers in instruction ─────────
      Three cite kinds, three treatments:
@@ -310,12 +329,76 @@
     background: rgba(184, 68, 79, 0.06);
     border-left-color: var(--col-instruction);
   }
+
+  /* ───────── Phase 3h (#68): staggered fade-in for live-mode blocks ─────────
+     Live-mode appendStepBlocks adds .fade-in (opacity 0) to each new
+     step, then schedules .is-visible with a per-index stagger so blocks
+     reveal one-by-one in step order rather than all at once. Static
+     reports never apply .fade-in — the Jinja loop renders blocks
+     without these classes, so archived reports have no opacity tricks. */
+  .step.fade-in {
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+  }
+  .step.fade-in.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ───────── Phase 3i (#72): validated-spec constraint summary banner ─────────
+     Small status block above the validated-spec column's blocks
+     showing what the constraint checker found. Three states:
+     all-clear (green), has-warnings (tan), has-errors (red).
+     Hidden when empty (no event captured yet — typical during early
+     live-mode load). */
+  .validated-summary {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--grid);
+    background: rgba(0, 0, 0, 0.015);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .validated-summary.is-empty { display: none; }
+  .validated-summary-line { color: var(--ink); }
+  .validated-summary-line.all-clear { border-left: 3px solid #4f8a2b; padding-left: 6px; }
+  .validated-summary-line.has-warnings { border-left: 3px solid #b08846; padding-left: 6px; }
+  .validated-summary-line.has-errors { border-left: 3px solid var(--col-instruction); padding-left: 6px; }
+  .validated-summary-warnings {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: var(--dim);
+    font-size: 11px;
+  }
+  .validated-summary-warnings li { margin: 1px 0; }
   span[data-prov-id]:hover,
   span[data-prov-id].prov-active,
   span[data-prov-id].prov-spotlight {
     outline: 1px solid currentColor;
     outline-offset: 1px;
     border-radius: 2px;
+  }
+
+  /* ───────── Phase 3j (#73): gap modal attach arrows ─────────
+     Dotted SVG paths from the gap-prompt modal to each cell the gap
+     is about. Lives in #arrow-overlay alongside the static path's
+     composite-step arrows + resolution arrows; cleared when the
+     modal closes. The "flowing dashes" animation communicates which
+     direction the attachment runs (modal → target). */
+  .modal-attach-arrow {
+    fill: none;
+    stroke: var(--col-instruction);
+    stroke-width: 1.4;
+    stroke-dasharray: 4 3;
+    stroke-linecap: round;
+    opacity: 0.7;
+    animation: modal-attach-flow 0.6s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes modal-attach-flow {
+    to { stroke-dashoffset: -14; }
   }
 
   /* ───────── ADR-0013 Phase 3b-3 (Group C): modal spotlight ─────────
@@ -934,11 +1017,37 @@
        show what changed (labware re-mappings + any constraint clips). -->
   <div class="col col-validated-spec{% if live_mode %} is-pending{% endif %}">
     <h2>Validated Spec</h2>
+    <!-- Phase 3i (#72): constraint-check summary. Static path renders
+         from constraint_summary; live path's JS replaces #validated-summary's
+         content on constraint_check_done. Hidden until populated. -->
+    <div id="validated-summary" class="validated-summary{% if not constraint_summary %} is-empty{% endif %}">
+      {% if constraint_summary %}
+        {% set vc = constraint_summary.violation_count %}
+        {% set wc = constraint_summary.warnings|length %}
+        <div class="validated-summary-line {% if vc > 0 %}has-errors{% elif wc > 0 %}has-warnings{% else %}all-clear{% endif %}">
+          {% if vc > 0 %}
+            <strong style="color: var(--col-instruction);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
+          {% elif wc > 0 %}
+            <strong style="color: #b08846;">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
+          {% else %}
+            <strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated
+          {% endif %}
+        </div>
+        {% if constraint_summary.warnings %}
+          <ul class="validated-summary-warnings">
+            {% for w in constraint_summary.warnings %}
+              <li>{{ w|e }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endif %}
+    </div>
     {% if validated_steps %}
       {% for step in validated_steps %}
         <div class="step {{ step.step_class }}"
              data-step-cited="{{ step.step_cited_text|e }}"
              data-step-palette="{{ step.step_palette_class }}"
+             data-script-step="s{{ loop.index0 }}"
              {% if step.step_reasoning %}data-step-reasoning="{{ step.step_reasoning|e }}"{% endif %}
              data-params-reasoning="{{ step.parameters_reasoning|e }}"
              data-confidence="{{ step.confidence }}">
@@ -957,7 +1066,9 @@
   <!-- ───────── Column 5: Generated Code ───────── -->
   <div class="col col-generated-code{% if live_mode %} is-pending{% endif %}">
     <h2>Generated Python</h2>
-    {% if generated_script %}
+    {% if generated_script_html %}
+      <pre class="code">{{ generated_script_html|safe }}</pre>
+    {% elif generated_script %}
       <pre class="code">{{ generated_script|e }}</pre>
     {% else %}
       <p style="color: var(--dim)">(script-generation stage not reached)</p>
@@ -1017,6 +1128,10 @@
 
   const overlay = document.getElementById("arrow-overlay");
   const tip = document.getElementById("hover-tip");
+  // Phase 3h (#68): trace-once memory for instruction→spec arrows so
+  // re-renders (scroll, resize, etc.) don't re-trigger the trace.
+  const seenArrowIds = new Set();
+  const seenResolutionArrowIds = new Set();
   if (!overlay) return;
 
   // Token-match selector: a span's data-cite-id may carry multiple
@@ -1079,6 +1194,31 @@
       path.setAttribute("d", bezierPath(srcRect, dstRect));
       path.dataset.citeId = id;
       (arrowGroup || overlay).appendChild(path);
+      // Phase 3h (#68): trace-on-first-appearance. The first time we
+      // see an id, animate the path drawing itself from cite to step
+      // by transitioning stroke-dashoffset from path-length to 0.
+      // Subsequent re-renders (scroll, resize, dom mutation) skip the
+      // animation and render the path statically — otherwise the
+      // arrows would re-trace on every event.
+      if (!seenArrowIds.has(id)) {
+        seenArrowIds.add(id);
+        try {
+          const len = path.getTotalLength();
+          if (len > 0) {
+            path.style.strokeDasharray = String(len);
+            path.style.strokeDashoffset = String(len);
+            // Stagger by step index so arrows trace one-by-one in
+            // step order. ID format is "s{idx}-step-trigger".
+            const m = id.match(/^s(\d+)/);
+            const stepIdx = m ? parseInt(m[1], 10) : 0;
+            const delay = stepIdx * 150;
+            setTimeout(() => {
+              path.style.transition = "stroke-dashoffset 0.28s ease-out";
+              path.style.strokeDashoffset = "0";
+            }, delay);
+          }
+        } catch (e) { /* defensive — getTotalLength may not be available */ }
+      }
     });
   }
 
@@ -1323,6 +1463,26 @@
       path.dataset.provId = pid;
       path.dataset.resolutionKind = arrow.resolution_kind;
       group.appendChild(path);
+      // Phase 3h (#68): same trace-once treatment as the step-trigger
+      // arrows. Stagger by step_order so the resolution arrows stream
+      // in alongside the resolved column's blocks rather than all at
+      // once.
+      if (!seenResolutionArrowIds.has(pid)) {
+        seenResolutionArrowIds.add(pid);
+        try {
+          const len = path.getTotalLength();
+          if (len > 0) {
+            path.style.strokeDasharray = String(len);
+            path.style.strokeDashoffset = String(len);
+            const stepIdx = (typeof arrow.step_order === "number") ? arrow.step_order : 0;
+            const delay = stepIdx * 150;
+            setTimeout(() => {
+              path.style.transition = "stroke-dashoffset 0.32s ease-out";
+              path.style.strokeDashoffset = "0";
+            }, delay);
+          }
+        } catch (e) { /* defensive */ }
+      }
     });
   }
 
@@ -1330,6 +1490,40 @@
     requestAnimationFrame(() => {
       renderArrows();
       renderResolutionArrows();
+    });
+  }
+
+  function wireScriptLinkage() {
+    // Phase 3i (#72): hover-pair between Validated Spec blocks and
+    // <pre.code> lines tagged with a matching data-script-step. Both
+    // directions: hovering a step block lights up its emitted lines;
+    // hovering a code line lights up its source step. Idempotent — a
+    // data-linkage-bound flag prevents double-binding when the script
+    // DOM is re-rendered (live mode).
+    function setLinkageActive(stepId, active) {
+      if (!stepId) return;
+      document.querySelectorAll(
+        '.col-validated-spec .step[data-script-step="' + stepId + '"]'
+      ).forEach((el) => el.classList.toggle("is-script-linked", active));
+      document.querySelectorAll(
+        '.code-line[data-script-step="' + stepId + '"]'
+      ).forEach((el) => el.classList.toggle("is-script-linked", active));
+    }
+    document.querySelectorAll(
+      '.col-validated-spec .step[data-script-step]'
+    ).forEach((el) => {
+      if (el.dataset.linkageBound === "1") return;
+      el.dataset.linkageBound = "1";
+      const stepId = el.dataset.scriptStep;
+      el.addEventListener("mouseenter", () => setLinkageActive(stepId, true));
+      el.addEventListener("mouseleave", () => setLinkageActive(stepId, false));
+    });
+    document.querySelectorAll('pre.code .code-line[data-script-step]').forEach((el) => {
+      if (el.dataset.linkageBound === "1") return;
+      el.dataset.linkageBound = "1";
+      const stepId = el.dataset.scriptStep;
+      el.addEventListener("mouseenter", () => setLinkageActive(stepId, true));
+      el.addEventListener("mouseleave", () => setLinkageActive(stepId, false));
     });
   }
 
@@ -1358,6 +1552,7 @@
     renderResolutionArrows();
     wireHover();
     wirePanelToggles();
+    wireScriptLinkage();
     // Re-render on every layout-affecting event so arrows track their anchors.
     window.addEventListener("resize", scheduleRender);
     window.addEventListener("scroll", scheduleRender, { passive: true });
@@ -1469,11 +1664,20 @@
       }
       // Phase 3b-3 (Group C): cross-column spotlight. Orchestrator stamps
       // gap.metadata.spotlight_prov_ids for gaps whose decision touches
-      // anchored cells (today: initial-contents volume gaps). Pulse those
-      // cells while the modal is open so the user sees where in the spec
-      // their answer lands.
+      // anchored cells. Pulse those cells while the modal is open so the
+      // user sees where in the spec their answer lands.
       const spotlight = gap.metadata && gap.metadata.spotlight_prov_ids;
       applySpotlight(spotlight);
+      // Phase 3j (#73): anchor the panel near the first target cell
+      // and draw dotted attach arrows to each. Run after panel is
+      // visible (display:block above) so getBoundingClientRect is
+      // accurate. Falls back to the default bottom-right position
+      // (left untouched) when no targets are onscreen.
+      requestAnimationFrame(() => {
+        if (anchorPanelToTargets(spotlight)) {
+          installAnchorListeners();
+        }
+      });
       // Build the per-gap button row. Mirrors CLI _action_prompt:
       //   - Accept only when a suggestion exists (default action — Enter).
       //   - Edit always shown.
@@ -1602,10 +1806,160 @@
       input.select();
     }
     function hidePanel() {
-      if (panel) panel.style.display = "none";
+      if (panel) {
+        panel.style.display = "none";
+        // Reset any inline anchoring so the next call starts clean.
+        panel.style.left = "";
+        panel.style.top = "";
+        panel.style.right = "";
+        panel.style.bottom = "";
+      }
       activeReq = null;
       removeKeyboardHandler();
       clearSpotlight();
+      clearAttachArrows();
+      removeAnchorListeners();
+    }
+
+    // Phase 3j (#73): anchor the modal near its target cell with dotted
+    // arrows pointing at each spotlighted cell.
+    let activeAnchorTargets = [];
+    function anchorPanelToTargets(provIdsStr) {
+      activeAnchorTargets = [];
+      if (!panel || !provIdsStr) return false;
+      const ids = String(provIdsStr).split(/\s+/).filter(Boolean);
+      ids.forEach((pid) => {
+        const els = document.querySelectorAll(sel("data-prov-id", pid));
+        els.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          // Only anchor to onscreen cells. Off-screen → fall back to
+          // bottom-right (no anchor target chosen).
+          if (r.width === 0 || r.height === 0) return;
+          if (r.bottom < 0 || r.top > window.innerHeight) return;
+          if (r.right < 0 || r.left > window.innerWidth) return;
+          activeAnchorTargets.push(el);
+        });
+      });
+      if (activeAnchorTargets.length === 0) return false;
+      positionPanelNearTarget(activeAnchorTargets[0]);
+      drawAttachArrows();
+      return true;
+    }
+
+    function positionPanelNearTarget(targetEl) {
+      if (!panel || !targetEl) return;
+      const rect = targetEl.getBoundingClientRect();
+      const panelW = 380;   // matches modal CSS width
+      const panelH = panel.offsetHeight || 280;
+      // Pick the side with the most room; prefer right then below.
+      const rightRoom = window.innerWidth - rect.right;
+      const leftRoom = rect.left;
+      const belowRoom = window.innerHeight - rect.bottom;
+      let left, top;
+      const margin = 16;
+      if (rightRoom >= panelW + margin) {
+        left = rect.right + margin;
+        top = Math.max(margin, rect.top - 8);
+      } else if (leftRoom >= panelW + margin) {
+        left = rect.left - panelW - margin;
+        top = Math.max(margin, rect.top - 8);
+      } else if (belowRoom >= panelH + margin) {
+        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
+        top = rect.bottom + margin;
+      } else {
+        // Fall back to above
+        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
+        top = Math.max(margin, rect.top - panelH - margin);
+      }
+      // Clamp top to viewport
+      top = Math.max(margin, Math.min(window.innerHeight - panelH - margin, top));
+      panel.style.left = left + "px";
+      panel.style.top = top + "px";
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+    }
+
+    function clearAttachArrows() {
+      const overlayEl = document.getElementById("arrow-overlay");
+      if (!overlayEl) return;
+      overlayEl.querySelectorAll(".modal-attach-arrow").forEach((p) => p.remove());
+    }
+
+    function drawAttachArrows() {
+      clearAttachArrows();
+      const overlayEl = document.getElementById("arrow-overlay");
+      if (!overlayEl || !panel || activeAnchorTargets.length === 0) return;
+      const panelRect = panel.getBoundingClientRect();
+      // Anchor on the panel's nearest edge to each target.
+      activeAnchorTargets.forEach((targetEl) => {
+        const tRect = targetEl.getBoundingClientRect();
+        if (!tRect.width) return;
+        const tx = tRect.left + tRect.width / 2;
+        const ty = tRect.top + tRect.height / 2;
+        // Choose anchor on panel: midpoint of nearest side.
+        const panelCx = panelRect.left + panelRect.width / 2;
+        const panelCy = panelRect.top + panelRect.height / 2;
+        let px, py;
+        if (tx < panelRect.left) {
+          // target is to the left of panel
+          px = panelRect.left;
+          py = panelCy;
+        } else if (tx > panelRect.right) {
+          px = panelRect.right;
+          py = panelCy;
+        } else if (ty < panelRect.top) {
+          px = panelCx;
+          py = panelRect.top;
+        } else {
+          px = panelCx;
+          py = panelRect.bottom;
+        }
+        // Cubic bezier with horizontal/vertical control points so the
+        // line curves smoothly toward the target.
+        const dx = (tx - px);
+        const dy = (ty - py);
+        const c1x = px + dx * 0.4;
+        const c1y = py;
+        const c2x = px + dx * 0.6;
+        const c2y = ty;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("class", "modal-attach-arrow");
+        path.setAttribute("d", `M${px},${py} C${c1x},${c1y} ${c2x},${c2y} ${tx},${ty}`);
+        overlayEl.appendChild(path);
+      });
+    }
+
+    let anchorScrollHandler = null;
+    let anchorResizeHandler = null;
+    function installAnchorListeners() {
+      removeAnchorListeners();
+      anchorScrollHandler = () => {
+        if (activeAnchorTargets.length > 0) {
+          positionPanelNearTarget(activeAnchorTargets[0]);
+          drawAttachArrows();
+        }
+      };
+      anchorResizeHandler = anchorScrollHandler;
+      window.addEventListener("scroll", anchorScrollHandler, { passive: true });
+      window.addEventListener("resize", anchorResizeHandler);
+      // Spec columns scroll independently — listen on each.
+      document.querySelectorAll(".col").forEach((c) =>
+        c.addEventListener("scroll", anchorScrollHandler, { passive: true })
+      );
+    }
+    function removeAnchorListeners() {
+      if (anchorScrollHandler) {
+        window.removeEventListener("scroll", anchorScrollHandler);
+        document.querySelectorAll(".col").forEach((c) =>
+          c.removeEventListener("scroll", anchorScrollHandler)
+        );
+      }
+      if (anchorResizeHandler) {
+        window.removeEventListener("resize", anchorResizeHandler);
+      }
+      anchorScrollHandler = null;
+      anchorResizeHandler = null;
+      activeAnchorTargets = [];
     }
 
     // Phase 3b-3 (Group C): pulsing outline on cells named in
@@ -1640,21 +1994,31 @@
       // Replace the column's "(stage not reached)" placeholder with
       // step blocks. Mirrors the Jinja loop's HTML structure exactly
       // so all existing CSS + hover JS apply unchanged.
+      // Phase 3h (#68): each new block is staggered. Adds .fade-in
+      // (opacity 0) on append + schedules .is-visible at index*150ms
+      // so blocks reveal one-by-one in step order, not all at once.
       const col = document.querySelector(colSelector);
       if (!col || !stepDicts) return;
       // Drop any "(...) not reached" placeholder paragraph.
       col.querySelectorAll("p").forEach((p) => p.remove());
       // Drop any existing step blocks (so re-runs don't duplicate).
       col.querySelectorAll(".step").forEach((s) => s.remove());
-      stepDicts.forEach((step) => {
+      const STAGGER_MS = 150;
+      const ARROW_TRACE_MS = 280;   // approx duration of arrow trace
+      const isValidatedCol = colSelector.includes("validated");
+      stepDicts.forEach((step, idx) => {
         const div = document.createElement("div");
-        div.className = "step " + (step.step_class || "");
+        div.className = "step fade-in " + (step.step_class || "");
         div.dataset.stepCited = step.step_cited_text || "";
         div.dataset.stepPalette = step.step_palette_class || "";
         if (step.step_reasoning) div.dataset.stepReasoning = step.step_reasoning;
         if (step.parameters_reasoning) div.dataset.paramsReasoning = step.parameters_reasoning;
         if (step.confidence) div.dataset.confidence = step.confidence;
         if (step.step_trigger_prov_id) div.dataset.provId = step.step_trigger_prov_id;
+        // Phase 3i (#72): tag validated-spec blocks with their script
+        // step id so the hover-pair handler can highlight matching
+        // .code-line elements (and vice-versa).
+        if (isValidatedCol) div.dataset.scriptStep = "s" + idx;
         let html = `<div class="step-action">Step ${step.order}: ${escapeHtml(step.action || "")}</div>`;
         (step.detail_lines || []).forEach((line) => {
           html += `<div class="step-detail">${line}</div>`;
@@ -1662,6 +2026,11 @@
         if (step.note_line) html += step.note_line;
         div.innerHTML = html;
         col.appendChild(div);
+        // Stagger the reveal. Block fades in just AFTER the arrow
+        // would finish tracing (so the visual reads as "arrow draws
+        // in, block lands at its destination").
+        const blockDelay = idx * STAGGER_MS + ARROW_TRACE_MS;
+        setTimeout(() => div.classList.add("is-visible"), blockDelay);
       });
       // Re-wire hover handlers so newly-added cells get listeners.
       // The existing wireHover function is idempotent at the listener
@@ -1669,6 +2038,10 @@
       // element are harmless cosmetically; minor memory overhead is
       // acceptable for v1 — Phase 3b-2 can refactor to event delegation).
       try { wireHover(); } catch (e) { /* defensive */ }
+      // Phase 3i (#72): bind the spec→code linkage handlers on newly-
+      // inserted validated-spec blocks. Idempotent (data-linkage-bound
+      // guard inside).
+      try { wireScriptLinkage(); } catch (e) { /* defensive */ }
     }
 
     // ────────── ADR-0013 Phase 3f: initial-contents batch modal ──────────
@@ -2026,6 +2399,38 @@
       updatePanelMeta(panel, rows, "mapping", "mappings");
     }
 
+    function updateValidatedSummary(data) {
+      // Phase 3i (#72): mirror the static-path Jinja render exactly so
+      // the banner reads the same in live + archived reports. Three
+      // states: clean (green), warnings only (tan), errors (red).
+      const banner = document.getElementById("validated-summary");
+      if (!banner || !data) return;
+      const vc = data.violation_count || 0;
+      const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const wc = warnings.length;
+      banner.classList.remove("is-empty");
+      let lineClass, html;
+      if (vc > 0) {
+        lineClass = "has-errors";
+        html = '<strong style="color: var(--col-instruction);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
+      } else if (wc > 0) {
+        lineClass = "has-warnings";
+        html = '<strong style="color: #b08846;">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
+      } else {
+        lineClass = "all-clear";
+        html = '<strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated';
+      }
+      let body = '<div class="validated-summary-line ' + lineClass + '">' + html + '</div>';
+      if (warnings.length > 0) {
+        body += '<ul class="validated-summary-warnings">';
+        warnings.forEach((w) => {
+          body += '<li>' + escapeHtml(String(w)) + '</li>';
+        });
+        body += '</ul>';
+      }
+      banner.innerHTML = body;
+    }
+
     function updateBulkPanels(data) {
       if (!data) return;
       if (Array.isArray(data.lab_state_rows)) {
@@ -2194,18 +2599,29 @@
             updateResolutionArrows(e.data.resolution_arrows);
           }
           break;
+        case "constraint_check_done":
+          updateValidatedSummary(e.data);
+          break;
         case "generated_script":
           revealCol(".col-generated-code");
           // Replace the placeholder paragraph in column 5 with a <pre>.
+          // Prefer server-rendered script_html (Phase 3i — per-line
+          // spans tagged with their step id for hover-pair linkage).
+          // Fall back to plain script text if the html field is missing.
           const codeCol = document.querySelector(".col-generated-code")
                          || document.querySelectorAll(".col")[4];
-          if (codeCol && e.data && e.data.script) {
+          if (codeCol && e.data && (e.data.script_html || e.data.script)) {
             codeCol.querySelectorAll("p").forEach((p) => p.remove());
             codeCol.querySelectorAll("pre.code").forEach((p) => p.remove());
             const pre = document.createElement("pre");
             pre.className = "code";
-            pre.textContent = e.data.script;
+            if (e.data.script_html) {
+              pre.innerHTML = e.data.script_html;
+            } else {
+              pre.textContent = e.data.script;
+            }
             codeCol.appendChild(pre);
+            try { wireScriptLinkage(); } catch (err) { /* defensive */ }
           }
           break;
         case "panel_request":

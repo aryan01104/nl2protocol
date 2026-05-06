@@ -725,6 +725,52 @@ def _labware_mapping_row_target_prov_ids(spec, description: str,
     return matches
 
 
+def _render_script_with_step_tags(script: str, step_line_map: dict) -> str:
+    """Wrap each script line in a <span class="code-line"> tagged with the
+    spec step that produced it, so the Validated Spec ↔ Generated Python
+    hover-pair (#72) can highlight matching lines on either side.
+
+    Pre:    `script` is the raw \\n-joined script string returned by
+            `generate_python_script`. `step_line_map` is the
+            {step_idx: [line_idx, ...]} dict from the same call. Lines
+            not in any step's list (prelude — module/labware/pipette
+            loads, blank separators) get a span with no step tag.
+    Post:   Returns the inner HTML for `<pre class="code">`. Each line
+            is a `<span class="code-line"[data-script-step="s{idx}"]>...</span>`
+            ending in `\\n` so the <pre> still renders the script as
+            multi-line text. HTML-escaped per line. Empty input → empty
+            string.
+
+    Static reports + the live-mode generated_script event both consume
+    this helper so the spec→code linkage shape is identical across paths.
+    """
+    import html as _html
+    if not script:
+        return ""
+    # Invert step_line_map → {line_idx: step_idx}
+    line_to_step: dict = {}
+    for step_idx, line_idxs in (step_line_map or {}).items():
+        # JSON keys are strings after serialization; coerce to int.
+        try:
+            si = int(step_idx)
+        except (TypeError, ValueError):
+            continue
+        for li in line_idxs or []:
+            try:
+                line_to_step[int(li)] = si
+            except (TypeError, ValueError):
+                continue
+    out = []
+    for li, line in enumerate(script.split("\n")):
+        escaped = _html.escape(line)
+        if li in line_to_step:
+            tag = f' data-script-step="s{line_to_step[li]}"'
+            out.append(f'<span class="code-line"{tag}>{escaped}</span>')
+        else:
+            out.append(f'<span class="code-line">{escaped}</span>')
+    return "\n".join(out)
+
+
 def _collect_lab_state_rows(spec) -> list:
     """Walk spec.initial_contents and prefilled_labware; return one row
     per pre-run lab-state entry the user should see audited.
@@ -1083,6 +1129,18 @@ class HTMLReporter(CapturingReporter):
         resolved_spec_event = self.first_of_kind("resolved_spec")
         completed_spec_event = self.first_of_kind("completed_spec")
         script_event = self.first_of_kind("generated_script")
+        # Phase 3i (#72): summary banner above the validated-spec column
+        # showing what the constraint checker found. Mirrors what live
+        # mode displays via JS on constraint_check_done; static path
+        # captures the same event from the buffered list.
+        constraint_event = self.first_of_kind("constraint_check_done")
+        constraint_summary = None
+        if constraint_event is not None:
+            cdata = constraint_event.data or {}
+            constraint_summary = {
+                "violation_count": cdata.get("violation_count", 0),
+                "warnings": list(cdata.get("warnings", [])),
+            }
 
         instruction = (instruction_event.data.get("instruction", "")
                        if instruction_event else "")
@@ -1116,6 +1174,14 @@ class HTMLReporter(CapturingReporter):
 
         generated_script = (script_event.data.get("script", "")
                             if script_event else "")
+        # Phase 3i (#72): step→script-line map for the hover-pair
+        # linkage between Validated Spec blocks and script lines.
+        # Empty dict when no script_event captured.
+        script_step_line_map = (script_event.data.get("step_line_map", {})
+                                 if script_event else {})
+        generated_script_html = _render_script_with_step_tags(
+            generated_script, script_step_line_map,
+        )
 
         success = bool(script_event)  # if we got to script generation, the run succeeded
 
@@ -1151,6 +1217,9 @@ class HTMLReporter(CapturingReporter):
             resolution_arrows_json=resolution_arrows_json,
             lab_state_rows=lab_state_rows,
             labware_mapping_rows=labware_mapping_rows,
+            constraint_summary=constraint_summary,
+            script_step_line_map=script_step_line_map,
+            generated_script_html=generated_script_html,
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
 

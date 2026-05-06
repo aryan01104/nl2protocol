@@ -385,6 +385,9 @@ class LiveModeApp:
             resolution_arrows_json="[]",
             lab_state_rows=[],
             labware_mapping_rows=[],
+            constraint_summary=None,
+            script_step_line_map={},
+            generated_script_html="",
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             live_mode=True,
         )
@@ -474,6 +477,22 @@ class LiveModeApp:
                     from nl2protocol.reporting import _collect_resolution_arrows
                     data["resolution_arrows"] = _collect_resolution_arrows(
                         self._gap_resolved_events,
+                    )
+                except Exception:
+                    pass
+            elif event.kind == "generated_script":
+                # Phase 3i (#72): pre-render the script-with-step-tags
+                # HTML so the browser can drop it into col 5 directly,
+                # same shape the static path produces.
+                data = _safe_data(event.data) or {}
+                if not isinstance(data, dict):
+                    data = {"_raw": data}
+                try:
+                    from nl2protocol.reporting import _render_script_with_step_tags
+                    raw_script = data.get("script", "") if isinstance(data, dict) else ""
+                    raw_map = data.get("step_line_map", {}) if isinstance(data, dict) else {}
+                    data["script_html"] = _render_script_with_step_tags(
+                        raw_script, raw_map,
                     )
                 except Exception:
                     pass
