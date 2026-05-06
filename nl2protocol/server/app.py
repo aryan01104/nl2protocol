@@ -38,6 +38,8 @@ from nl2protocol.server.handlers import (
     HTMLAssignmentsHandler,
     HTMLBinaryConfirmHandler,
     HTMLConfirmationHandler,
+    HTMLInitialContentsHandler,
+    InitialContentsConfirmation,
     PendingRequest,
 )
 from nl2protocol.server.reporter import (
@@ -248,6 +250,8 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
     try:
         from nl2protocol.reporting import (
             _collect_arrow_targets,
+            _collect_lab_state_rows,
+            _collect_labware_mapping_rows,
             _render_instruction_with_marks,
             _step_to_render_dict,
         )
@@ -264,6 +268,16 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
             out["instruction_html"] = _render_instruction_with_marks(
                 instruction, arrow_targets,
             )
+        # Phase 3b-3 (Group C): bulk panels populate live. The static
+        # path's helpers compute the same rows the Jinja template
+        # iterates — return them in the same shape so the browser can
+        # rebuild the panel tables on each spec snapshot. ProtocolSpec
+        # carries initial_contents + prefilled_labware on every event,
+        # so all three spec events (extracted/resolved/completed) drive
+        # an updated panel; the user sees the lab state evolving as the
+        # orchestrator fills in initial-contents volumes.
+        out["lab_state_rows"] = _collect_lab_state_rows(spec)
+        out["labware_mapping_rows"] = _collect_labware_mapping_rows(spec)
         return out
     except Exception:
         return _safe_data(raw_data)
@@ -330,6 +344,10 @@ class LiveModeApp:
         # Phase 3e: stand-alone Y/N prompts (source containers,
         # hardware-error proceed). Same dict-by-rid pattern.
         self._pending_binary_confirms: Dict[str, BinaryConfirmation] = {}
+        # Phase 3f: batched initial-contents volume confirmation
+        # (replaces N per-Gap modals during gap resolution). Same
+        # dict-by-rid pattern.
+        self._pending_initial_contents: Dict[str, InitialContentsConfirmation] = {}
         self._setup_routes()
 
     def _render_live_page(self) -> str:
@@ -516,6 +534,11 @@ class LiveModeApp:
                 if pending_bc is None:
                     continue
                 pending_bc.set_response(action)
+            elif kind == "initial_contents_response":
+                pending_ic = self._pending_initial_contents.get(rid)
+                if pending_ic is None:
+                    continue
+                pending_ic.set_response(action, msg.get("volumes"))
 
     def _replay_pending_requests(self) -> None:
         """When the browser reconnects mid-run, re-emit a panel_request
@@ -539,6 +562,18 @@ class LiveModeApp:
                 "gap": _serialize_gap(pending.gap),
                 "suggestion": _serialize_suggestion(pending.suggestion),
             })
+
+    def _send_initial_contents_request(self, payload: Dict[str, Any]) -> None:
+        """Push an initial_contents_request envelope onto the outbound queue."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="initial_contents_request",
+                data=payload,
+                stage_name="stage_2_5_initial_contents",
+            ))
+        except queue.Full:
+            pass
 
     def _send_binary_confirm_request(self, payload: Dict[str, Any]) -> None:
         """Push a binary_confirm_request envelope onto the outbound queue."""
@@ -631,6 +666,11 @@ class LiveModeApp:
             pending_confirms=self._pending_binary_confirms,
             timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         )
+        initial_contents_handler = HTMLInitialContentsHandler(
+            send_request=self._send_initial_contents_request,
+            pending_initial_contents=self._pending_initial_contents,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
 
         try:
             agent = ProtocolAgent(
@@ -640,6 +680,7 @@ class LiveModeApp:
                 confirmation_handler=confirmation_handler,
                 assignments_handler=assignments_handler,
                 binary_confirm_handler=binary_confirm_handler,
+                initial_contents_handler=initial_contents_handler,
             )
             agent.run_pipeline(instruction)
         except Exception as e:

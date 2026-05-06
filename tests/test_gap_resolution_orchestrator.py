@@ -298,6 +298,71 @@ class TestAutoAccept:
         seen_gap, _ = handler.calls[0]
         assert "reviewer_objection" not in seen_gap.metadata
 
+    def test_initial_contents_gap_gets_spotlight_prov_ids_stamped(self):
+        # Phase 3b-3 (Group C): for initial-contents gaps, the orchestrator
+        # stamps gap.metadata["spotlight_prov_ids"] with the prov-ids of
+        # every spec cell that references the underlying labware/well, so
+        # the modal can pulse those cells while the user decides.
+        from types import SimpleNamespace as _NS
+        from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
+
+        # Minimal fake spec: one step whose source references a labware/well
+        # that matches initial_contents[0].
+        spec = _NS(
+            initial_contents=[
+                _NS(labware="tube rack", well="A1", volume_ul=None,
+                    substance="sample"),
+            ],
+            steps=[
+                _NS(
+                    source=_NS(resolved_label="tube rack",
+                                description="tube rack",
+                                well="A1", wells=None, well_range=None),
+                    destination=None,
+                ),
+            ],
+        )
+        g = Gap(
+            id="ic0", step_order=None,
+            field_path="initial_contents[0].volume_ul",
+            kind="missing", current_value=None,
+            description="vol missing", severity="blocker", metadata={},
+        )
+        _stamp_spotlight_prov_ids(g, spec)
+        assert "s0-source" in g.metadata.get("spotlight_prov_ids", "")
+
+    def test_non_initial_contents_gap_no_spotlight(self):
+        # Defensive: spotlight stamping must not fire on gap shapes that
+        # don't carry a labware/well anchor (steps[N].volume etc).
+        from types import SimpleNamespace as _NS
+        from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
+
+        spec = _NS(initial_contents=[], steps=[])
+        g = Gap(
+            id="s0v", step_order=0,
+            field_path="steps[0].volume",
+            kind="missing", current_value=None,
+            description="vol missing", severity="blocker", metadata={},
+        )
+        _stamp_spotlight_prov_ids(g, spec)
+        assert "spotlight_prov_ids" not in g.metadata
+
+    def test_spotlight_helper_gracefully_handles_oob_index(self):
+        # Defensive: malformed gap (index past initial_contents length)
+        # should no-op, not crash. UX hint, not load-bearing.
+        from types import SimpleNamespace as _NS
+        from nl2protocol.gap_resolution.orchestrator import _stamp_spotlight_prov_ids
+
+        spec = _NS(initial_contents=[], steps=[])
+        g = Gap(
+            id="ic9", step_order=None,
+            field_path="initial_contents[9].volume_ul",
+            kind="missing", current_value=None,
+            description="vol missing", severity="blocker", metadata={},
+        )
+        _stamp_spotlight_prov_ids(g, spec)
+        assert "spotlight_prov_ids" not in g.metadata
+
     def test_no_reviewer_means_no_objection_metadata(self):
         # Defensive: when no reviewer is configured, nothing should land
         # in gap.metadata under reviewer_objection. The orchestrator's

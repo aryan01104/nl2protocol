@@ -242,6 +242,118 @@ class HTMLAssignmentsHandler:
         return confirmation.confirmed
 
 
+class InitialContentsConfirmation:
+    """Coordination primitive for one in-flight initial-contents
+    batch confirmation. Same shape as AssignmentsConfirmation, but
+    confirmed values are floats (volumes in µL) rather than strings
+    (config labels).
+
+    Pre:    Constructed before the labware_initial_contents_request
+            envelope is sent. Owning handler stores it on a slot the
+            WS receiver can read.
+    Post:   `set_response(action, volumes)` populates `confirmed`
+            (None on abort) and signals the event. `volumes` is a list
+            of dicts `{labware, well, volume_ul}` keyed by their
+            position in the table; the pipeline applies them to
+            spec.initial_contents by matching (labware, well) tuples.
+    """
+
+    def __init__(self):
+        self.event = threading.Event()
+        self.confirmed: Optional[list] = None   # list of {labware, well, volume_ul}
+        self.aborted: bool = False
+
+    def set_response(self, action: str,
+                      volumes: Optional[list]) -> None:
+        """Map browser response onto confirmation slots and signal.
+
+        Pre:    `action` is "confirm" or "abort". For "confirm",
+                `volumes` is a list of dicts the browser computed from
+                the modal table's row state.
+        Post:   On "abort", `aborted=True` and `confirmed=None`.
+                On "confirm", `confirmed=volumes` (may be empty list).
+                `event` is set last so the waiter sees fully-populated
+                slots.
+        """
+        if action == "abort":
+            self.aborted = True
+            self.confirmed = None
+        else:
+            self.aborted = False
+            self.confirmed = list(volumes or [])
+        self.event.set()
+
+
+class HTMLInitialContentsHandler:
+    """Browser-bridged handler for batched initial-contents volume
+    confirmation (ADR-0013 Phase 3f / Group D). Replaces N per-Gap
+    modals during gap resolution with one table modal where the user
+    accepts or edits all volumes at once.
+
+    Pre:    `send_request` is a callable that pushes the
+            initial_contents_request payload onto the outbound queue.
+            `pending_initial_contents` is the dict the WS receiver
+            writes responses into.
+
+    Post:   Each `confirm(table)` call:
+              - Generates a request_id.
+              - Stores an InitialContentsConfirmation on the slot.
+              - Pushes the payload (rows: labware, well, substance,
+                current_volume_ul, suggested_volume_ul).
+              - Blocks on the InitialContentsConfirmation's event.
+              - Returns the confirmed list (None on abort/timeout).
+            Empty input table short-circuits — no modal pop, returns
+            empty list immediately.
+    """
+
+    def __init__(
+        self,
+        send_request: Callable[[Dict[str, Any]], None],
+        pending_initial_contents: Dict[str, "InitialContentsConfirmation"],
+        timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    ):
+        self._send = send_request
+        self._pending = pending_initial_contents
+        self._timeout = timeout_seconds
+        self._counter = 0
+        self._lock = threading.Lock()
+
+    def _next_request_id(self) -> str:
+        with self._lock:
+            self._counter += 1
+            return f"ic-{self._counter}"
+
+    def confirm(self, table: list) -> Optional[list]:
+        """Send the IC table to the browser and block until the user
+        confirms or aborts.
+
+        Pre:    `table` is a list of dicts: each carries
+                `{labware, well, substance, current_volume_ul,
+                  suggested_volume_ul}`. Empty table → no-op.
+        Post:   Returns list of `{labware, well, volume_ul}` on
+                confirm, or None on abort/timeout. Empty list when the
+                input table was empty.
+        """
+        if not table:
+            return []
+        rid = self._next_request_id()
+        confirmation = InitialContentsConfirmation()
+        self._pending[rid] = confirmation
+        try:
+            self._send({
+                "request_id": rid,
+                "rows": table,
+            })
+            signaled = confirmation.event.wait(timeout=self._timeout)
+        finally:
+            self._pending.pop(rid, None)
+        if not signaled:
+            return None
+        if confirmation.aborted:
+            return None
+        return confirmation.confirmed
+
+
 class BinaryConfirmation:
     """Coordination primitive for one in-flight binary (yes/no)
     confirmation. Shared with HTMLBinaryConfirmHandler the same way

@@ -879,16 +879,26 @@ class TestADR0011Phase2cBulkPanels:
         assert "(no initial-state entries)" in rendered
         assert "(no labware references)" in rendered
 
-    def test_panels_rendered_below_grid(self, tmp_path):
+    def test_panels_rendered_above_grid(self, tmp_path):
+        # Group C revision (ADR-0013 Phase 3b-3 follow-up): panels moved
+        # ABOVE the 5-column grid as collapsible bar-boxes. Lab state +
+        # labware-mapping show pre-grid state (what the user is pre-filling
+        # and what config the resolver picked), so they belong before the
+        # transformation chain visually too.
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # The panels section appears AFTER the column grid in document order.
-        grid_idx = rendered.index('<div class="grid">')
+        # Phase 3g (Group B): grid now also carries .cols-N (initial col
+        # count) — class list looks like `class="grid cols-5"` in static.
+        # Use a class-attribute regex so the test isn't fragile to that.
+        import re as _re
+        m = _re.search(r'<div class="grid[^"]*">', rendered)
+        assert m is not None
+        grid_idx = m.start()
         panels_idx = rendered.index('<section class="panels">')
-        assert panels_idx > grid_idx
+        assert panels_idx < grid_idx
 
 
 class TestADR0011Phase4RowHover:

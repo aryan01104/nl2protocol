@@ -217,6 +217,12 @@ class Orchestrator:
             self._emit("gap_iteration_start",
                        {"iteration": i, "gap_count": len(gaps)},
                        stage_name="stage_3_gap_resolver")
+            # Phase 3g (Group B): plain-language sub-line for the live
+            # indicator. "iteration N — detecting gaps" reads as the
+            # micro-action the user sees while we run the loop.
+            self._emit("pipeline_progress",
+                       {"message": f"iteration {i} — detected {len(gaps)} gaps"},
+                       stage_name="stage_3_gap_resolver")
 
             iter_result = IterationResult(iteration=i)
             iterations.append(iter_result)
@@ -238,6 +244,9 @@ class Orchestrator:
                 }, stage_name="stage_3_gap_resolver")
 
             # SUGGEST: try suggesters in registry order; first non-None wins.
+            self._emit("pipeline_progress",
+                       {"message": f"iteration {i} — running suggesters"},
+                       stage_name="stage_3_gap_resolver")
             suggestions: dict = {}
             for gap in gaps:
                 suggestions[gap.id] = self._first_suggestion(gap, spec, context)
@@ -249,6 +258,13 @@ class Orchestrator:
             # stamp; real ProtocolSpec instances always have `.steps`.
             reviews: dict = {}
             if self._reviewer is not None:
+                review_count = sum(1 for s in suggestions.values()
+                                    if s is not None
+                                    and getattr(s, "provenance_source", "") in ("inferred", "domain_default"))
+                if review_count > 0:
+                    self._emit("pipeline_progress",
+                               {"message": f"iteration {i} — Haiku auditing {review_count} suggestions"},
+                               stage_name="stage_3_gap_resolver")
                 reviews = self._reviewer.review(spec, context)
                 if hasattr(spec, "steps"):
                     stamp_reviewer_verdicts(spec, reviews)
@@ -285,6 +301,15 @@ class Orchestrator:
                 if review is not None and getattr(review, "objection", None):
                     gap.metadata["reviewer_objection"] = review.objection
 
+                # Phase 3b-3 (Group C): cross-column spotlight. For
+                # initial-contents gaps, look up the underlying labware
+                # + well and stamp the prov-ids of every spec cell that
+                # references them. The HTML modal reads this out of
+                # gap.metadata and pulses those cells while the prompt
+                # is open, anchoring the user's attention to the place
+                # in the spec their decision affects.
+                _stamp_spotlight_prov_ids(gap, spec)
+
                 # Present to user.
                 resolution = self._handler.present(gap, suggestion)
                 iter_result.records.append(GapResolutionRecord(
@@ -318,6 +343,9 @@ class Orchestrator:
                 "remaining": len(gaps) - resolved_in_iteration,
                 "aborted": False,
             }, stage_name="stage_3_gap_resolver")
+            self._emit("pipeline_progress",
+                       {"message": f"iteration {i} — applied {resolved_in_iteration} fixes"},
+                       stage_name="stage_3_gap_resolver")
 
         # Hit iteration cap without converging.
         # Final detect to know if anything remains.
@@ -490,6 +518,50 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
 # ============================================================================
 # Default apply_resolution callback for the spec
 # ============================================================================
+
+def _stamp_spotlight_prov_ids(gap: Gap, spec) -> None:
+    """For gaps whose decision affects a cross-column anchor (today:
+    initial-contents volume gaps), stamp the prov-ids of every spec cell
+    that references the underlying (labware, well) onto
+    `gap.metadata["spotlight_prov_ids"]`.
+
+    The HTML modal reads this out and pulses those cells (.prov-spotlight
+    class) while the prompt is open. Static-CLI runs ignore the metadata
+    — no rendering surface for it.
+
+    Pre:    `gap` is the gap about to be presented to the user.
+            `gap.metadata` is the mutable dict on the (frozen) gap.
+            `spec` is the current ProtocolSpec.
+    Post:   When `gap.field_path` matches `initial_contents[N].volume_ul`
+            AND `spec.initial_contents[N]` is reachable AND any spec cell
+            references that (labware, well), `gap.metadata["spotlight_prov_ids"]`
+            holds a space-separated string of "s{step_idx}-{role}" prov-ids.
+            On any structural mismatch the helper is a silent no-op (it
+            shouldn't break the resolution flow if the spec shape drifts).
+    """
+    import re as _re
+    field_path = getattr(gap, "field_path", "") or ""
+    m = _re.match(r"initial_contents\[(\d+)\]", field_path)
+    if not m:
+        return
+    try:
+        from nl2protocol.reporting import _lab_state_row_target_prov_ids
+        idx = int(m.group(1))
+        ic_list = getattr(spec, "initial_contents", None) or []
+        if idx >= len(ic_list):
+            return
+        ic = ic_list[idx]
+        labware = getattr(ic, "labware", None)
+        well = getattr(ic, "well", None)
+        if not labware:
+            return
+        pids = _lab_state_row_target_prov_ids(spec, labware, well or "")
+        if pids:
+            gap.metadata["spotlight_prov_ids"] = " ".join(pids)
+    except Exception:
+        # Defensive: this is a UX hint, not a load-bearing decision.
+        return
+
 
 def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
     """Stamp `field_obj.provenance.review_status = user_action_provenance`,

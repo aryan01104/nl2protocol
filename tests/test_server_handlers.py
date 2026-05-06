@@ -26,6 +26,8 @@ from nl2protocol.server.handlers import (
     HTMLAssignmentsHandler,
     HTMLBinaryConfirmHandler,
     HTMLConfirmationHandler,
+    HTMLInitialContentsHandler,
+    InitialContentsConfirmation,
     PendingRequest,
 )
 
@@ -574,4 +576,120 @@ class TestHTMLBinaryConfirmHandlerConfirm:
         )
         result = h.confirm("Are you sure", ["x"])
         assert result is False
+        assert pending == {}
+
+
+# ============================================================================
+# InitialContentsConfirmation + HTMLInitialContentsHandler (Phase 3f)
+# ============================================================================
+
+class TestInitialContentsConfirmationActionMapping:
+    """Receiver writes the confirmed list (or aborted flag) onto the
+    primitive; pipeline thread reads either off the same instance."""
+
+    def test_confirm_stores_volumes_list(self):
+        ic = InitialContentsConfirmation()
+        ic.set_response("confirm", [
+            {"labware": "tube rack", "well": "A1", "volume_ul": 100.0},
+            {"labware": "reservoir", "well": "A1", "volume_ul": 5000.0},
+        ])
+        assert ic.aborted is False
+        assert ic.confirmed == [
+            {"labware": "tube rack", "well": "A1", "volume_ul": 100.0},
+            {"labware": "reservoir", "well": "A1", "volume_ul": 5000.0},
+        ]
+        assert ic.event.is_set()
+
+    def test_abort_clears_confirmed_and_sets_aborted(self):
+        ic = InitialContentsConfirmation()
+        ic.set_response("abort", None)
+        assert ic.aborted is True
+        assert ic.confirmed is None
+        assert ic.event.is_set()
+
+    def test_confirm_with_none_volumes_yields_empty_list(self):
+        # Defensive: malformed payload → treat as "confirmed empty".
+        ic = InitialContentsConfirmation()
+        ic.set_response("confirm", None)
+        assert ic.aborted is False
+        assert ic.confirmed == []
+
+
+class TestHTMLInitialContentsHandlerConfirm:
+    """confirm(table) blocks until the receiver fills the slot; returns
+    confirmed list (None on abort/timeout). Empty input table short-
+    circuits without touching the queue."""
+
+    def test_confirm_pushes_payload_via_send_callable(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, InitialContentsConfirmation] = {}
+        h = HTMLInitialContentsHandler(
+            send_request=sent.append,
+            pending_initial_contents=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("confirm", [
+                {"labware": "tube rack", "well": "A1", "volume_ul": 100.0},
+            ])
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"labware": "tube rack", "well": "A1", "substance": "sample",
+             "current_volume_ul": None, "suggested_volume_ul": 100.0},
+        ])
+        assert len(sent) == 1
+        assert sent[0]["rows"][0]["labware"] == "tube rack"
+        assert result == [
+            {"labware": "tube rack", "well": "A1", "volume_ul": 100.0},
+        ]
+
+    def test_confirm_returns_none_on_abort(self):
+        pending: Dict[str, InitialContentsConfirmation] = {}
+        h = HTMLInitialContentsHandler(
+            send_request=lambda _: None,
+            pending_initial_contents=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("abort", None)
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"labware": "x", "well": "A1", "substance": "y",
+             "current_volume_ul": None, "suggested_volume_ul": 10.0},
+        ])
+        assert result is None
+
+    def test_empty_table_short_circuits_without_pushing(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, InitialContentsConfirmation] = {}
+        h = HTMLInitialContentsHandler(
+            send_request=sent.append,
+            pending_initial_contents=pending,
+            timeout_seconds=2,
+        )
+        result = h.confirm([])
+        assert result == []
+        assert sent == []
+        assert pending == {}
+
+    def test_confirm_returns_none_on_timeout(self):
+        pending: Dict[str, InitialContentsConfirmation] = {}
+        h = HTMLInitialContentsHandler(
+            send_request=lambda _: None,
+            pending_initial_contents=pending,
+            timeout_seconds=0.05,
+        )
+        result = h.confirm([
+            {"labware": "x", "well": "A1", "substance": "y",
+             "current_volume_ul": None, "suggested_volume_ul": 10.0},
+        ])
+        assert result is None
         assert pending == {}
