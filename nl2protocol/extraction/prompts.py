@@ -38,14 +38,33 @@ PROVENANCE — every value you extract MUST have a provenance object:
   NOTE: do NOT use "config" — you do not have access to the lab config at this stage;
   config-derived values are filled in by a later resolution stage.
 
-  THIS APPLIES TO LOCATION REFS TOO: every populated source/destination LocationRef
-  MUST carry a provenance object. If the wells were derived from a prior step (e.g.
-  "Mix each tube" inheriting B1-B4 from the previous transfer), use
-  source="instruction" and cite the substring that names those wells in the
-  instruction (e.g. "B1-B4"). If you genuinely inferred wells from context with no
-  cite available, use source="inferred" with positive_reasoning + why_not_in_instruction.
-  NEVER leave provenance=null on a populated LocationRef — the visualization relies
-  on it for traceability.
+  LOCATION REFS CARRY TWO PROVENANCES: every populated source/destination
+  LocationRef MUST carry BOTH `description_provenance` (about the labware
+  label) AND `wells_provenance` (about the well positions). They are
+  separate because the labware label and the wells are usually grounded
+  in different parts of the instruction (e.g. labware named once in
+  step 1, wells named per-step thereafter).
+
+    description_provenance:
+      REQUIRED on every populated LocationRef. Use source="instruction"
+      with cited_text naming the labware (e.g. "tube rack") when the
+      instruction names it at this step's clause. Use source="inferred"
+      with positive_reasoning explaining the connection and
+      why_not_in_instruction explaining what's missing at this clause
+      when the labware is implicit (e.g. inherited from a prior step).
+
+    wells_provenance:
+      REQUIRED when any of well/wells/well_range is populated; OMIT when
+      the ref is labware-only (e.g. a temperature module referenced by
+      name with no well). Use source="instruction" with cited_text
+      naming the wells (e.g. "A1", "B1-B4", "column 2") when the
+      instruction states them at this clause. Use source="inferred"
+      with reasoning when wells are derived from a prior step (e.g.
+      "Mix each tube" inheriting from the previous transfer's wells).
+
+  NEVER leave description_provenance=null on a populated LocationRef —
+  the visualization relies on it for traceability. NEVER leave
+  wells_provenance=null when wells are populated — the schema rejects.
 
   WHICH FIELDS YOU OWE BY SOURCE:
     source = "instruction"     → cited_text REQUIRED;

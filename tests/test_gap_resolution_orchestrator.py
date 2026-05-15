@@ -642,11 +642,11 @@ def _real_spec():
         ),
         source=LocationRef(
             description="src", well="A1",
-            provenance=_inferred_prov("config lookup", "instruction omits source"),
+            description_provenance=_inferred_prov("config lookup", "instruction omits source"), wells_provenance=_inferred_prov("config lookup", "instruction omits source"),
         ),
         destination=LocationRef(
             description="dst", well="B1",
-            provenance=_inferred_prov("dest from context", "instruction omits dest"),
+            description_provenance=_inferred_prov("dest from context", "instruction omits dest"), wells_provenance=_inferred_prov("dest from context", "instruction omits dest"),
         ),
         composition_provenance=comp,
     )
@@ -681,9 +681,11 @@ class TestStampReviewerVerdicts:
             ),
         }
         stamp_reviewer_verdicts(spec, reviews)
-        prov = spec.steps[0].source.provenance
+        prov = spec.steps[0].source.description_provenance
         assert prov.review_status == "reviewed_disagree"
         assert prov.reviewer_objection == "instruction line 3 names this source verbatim"
+        # The verdict propagates to both LocationRef slots.
+        assert spec.steps[0].source.wells_provenance.review_status == "reviewed_disagree"
 
     def test_disagreement_on_positive_also_stamps_disagree(self):
         # Either-claim disagreement → reviewed_disagree (not just both-disagree).
@@ -710,14 +712,18 @@ class TestStampReviewerVerdicts:
         }
         stamp_reviewer_verdicts(spec, reviews)
         assert spec.steps[0].volume.provenance.review_status == "reviewed_agree"
-        assert spec.steps[0].source.provenance.review_status == "original"
-        assert spec.steps[0].destination.provenance.review_status == "original"
+        assert spec.steps[0].source.description_provenance.review_status == "original"
+        assert spec.steps[0].destination.description_provenance.review_status == "original"
 
     def test_empty_reviews_leaves_spec_untouched(self):
         spec = _real_spec()
         stamp_reviewer_verdicts(spec, reviews={})
-        for fname in ("volume", "source", "destination"):
-            assert getattr(spec.steps[0], fname).provenance.review_status == "original"
+        assert spec.steps[0].volume.provenance.review_status == "original"
+        for fname in ("source", "destination"):
+            ref = getattr(spec.steps[0], fname)
+            assert ref.description_provenance.review_status == "original"
+            if ref.wells_provenance:
+                assert ref.wells_provenance.review_status == "original"
 
     def test_orchestrator_wires_stamp_after_review(self):
         # Wire-level test: the orchestrator's run() invokes stamp after the
@@ -775,7 +781,12 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.models.spec import LocationRef, Provenance
         return LocationRef(
             description="config-found", well=well,
-            provenance=Provenance(
+            description_provenance=Provenance(
+                source="inferred",
+                positive_reasoning="config lookup",
+                why_not_in_instruction="instruction omits source",
+                confidence=0.9,
+            ), wells_provenance=Provenance(
                 source="inferred",
                 positive_reasoning="config lookup",
                 why_not_in_instruction="instruction omits source",
@@ -854,7 +865,9 @@ class TestDefaultApplyStampsUserAction:
                          user_action_provenance="user_edited")
         default_apply_resolution(spec, g, res, suggestion=None)
         assert spec.steps[0].destination.wells == new_wells
-        assert spec.steps[0].destination.provenance.review_status == "user_edited"
+        # User edit on a LocationRef stamps both provenance slots.
+        assert spec.steps[0].destination.description_provenance.review_status == "user_edited"
+        assert spec.steps[0].destination.wells_provenance.review_status == "user_edited"
 
     def test_initial_contents_volume_writes_float_no_provenance_changes(self):
         # initial_contents.volume_ul has no Provenance — the apply just
@@ -920,13 +933,13 @@ def _real_spec_with_resolution_provenance():
         source=LocationRef(
             description="rack", well="A1",
             resolved_label="sample_rack",
-            provenance=instr_prov,
+            description_provenance=instr_prov, wells_provenance=instr_prov,
             resolved_label_provenance=res_prov,
         ),
         destination=LocationRef(
             description="rack", well="B1",
             resolved_label="sample_rack",
-            provenance=instr_prov,
+            description_provenance=instr_prov, wells_provenance=instr_prov,
             resolved_label_provenance=res_prov,
         ),
         composition_provenance=comp,
@@ -953,7 +966,7 @@ class TestApplyResolutionForResolvedLabel:
         rprov = spec.steps[0].source.resolved_label_provenance
         assert rprov.review_status == "user_accepted_suggestion"
         # Primary provenance is NOT touched (it's about the location, not the resolution)
-        assert spec.steps[0].source.provenance.review_status == "original"
+        assert spec.steps[0].source.description_provenance.review_status == "original"
 
     def test_user_pick_when_no_prior_resolution_provenance(self):
         # If the resolver didn't run (no resolved_label_provenance set),
@@ -973,9 +986,9 @@ class TestApplyResolutionForResolvedLabel:
             volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
                                       provenance=instr_prov),
             source=LocationRef(description="rack", well="A1",
-                                provenance=instr_prov),
+                                description_provenance=instr_prov, wells_provenance=instr_prov),
             destination=LocationRef(description="plate", well="B1",
-                                     provenance=instr_prov),
+                                     description_provenance=instr_prov, wells_provenance=instr_prov),
             composition_provenance=comp,
         )])
         g = gap("g1", field_path="steps[0].source.resolved_label")
@@ -1006,7 +1019,7 @@ class TestStampReviewerVerdictsForResolvedLabel:
         rprov = spec.steps[0].source.resolved_label_provenance
         assert rprov.review_status == "reviewed_agree"
         # Primary provenance untouched.
-        assert spec.steps[0].source.provenance.review_status == "original"
+        assert spec.steps[0].source.description_provenance.review_status == "original"
 
     def test_disagreement_stamps_resolved_label_provenance_with_objection(self):
         spec = _real_spec_with_resolution_provenance()
@@ -1254,14 +1267,14 @@ class TestReviewerCollectsResolutionClaims:
             source=LocationRef(
                 description="rack", well="A1",
                 resolved_label="sample_rack",
-                provenance=instr_prov,
+                description_provenance=instr_prov, wells_provenance=instr_prov,
                 resolved_label_provenance=Provenance(
                     source="instruction", cited_text="sample_rack", confidence=1.0,
                 ),
             ),
             destination=LocationRef(
                 description="plate", well="B1",
-                provenance=instr_prov,
+                description_provenance=instr_prov, wells_provenance=instr_prov,
             ),
             composition_provenance=comp,
         )])
@@ -1307,9 +1320,9 @@ class TestADR0012FabricationOverride:
             volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
                                       provenance=instr_prov),
             source=LocationRef(description="rack", well="A1",
-                                provenance=instr_prov),
+                                description_provenance=instr_prov, wells_provenance=instr_prov),
             destination=LocationRef(description="plate", well="B1",
-                                     provenance=instr_prov),
+                                     description_provenance=instr_prov, wells_provenance=instr_prov),
             composition_provenance=comp,
         )])
 

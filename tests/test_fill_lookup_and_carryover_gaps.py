@@ -167,7 +167,7 @@ class TestLookupGap:
                 substance=ProvenancedString(value="buffer", provenance=_instr_prov("buffer")),
                 source=None,
                 destination=LocationRef(description="dest_plate", well="A1",
-                                        provenance=_instr_prov("dest_plate A1")),
+                                        description_provenance=_instr_prov("dest_plate A1"), wells_provenance=_instr_prov("dest_plate A1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -181,10 +181,13 @@ class TestLookupGap:
         # bare config key so ConstraintChecker passes on the first lookup.
         assert src.description == "reagent_rack"
         assert src.resolved_label == "reagent_rack"
-        # Per ADR-0007: lookup fills MUST attach provenance — the historical
-        # bug was leaving provenance=None so the renderer showed silent black text.
-        assert src.provenance is not None
-        assert src.provenance.source == "inferred"
+        # Lookup fills MUST attach both LocationRef provenances — the
+        # historical bug was leaving provenance=None so the renderer
+        # showed silent black text.
+        assert src.description_provenance is not None
+        assert src.description_provenance.source == "inferred"
+        assert src.wells_provenance is not None
+        assert src.wells_provenance.source == "inferred"
         # PR3b bug-1 fix moved the substance-match reasoning to
         # resolved_label_provenance (the audit slot for the resolution
         # decision); the primary provenance describes the synthesis instead.
@@ -201,7 +204,7 @@ class TestLookupGap:
                 substance=ProvenancedString(value="rare_reagent", provenance=_instr_prov("rare_reagent")),
                 source=None,
                 destination=LocationRef(description="dest_plate", well="A1",
-                                        provenance=_instr_prov("dest_plate A1")),
+                                        description_provenance=_instr_prov("dest_plate A1"), wells_provenance=_instr_prov("dest_plate A1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -218,9 +221,9 @@ class TestLookupGap:
                 order=1, action="transfer",
                 substance=ProvenancedString(value="buffer", provenance=_instr_prov("buffer")),
                 source=LocationRef(description="custom_rack", well="C5",
-                                   provenance=_instr_prov("custom_rack C5")),
+                                   description_provenance=_instr_prov("custom_rack C5"), wells_provenance=_instr_prov("custom_rack C5")),
                 destination=LocationRef(description="dest_plate", well="A1",
-                                        provenance=_instr_prov("dest_plate A1")),
+                                        description_provenance=_instr_prov("dest_plate A1"), wells_provenance=_instr_prov("dest_plate A1")),
                 composition_provenance=_comp(),
             ),
         ])

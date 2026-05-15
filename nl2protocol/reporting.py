@@ -382,30 +382,35 @@ def _collect_arrow_targets(spec) -> list:
         # Atomic per-value cites — color-matched in instruction column.
         # Each unique cited_text hashes to a palette slot; the same slot is
         # applied to the spec value span so reader connects them by hue.
-        for field_name, field_obj in [
-            ("volume", step.volume),
-            ("substance", step.substance),
-            ("duration", step.duration),
-            ("temperature", step.temperature),
-            ("source", step.source),
-            ("destination", step.destination),
-        ]:
+        # LocationRefs carry TWO provenances (description + wells); each that
+        # is instruction-sourced contributes its own cite-span, both anchored
+        # to the same field prov_id so hovering the cell highlights both.
+        atomic_fields = [
+            ("volume", step.volume, ("provenance",)),
+            ("substance", step.substance, ("provenance",)),
+            ("duration", step.duration, ("provenance",)),
+            ("temperature", step.temperature, ("provenance",)),
+            ("source", step.source, ("description_provenance", "wells_provenance")),
+            ("destination", step.destination, ("description_provenance", "wells_provenance")),
+        ]
+        for field_name, field_obj, prov_attrs in atomic_fields:
             if field_obj is None:
                 continue
-            prov = getattr(field_obj, "provenance", None)
-            if prov is None:
-                continue
-            if getattr(prov, "source", None) != "instruction":
-                continue
-            cited = getattr(prov, "cited_text", None)
-            if not cited:
-                continue
-            targets.append({
-                "prov_id": f"{sid}-{field_name}",
-                "cited_text": cited,
-                "kind": "atomic-color",
-                "palette_class": _palette_class(cited),
-            })
+            for attr in prov_attrs:
+                prov = getattr(field_obj, attr, None)
+                if prov is None:
+                    continue
+                if getattr(prov, "source", None) != "instruction":
+                    continue
+                cited = getattr(prov, "cited_text", None)
+                if not cited:
+                    continue
+                targets.append({
+                    "prov_id": f"{sid}-{field_name}",
+                    "cited_text": cited,
+                    "kind": "atomic-color",
+                    "palette_class": _palette_class(cited),
+                })
     return targets
 
 
@@ -879,8 +884,9 @@ def _atomic_provenance_stats(spec) -> dict:
     """
     total = 0
     non_instr = 0
+    atomic = ("volume", "substance", "duration", "temperature")
     for step in spec.steps:
-        for fname in ("volume", "substance", "duration", "temperature", "source", "destination"):
+        for fname in atomic:
             field = getattr(step, fname, None)
             if field is None:
                 continue
@@ -890,6 +896,17 @@ def _atomic_provenance_stats(spec) -> dict:
             total += 1
             if getattr(prov, "source", None) != "instruction":
                 non_instr += 1
+        for role in ("source", "destination"):
+            ref = getattr(step, role, None)
+            if ref is None:
+                continue
+            for prov_attr in ("description_provenance", "wells_provenance"):
+                prov = getattr(ref, prov_attr, None)
+                if prov is None:
+                    continue
+                total += 1
+                if getattr(prov, "source", None) != "instruction":
+                    non_instr += 1
     pct = (non_instr * 100.0 / total) if total else 0.0
     return {"total": total, "non_instr": non_instr, "non_instr_pct": pct}
 
@@ -994,8 +1011,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
 
     if step.source is not None:
         loc_text = _format_location(step.source)
-        if step.source.provenance:
-            v = _render_provenanced_value(loc_text, step.source.provenance, prov_id=f"{sid}-source", instruction=instruction)
+        prov = step.source.description_provenance
+        if prov:
+            v = _render_provenanced_value(loc_text, prov, prov_id=f"{sid}-source", instruction=instruction)
         else:
             import html as _html
             v = _html.escape(loc_text)
@@ -1005,8 +1023,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
 
     if step.destination is not None:
         loc_text = _format_location(step.destination)
-        if step.destination.provenance:
-            v = _render_provenanced_value(loc_text, step.destination.provenance, prov_id=f"{sid}-destination", instruction=instruction)
+        prov = step.destination.description_provenance
+        if prov:
+            v = _render_provenanced_value(loc_text, prov, prov_id=f"{sid}-destination", instruction=instruction)
         else:
             import html as _html
             v = _html.escape(loc_text)

@@ -101,22 +101,30 @@ class ConfigLookupSuggester:
                     #     match. This is what the IndependentReviewSuggester
                     #     reviews (per ADR-0009).
                     from nl2protocol.models.spec import LocationRef, Provenance
+                    _synth_reason = (
+                        f"Synthesized by ConfigLookupSuggester from the "
+                        f"substance match below; no user wording existed "
+                        f"for this LocationRef."
+                    )
+                    _synth_why_not = (
+                        f"Instruction names the substance "
+                        f"('{substance_val}') but does not state any "
+                        f"location for it — entire ref is suggester-filled."
+                    )
                     loc = LocationRef(
                         description=label,
                         well=well,
                         resolved_label=label,
-                        provenance=Provenance(
+                        description_provenance=Provenance(
                             source="inferred",
-                            positive_reasoning=(
-                                f"Synthesized by ConfigLookupSuggester from "
-                                f"the substance match below; no user wording "
-                                f"existed for this LocationRef."
-                            ),
-                            why_not_in_instruction=(
-                                f"Instruction names the substance "
-                                f"('{substance_val}') but does not state any "
-                                f"location for it — entire ref is suggester-filled."
-                            ),
+                            positive_reasoning=_synth_reason,
+                            why_not_in_instruction=_synth_why_not,
+                            confidence=0.9,
+                        ),
+                        wells_provenance=Provenance(
+                            source="inferred",
+                            positive_reasoning=_synth_reason,
+                            why_not_in_instruction=_synth_why_not,
                             confidence=0.9,
                         ),
                         resolved_label_provenance=Provenance(
@@ -779,23 +787,50 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
         verification protocol; one batched reviewer call covers both."""
         claims = []
         for step_idx, step in enumerate(spec.steps):
-            # Spec-value claims: volume / duration / temperature / substance /
-            # source / destination provenances.
-            for fname in ("volume", "duration", "temperature", "substance",
-                           "source", "destination"):
+            # Atomic-value claims: volume / duration / temperature / substance.
+            for fname in ("volume", "duration", "temperature", "substance"):
                 field_obj = getattr(step, fname, None)
                 if field_obj is None:
                     continue
                 prov = getattr(field_obj, "provenance", None)
                 if prov is None or prov.source == "instruction":
                     continue
-                value_repr = (
-                    repr(field_obj.value) if hasattr(field_obj, "value")
-                    else f"{getattr(field_obj, 'description', '')} "
-                         f"{getattr(field_obj, 'well', '') or getattr(field_obj, 'wells', '')}"
-                )
                 claims.append({
                     "field_path": f"steps[{step_idx}].{fname}",
+                    "value": repr(field_obj.value),
+                    "positive_reasoning": prov.positive_reasoning or "",
+                    "why_not_in_instruction": prov.why_not_in_instruction or "",
+                    "source": prov.source,
+                    "confidence": prov.confidence,
+                })
+
+            # LocationRef-field claims (source / destination). Each ref has
+            # two provenance slots; emit one claim per non-instruction slot
+            # whose verdict the orchestrator routes back to the matching
+            # slot. Both slots claim the SAME field_path because today's
+            # _apply_reviewer_verdicts propagates a single verdict to both —
+            # so reviewing either reviews the field as a whole. Skip when
+            # both slots are instruction-sourced (nothing to verify).
+            for role in ("source", "destination"):
+                ref = getattr(step, role, None)
+                if ref is None:
+                    continue
+                # Prefer the slot whose source is NOT 'instruction' (that's
+                # the one with reasoning the reviewer needs to verify).
+                prov = None
+                for prov_attr in ("description_provenance", "wells_provenance"):
+                    candidate = getattr(ref, prov_attr, None)
+                    if candidate and candidate.source != "instruction":
+                        prov = candidate
+                        break
+                if prov is None:
+                    continue
+                value_repr = (
+                    f"{ref.description} "
+                    f"{ref.well or ref.wells or ref.well_range or ''}"
+                ).strip()
+                claims.append({
+                    "field_path": f"steps[{step_idx}].{role}",
                     "value": value_repr,
                     "positive_reasoning": prov.positive_reasoning or "",
                     "why_not_in_instruction": prov.why_not_in_instruction or "",

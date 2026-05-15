@@ -84,9 +84,14 @@ def _find_provenance_reason(step, field_name: str) -> Optional[str]:
         return None
 
     # Location refs: "source location", "source labware", "source wells", etc.
+    # LocationRef carries two provenances (description + wells); prefer the
+    # wells one when the field name targets wells, else the description one.
     for prefix, ref in [("source", step.source), ("destination", step.destination), ("dest", step.destination)]:
-        if field_name.startswith(prefix) and ref and ref.provenance:
-            return _provenance_text(ref.provenance)
+        if not (field_name.startswith(prefix) and ref):
+            continue
+        prov = ref.wells_provenance if "well" in field_name else ref.description_provenance
+        if prov:
+            return _provenance_text(prov)
 
     # Post-action fields: "mix volume", "blow_out volume", etc.
     if step.post_actions:
@@ -448,9 +453,12 @@ class SemanticExtractor:
                         f"from instruction but not found in text",
                     ))
 
-            # --- LocationRef: labware + wells ---
+            # --- LocationRef: labware + wells (each has its own provenance) ---
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if (ref and ref.provenance and ref.provenance.source == "instruction"):
+                if not ref:
+                    continue
+                desc_prov = ref.description_provenance
+                if desc_prov and desc_prov.source == "instruction":
                     if ref.description.lower() not in instruction_lower:
                         warnings.append(self._warn(
                             step.order, f"{role} labware", ref.description,
@@ -458,6 +466,8 @@ class SemanticExtractor:
                             f"Step {step.order} {role}: claims labware '{ref.description}' "
                             f"from instruction but not found in text",
                         ))
+                wells_prov = ref.wells_provenance
+                if wells_prov and wells_prov.source == "instruction":
                     wells_to_check = [ref.well] if ref.well else (ref.wells or [])
                     missing = [w for w in wells_to_check if w not in text_wells]
                     if missing:
@@ -515,8 +525,11 @@ class SemanticExtractor:
         for step in spec.steps:
             # LocationRef with source='config': resolved_label must be a valid config key.
             # Only check after resolution (Stage 3.5) has filled resolved_label.
+            # The config claim lives on description_provenance (the labware
+            # label is what gets resolved from the lab config).
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if (ref and ref.provenance and ref.provenance.source == "config"
+                desc_prov = ref.description_provenance if ref else None
+                if (ref and desc_prov and desc_prov.source == "config"
                         and ref.resolved_label and ref.resolved_label not in labware_labels):
                     warnings.append(self._warn(
                         step.order, f"{role} labware", ref.resolved_label,
@@ -565,19 +578,25 @@ class SemanticExtractor:
                         f"{step.composition_provenance.confidence} — may need confirmation",
                     ))
 
-            # Walk provenanced fields
+            # Walk provenanced fields. Atomic fields carry one provenance;
+            # LocationRefs carry two (description + wells) — each gets its
+            # own uncertainty check so a low-confidence wells claim is not
+            # masked by a high-confidence description claim, or vice versa.
             fields = [
-                ("volume", step.volume),
-                ("temperature", step.temperature),
-                ("substance", step.substance),
-                ("duration", step.duration),
+                ("volume", step.volume, step.volume.provenance if step.volume else None),
+                ("temperature", step.temperature, step.temperature.provenance if step.temperature else None),
+                ("substance", step.substance, step.substance.provenance if step.substance else None),
+                ("duration", step.duration, step.duration.provenance if step.duration else None),
             ]
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if ref and ref.provenance:
-                    fields.append((f"{role} location", ref))
+                if not ref:
+                    continue
+                if ref.description_provenance:
+                    fields.append((f"{role} labware", ref, ref.description_provenance))
+                if ref.wells_provenance:
+                    fields.append((f"{role} wells", ref, ref.wells_provenance))
 
-            for field_name, field_val in fields:
-                prov = getattr(field_val, 'provenance', None) if field_val else None
+            for field_name, field_val, prov in fields:
                 if not prov:
                     continue
 
@@ -747,22 +766,30 @@ class SemanticExtractor:
                             #   resolved_label_provenance carries the
                             #     "why this label" reasoning for the
                             #     reviewer pass.
+                            _synth_reason = (
+                                f"Synthesized by fill_lookup_and_carryover_gaps "
+                                f"from the substance match below; no user "
+                                f"wording existed for this LocationRef."
+                            )
+                            _synth_why_not = (
+                                f"Instruction names the substance "
+                                f"('{substance_val}') but does not state any "
+                                f"location for it — entire ref is filled in."
+                            )
                             step.source = LocationRef(
                                 description=label,
                                 well=well,
                                 resolved_label=label,
-                                provenance=Provenance(
+                                description_provenance=Provenance(
                                     source="inferred",
-                                    positive_reasoning=(
-                                        f"Synthesized by fill_lookup_and_carryover_gaps "
-                                        f"from the substance match below; no user "
-                                        f"wording existed for this LocationRef."
-                                    ),
-                                    why_not_in_instruction=(
-                                        f"Instruction names the substance "
-                                        f"('{substance_val}') but does not state any "
-                                        f"location for it — entire ref is filled in."
-                                    ),
+                                    positive_reasoning=_synth_reason,
+                                    why_not_in_instruction=_synth_why_not,
+                                    confidence=0.9,
+                                ),
+                                wells_provenance=Provenance(
+                                    source="inferred",
+                                    positive_reasoning=_synth_reason,
+                                    why_not_in_instruction=_synth_why_not,
                                     confidence=0.9,
                                 ),
                                 resolved_label_provenance=Provenance(

@@ -80,8 +80,8 @@ class TestMissingFieldsDetector:
         spec = _spec([
             ExtractedStep(
                 order=1, action="transfer",
-                source=LocationRef(description="src", well="A1", provenance=_instr_prov()),
-                destination=LocationRef(description="dst", well="B1", provenance=_instr_prov()),
+                source=LocationRef(description="src", well="A1", description_provenance=_instr_prov(), wells_provenance=_instr_prov()),
+                destination=LocationRef(description="dst", well="B1", description_provenance=_instr_prov(), wells_provenance=_instr_prov()),
                 composition_provenance=_comp(),
             ),
         ])
@@ -115,8 +115,8 @@ class TestMissingFieldsDetector:
         spec = _spec([
             ExtractedStep(
                 order=1, action="transfer",
-                source=LocationRef(description="src", well="A1", provenance=_instr_prov()),
-                destination=LocationRef(description="dst", well="B1", provenance=_instr_prov()),
+                source=LocationRef(description="src", well="A1", description_provenance=_instr_prov(), wells_provenance=_instr_prov()),
+                destination=LocationRef(description="dst", well="B1", description_provenance=_instr_prov(), wells_provenance=_instr_prov()),
                 composition_provenance=_comp(),
             ),
         ])
@@ -158,9 +158,9 @@ class TestProvenanceWarningDetector:
                                           cited_text="100uL", confidence=1.0),
                 ),
                 source=LocationRef(description="tube rack", well="A1",
-                                   provenance=_instr_prov("from A1")),
+                                   description_provenance=_instr_prov("from A1"), wells_provenance=_instr_prov("from A1")),
                 destination=LocationRef(description="tube rack", well="B1",
-                                        provenance=_instr_prov("to B1")),
+                                        description_provenance=_instr_prov("to B1"), wells_provenance=_instr_prov("to B1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -185,9 +185,9 @@ class TestProvenanceWarningDetector:
                                           cited_text="999uL", confidence=1.0),
                 ),
                 source=LocationRef(description="tube rack", well="A1",
-                                   provenance=_instr_prov("from A1")),
+                                   description_provenance=_instr_prov("from A1"), wells_provenance=_instr_prov("from A1")),
                 destination=LocationRef(description="tube rack", well="B1",
-                                        provenance=_instr_prov("to B1")),
+                                        description_provenance=_instr_prov("to B1"), wells_provenance=_instr_prov("to B1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -367,13 +367,13 @@ class TestConstraintViolationDetector:
                     description="sample_rack",
                     wells=["A1", "A2", "A7", "A8"],
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("A1, A2, A7, A8"),
+                    description_provenance=_instr_prov("A1, A2, A7, A8"), wells_provenance=_instr_prov("A1, A2, A7, A8"),
                 ),
                 destination=LocationRef(
                     description="sample_rack",
                     well="B1",
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("B1"),
+                    description_provenance=_instr_prov("B1"), wells_provenance=_instr_prov("B1"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -456,12 +456,12 @@ class TestConstraintViolationDetector:
                     description="sample_rack",
                     wells=["A1", "A7", "A8"],
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("A1, A7, A8"),
+                    description_provenance=_instr_prov("A1, A7, A8"), wells_provenance=_instr_prov("A1, A7, A8"),
                 ),
                 destination=LocationRef(
                     description="sample_rack", well="B1",
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("B1"),
+                    description_provenance=_instr_prov("B1"), wells_provenance=_instr_prov("B1"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -473,12 +473,12 @@ class TestConstraintViolationDetector:
                     description="sample_rack",
                     wells=["A2", "A7", "A8"],
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("A2, A7, A8"),
+                    description_provenance=_instr_prov("A2, A7, A8"), wells_provenance=_instr_prov("A2, A7, A8"),
                 ),
                 destination=LocationRef(
                     description="sample_rack", well="B2",
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("B2"),
+                    description_provenance=_instr_prov("B2"), wells_provenance=_instr_prov("B2"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -529,12 +529,12 @@ class TestConstraintViolationDetector:
                 source=LocationRef(
                     description="sample_rack", wells=["A20"],
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("A20"),
+                    description_provenance=_instr_prov("A20"), wells_provenance=_instr_prov("A20"),
                 ),
                 destination=LocationRef(
                     description="sample_rack", well="B1",
                     resolved_label="sample_rack",
-                    provenance=_instr_prov("B1"),
+                    description_provenance=_instr_prov("B1"), wells_provenance=_instr_prov("B1"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -545,12 +545,12 @@ class TestConstraintViolationDetector:
                 source=LocationRef(
                     description="wide_plate", wells=["A20"],
                     resolved_label="wide_plate",
-                    provenance=_instr_prov("A20"),
+                    description_provenance=_instr_prov("A20"), wells_provenance=_instr_prov("A20"),
                 ),
                 destination=LocationRef(
                     description="wide_plate", well="B1",
                     resolved_label="wide_plate",
-                    provenance=_instr_prov("B1"),
+                    description_provenance=_instr_prov("B1"), wells_provenance=_instr_prov("B1"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -581,10 +581,10 @@ class TestConstraintViolationDetector:
                 volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
                                          provenance=_instr_prov()),
                 source=LocationRef(description="ghost_rack", well="A1",
-                                    provenance=_instr_prov("A1")),
+                                    description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1")),
                 destination=LocationRef(description="real_rack", well="B1",
                                          resolved_label="real_rack",
-                                         provenance=_instr_prov("B1")),
+                                         description_provenance=_instr_prov("B1"), wells_provenance=_instr_prov("B1")),
                 composition_provenance=_comp(),
             ),
             ExtractedStep(
@@ -592,10 +592,10 @@ class TestConstraintViolationDetector:
                 volume=ProvenancedVolume(value=10.0, unit="uL", exact=True,
                                          provenance=_instr_prov()),
                 source=LocationRef(description="ghost_rack", well="A2",
-                                    provenance=_instr_prov("A2")),
+                                    description_provenance=_instr_prov("A2"), wells_provenance=_instr_prov("A2")),
                 destination=LocationRef(description="real_rack", well="B2",
                                          resolved_label="real_rack",
-                                         provenance=_instr_prov("B2")),
+                                         description_provenance=_instr_prov("B2"), wells_provenance=_instr_prov("B2")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -627,12 +627,12 @@ class TestLabwareAmbiguityDetector:
             source=LocationRef(
                 description=source_desc, well="A1",
                 resolved_label=source_resolved,
-                provenance=_instr_prov("rack A1"),
+                description_provenance=_instr_prov("rack A1"), wells_provenance=_instr_prov("rack A1"),
             ),
             destination=LocationRef(
                 description=destination_desc, well="B1",
                 resolved_label=destination_resolved,
-                provenance=_instr_prov("plate B1"),
+                description_provenance=_instr_prov("plate B1"), wells_provenance=_instr_prov("plate B1"),
             ),
             composition_provenance=_comp(),
         )

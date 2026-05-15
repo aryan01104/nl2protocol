@@ -432,17 +432,24 @@ class LocationRef(BaseModel):
     resolved_label: Optional[str] = Field(None, description=(
         "Config labware key. Filled automatically by the labware resolver — leave null during extraction."
     ))
-    provenance: Provenance = Field(..., description=(
-        "How this location reference was determined. Covers the labware + well(s) as a unit. "
-        "REQUIRED — every populated LocationRef must carry provenance, matching the field-level "
-        "requirement on every other provenance-carrying value (volume/duration/temperature/substance). "
-        "If the wells were derived from a prior step (e.g. 'Mix each tube' inheriting B1-B4), "
-        "use source='instruction' and cite the substring naming those wells. If genuinely inferred "
-        "from context with no cite, use source='inferred' with reasoning."
+    description_provenance: Provenance = Field(..., description=(
+        "How the labware DESCRIPTION (the user's wording for the labware) was determined. "
+        "REQUIRED on every LocationRef. If the instruction names the labware (e.g. "
+        "'tube rack'), use source='instruction' with cited_text='tube rack'. If the "
+        "labware is implicit at this step (e.g. the instruction names it earlier and "
+        "this step continues with it), use source='inferred' with positive_reasoning "
+        "explaining the connection and why_not_in_instruction explaining what's missing "
+        "at this step's clause."
+    ))
+    wells_provenance: Optional[Provenance] = Field(None, description=(
+        "How the WELL(S) were determined. Separate from description_provenance because "
+        "the labware label and the well positions are typically cited from different "
+        "parts of the instruction (e.g. labware named in step 1, wells named in step 5). "
+        "REQUIRED when any of well/wells/well_range is populated; null otherwise."
     ))
     resolved_label_provenance: Optional[Provenance] = Field(None, description=(
         "How the resolved_label was picked from the lab config. Distinct from "
-        "`provenance` (which is about how the user described the location). "
+        "`description_provenance` (which is about how the user described the location). "
         "Filled by the labware resolver when it picks a config label; left null "
         "during extraction. Carries the resolver's positive_reasoning / "
         "why_not_in_instruction so the IndependentReviewSuggester can verify "
@@ -450,6 +457,31 @@ class LocationRef(BaseModel):
         "Subject to the same review_status lifecycle (reviewed_agree / "
         "reviewed_disagree / user_confirmed / user_edited)."
     ))
+
+    @model_validator(mode='after')
+    def require_wells_provenance_when_wells_present(self) -> 'LocationRef':
+        """Wells must carry provenance when any well/wells/well_range is set.
+
+        Pre:    LocationRef instance after Pydantic field validation.
+
+        Post:   When at least one of well, wells, well_range is non-null,
+                wells_provenance must be non-null. When all three are null
+                (labware-only ref, e.g. a temperature module referenced by
+                name with no well position), wells_provenance may stay null.
+                Returns self unchanged in both valid cases.
+
+        Raises: ValueError when a well-bearing LocationRef has
+                wells_provenance=None.
+        """
+        has_wells = self.well or self.wells or self.well_range
+        if has_wells and self.wells_provenance is None:
+            raise ValueError(
+                "LocationRef.wells_provenance is required when "
+                "well/wells/well_range is populated. Got "
+                f"well={self.well!r}, wells={self.wells!r}, "
+                f"well_range={self.well_range!r}."
+            )
+        return self
 
 
 class PostAction(BaseModel):

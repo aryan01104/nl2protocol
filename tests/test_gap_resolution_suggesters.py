@@ -81,7 +81,7 @@ class TestConfigLookupSuggester:
                 substance=ProvenancedString(value="buffer", provenance=_instr_prov("buffer")),
                 source=None,
                 destination=LocationRef(description="dest", well="A1",
-                                        provenance=_instr_prov("A1")),
+                                        description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -123,7 +123,7 @@ class TestConfigLookupSuggester:
                 destination=LocationRef(
                     description="reagent_rack", well="A1",
                     resolved_label="reagent_rack",
-                    provenance=_instr_prov("A1"),
+                    description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1"),
                 ),
                 composition_provenance=_comp(),
             ),
@@ -157,7 +157,7 @@ class TestConfigLookupSuggester:
                                             provenance=_instr_prov("rare_reagent")),
                 source=None,
                 destination=LocationRef(description="dest", well="A1",
-                                        provenance=_instr_prov("A1")),
+                                        description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1")),
                 composition_provenance=_comp(),
             ),
         ])
@@ -185,7 +185,7 @@ class TestConfigLookupSuggester:
                                          provenance=_instr_prov()),
                 source=None,
                 destination=LocationRef(description="dest", well="A1",
-                                        provenance=_instr_prov("A1")),
+                                        description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1")),
                 composition_provenance=_comp(),
             ),
         ])

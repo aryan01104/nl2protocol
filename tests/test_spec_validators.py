@@ -232,8 +232,8 @@ class TestValidateCompleteness:
             _step(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="src", well="A1", provenance=_prov()),
-                destination=LocationRef(description="dst", well="A1", provenance=_prov()),
+                source=LocationRef(description="src", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+                destination=LocationRef(description="dst", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
             ),
         ])
 
@@ -244,7 +244,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    destination=LocationRef(description="dst", well="A1", provenance=_prov()),
+                    destination=LocationRef(description="dst", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
                 ),
             ])
         msg = str(exc_info.value)
@@ -257,7 +257,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    source=LocationRef(description="src", well="A1", provenance=_prov()),
+                    source=LocationRef(description="src", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
                 ),
             ])
         assert "missing destination" in str(exc_info.value)
@@ -297,32 +297,55 @@ class TestValidateCompleteness:
 
 
 # ============================================================================
-# LocationRef.provenance — required at the field level (ADR-0007)
+# LocationRef provenance split — description_provenance required;
+# wells_provenance required when any well/wells/well_range is set.
 # ============================================================================
 
 class TestLocationRefProvenanceRequired:
-    """Per ADR-0007, every populated LocationRef must carry provenance —
-    field-level enforced by Pydantic. This closes the schema gap where
-    LocationRef.provenance was historically Optional, allowing silent
-    null-provenance values to pass parse and disappear into downstream
-    rendering / confirmation logic."""
+    """Every populated LocationRef must carry description_provenance, and
+    (separately) wells_provenance whenever any well/wells/well_range is
+    populated. The split closes the historic schema conflation where one
+    provenance covered both the labware label and the well positions —
+    semantically distinct claims that usually ground in different parts
+    of the instruction."""
 
-    def test_locationref_without_provenance_raises_at_construction(self):
-        # The point of moving from Optional to required is parse-time rejection.
+    def test_locationref_without_description_provenance_raises(self):
+        # description_provenance is required regardless of whether wells set.
         with pytest.raises(ValidationError) as exc_info:
             LocationRef(description="tube rack", well="A1")
         msg = str(exc_info.value)
-        assert "provenance" in msg.lower()
+        assert "description_provenance" in msg.lower() or "provenance" in msg.lower()
 
-    def test_locationref_with_provenance_constructs_cleanly(self):
-        # Sanity check: providing provenance succeeds.
+    def test_wells_present_without_wells_provenance_raises(self):
+        # wells_provenance is required when any of well/wells/well_range set.
+        with pytest.raises(ValidationError) as exc_info:
+            LocationRef(
+                description="tube rack",
+                well="A1",
+                description_provenance=_prov(source="instruction", text="tube rack"),
+            )
+        msg = str(exc_info.value)
+        assert "wells_provenance" in msg.lower()
+
+    def test_labware_only_locationref_omits_wells_provenance(self):
+        # Refs that name labware alone (e.g. a module by name with no well)
+        # may leave wells_provenance null.
+        ref = LocationRef(
+            description="temperature module",
+            description_provenance=_prov(source="instruction", text="temperature module"),
+        )
+        assert ref.description_provenance is not None
+        assert ref.wells_provenance is None
+
+    def test_locationref_with_both_provenances_constructs_cleanly(self):
         ref = LocationRef(
             description="tube rack",
             well="A1",
-            provenance=_prov(source="instruction", text="from A1"),
+            description_provenance=_prov(source="instruction", text="tube rack"),
+            wells_provenance=_prov(source="instruction", text="A1"),
         )
-        assert ref.provenance is not None
-        assert ref.provenance.source == "instruction"
+        assert ref.description_provenance.source == "instruction"
+        assert ref.wells_provenance.source == "instruction"
 
     def test_inferred_provenance_acceptable_for_locationref(self):
         # The required-field rule doesn't constrain the SOURCE — inferred
@@ -331,6 +354,7 @@ class TestLocationRefProvenanceRequired:
         ref = LocationRef(
             description="reagent_rack (inferred from config)",
             well="A1",
-            provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
+            description_provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
+            wells_provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
         )
-        assert ref.provenance.source == "inferred"
+        assert ref.description_provenance.source == "inferred"

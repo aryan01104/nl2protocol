@@ -175,8 +175,8 @@ class TestHTMLReporterRendering:
             order=1,
             action="transfer",
             volume=ProvenancedVolume(value=100.0, unit="uL", exact=True, provenance=prov),
-            source=LocationRef(description="source_plate", well="A1", provenance=prov),
-            destination=LocationRef(description="dest_plate", well="B1", provenance=prov),
+            source=LocationRef(description="source_plate", well="A1", description_provenance=prov, wells_provenance=prov),
+            destination=LocationRef(description="dest_plate", well="B1", description_provenance=prov, wells_provenance=prov),
             composition_provenance=CompositionProvenance(
                 step_cited_text="user explicitly requested transfer",
                 parameters_cited_texts=["user explicitly requested transfer"],
@@ -540,9 +540,9 @@ class TestADR0011FiveColumnLayout:
                 volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
                                           provenance=prov),
                 source=LocationRef(description="src", well="A1",
-                                    provenance=prov),
+                                    description_provenance=prov, wells_provenance=prov),
                 destination=LocationRef(description="dst", well="B1",
-                                         provenance=prov),
+                                         description_provenance=prov, wells_provenance=prov),
                 composition_provenance=comp,
             ),
         ])
@@ -794,10 +794,10 @@ class TestADR0011Phase2cBulkPanels:
                                               provenance=prov),
                     source=LocationRef(description="tube rack", well="A1",
                                         resolved_label="sample_rack",
-                                        provenance=prov),
+                                        description_provenance=prov, wells_provenance=prov),
                     destination=LocationRef(description="96-well plate", well="A1",
                                              resolved_label="assay_plate",
-                                             provenance=prov),
+                                             description_provenance=prov, wells_provenance=prov),
                     composition_provenance=comp,
                 ),
             ],
@@ -928,10 +928,10 @@ class TestADR0011Phase4RowHover:
                                               provenance=prov),
                     source=LocationRef(description="rack", well="A1",
                                         resolved_label="sample_rack",
-                                        provenance=prov),
+                                        description_provenance=prov, wells_provenance=prov),
                     destination=LocationRef(description="plate", well="A1",
                                              resolved_label="assay_plate",
-                                             provenance=prov),
+                                             description_provenance=prov, wells_provenance=prov),
                     composition_provenance=comp,
                 ),
                 # Step 1: source = sample_rack A2, dest = assay_plate B1
@@ -941,10 +941,10 @@ class TestADR0011Phase4RowHover:
                                               provenance=prov),
                     source=LocationRef(description="rack", well="A2",
                                         resolved_label="sample_rack",
-                                        provenance=prov),
+                                        description_provenance=prov, wells_provenance=prov),
                     destination=LocationRef(description="plate", well="B1",
                                              resolved_label="assay_plate",
-                                             provenance=prov),
+                                             description_provenance=prov, wells_provenance=prov),
                     composition_provenance=comp,
                 ),
             ],
@@ -1056,7 +1056,7 @@ class TestADR0011NullFieldPlaceholders:
                                              confidence=1.0)),
             source=None,
             destination=LocationRef(description="plate", well="B12",
-                                     provenance=prov),
+                                     description_provenance=prov, wells_provenance=prov),
             composition_provenance=comp,
         )
 
@@ -1098,7 +1098,7 @@ class TestADR0011NullFieldPlaceholders:
                                              confidence=1.0)),
             source=None,
             destination=LocationRef(description="plate", well="B12",
-                                     provenance=prov),
+                                     description_provenance=prov, wells_provenance=prov),
             composition_provenance=comp,
         )])
         # Resolved spec: source is filled in.
@@ -1114,7 +1114,12 @@ class TestADR0011NullFieldPlaceholders:
             source=LocationRef(
                 description="reagent_reservoir", well="A2",
                 resolved_label="reagent_reservoir",
-                provenance=Provenance(
+                description_provenance=Provenance(
+                    source="inferred",
+                    positive_reasoning="config lookup found water at A2",
+                    why_not_in_instruction="instruction omits source",
+                    confidence=0.9,
+                ), wells_provenance=Provenance(
                     source="inferred",
                     positive_reasoning="config lookup found water at A2",
                     why_not_in_instruction="instruction omits source",
@@ -1122,7 +1127,7 @@ class TestADR0011NullFieldPlaceholders:
                 ),
             ),
             destination=LocationRef(description="plate", well="B12",
-                                     provenance=prov),
+                                     description_provenance=prov, wells_provenance=prov),
             composition_provenance=comp,
         )])
         out_path = tmp_path / "report.html"
@@ -1250,9 +1255,9 @@ class TestCollectArrowTargets:
             action="transfer",
             volume=ProvenancedVolume(value=100.0, unit="uL", exact=True, provenance=prov),
             source=LocationRef(description="src", well="A1",
-                               provenance=Provenance(source="instruction", cited_text="from A1", confidence=1.0)),
+                               description_provenance=Provenance(source="instruction", cited_text="from A1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="from A1", confidence=1.0)),
             destination=LocationRef(description="dst", well="B1",
-                                     provenance=Provenance(source="instruction", cited_text="to B1", confidence=1.0)),
+                                     description_provenance=Provenance(source="instruction", cited_text="to B1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="to B1", confidence=1.0)),
             composition_provenance=CompositionProvenance(
                 step_cited_text="Transfer 100uL from A1 to B1",
                 parameters_cited_texts=["Transfer 100uL from A1 to B1"],
@@ -1284,11 +1289,17 @@ class TestCollectArrowTargets:
     def test_emits_atomic_color_targets_for_each_provenanced_field(self):
         # Atomic cites are color-matched in the instruction column (no arrow).
         # They still need data-cite-id ↔ data-prov-id wiring for hover emphasis.
+        # LocationRef fields contribute TWO targets per field (description +
+        # wells slots), each sharing the field's prov_id so hovering the cell
+        # lights up both cite spans.
         spec = self._spec_with_one_step()
         targets = _collect_arrow_targets(spec)
         atomic_ids = sorted(t["prov_id"] for t in targets if t["kind"] == "atomic-color")
-        # volume + source + destination, in some order.
-        assert atomic_ids == ["s0-destination", "s0-source", "s0-volume"]
+        assert atomic_ids == [
+            "s0-destination", "s0-destination",
+            "s0-source", "s0-source",
+            "s0-volume",
+        ]
 
     def test_skips_non_instruction_provenance(self):
         from nl2protocol.models.spec import (
@@ -1344,8 +1355,8 @@ class TestHTMLReporterArrowsEnd2End:
             order=1,
             action="transfer",
             volume=ProvenancedVolume(value=100.0, unit="uL", exact=True, provenance=prov),
-            source=LocationRef(description="src", well="A1", provenance=prov),
-            destination=LocationRef(description="dst", well="B1", provenance=prov),
+            source=LocationRef(description="src", well="A1", description_provenance=prov, wells_provenance=prov),
+            destination=LocationRef(description="dst", well="B1", description_provenance=prov, wells_provenance=prov),
             composition_provenance=CompositionProvenance(
                 step_cited_text="user explicitly requested transfer",
                 parameters_cited_texts=["user explicitly requested transfer"],
@@ -1377,7 +1388,7 @@ class TestHTMLReporterArrowsEnd2End:
             ),
             destination=LocationRef(
                 description="dest_plate", well="B1",
-                provenance=Provenance(source="instruction", cited_text="to well B1", confidence=1.0),
+                description_provenance=Provenance(source="instruction", cited_text="to well B1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="to well B1", confidence=1.0),
             ),
             composition_provenance=CompositionProvenance(
                 step_cited_text="Add liquid",

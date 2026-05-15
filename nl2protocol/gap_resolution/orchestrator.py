@@ -483,9 +483,8 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
         }
 
     for step_idx, step in enumerate(spec.steps):
-        # Spec-value field provenances.
-        for fname in ("volume", "duration", "temperature", "substance",
-                       "source", "destination"):
+        # Atomic-field provenances (one slot each).
+        for fname in ("volume", "duration", "temperature", "substance"):
             field_obj = getattr(step, fname, None)
             if field_obj is None:
                 continue
@@ -498,6 +497,25 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             field_obj.provenance = Provenance.model_validate({
                 **prov.model_dump(), **_verdict_updates(review),
             })
+
+        # LocationRef field provenances (two slots: description + wells).
+        # A reviewer verdict on `steps[N].source` covers the whole field —
+        # it propagates to both slots so each remains independently
+        # re-validatable.
+        for role in ("source", "destination"):
+            ref = getattr(step, role, None)
+            if ref is None:
+                continue
+            review = reviews.get(f"steps[{step_idx}].{role}")
+            if review is None:
+                continue
+            for prov_attr in ("description_provenance", "wells_provenance"):
+                prov = getattr(ref, prov_attr, None)
+                if prov is None:
+                    continue
+                setattr(ref, prov_attr, Provenance.model_validate({
+                    **prov.model_dump(), **_verdict_updates(review),
+                }))
 
         # Labware-resolution provenances on LocationRefs (PR3a step 3).
         for role in ("source", "destination"):
@@ -600,27 +618,28 @@ def _stamp_spotlight_prov_ids(gap: Gap, spec) -> None:
 
 
 def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
-    """Stamp `field_obj.provenance.review_status = user_action_provenance`,
-    clearing reviewer_objection in the process (a user action supersedes
+    """Stamp review_status=user_action_provenance on every Provenance slot
+    of field_obj, clearing reviewer_objection (a user action supersedes
     any prior reviewer state).
 
-    Pre:    `field_obj` is None, or any object that may carry a
-            `.provenance` attribute (Provenanced*, LocationRef).
-            `user_action_provenance` is one of the user_* values that
-            Provenance.review_status accepts (user_confirmed,
-            user_edited, user_accepted_suggestion, user_skipped).
+    Pre:    `field_obj` is None, or any object that may carry one or more
+            Provenance slots. Atomic Provenanced* types carry `.provenance`;
+            LocationRef carries `.description_provenance` and (optionally)
+            `.wells_provenance`. `user_action_provenance` is one of the
+            user_* values that Provenance.review_status accepts
+            (user_confirmed, user_edited, user_accepted_suggestion,
+            user_skipped).
 
-    Post:   When `field_obj` has a non-None `.provenance`:
-              * field_obj.provenance is REPLACED with a re-validated copy
-                whose review_status equals the passed user_action_provenance
-                and whose reviewer_objection is None.
-            When `field_obj` is None or lacks a `.provenance`: no-op.
+    Post:   Every populated provenance slot on field_obj is REPLACED with
+            a re-validated copy whose review_status equals the passed
+            user_action_provenance and whose reviewer_objection is None.
+            When `field_obj` is None or carries no provenance slots: no-op.
             Re-validation re-runs Provenance's per-source invariants and
             its review_status biconditional.
 
-    Side effects: Mutates `field_obj.provenance` in place.
+    Side effects: Mutates provenance slots on field_obj in place.
 
-    Raises: pydantic.ValidationError if the resulting Provenance violates
+    Raises: pydantic.ValidationError if a resulting Provenance violates
             its invariants — should not happen because user_action values
             are all valid review_status Literals AND reviewer_objection
             is cleared (so the disagree-iff-objection invariant can't
@@ -628,15 +647,16 @@ def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
     """
     if field_obj is None:
         return
-    prov = getattr(field_obj, "provenance", None)
-    if prov is None:
-        return
     from nl2protocol.models.spec import Provenance
-    field_obj.provenance = Provenance.model_validate({
-        **prov.model_dump(),
-        "review_status": user_action_provenance,
-        "reviewer_objection": None,
-    })
+    for prov_attr in ("provenance", "description_provenance", "wells_provenance"):
+        prov = getattr(field_obj, prov_attr, None)
+        if prov is None:
+            continue
+        setattr(field_obj, prov_attr, Provenance.model_validate({
+            **prov.model_dump(),
+            "review_status": user_action_provenance,
+            "reviewer_objection": None,
+        }))
 
 
 def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> None:

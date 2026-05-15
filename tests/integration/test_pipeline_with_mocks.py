@@ -91,12 +91,14 @@ def _spec_simple_transfer(volume_uL: float = 100.0):
                 "source": {
                     "description": "source_plate", "well": "A1",
                     "resolved_label": "source_plate",
-                    "provenance": {"source": "instruction", "cited_text": "from A1", "confidence": 1.0},
+                    "description_provenance": {"source": "instruction", "cited_text": "source_plate", "confidence": 1.0},
+                    "wells_provenance": {"source": "instruction", "cited_text": "from A1", "confidence": 1.0},
                 },
                 "destination": {
                     "description": "dest_plate", "well": "B1",
                     "resolved_label": "dest_plate",
-                    "provenance": {"source": "instruction", "cited_text": "to B1", "confidence": 1.0},
+                    "description_provenance": {"source": "instruction", "cited_text": "dest_plate", "confidence": 1.0},
+                    "wells_provenance": {"source": "instruction", "cited_text": "to B1", "confidence": 1.0},
                 },
             }
         ],
@@ -119,8 +121,8 @@ def _spec_multi_step():
     prov = {"source": "instruction", "cited_text": "test step phrase", "confidence": 1.0}
     transfer_extras = lambda src, dst: {
         "volume": {"value": 50.0, "unit": "uL", "exact": True, "provenance": prov},
-        "source": {"description": "source_plate", "well": src, "resolved_label": "source_plate", "provenance": prov},
-        "destination": {"description": "dest_plate", "well": dst, "resolved_label": "dest_plate", "provenance": prov},
+        "source": {"description": "source_plate", "well": src, "resolved_label": "source_plate", "description_provenance": prov, "wells_provenance": prov},
+        "destination": {"description": "dest_plate", "well": dst, "resolved_label": "dest_plate", "description_provenance": prov, "wells_provenance": prov},
     }
     return {
         "summary": "multi-step test",

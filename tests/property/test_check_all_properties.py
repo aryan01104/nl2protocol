@@ -159,7 +159,8 @@ def location_ref(description_strat=None, well_strat=None, resolved=True):
         description=description_strat,
         well=well_strat,
         resolved_label=description_strat if resolved else st.none(),
-        provenance=provenance(),
+        description_provenance=provenance(),
+        wells_provenance=provenance(),
     )
 
 

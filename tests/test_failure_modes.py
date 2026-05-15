@@ -66,11 +66,12 @@ def _prov(source="instruction", text="test cited text", confidence=1.0):
 
 
 def _loc(**kwargs):
-    """LocationRef with default test provenance — added when LocationRef.provenance
-    became required at the field level (ADR-0007). Lets pre-existing test
-    fixtures construct LocationRefs without each call having to spell out
-    a fresh provenance object."""
-    kwargs.setdefault("provenance", _prov())
+    """LocationRef with default test provenance for both the description and
+    wells slots. Lets pre-existing test fixtures construct LocationRefs
+    without each call having to spell out a fresh provenance object."""
+    kwargs.setdefault("description_provenance", _prov())
+    if any(kwargs.get(k) for k in ("well", "wells", "well_range")):
+        kwargs.setdefault("wells_provenance", _prov())
     return LocationRef(**kwargs)
 
 
