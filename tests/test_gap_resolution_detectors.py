@@ -147,8 +147,9 @@ class TestProvenanceWarningDetector:
         return SemanticExtractor(client=object())
 
     def test_clean_spec_yields_no_gaps(self, extractor):
-        # Every cite ("100uL", "tube rack", "from A1", "to B1") appears in
-        # the instruction → no fabrication warnings.
+        # Every cite grounds its value: the labware cite contains the
+        # labware label, the wells cite contains the well, the volume
+        # cite contains the volume. No fabrication warnings.
         spec = _spec([
             ExtractedStep(
                 order=1, action="transfer",
@@ -157,14 +158,19 @@ class TestProvenanceWarningDetector:
                     provenance=Provenance(source="instruction",
                                           cited_text="100uL", confidence=1.0),
                 ),
-                source=LocationRef(description="tube rack", well="A1",
-                                   description_provenance=_instr_prov("from A1"), wells_provenance=_instr_prov("from A1")),
-                destination=LocationRef(description="tube rack", well="B1",
-                                        description_provenance=_instr_prov("to B1"), wells_provenance=_instr_prov("to B1")),
+                source=LocationRef(
+                    description="tube rack", well="A1",
+                    description_provenance=_instr_prov("tube rack"),
+                    wells_provenance=_instr_prov("A1"),
+                ),
+                destination=LocationRef(
+                    description="tube rack", well="B1",
+                    description_provenance=_instr_prov("tube rack"),
+                    wells_provenance=_instr_prov("B1"),
+                ),
                 composition_provenance=_comp(),
             ),
         ])
-        spec.explicit_volumes = [100.0]
         gaps = ProvenanceWarningDetector(extractor).detect(
             spec,
             context={"instruction": "Transfer 100uL from tube rack A1 to tube rack B1.", "config": {}},

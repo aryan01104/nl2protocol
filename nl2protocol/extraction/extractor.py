@@ -389,126 +389,83 @@ class SemanticExtractor:
             "message": message,
         }
 
-    def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
-        """Verify all source='instruction' claims against the instruction text.
+    @staticmethod
+    def _value_in_quote(value, quote: str) -> bool:
+        """Return True if `value` is contained within the cited quote.
 
-        If the LLM claims a value came from the instruction but the value
-        doesn't appear in the text, that's a fabricated provenance claim.
-        Severity: 'fabrication'.
+        Numeric values: accept both '100' and '100.0' forms (integer-valued
+        floats may appear in the cite either way). String values: case-
+        insensitive substring match.
         """
+        if isinstance(value, (int, float)):
+            if float(value).is_integer() and str(int(value)) in quote:
+                return True
+            return str(value) in quote
+        return str(value).lower() in quote.lower()
+
+    def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
+        """Verify every source='instruction' provenance via cited_text.
+
+        For each provenance with source='instruction', three checks must
+        all pass:
+          1. cited_text is non-empty.
+          2. cited_text appears in the instruction (case-insensitive,
+             whitespace-collapsed via citing.find_cite_position).
+          3. the value is contained within the cited_text.
+
+        Each failed check yields one warning with severity='fabrication'.
+        Walks every field that can carry instruction-sourced provenance:
+        atomic value fields (volume / substance / duration / temperature),
+        post_action volumes, and LocationRef slots (description + wells
+        — each has its own provenance after the 1a split).
+        """
+        from nl2protocol.citing import find_cite_position
+
         warnings = []
-        text_volumes = self._extract_volumes_from_text(instruction)
-        text_wells = self._extract_wells_from_text(instruction)
-        text_durations = self._extract_durations_from_text(instruction)
-        non_volume_numbers = self._extract_non_volume_numbers(instruction, set(text_volumes))
-        instruction_lower = instruction.lower()
+
+        def check(step_order: int, field_name: str, value, prov):
+            if not prov or prov.source != "instruction":
+                return
+            quote = prov.cited_text
+            if not quote:
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: source='instruction' but cited_text missing",
+                ))
+                return
+            if find_cite_position(instruction, quote) is None:
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: cited_text {quote!r} not found in instruction",
+                ))
+                return
+            if not self._value_in_quote(value, quote):
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: value {value!r} not present in cited_text {quote!r}",
+                ))
 
         for step in spec.steps:
-            # --- Volume ---
-            if step.volume and step.volume.provenance.source == "instruction" and step.volume.exact:
-                if step.volume.value not in text_volumes:
-                    warnings.append(self._warn(
-                        step.order, "volume",
-                        f"{step.volume.value}{step.volume.unit}",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.volume.value}{step.volume.unit} "
-                        f"from instruction but not found in text (found: {text_volumes})",
-                    ))
-
-            # --- Substance ---
-            if step.substance and step.substance.provenance.source == "instruction":
-                sub = step.substance.value.lower()
-                # Check exact match, singular/plural variants, and individual words
-                found = (sub in instruction_lower
-                         or sub.rstrip('s') in instruction_lower
-                         or (sub + 's') in instruction_lower)
-                if not found:
-                    warnings.append(self._warn(
-                        step.order, "substance", step.substance.value,
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims substance '{step.substance.value}' "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- Duration ---
-            if step.duration and step.duration.provenance.source == "instruction":
-                if not any(abs(val - step.duration.value) < 0.01 and unit == step.duration.unit
-                           for val, unit in text_durations):
-                    warnings.append(self._warn(
-                        step.order, "duration",
-                        f"{step.duration.value} {step.duration.unit}",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.duration.value} {step.duration.unit} "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- Temperature ---
-            if step.temperature and step.temperature.provenance.source == "instruction":
-                if step.temperature.value not in non_volume_numbers:
-                    warnings.append(self._warn(
-                        step.order, "temperature",
-                        f"{step.temperature.value}°C",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.temperature.value}°C "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- LocationRef: labware + wells (each has its own provenance) ---
+            if step.volume:
+                check(step.order, "volume", step.volume.value, step.volume.provenance)
+            if step.substance:
+                check(step.order, "substance", step.substance.value, step.substance.provenance)
+            if step.duration:
+                check(step.order, "duration", step.duration.value, step.duration.provenance)
+            if step.temperature:
+                check(step.order, "temperature", step.temperature.value, step.temperature.provenance)
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
                 if not ref:
                     continue
-                desc_prov = ref.description_provenance
-                if desc_prov and desc_prov.source == "instruction":
-                    if ref.description.lower() not in instruction_lower:
-                        warnings.append(self._warn(
-                            step.order, f"{role} labware", ref.description,
-                            "instruction", "fabrication",
-                            f"Step {step.order} {role}: claims labware '{ref.description}' "
-                            f"from instruction but not found in text",
-                        ))
-                wells_prov = ref.wells_provenance
-                if wells_prov and wells_prov.source == "instruction":
-                    wells_to_check = [ref.well] if ref.well else (ref.wells or [])
-                    missing = [w for w in wells_to_check if w not in text_wells]
-                    if missing:
-                        warnings.append(self._warn(
-                            step.order, f"{role} wells", str(missing),
-                            "instruction", "fabrication",
-                            f"Step {step.order} {role}: claims wells {missing} "
-                            f"from instruction but not found in text",
-                        ))
-
-            # --- Post-action volumes ---
+                check(step.order, f"{role} labware", ref.description, ref.description_provenance)
+                wells = list(ref.wells or ([ref.well] if ref.well else []))
+                for w in wells:
+                    check(step.order, f"{role} well", w, ref.wells_provenance)
             if step.post_actions:
                 for pa in step.post_actions:
-                    if pa.volume and pa.volume.provenance.source == "instruction" and pa.volume.exact:
-                        if pa.volume.value not in text_volumes:
-                            warnings.append(self._warn(
-                                step.order, f"{pa.action} volume",
-                                f"{pa.volume.value}{pa.volume.unit}",
-                                "instruction", "fabrication",
-                                f"Step {step.order} {pa.action}: claims {pa.volume.value}"
-                                f"{pa.volume.unit} from instruction but not found in text",
-                            ))
-
-        # --- Cross-check invariant: instruction-claimed volumes vs text_extracted_volumes ---
-        instruction_volumes = set()
-        for step in spec.steps:
-            if step.volume and step.volume.provenance.source == "instruction":
-                instruction_volumes.add(step.volume.value)
-            if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.volume and pa.volume.provenance.source == "instruction":
-                        instruction_volumes.add(pa.volume.value)
-        text_extracted = set(spec.explicit_volumes)
-        fabricated = instruction_volumes - text_extracted
-        if fabricated:
-            warnings.append(self._warn(
-                0, "cross-check", str(fabricated),
-                "instruction", "fabrication",
-                f"Volumes claimed as source='instruction' but absent from "
-                f"text_extracted_volumes: {fabricated}",
-            ))
+                    if pa.volume:
+                        check(step.order, f"{pa.action} volume",
+                              pa.volume.value, pa.volume.provenance)
 
         return warnings
 

@@ -301,46 +301,15 @@ def _render_provenanced_value(
 
 # ============================================================================
 # Phase 3: Span recovery — find cited_text positions in the instruction.
+# The predicate lives in nl2protocol.citing so the verifier (extractor) and
+# the visual surface (reporter) share one implementation; ADR-0003 calls
+# this out as a requirement for cited-text-driven verification.
 # ============================================================================
 
-def _normalize_for_match(s: str) -> str:
-    """Lowercase + collapse whitespace. Used for substring matching where
-    minor spacing differences shouldn't cause misses."""
-    import re
-    return re.sub(r"\s+", " ", s.lower()).strip()
-
-
-def _find_cite_position(instruction: str, cited_text: str) -> Optional[tuple]:
-    """Find the (start, end) char offsets where `cited_text` appears in
-    `instruction`. Case-insensitive. Returns None if not found.
-
-    First-match-wins for substrings that appear multiple times. Phase 3
-    accepts this as a known simplification — multi-cite disambiguation
-    could be a future improvement (e.g. carry the LLM's character offset
-    if/when the prompt asks for it).
-    """
-    import re
-    if not cited_text:
-        return None
-    # Try exact case-insensitive match first.
-    pattern = re.compile(re.escape(cited_text), re.IGNORECASE)
-    m = pattern.search(instruction)
-    if m:
-        return m.start(), m.end()
-    # Fallback: collapse whitespace on both sides and try again.
-    norm_instruction = _normalize_for_match(instruction)
-    norm_cite = _normalize_for_match(cited_text)
-    pattern2 = re.compile(re.escape(norm_cite))
-    m2 = pattern2.search(norm_instruction)
-    if m2:
-        # Map back to the original instruction by counting chars.
-        # Approximate: use the same offsets (acceptable for whitespace-only diffs).
-        approx_start = m2.start()
-        approx_end = m2.end()
-        # Clamp to valid range — instruction may be shorter due to original whitespace.
-        approx_end = min(approx_end, len(instruction))
-        return approx_start, approx_end
-    return None
+from nl2protocol.citing import (
+    find_cite_position as _find_cite_position,
+    normalize_for_match as _normalize_for_match,
+)
 
 
 def _collect_arrow_targets(spec) -> list:
