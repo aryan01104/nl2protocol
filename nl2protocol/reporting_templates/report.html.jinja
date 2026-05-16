@@ -784,13 +784,33 @@
     </div>
     <div id="indicator-substep" class="indicator-line-sub"></div>
   </div>
-  <!-- ADR-0013 Phase 3b-1: live-mode control bar. Only shown when the
-       template renders for the FastAPI server's GET /. The static
-       HTMLReporter path doesn't set live_mode so this stays hidden. -->
-  <div class="live-controls" style="margin-top: 10px; display: flex; gap: 12px; align-items: center;">
-    <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #c0c0c0; background: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
-    <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
-    <span style="color: var(--dim); font-size: 12px; font-style: italic;">live mode · events stream as the pipeline runs · static report archived to <code>output/</code> at end-of-run</span>
+  <!-- ADR-0013 Phase 3b-1 + hosted-deploy form: live-mode control bar.
+       Only shown when the template renders for the FastAPI server's GET /.
+       The static HTMLReporter path doesn't set live_mode so this stays
+       hidden. User picks an example OR uploads their own files, supplies
+       their Anthropic API key, then submits. /start receives JSON. -->
+  <div class="live-controls" style="margin-top: 10px; padding: 12px 14px; border: 1px solid var(--grid); border-radius: 6px; background: var(--panel); display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <label for="live-example-select" style="font-size: 13px; color: var(--ink);">Protocol:</label>
+      <select id="live-example-select" style="font: 13px -apple-system, sans-serif; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 220px;">
+        <option value="">— choose —</option>
+      </select>
+      <span style="color: var(--dim); font-size: 12px;">or</span>
+      <button type="button" id="live-upload-toggle" style="font: 13px -apple-system, sans-serif; padding: 5px 10px; border: 1px solid #c0c0c0; background: white; cursor: pointer; border-radius: 4px;">Upload your own…</button>
+    </div>
+    <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: #faf6e8; border-radius: 4px;">
+      <label style="font-size: 12px; color: var(--ink);">Instruction (.txt): <input type="file" id="live-instruction-file" accept=".txt,.md,text/plain" style="font-size: 12px;"></label>
+      <label style="font-size: 12px; color: var(--ink);">Config (.json): <input type="file" id="live-config-file" accept=".json,application/json" style="font-size: 12px;"></label>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <label for="live-api-key" style="font-size: 13px; color: var(--ink);">Anthropic key:</label>
+      <input type="password" id="live-api-key" placeholder="sk-ant-…" autocomplete="off" style="font: 13px ui-monospace, 'SF Mono', Menlo, monospace; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 280px;">
+      <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
+      <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
+    </div>
+    <div style="color: var(--dim); font-size: 11px; line-height: 1.5;">
+      Your key is used only for this request and never stored. Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.
+    </div>
   </div>
   <!-- ADR-0013 Phase 3e: small Y/N modal for stand-alone binary
        confirmations (inferred-source containers, hardware-error
@@ -2968,18 +2988,97 @@
     if (icConfirm) icConfirm.addEventListener("click", () => sendIcResponse("confirm"));
     if (icAbort) icAbort.addEventListener("click", () => sendIcResponse("abort"));
 
+    // Populate examples dropdown on load.
+    const exampleSelect = document.getElementById("live-example-select");
+    fetch("/examples").then(r => r.json()).then(data => {
+      (data.examples || []).forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        exampleSelect.appendChild(opt);
+      });
+    }).catch(() => { /* non-fatal */ });
+
+    // Toggle upload group; mutually exclusive with example pick.
+    const uploadToggle = document.getElementById("live-upload-toggle");
+    const uploadGroup = document.getElementById("live-upload-group");
+    let uploadMode = false;
+    if (uploadToggle) {
+      uploadToggle.addEventListener("click", () => {
+        uploadMode = !uploadMode;
+        uploadGroup.style.display = uploadMode ? "flex" : "none";
+        uploadToggle.textContent = uploadMode ? "Use an example instead" : "Upload your own…";
+        if (uploadMode) exampleSelect.value = "";
+      });
+    }
+    if (exampleSelect) {
+      exampleSelect.addEventListener("change", () => {
+        if (exampleSelect.value && uploadMode) {
+          uploadMode = false;
+          uploadGroup.style.display = "none";
+          uploadToggle.textContent = "Upload your own…";
+        }
+      });
+    }
+
+    async function readFileText(input) {
+      if (!input || !input.files || !input.files[0]) return null;
+      return await input.files[0].text();
+    }
+
     startBtn.addEventListener("click", async () => {
+      const apiKey = (document.getElementById("live-api-key").value || "").trim();
+      if (!apiKey) {
+        setStatus("API key required", "#f8d7da", "#721c24");
+        return;
+      }
+
+      let instruction, config;
+      try {
+        if (uploadMode) {
+          const instText = await readFileText(document.getElementById("live-instruction-file"));
+          const configText = await readFileText(document.getElementById("live-config-file"));
+          if (!instText) { setStatus("instruction file required", "#f8d7da", "#721c24"); return; }
+          if (!configText) { setStatus("config file required", "#f8d7da", "#721c24"); return; }
+          instruction = instText;
+          try { config = JSON.parse(configText); }
+          catch (e) { setStatus("invalid config JSON", "#f8d7da", "#721c24"); return; }
+        } else if (exampleSelect.value) {
+          const [instResp, configResp] = await Promise.all([
+            fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/instruction"),
+            fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/config"),
+          ]);
+          if (!instResp.ok || !configResp.ok) {
+            setStatus("failed to load example", "#f8d7da", "#721c24");
+            return;
+          }
+          instruction = await instResp.text();
+          config = await configResp.json();
+        } else {
+          setStatus("pick an example or upload files", "#f8d7da", "#721c24");
+          return;
+        }
+      } catch (err) {
+        setStatus("input read error", "#f8d7da", "#721c24");
+        return;
+      }
+
       startBtn.disabled = true;
       setStatus("starting...", "#fff3cd", "#856404");
       try {
-        const r = await fetch("/start", { method: "POST" });
+        const r = await fetch("/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instruction, config, api_key: apiKey }),
+        });
         const j = await r.json();
         if (j.status === "started") {
           setStatus("running", "#fff3cd", "#856404");
         } else if (j.status === "already_running") {
-          setStatus("already running", "#fff3cd", "#856404");
+          setStatus("demo busy — try again in a few minutes", "#fff3cd", "#856404");
+          startBtn.disabled = false;
         } else {
-          setStatus("start failed", "#f8d7da", "#721c24");
+          setStatus("error: " + (j.message || "start failed"), "#f8d7da", "#721c24");
           startBtn.disabled = false;
         }
       } catch (err) {

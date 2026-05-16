@@ -530,7 +530,23 @@ def main(argv: list = None) -> int:
     if args.init:
         return handle_init()
 
-    # For protocol generation, --intent is required
+    # ADR-0013 + hosted-deploy: when --serve is set, hand off to the
+    # FastAPI server. Instruction + config + api_key come from the
+    # browser form (POST /start), not from CLI args, so -i/-c are
+    # not required here.
+    if args.serve:
+        from .server import run_serve
+        try:
+            run_serve(
+                host=args.serve_host,
+                port=args.serve_port,
+                open_browser=not args.no_open_browser,
+            )
+        except KeyboardInterrupt:
+            print("\n  Server stopped.")
+        return 0
+
+    # For protocol generation (non-serve), --intent is required.
     if not args.intent:
         print("Error: -i/--intent is required for protocol generation", file=sys.stderr)
         parser.print_usage(sys.stderr)
@@ -541,37 +557,6 @@ def main(argv: list = None) -> int:
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
-    # ADR-0013 Phase 3a: live-mode server. When --serve is set, hand off
-    # to the FastAPI server. The pipeline runs server-side; the browser
-    # is the user surface. Static-CLI mode (without --serve) remains
-    # available for non-interactive runs.
-    if args.serve:
-        # The serve path needs an instruction file path (not resolved
-        # text); the server reads the file itself in its worker thread.
-        # If the user passed literal instruction text, write it to a
-        # temp file for the server to read.
-        instruction_path = args.intent
-        if not os.path.isfile(instruction_path):
-            import tempfile
-            tmp = tempfile.NamedTemporaryFile(
-                mode='w', suffix='.txt', delete=False, encoding='utf-8',
-            )
-            tmp.write(args.intent)
-            tmp.close()
-            instruction_path = tmp.name
-        from .server import run_serve
-        try:
-            run_serve(
-                instruction_path=instruction_path,
-                config_path=args.config,
-                host=args.serve_host,
-                port=args.serve_port,
-                open_browser=not args.no_open_browser,
-            )
-        except KeyboardInterrupt:
-            print("\n  Server stopped.")
-        return 0
 
     # Resolve intent (read from file if .txt or .pdf)
     try:
