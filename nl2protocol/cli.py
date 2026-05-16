@@ -148,6 +148,43 @@ Files:
         help='Show full reasoning, provenance details, and debug information'
     )
 
+    parser.add_argument(
+        '--html-report',
+        nargs='?',
+        const='_DEFAULT_',
+        default=None,
+        metavar='PATH',
+        help='Write a self-contained HTML provenance report to PATH after the run. '
+             'If PATH is omitted, defaults to output/report_<timestamp>.html. '
+             'Opens in any browser; shows the 4-stage decomposition '
+             '(instruction → spec → complete spec → script) with color-coded provenance.'
+    )
+
+    # ADR-0013: live-mode server (primary user surface).
+    parser.add_argument(
+        '--serve',
+        action='store_true',
+        help='Start the live-mode FastAPI server (ADR-0013). Opens the browser, runs '
+             'the pipeline server-side, streams events over WebSocket. Phase 3a: backend '
+             'network layer + placeholder page; Phase 3b adds the real visual rendering.'
+    )
+    parser.add_argument(
+        '--serve-host',
+        default='127.0.0.1',
+        help='Host to bind the live-mode server to (default: 127.0.0.1).'
+    )
+    parser.add_argument(
+        '--serve-port',
+        type=int,
+        default=8000,
+        help='Port to bind the live-mode server to (default: 8000).'
+    )
+    parser.add_argument(
+        '--no-open-browser',
+        action='store_true',
+        help='Do not auto-open a browser tab when --serve starts (CI / headless mode).'
+    )
+
     return parser
 
 
@@ -505,6 +542,37 @@ def main(argv: list = None) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # ADR-0013 Phase 3a: live-mode server. When --serve is set, hand off
+    # to the FastAPI server. The pipeline runs server-side; the browser
+    # is the user surface. Static-CLI mode (without --serve) remains
+    # available for non-interactive runs.
+    if args.serve:
+        # The serve path needs an instruction file path (not resolved
+        # text); the server reads the file itself in its worker thread.
+        # If the user passed literal instruction text, write it to a
+        # temp file for the server to read.
+        instruction_path = args.intent
+        if not os.path.isfile(instruction_path):
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(
+                mode='w', suffix='.txt', delete=False, encoding='utf-8',
+            )
+            tmp.write(args.intent)
+            tmp.close()
+            instruction_path = tmp.name
+        from .server import run_serve
+        try:
+            run_serve(
+                instruction_path=instruction_path,
+                config_path=args.config,
+                host=args.serve_host,
+                port=args.serve_port,
+                open_browser=not args.no_open_browser,
+            )
+        except KeyboardInterrupt:
+            print("\n  Server stopped.")
+        return 0
+
     # Resolve intent (read from file if .txt or .pdf)
     try:
         intent = resolve_intent(args.intent)
@@ -573,8 +641,20 @@ def main(argv: list = None) -> int:
         config_path = temp_config.name
         print(f"\nUsing generated config: {config_path}")
 
+    # Build the optional HTML reporter if --html-report was passed.
+    reporter = None
+    html_report_path = None
+    if args.html_report is not None:
+        from datetime import datetime
+        from .reporting import HTMLReporter
+        if args.html_report == '_DEFAULT_':
+            html_report_path = f"output/report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        else:
+            html_report_path = args.html_report
+        reporter = HTMLReporter(output_path=html_report_path)
+
     try:
-        agent = ProtocolAgent(config_path=config_path)
+        agent = ProtocolAgent(config_path=config_path, reporter=reporter)
     except APIKeyError as e:
         # Offer interactive setup if key is missing
         if offer_setup_on_missing_key():
@@ -582,7 +662,7 @@ def main(argv: list = None) -> int:
             try:
                 from dotenv import find_dotenv, load_dotenv
                 load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
-                agent = ProtocolAgent(config_path=config_path)
+                agent = ProtocolAgent(config_path=config_path, reporter=reporter)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)
                 return 1
@@ -643,6 +723,8 @@ def main(argv: list = None) -> int:
     print(f"  {clabel('Simulation:')} {success('passed')}", file=sys.stderr)
     print(f"  Output:     {output_path}", file=sys.stderr)
     print(f"  Log:        {log_path}", file=sys.stderr)
+    if html_report_path:
+        print(f"  Report:     {html_report_path}", file=sys.stderr)
     print(f"{'─' * 48}", file=sys.stderr)
 
     # Also print paths to stdout (machine-parseable)

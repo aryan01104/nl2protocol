@@ -45,11 +45,17 @@ def simple_config():
 
 
 def _prov():
-    return Provenance(source="instruction", reason="test", confidence=1.0)
+    return Provenance(source="instruction", cited_text="test", confidence=1.0)
 
 
 def _comp():
-    return CompositionProvenance(justification="test", grounding=["instruction"], confidence=1.0)
+    return CompositionProvenance(
+        step_cited_text="test",
+        parameters_cited_texts=["test"],
+        parameters_reasoning="test",
+        grounding=["instruction"],
+        confidence=1.0,
+    )
 
 
 def _dummy_step():
@@ -133,20 +139,20 @@ class TestProvenanceConfidenceBoundaries:
     """Pydantic confidence constraints (ge=0.0, le=1.0) — exact-edge tests."""
 
     def test_confidence_zero_accepted(self):
-        p = Provenance(source="instruction", reason="t", confidence=0.0)
+        p = Provenance(source="instruction", cited_text="t", confidence=0.0)
         assert p.confidence == 0.0
 
     def test_confidence_one_accepted(self):
-        p = Provenance(source="instruction", reason="t", confidence=1.0)
+        p = Provenance(source="instruction", cited_text="t", confidence=1.0)
         assert p.confidence == 1.0
 
     def test_confidence_just_above_one_rejected(self):
         with pytest.raises(ValidationError):
-            Provenance(source="instruction", reason="t", confidence=1.0001)
+            Provenance(source="instruction", cited_text="t", confidence=1.0001)
 
     def test_confidence_just_below_zero_rejected(self):
         with pytest.raises(ValidationError):
-            Provenance(source="instruction", reason="t", confidence=-0.0001)
+            Provenance(source="instruction", cited_text="t", confidence=-0.0001)
 
 
 # ============================================================================

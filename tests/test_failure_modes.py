@@ -50,25 +50,43 @@ def make_spec(steps, **kwargs):
         "protocol_type": "test",
         "summary": "test",
         "reasoning": "",
-        "explicit_volumes": [],
         "initial_contents": [],
     }
     defaults.update(kwargs)
     return ProtocolSpec(steps=steps, **defaults)
 
 
-def _prov(source="instruction", reason="test", confidence=1.0):
-    """Shorthand for test provenance."""
-    return Provenance(source=source, reason=reason, confidence=confidence)
+def _prov(source="instruction", text="test cited text", confidence=1.0):
+    """Shorthand for test provenance. `text` becomes cited_text for instruction-sourced,
+    reasoning for non-instruction-sourced."""
+    if source == "instruction":
+        return Provenance(source=source, cited_text=text, confidence=confidence)
+    return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
-def _comp(grounding=None, justification="test step", confidence=1.0):
+def _loc(**kwargs):
+    """LocationRef with default test provenance for both the description and
+    wells slots. Lets pre-existing test fixtures construct LocationRefs
+    without each call having to spell out a fresh provenance object."""
+    kwargs.setdefault("description_provenance", _prov())
+    if any(kwargs.get(k) for k in ("well", "wells", "well_range")):
+        kwargs.setdefault("wells_provenance", _prov())
+    return LocationRef(**kwargs)
+
+
+def _comp(grounding=None, label="test step", confidence=1.0):
     """Shorthand for test composition provenance."""
-    return CompositionProvenance(
-        justification=justification,
-        grounding=grounding or ["instruction"],
+    grounding = grounding or ["instruction"]
+    kwargs = dict(
+        step_cited_text=label,
+        parameters_cited_texts=[label],
+        parameters_reasoning=label,
+        grounding=grounding,
         confidence=confidence,
     )
+    if "domain_default" in grounding:
+        kwargs["step_reasoning"] = "test domain expansion reasoning"
+    return CompositionProvenance(**kwargs)
 
 
 def _vol(value, unit="uL", exact=True, source="instruction"):
@@ -109,15 +127,15 @@ class TestPipetteInsufficient:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(5.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="B1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="B1"),
                 composition_provenance=_comp(),
             ),
             ExtractedStep(
                 order=2, action="transfer",
                 volume=_vol(500.0),
-                source=LocationRef(description="reservoir", well="A1"),
-                destination=LocationRef(description="dest_plate", well="B1"),
+                source=_loc(description="reservoir", well="A1"),
+                destination=_loc(description="dest_plate", well="B1"),
                 composition_provenance=_comp(),
             ),
         ])
@@ -143,8 +161,8 @@ class TestLabwareMissing:
                 ExtractedStep(
                     order=1, action="distribute",
                     volume=_vol(50.0),
-                    source=LocationRef(description="reagent_reservoir", well="A1"),
-                    destination=LocationRef(description="assay_plate_384", well_range="A1-P24"),
+                    source=_loc(description="reagent_reservoir", well="A1"),
+                    destination=_loc(description="assay_plate_384", well_range="A1-P24"),
                     composition_provenance=_comp(),
                 )
             ],
@@ -166,8 +184,8 @@ class TestModuleMissing:
             ExtractedStep(
                 order=2, action="distribute",
                 volume=_vol(200.0),
-                source=LocationRef(description="reservoir", well="A1"),
-                destination=LocationRef(description="culture_plate", well_range="A1-H12"),
+                source=_loc(description="reservoir", well="A1"),
+                destination=_loc(description="culture_plate", well_range="A1-H12"),
                 composition_provenance=_comp(),
             ),
         ])
@@ -195,7 +213,7 @@ class TestCombinedConfigGaps:
                 ExtractedStep(
                     order=3, action="aspirate",
                     volume=_vol(150.0),
-                    source=LocationRef(description="deep_well_plate", well_range="A1-H1"),
+                    source=_loc(description="deep_well_plate", well_range="A1-H1"),
                     composition_provenance=_comp(),
                 ),
             ],
@@ -282,8 +300,8 @@ class TestMismatchedProtocol:
             ExtractedStep(
                 order=1, action="serial_dilution",
                 volume=_vol(100.0),
-                source=LocationRef(description="drug_stock"),
-                destination=LocationRef(description="96_well_plate", well_range="A1-A12"),
+                source=_loc(description="drug_stock"),
+                destination=_loc(description="96_well_plate", well_range="A1-A12"),
                 post_actions=[PostAction(action="mix", repetitions=5,
                                          volume=_vol(100.0))],
                 composition_provenance=_comp(),
@@ -384,16 +402,26 @@ class TestEquivalentNames:
                 all_descriptions.append(step.destination.description)
         assert len(all_descriptions) >= 2, f"Expected location refs, got none"
 
-        # Labware resolver should map user wording to config labels
+        # Labware resolver should map user wording to config labels.
+        # Post-refactor API: suggest() returns a {description: LabwareSuggestion}
+        # dict (NOT a mutated spec). The pipeline is the sole writer of
+        # resolved_label + resolved_label_provenance after user confirmation.
         resolver = LabwareResolver(config=config, client=client)
-        resolved = resolver.resolve(spec)
-        # All LocationRefs should have resolved_label set
-        for step in resolved.steps:
+        suggestions = resolver.suggest(spec)
+        # Every unique description should get a non-null suggested_label.
+        descriptions_seen = set()
+        for step in spec.steps:
             for ref in [step.source, step.destination]:
-                if ref:
-                    assert ref.resolved_label is not None, (
-                        f"Resolver couldn't map '{ref.description}'"
-                    )
+                if ref is None:
+                    continue
+                descriptions_seen.add(ref.description)
+                sug = suggestions.get(ref.description)
+                assert sug is not None, (
+                    f"No suggestion produced for '{ref.description}'"
+                )
+                assert sug.suggested_label is not None, (
+                    f"Resolver couldn't map '{ref.description}'"
+                )
 
 
 @requires_llm
@@ -412,7 +440,16 @@ class TestCompactInstruction:
 
         assert spec is not None
         assert len(spec.steps) >= 3  # standards + samples + reagent + mix
-        # Key volumes from instruction
-        assert 10.0 in spec.explicit_volumes
-        assert 200.0 in spec.explicit_volumes
-        assert 150.0 in spec.explicit_volumes
+        # Key volumes from instruction must appear as extracted step volumes.
+        extracted_volumes = set()
+        for step in spec.steps:
+            if step.volume:
+                extracted_volumes.add(step.volume.value)
+            for pa in (step.post_actions or []):
+                if pa.volume:
+                    extracted_volumes.add(pa.volume.value)
+        for required in (10.0, 200.0, 150.0):
+            assert required in extracted_volumes, (
+                f"Expected volume {required} to appear in extracted spec; "
+                f"got {sorted(extracted_volumes)}"
+            )

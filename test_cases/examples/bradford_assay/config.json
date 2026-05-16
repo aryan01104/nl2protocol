@@ -18,7 +18,11 @@
         },
         "reagent_reservoir": {
             "load_name": "nest_12_reservoir_15ml",
-            "slot": "5"
+            "slot": "5",
+            "contents": {
+                "A1": "Bradford reagent",
+                "A2": "water"
+            }
         }
     },
     "pipettes": {

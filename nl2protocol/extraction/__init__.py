@@ -16,7 +16,7 @@ from nl2protocol.extraction.prompts import (
     REASONING_SYSTEM_PROMPT,
     REASONING_USER_PROMPT,
 )
-from nl2protocol.extraction.resolver import LabwareResolver
+from nl2protocol.extraction.resolver import LabwareResolver, LabwareSuggestion
 from nl2protocol.extraction.extractor import (
     SemanticExtractor,
     _find_provenance_reason,

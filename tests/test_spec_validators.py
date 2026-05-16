@@ -19,16 +19,24 @@ from nl2protocol.models.spec import (
 # HELPERS
 # ============================================================================
 
-def _prov(source="instruction", reason="test", confidence=1.0):
-    return Provenance(source=source, reason=reason, confidence=confidence)
+def _prov(source="instruction", text="test cited text", confidence=1.0):
+    if source == "instruction":
+        return Provenance(source=source, cited_text=text, confidence=confidence)
+    return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
-def _comp(grounding=None, justification="test step", confidence=1.0):
-    return CompositionProvenance(
-        justification=justification,
-        grounding=grounding or ["instruction"],
+def _comp(grounding=None, label="test step", confidence=1.0):
+    grounding = grounding or ["instruction"]
+    kwargs = dict(
+        step_cited_text=label,
+        parameters_cited_texts=[label],
+        parameters_reasoning=label,
+        grounding=grounding,
         confidence=confidence,
     )
+    if "domain_default" in grounding:
+        kwargs["step_reasoning"] = "test domain expansion reasoning"
+    return CompositionProvenance(**kwargs)
 
 
 def _vol(value, unit="uL"):
@@ -61,21 +69,28 @@ class TestCompositionProvenanceGroundingInvariant:
     steps that have no instruction origin.
     """
 
+    # Common kwargs to keep test signal focused on the grounding invariant.
+    # Each test below overrides only `grounding` (or other) to exercise the
+    # specific clause being tested.
+    _DEFAULT_KWARGS = dict(
+        step_cited_text="user said this",
+        parameters_cited_texts=["user said this with these parameters"],
+        parameters_reasoning="ties the cite to the parameter values",
+        confidence=1.0,
+    )
+
     # Post: grounding=['instruction'] alone is valid
     def test_instruction_alone_is_valid(self):
-        cp = CompositionProvenance(
-            justification="user explicitly described this step",
-            grounding=["instruction"],
-            confidence=1.0,
-        )
+        cp = CompositionProvenance(**self._DEFAULT_KWARGS, grounding=["instruction"])
         assert cp.grounding == ["instruction"]
 
-    # Post: grounding=['instruction', 'domain_default'] is valid (compound)
+    # Post: grounding=['instruction', 'domain_default'] is valid (compound) — but
+    # requires step_reasoning when domain_default is in grounding.
     def test_instruction_plus_domain_default_is_valid(self):
         cp = CompositionProvenance(
-            justification="step expanded from named protocol",
+            **self._DEFAULT_KWARGS,
             grounding=["instruction", "domain_default"],
-            confidence=0.8,
+            step_reasoning="explains how the cited instruction expanded via domain knowledge",
         )
         assert "instruction" in cp.grounding
         assert "domain_default" in cp.grounding
@@ -84,28 +99,20 @@ class TestCompositionProvenanceGroundingInvariant:
     def test_domain_default_alone_is_rejected(self):
         with pytest.raises(ValidationError, match="must include 'instruction'"):
             CompositionProvenance(
-                justification="LLM added this from domain knowledge",
+                **self._DEFAULT_KWARGS,
                 grounding=["domain_default"],
-                confidence=0.5,
+                step_reasoning="LLM added this from domain knowledge",
             )
 
     # Post: grounding=[] is rejected by the Literal/min_length constraint anyway
     def test_empty_grounding_is_rejected(self):
         with pytest.raises(ValidationError):
-            CompositionProvenance(
-                justification="orphan",
-                grounding=[],
-                confidence=0.5,
-            )
+            CompositionProvenance(**self._DEFAULT_KWARGS, grounding=[])
 
     # Post: grounding=['config'] is rejected — 'config' is no longer a valid Literal
     def test_config_grounding_is_rejected(self):
         with pytest.raises(ValidationError):
-            CompositionProvenance(
-                justification="step from lab config",
-                grounding=["config"],
-                confidence=1.0,
-            )
+            CompositionProvenance(**self._DEFAULT_KWARGS, grounding=["config"])
 
 
 # ============================================================================
@@ -225,8 +232,8 @@ class TestValidateCompleteness:
             _step(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="src", well="A1"),
-                destination=LocationRef(description="dst", well="A1"),
+                source=LocationRef(description="src", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+                destination=LocationRef(description="dst", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
             ),
         ])
 
@@ -237,7 +244,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    destination=LocationRef(description="dst", well="A1"),
+                    destination=LocationRef(description="dst", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
                 ),
             ])
         msg = str(exc_info.value)
@@ -250,7 +257,7 @@ class TestValidateCompleteness:
                 _step(
                     order=1, action="transfer",
                     volume=_vol(100.0),
-                    source=LocationRef(description="src", well="A1"),
+                    source=LocationRef(description="src", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
                 ),
             ])
         assert "missing destination" in str(exc_info.value)
@@ -287,3 +294,67 @@ class TestValidateCompleteness:
                 _step(order=1, action="mix", substance=_pstr("buffer")),
             ])
         assert "for 'buffer'" in str(exc_info.value)
+
+
+# ============================================================================
+# LocationRef provenance split — description_provenance required;
+# wells_provenance required when any well/wells/well_range is set.
+# ============================================================================
+
+class TestLocationRefProvenanceRequired:
+    """Every populated LocationRef must carry description_provenance, and
+    (separately) wells_provenance whenever any well/wells/well_range is
+    populated. The split closes the historic schema conflation where one
+    provenance covered both the labware label and the well positions —
+    semantically distinct claims that usually ground in different parts
+    of the instruction."""
+
+    def test_locationref_without_description_provenance_raises(self):
+        # description_provenance is required regardless of whether wells set.
+        with pytest.raises(ValidationError) as exc_info:
+            LocationRef(description="tube rack", well="A1")
+        msg = str(exc_info.value)
+        assert "description_provenance" in msg.lower() or "provenance" in msg.lower()
+
+    def test_wells_present_without_wells_provenance_raises(self):
+        # wells_provenance is required when any of well/wells/well_range set.
+        with pytest.raises(ValidationError) as exc_info:
+            LocationRef(
+                description="tube rack",
+                well="A1",
+                description_provenance=_prov(source="instruction", text="tube rack"),
+            )
+        msg = str(exc_info.value)
+        assert "wells_provenance" in msg.lower()
+
+    def test_labware_only_locationref_omits_wells_provenance(self):
+        # Refs that name labware alone (e.g. a module by name with no well)
+        # may leave wells_provenance null.
+        ref = LocationRef(
+            description="temperature module",
+            description_provenance=_prov(source="instruction", text="temperature module"),
+        )
+        assert ref.description_provenance is not None
+        assert ref.wells_provenance is None
+
+    def test_locationref_with_both_provenances_constructs_cleanly(self):
+        ref = LocationRef(
+            description="tube rack",
+            well="A1",
+            description_provenance=_prov(source="instruction", text="tube rack"),
+            wells_provenance=_prov(source="instruction", text="A1"),
+        )
+        assert ref.description_provenance.source == "instruction"
+        assert ref.wells_provenance.source == "instruction"
+
+    def test_inferred_provenance_acceptable_for_locationref(self):
+        # The required-field rule doesn't constrain the SOURCE — inferred
+        # provenance from gap-filling (e.g. fill_lookup_and_carryover_gaps)
+        # is just as valid as instruction-sourced provenance.
+        ref = LocationRef(
+            description="reagent_rack (inferred from config)",
+            well="A1",
+            description_provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
+            wells_provenance=_prov(source="inferred", text="config lookup matched substance 'buffer'"),
+        )
+        assert ref.description_provenance.source == "inferred"

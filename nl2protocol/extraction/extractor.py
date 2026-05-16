@@ -78,23 +78,35 @@ def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     if field_name in field_map:
         val = field_map[field_name]
         if val and hasattr(val, 'provenance') and val.provenance:
-            return val.provenance.reason
+            return _provenance_text(val.provenance)
         if field_name == "composition":
-            return step.composition_provenance.justification
+            return step.composition_provenance.step_cited_text
         return None
 
     # Location refs: "source location", "source labware", "source wells", etc.
+    # LocationRef carries two provenances (description + wells); prefer the
+    # wells one when the field name targets wells, else the description one.
     for prefix, ref in [("source", step.source), ("destination", step.destination), ("dest", step.destination)]:
-        if field_name.startswith(prefix) and ref and ref.provenance:
-            return ref.provenance.reason
+        if not (field_name.startswith(prefix) and ref):
+            continue
+        prov = ref.wells_provenance if "well" in field_name else ref.description_provenance
+        if prov:
+            return _provenance_text(prov)
 
     # Post-action fields: "mix volume", "blow_out volume", etc.
     if step.post_actions:
         for pa in step.post_actions:
             if field_name.startswith(pa.action) and pa.volume and pa.volume.provenance:
-                return pa.volume.provenance.reason
+                return _provenance_text(pa.volume.provenance)
 
     return None
+
+
+def _provenance_text(prov) -> str:
+    """Return the human-readable explanation for a Provenance, picking the
+    field populated by the schema: cited_text for instruction-sourced,
+    positive_reasoning for domain_default/inferred-sourced. See ADR-0005, ADR-0009."""
+    return prov.cited_text or prov.positive_reasoning or ""
 
 
 # ============================================================================
@@ -158,9 +170,6 @@ class SemanticExtractor:
 
             # Store the reasoning chain-of-thought
             spec.reasoning = reasoning
-
-            # Populate explicit_volumes from instruction text (deterministic regex)
-            spec.explicit_volumes = self._extract_volumes_from_text(instruction)
 
             return spec
 
@@ -233,319 +242,141 @@ class SemanticExtractor:
 
         return reasoning, spec_json
 
-    @staticmethod
-    def _extract_volumes_from_text(instruction: str) -> List[float]:
-        """Regex extraction of all volumes mentioned in instruction text.
-        These are ground-truth values from the user — immutable."""
-        pattern = re.compile(r'(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])')
-        return sorted(set(float(m.group(1)) for m in pattern.finditer(instruction)))
-
-    def refine(self, spec: ProtocolSpec, gaps: List[str], instruction: str, config: dict) -> Optional[ProtocolSpec]:
-        """Re-run reasoning with feedback about what's missing (self-refinement).
-
-        This is inference-time scaling via self-refinement (Raschka Ch.5):
-        the model reviews its own output, gets feedback on gaps, and tries again.
-        """
-        schema = ProtocolSpec.model_json_schema()
-
-        system_prompt = REASONING_SYSTEM_PROMPT.format(
-            schema=json.dumps(schema, indent=2)
-        )
-
-        refinement_prompt = f"""INSTRUCTION:
-{instruction}
-
-LAB CONFIG:
-{json.dumps(config, indent=2)}
-
-YOUR PREVIOUS SPECIFICATION HAD GAPS:
-{json.dumps(gaps, indent=2)}
-
-PREVIOUS SPEC:
-{spec.model_dump_json(indent=2)}
-
-Please fix the gaps listed above. Re-read the instruction carefully and ensure every
-liquid-handling step has a volume, and every transfer/distribute has source and destination.
-For well ranges, use the format "A1-H12" or provide explicit well lists.
-For time durations, use the "duration" field with unit "seconds", "minutes", or "hours" — NOT the "volume" field.
-
-Output the corrected specification.
-"""
-
-        try:
-            from nl2protocol.spinner import Spinner
-            with Spinner("Refining specification..."):
-                response = self.client.messages.create(
-                    model=self.model_name,
-                    max_tokens=4096,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": refinement_prompt}]
-                )
-
-            full_response = response.content[0].text.strip()
-            reasoning, spec_json = self._parse_response(full_response)
-            data = json.loads(spec_json)
-            refined = ProtocolSpec.model_validate(data)
-            refined.reasoning = reasoning
-            refined.explicit_volumes = self._extract_volumes_from_text(instruction)
-            return refined
-
-        except Exception as e:
-            print(f"  Refinement failed: {e}")
-            return None
-
     # ========================================================================
-    # PROVENANCE VERIFICATION (Task 5)
+    # PROVENANCE VERIFICATION
     # ========================================================================
-
-    @staticmethod
-    def _expand_well_range(start: str, end: str) -> set:
-        """Expand a well range like A1-A12 or A1-H1 to a full set."""
-        start_row, start_col = start[0], int(start[1:])
-        end_row, end_col = end[0], int(end[1:])
-
-        wells = set()
-        if start_row == end_row:
-            # Same row, column range: A1-A12
-            lo, hi = min(start_col, end_col), max(start_col, end_col)
-            for c in range(lo, hi + 1):
-                wells.add(f"{start_row}{c}")
-        elif start_col == end_col:
-            # Same column, row range: A1-H1
-            lo, hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
-            for r in range(lo, hi + 1):
-                wells.add(f"{chr(r)}{start_col}")
-        else:
-            # Block: rectangle from (min_row, min_col) to (max_row, max_col)
-            r_lo, r_hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
-            c_lo, c_hi = min(start_col, end_col), max(start_col, end_col)
-            for r in range(r_lo, r_hi + 1):
-                for c in range(c_lo, c_hi + 1):
-                    wells.add(f"{chr(r)}{c}")
-        return wells
-
-    @staticmethod
-    def _extract_wells_from_text(instruction: str) -> set:
-        """Extract all well positions mentioned in instruction text.
-
-        Handles:
-          - Literal wells: A1, B6, H12
-          - Ranges with dash: A1-A12, A1-H1
-          - Ranges with 'to'/'through': A1 to H1, A1 through A12
-          - Column references: column 1, columns 2-8
-          - Row references: row A, rows A-H
-        """
-        wells = set()
-
-        # 1. Explicit ranges: A1-H1, A1 to A12, A1 through H1
-        range_pattern = re.compile(
-            r'\b([A-H](?:1[0-2]|[1-9]))\s*(?:-|to|through)\s*([A-H](?:1[0-2]|[1-9]))\b',
-            re.IGNORECASE
-        )
-        for m in range_pattern.finditer(instruction):
-            wells |= SemanticExtractor._expand_well_range(m.group(1).upper(), m.group(2).upper())
-
-        # 2. Column references: "column 1", "columns 2-8", "columns 2 through 8"
-        col_single = re.compile(r'\bcolumns?\s+(1[0-2]|[1-9])\b', re.IGNORECASE)
-        for m in col_single.finditer(instruction):
-            col = int(m.group(1))
-            for row in "ABCDEFGH":
-                wells.add(f"{row}{col}")
-
-        col_range = re.compile(
-            r'\bcolumns?\s+(1[0-2]|[1-9])\s*(?:-|to|through)\s*(1[0-2]|[1-9])\b',
-            re.IGNORECASE
-        )
-        for m in col_range.finditer(instruction):
-            lo, hi = int(m.group(1)), int(m.group(2))
-            for col in range(min(lo, hi), max(lo, hi) + 1):
-                for row in "ABCDEFGH":
-                    wells.add(f"{row}{col}")
-
-        # 3. Row references: "row A", "rows A-H"
-        row_single = re.compile(r'\brows?\s+([A-H])\b', re.IGNORECASE)
-        for m in row_single.finditer(instruction):
-            row = m.group(1).upper()
-            for col in range(1, 13):
-                wells.add(f"{row}{col}")
-
-        row_range = re.compile(
-            r'\brows?\s+([A-H])\s*(?:-|to|through)\s*([A-H])\b',
-            re.IGNORECASE
-        )
-        for m in row_range.finditer(instruction):
-            lo, hi = ord(m.group(1).upper()), ord(m.group(2).upper())
-            for r in range(min(lo, hi), max(lo, hi) + 1):
-                for col in range(1, 13):
-                    wells.add(f"{chr(r)}{col}")
-
-        # 4. Literal wells (also catches range endpoints already added above)
-        literal = re.compile(r'\b([A-H](?:1[0-2]|[1-9]))\b')
-        wells |= set(literal.findall(instruction))
-
-        return wells
-
-    @staticmethod
-    def _extract_durations_from_text(instruction: str) -> List[tuple]:
-        """Extract all durations mentioned in instruction text.
-        Returns list of (value, unit) tuples."""
-        pattern = re.compile(
-            r'(\d+(?:\.\d+)?)\s*[-]?\s*'
-            r'(seconds?|minutes?|hours?|secs?|mins?|hrs?)',
-            re.IGNORECASE
-        )
-        unit_map = {
-            'second': 'seconds', 'seconds': 'seconds', 'sec': 'seconds', 'secs': 'seconds',
-            'minute': 'minutes', 'minutes': 'minutes', 'min': 'minutes', 'mins': 'minutes',
-            'hour': 'hours', 'hours': 'hours', 'hr': 'hours', 'hrs': 'hours',
-        }
-        results = []
-        for m in pattern.finditer(instruction):
-            val = float(m.group(1))
-            unit = unit_map.get(m.group(2).lower(), m.group(2).lower())
-            results.append((val, unit))
-        return results
-
-    @staticmethod
-    def _extract_non_volume_numbers(instruction: str, volume_set: set) -> set:
-        """Extract all numbers from instruction text that aren't volumes.
-
-        Finds every standalone number, removes those already identified as
-        volumes (uL/mL suffix). The remaining numbers are candidates for
-        temperatures, counts, concentrations, etc.
-        """
-        all_numbers = set()
-        for m in re.finditer(r'\b(\d+(?:\.\d+)?)\b', instruction):
-            all_numbers.add(float(m.group(1)))
-        return all_numbers - volume_set
 
     def _warn(self, step_order: int, field: str, value: str,
-              claimed_source: str, severity: str, message: str) -> dict:
-        """Build a structured provenance warning."""
+              claimed_source: str, severity: str, message: str,
+              field_path: Optional[str] = None) -> dict:
+        """Build a structured provenance warning.
+
+        `field_path` is the spec address the warning is about (e.g.
+        `steps[2].source.wells_provenance`). The verifier already
+        knows this when it walks the spec — emitting it here means
+        downstream consumers (the orchestrator's Gap detector) don't
+        have to translate the human-readable `field` label back into
+        a path. `field` stays as the display label.
+        """
         return {
             "step": step_order,
             "field": field,
+            "field_path": field_path,
             "value": value,
             "claimed_source": claimed_source,
             "severity": severity,
             "message": message,
         }
 
-    def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
-        """Verify all source='instruction' claims against the instruction text.
+    @staticmethod
+    def _value_in_quote(value, quote: str) -> bool:
+        """Return True if `value` is contained within the cited quote.
 
-        If the LLM claims a value came from the instruction but the value
-        doesn't appear in the text, that's a fabricated provenance claim.
-        Severity: 'fabrication'.
+        Numeric values: accept both '100' and '100.0' forms (integer-valued
+        floats may appear in the cite either way). String values: case-
+        insensitive substring match.
         """
+        if isinstance(value, (int, float)):
+            if float(value).is_integer() and str(int(value)) in quote:
+                return True
+            return str(value) in quote
+        return str(value).lower() in quote.lower()
+
+    def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
+        """Verify every source='instruction' provenance via cited_text.
+
+        For each provenance with source='instruction', three checks must
+        all pass:
+          1. cited_text is non-empty.
+          2. cited_text appears in the instruction (case-insensitive,
+             whitespace-collapsed via citing.find_cite_position).
+          3. the value is contained within the cited_text.
+
+        Each failed check yields one warning with severity='fabrication'.
+        Walks every field that can carry instruction-sourced provenance:
+        atomic value fields (volume / substance / duration / temperature),
+        post_action volumes, and LocationRef slots (description + wells
+        — each has its own provenance after the 1a split).
+        """
+        from nl2protocol.citing import find_cite_position
+
         warnings = []
-        text_volumes = self._extract_volumes_from_text(instruction)
-        text_wells = self._extract_wells_from_text(instruction)
-        text_durations = self._extract_durations_from_text(instruction)
-        non_volume_numbers = self._extract_non_volume_numbers(instruction, set(text_volumes))
-        instruction_lower = instruction.lower()
 
-        for step in spec.steps:
-            # --- Volume ---
-            if step.volume and step.volume.provenance.source == "instruction" and step.volume.exact:
-                if step.volume.value not in text_volumes:
-                    warnings.append(self._warn(
-                        step.order, "volume",
-                        f"{step.volume.value}{step.volume.unit}",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.volume.value}{step.volume.unit} "
-                        f"from instruction but not found in text (found: {text_volumes})",
-                    ))
+        def check(step_order: int, field_name: str, field_path: str,
+                  value, prov):
+            if not prov or prov.source != "instruction":
+                return
+            quotes = prov.cited_text  # List[str] (normalizer wraps str → [str])
+            if not quotes:
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: source='instruction' but cited_text missing",
+                    field_path=field_path,
+                ))
+                return
+            # Every cite must appear in the instruction. A list of cites is
+            # only honest if all of them are real verbatim quotes — one
+            # bogus entry means the LLM confabulated.
+            missing = next(
+                (q for q in quotes if find_cite_position(instruction, q) is None),
+                None,
+            )
+            if missing is not None:
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: cited_text {missing!r} not found in instruction",
+                    field_path=field_path,
+                ))
+                return
+            # At least one cite must contain THIS specific value. For a
+            # wells list where each well has its own cite ("Plasmid A1 to
+            # cells B1", "Plasmid A2 to cells B2", ...), the verifier is
+            # called once per well; A1 should match its own cite, A2 its
+            # own, etc. — at-least-one-contains is the right relaxation.
+            if not any(self._value_in_quote(value, q) for q in quotes):
+                warnings.append(self._warn(
+                    step_order, field_name, str(value), "instruction", "fabrication",
+                    f"Step {step_order} {field_name}: value {value!r} not present in any cited_text {quotes!r}",
+                    field_path=field_path,
+                ))
 
-            # --- Substance ---
-            if step.substance and step.substance.provenance.source == "instruction":
-                sub = step.substance.value.lower()
-                # Check exact match, singular/plural variants, and individual words
-                found = (sub in instruction_lower
-                         or sub.rstrip('s') in instruction_lower
-                         or (sub + 's') in instruction_lower)
-                if not found:
-                    warnings.append(self._warn(
-                        step.order, "substance", step.substance.value,
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims substance '{step.substance.value}' "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- Duration ---
-            if step.duration and step.duration.provenance.source == "instruction":
-                if not any(abs(val - step.duration.value) < 0.01 and unit == step.duration.unit
-                           for val, unit in text_durations):
-                    warnings.append(self._warn(
-                        step.order, "duration",
-                        f"{step.duration.value} {step.duration.unit}",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.duration.value} {step.duration.unit} "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- Temperature ---
-            if step.temperature and step.temperature.provenance.source == "instruction":
-                if step.temperature.value not in non_volume_numbers:
-                    warnings.append(self._warn(
-                        step.order, "temperature",
-                        f"{step.temperature.value}°C",
-                        "instruction", "fabrication",
-                        f"Step {step.order}: claims {step.temperature.value}°C "
-                        f"from instruction but not found in text",
-                    ))
-
-            # --- LocationRef: labware + wells ---
+        for step_idx, step in enumerate(spec.steps):
+            if step.volume:
+                check(step.order, "volume",
+                      f"steps[{step_idx}].volume.provenance",
+                      step.volume.value, step.volume.provenance)
+            if step.substance:
+                check(step.order, "substance",
+                      f"steps[{step_idx}].substance.provenance",
+                      step.substance.value, step.substance.provenance)
+            if step.duration:
+                check(step.order, "duration",
+                      f"steps[{step_idx}].duration.provenance",
+                      step.duration.value, step.duration.provenance)
+            if step.temperature:
+                check(step.order, "temperature",
+                      f"steps[{step_idx}].temperature.provenance",
+                      step.temperature.value, step.temperature.provenance)
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if (ref and ref.provenance and ref.provenance.source == "instruction"):
-                    if ref.description.lower() not in instruction_lower:
-                        warnings.append(self._warn(
-                            step.order, f"{role} labware", ref.description,
-                            "instruction", "fabrication",
-                            f"Step {step.order} {role}: claims labware '{ref.description}' "
-                            f"from instruction but not found in text",
-                        ))
-                    wells_to_check = [ref.well] if ref.well else (ref.wells or [])
-                    missing = [w for w in wells_to_check if w not in text_wells]
-                    if missing:
-                        warnings.append(self._warn(
-                            step.order, f"{role} wells", str(missing),
-                            "instruction", "fabrication",
-                            f"Step {step.order} {role}: claims wells {missing} "
-                            f"from instruction but not found in text",
-                        ))
-
-            # --- Post-action volumes ---
+                if not ref:
+                    continue
+                check(step.order, f"{role} labware",
+                      f"steps[{step_idx}].{role}.description_provenance",
+                      ref.description, ref.description_provenance)
+                wells = list(ref.wells or ([ref.well] if ref.well else []))
+                for w in wells:
+                    # Every well on a ref shares one wells_provenance, so all
+                    # well-fabrication warnings point at the SAME slot. Gap
+                    # dedup by id collapses them into one Gap.
+                    check(step.order, f"{role} well",
+                          f"steps[{step_idx}].{role}.wells_provenance",
+                          w, ref.wells_provenance)
             if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.volume and pa.volume.provenance.source == "instruction" and pa.volume.exact:
-                        if pa.volume.value not in text_volumes:
-                            warnings.append(self._warn(
-                                step.order, f"{pa.action} volume",
-                                f"{pa.volume.value}{pa.volume.unit}",
-                                "instruction", "fabrication",
-                                f"Step {step.order} {pa.action}: claims {pa.volume.value}"
-                                f"{pa.volume.unit} from instruction but not found in text",
-                            ))
-
-        # --- Cross-check invariant: instruction-claimed volumes vs text_extracted_volumes ---
-        instruction_volumes = set()
-        for step in spec.steps:
-            if step.volume and step.volume.provenance.source == "instruction":
-                instruction_volumes.add(step.volume.value)
-            if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.volume and pa.volume.provenance.source == "instruction":
-                        instruction_volumes.add(pa.volume.value)
-        text_extracted = set(spec.explicit_volumes)
-        fabricated = instruction_volumes - text_extracted
-        if fabricated:
-            warnings.append(self._warn(
-                0, "cross-check", str(fabricated),
-                "instruction", "fabrication",
-                f"Volumes claimed as source='instruction' but absent from "
-                f"text_extracted_volumes: {fabricated}",
-            ))
+                for pa_idx, pa in enumerate(step.post_actions):
+                    if pa.volume:
+                        check(step.order, f"{pa.action} volume",
+                              f"steps[{step_idx}].post_actions[{pa_idx}].volume.provenance",
+                              pa.volume.value, pa.volume.provenance)
 
         return warnings
 
@@ -562,8 +393,11 @@ Output the corrected specification.
         for step in spec.steps:
             # LocationRef with source='config': resolved_label must be a valid config key.
             # Only check after resolution (Stage 3.5) has filled resolved_label.
+            # The config claim lives on description_provenance (the labware
+            # label is what gets resolved from the lab config).
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if (ref and ref.provenance and ref.provenance.source == "config"
+                desc_prov = ref.description_provenance if ref else None
+                if (ref and desc_prov and desc_prov.source == "config"
                         and ref.resolved_label and ref.resolved_label not in labware_labels):
                     warnings.append(self._warn(
                         step.order, f"{role} labware", ref.resolved_label,
@@ -612,19 +446,25 @@ Output the corrected specification.
                         f"{step.composition_provenance.confidence} — may need confirmation",
                     ))
 
-            # Walk provenanced fields
+            # Walk provenanced fields. Atomic fields carry one provenance;
+            # LocationRefs carry two (description + wells) — each gets its
+            # own uncertainty check so a low-confidence wells claim is not
+            # masked by a high-confidence description claim, or vice versa.
             fields = [
-                ("volume", step.volume),
-                ("temperature", step.temperature),
-                ("substance", step.substance),
-                ("duration", step.duration),
+                ("volume", step.volume, step.volume.provenance if step.volume else None),
+                ("temperature", step.temperature, step.temperature.provenance if step.temperature else None),
+                ("substance", step.substance, step.substance.provenance if step.substance else None),
+                ("duration", step.duration, step.duration.provenance if step.duration else None),
             ]
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
-                if ref and ref.provenance:
-                    fields.append((f"{role} location", ref))
+                if not ref:
+                    continue
+                if ref.description_provenance:
+                    fields.append((f"{role} labware", ref, ref.description_provenance))
+                if ref.wells_provenance:
+                    fields.append((f"{role} wells", ref, ref.wells_provenance))
 
-            for field_name, field_val in fields:
-                prov = getattr(field_val, 'provenance', None) if field_val else None
+            for field_name, field_val, prov in fields:
                 if not prov:
                     continue
 
@@ -672,14 +512,11 @@ Output the corrected specification.
         """Verify provenance claims across all source types.
 
         Dispatches on provenance.source for each field:
-          - instruction: value must appear in instruction text → 'fabrication' if not
+          - instruction: cited_text must appear in the instruction AND must
+            contain the value → 'fabrication' if either check fails
           - config: referenced key must exist in config → 'fabrication' if not
           - domain_default: flag if confidence < 0.8 → 'unverified'
           - inferred: always flag → 'low_confidence'
-
-        Also enforces the cross-check invariant: any source='instruction' volume
-        not in spec.explicit_volumes (regex-extracted from text) is a fabricated
-        provenance claim.
 
         Returns list of warning dicts:
           {step, field, value, claimed_source, severity, message}
@@ -727,200 +564,154 @@ Output the corrected specification.
     # ========================================================================
 
     @staticmethod
-    def fill_gaps(spec: ProtocolSpec, config: dict) -> Tuple[ProtocolSpec, List[str]]:
-        """Fill missing parameters with inferred defaults from config.
-        Returns (filled_spec, list of descriptions of what was filled)."""
+    def fill_lookup_and_carryover_gaps(spec: ProtocolSpec, config: dict) -> Tuple[ProtocolSpec, List[str]]:
+        """Fill exactly two kinds of deterministic gaps the LLM tends to leave.
+
+        Per ADR-0006, this function is INTENTIONALLY narrow. It is NOT a
+        general-purpose gap filler. It handles only the two patterns where
+        the missing value is *forced by context already in the system* —
+        not heuristically guessed. Adding a third case requires a new ADR
+        with its own justification.
+
+        The two patterns:
+
+        1. **Lookup gaps** (substance → source location).
+           When a step has a `substance` but no `source`, search the
+           config's labware contents for a well that lists this substance.
+           This is a config lookup keyed on substance name. Filled with
+           `Provenance(source="inferred", positive_reasoning="<config path>",
+           why_not_in_instruction="<what the instruction omitted>",
+           confidence=0.9)`.
+
+        2. **Carryover gaps** (wait_for_temperature → prior set_temperature).
+           A `wait_for_temperature` action with no `temperature` value is
+           semantically forced — "wait until the module reaches its target"
+           can only refer to the most recent `set_temperature` in the same
+           protocol. Filled with `Provenance(source="inferred",
+           positive_reasoning="Inherited from prior set_temperature (X°C)...",
+           why_not_in_instruction="instruction did not re-state the target",
+           confidence=0.95)`.
+
+        Both kinds get inferred provenance attached so the report's ▴
+        marker + tooltip surface what was filled and why.
+
+        Pre:    `spec` is a ProtocolSpec post-extraction; some steps may
+                have null `source` (with substance set) or null
+                `temperature` (on wait_for_temperature actions).
+        Post:   Returns (filled_spec, fills) where filled_spec is a deep
+                copy of spec with applicable gaps populated. fills is a
+                list of human-readable strings describing each fill.
+                Steps the function CANNOT fill (no config match, no prior
+                set_temperature) are left untouched — the strict
+                CompleteProtocolSpec validator will catch them later.
+        Side effects: None on the input spec (deep-copied).
+        Raises: Never.
+        """
+        from ..models.spec import Provenance, ProvenancedTemperature
+
         filled = copy.deepcopy(spec)
         fills = []
 
+        # ---- (1) Lookup gaps: substance → source location via config ----
         for step in filled.steps:
-            # Try to resolve source from config labware contents
             if step.source is None and step.substance and "labware" in config:
                 substance_val = step.substance.value
                 for label, lw in config["labware"].items():
                     contents = lw.get("contents", {})
                     for well, content_desc in contents.items():
                         if isinstance(content_desc, str) and substance_val.lower() in content_desc.lower():
+                            # Schema-correct fill (PR3b bug-1 fix):
+                            #   description=label (bare config key — no
+                            #     user wording to preserve since the user
+                            #     didn't describe this ref).
+                            #   resolved_label=label (the SAME config key,
+                            #     filled directly so ConstraintChecker's
+                            #     `resolved_label or description` lookup
+                            #     finds a real config key on the first try).
+                            #   resolved_label_provenance carries the
+                            #     "why this label" reasoning for the
+                            #     reviewer pass.
+                            _synth_reason = (
+                                f"Synthesized by fill_lookup_and_carryover_gaps "
+                                f"from the substance match below; no user "
+                                f"wording existed for this LocationRef."
+                            )
+                            _synth_why_not = (
+                                f"Instruction names the substance "
+                                f"('{substance_val}') but does not state any "
+                                f"location for it — entire ref is filled in."
+                            )
                             step.source = LocationRef(
-                                description=f"{label} (inferred from config)",
-                                well=well
+                                description=label,
+                                well=well,
+                                resolved_label=label,
+                                description_provenance=Provenance(
+                                    source="inferred",
+                                    positive_reasoning=_synth_reason,
+                                    why_not_in_instruction=_synth_why_not,
+                                    confidence=0.9,
+                                ),
+                                wells_provenance=Provenance(
+                                    source="inferred",
+                                    positive_reasoning=_synth_reason,
+                                    why_not_in_instruction=_synth_why_not,
+                                    confidence=0.9,
+                                ),
+                                resolved_label_provenance=Provenance(
+                                    source="inferred",
+                                    positive_reasoning=(
+                                        f"Config labware '{label}' lists substance "
+                                        f"'{substance_val}' at well {well}."
+                                    ),
+                                    why_not_in_instruction=(
+                                        f"Instruction names the substance "
+                                        f"('{substance_val}') but does not state "
+                                        f"which labware/well it comes from."
+                                    ),
+                                    confidence=0.9,
+                                ),
                             )
                             fills.append(f"Step {step.order}: '{substance_val}' source → {label} well {well}")
                             break
                     if step.source:
                         break
 
+        # ---- (2) Carryover gaps: wait_for_temperature inherits from set_temperature ----
+        last_set_temp_celsius = None
+        for step in filled.steps:
+            if step.action == "set_temperature" and step.temperature is not None:
+                last_set_temp_celsius = step.temperature.value
+            elif step.action == "wait_for_temperature" and step.temperature is None:
+                if last_set_temp_celsius is None:
+                    # No prior set_temperature to inherit from. Leave the
+                    # gap; the strict CompleteProtocolSpec validator will
+                    # surface a clear error to the user.
+                    continue
+                step.temperature = ProvenancedTemperature(
+                    value=last_set_temp_celsius,
+                    provenance=Provenance(
+                        source="inferred",
+                        positive_reasoning=(
+                            f"wait_for_temperature inherits from the most "
+                            f"recent set_temperature ({last_set_temp_celsius}°C); "
+                            f"the action's semantics force this — 'wait until "
+                            f"the module reaches its target' can only refer to "
+                            f"the most recent set_temperature."
+                        ),
+                        why_not_in_instruction=(
+                            "The instruction said to wait for the temperature "
+                            "to stabilize but did not re-state the target "
+                            "temperature for this wait."
+                        ),
+                        confidence=0.95,
+                    ),
+                )
+                fills.append(
+                    f"Step {step.order}: wait_for_temperature target → "
+                    f"{last_set_temp_celsius}°C (inherited from prior set_temperature)"
+                )
+
         return filled, fills
-
-    # ========================================================================
-    # USER CONFIRMATION FORMATTER
-    # ========================================================================
-
-    @staticmethod
-    def format_for_confirmation(spec: ProtocolSpec, provenance_warnings: List[dict] = None,
-                                threshold: float = 0.7, full: bool = False,
-                                extra_confirmable: List[dict] = None) -> str:
-        """Format SPEC for user confirmation, grouped by provenance bucket.
-
-        Three sections:
-          1. Auto-accepted: instruction/config values above threshold (count only)
-          2. Confirmation queue: domain_default below threshold + all inferred
-          3. Fabrication errors: provenance claims that failed verification
-
-        If full=True, shows all parameters regardless of provenance (legacy behavior).
-        """
-        warnings = provenance_warnings or []
-        fabrications = [w for w in warnings if w["severity"] == "fabrication"]
-        confirmable = [w for w in warnings if w["severity"] in ("unverified", "low_confidence")]
-        if extra_confirmable:
-            confirmable.extend(extra_confirmable)
-
-        lines = [
-            "",
-            "=" * 60,
-            "PROTOCOL SPECIFICATION",
-            "=" * 60,
-        ]
-
-        if spec.protocol_type:
-            lines.append(f"  Type: {spec.protocol_type}")
-        lines.append(f"  Summary: {spec.summary}")
-        lines.append("")
-
-        # --- Fabrication errors (always shown) ---
-        if fabrications:
-            lines.append(f"  ERRORS ({len(fabrications)}):")
-            for w in fabrications:
-                lines.append(f"    ! Step {w['step']}, {w['field']}: {w['message']}")
-            lines.append("")
-
-        if full:
-            # Full mode: show every step with provenance tags (legacy behavior)
-            lines.append("  ALL STEPS (full confirmation mode):")
-            for step in spec.steps:
-                step_line = _format_step_line(step)
-                # Composition provenance
-                comp = step.composition_provenance
-                grounding = ",".join(comp.grounding) if comp.grounding else "inferred"
-                lines.append(f"    {step_line}")
-                lines.append(f"       composition: [{grounding.upper()}, {comp.confidence}]")
-                lines.append(f"         \"{comp.justification}\"")
-
-                # Per-field provenance
-                fields = []
-                if step.volume:
-                    p = step.volume.provenance
-                    exactness = ", exact" if step.volume.exact else ", approx"
-                    fields.append(f"volume: {step.volume.value}{step.volume.unit} "
-                                  f"[{p.source}, {p.confidence}{exactness}]")
-                if step.temperature:
-                    p = step.temperature.provenance
-                    fields.append(f"temperature: {step.temperature.value}°C "
-                                  f"[{p.source}, {p.confidence}]")
-                if step.substance:
-                    p = step.substance.provenance
-                    fields.append(f"substance: {step.substance.value} [{p.source}, {p.confidence}]")
-                if step.duration:
-                    p = step.duration.provenance
-                    fields.append(f"duration: {step.duration.value} {step.duration.unit} "
-                                  f"[{p.source}, {p.confidence}]")
-                for ref, role in [(step.source, "source"), (step.destination, "dest")]:
-                    if ref and ref.provenance:
-                        p = ref.provenance
-                        fields.append(f"{role}: {ref.description} [{p.source}, {p.confidence}]")
-                for f in fields:
-                    lines.append(f"       {f}")
-
-                # Post-action provenance only (the action/reps/volume text
-                # is already in the step_line above via _format_step_line).
-                if step.post_actions:
-                    for pa in step.post_actions:
-                        if pa.volume:
-                            p = pa.volume.provenance
-                            lines.append(f"       {pa.action} volume: "
-                                         f"{pa.volume.value}{pa.volume.unit} "
-                                         f"[{p.source}, {p.confidence}]")
-
-                if step.pipette_hint:
-                    lines.append(f"       -> pipette: {step.pipette_hint}")
-
-        else:
-            # Threshold mode: show auto-accepted count, then confirmation queue
-
-            # Count auto-accepted parameters
-            auto_accepted = 0
-            for step in spec.steps:
-                for field_val in [step.volume, step.temperature, step.substance, step.duration]:
-                    if field_val and hasattr(field_val, 'provenance') and field_val.provenance:
-                        p = field_val.provenance
-                        if p.source in ("instruction", "config") and p.confidence >= threshold:
-                            auto_accepted += 1
-                for ref in [step.source, step.destination]:
-                    if ref and ref.provenance:
-                        p = ref.provenance
-                        if p.source in ("instruction", "config") and p.confidence >= threshold:
-                            auto_accepted += 1
-                if step.composition_provenance:
-                    comp = step.composition_provenance
-                    if "instruction" in comp.grounding and comp.confidence >= threshold:
-                        auto_accepted += 1
-
-            # Step overview (always shown for context).
-            # _format_step_line is the canonical one-line projection — it now
-            # includes post-actions and tip strategy. Don't re-render here.
-            lines.append("  STEPS:")
-            for step in spec.steps:
-                lines.append(f"    {_format_step_line(step)}")
-            lines.append("")
-
-            if auto_accepted:
-                lines.append(f"  {auto_accepted} parameter(s) auto-accepted "
-                             f"(instruction/config, confidence >= {threshold})")
-                lines.append("")
-
-            # Confirmation queue
-            if confirmable:
-                lines.append(f"  NEEDS CONFIRMATION ({len(confirmable)}):")
-                for i, w in enumerate(confirmable, 1):
-                    if w.get("type") == "initial_volume":
-                        lines.append(f"    [{i}] Initial contents: "
-                                     f"{w['labware']} {w['well']}, "
-                                     f"\"{w['substance']}\" — no volume stated")
-                        lines.append(f"        Default: {w['default_volume']:.0f}uL "
-                                     f"(well capacity)")
-                    elif w.get("type") == "initial_volume_group":
-                        # Compact range display for grouped wells.
-                        from ..pipeline import ProtocolAgent
-                        well_str = ProtocolAgent._summarize_well_list(w["wells"])
-                        n = len(w["wells"])
-                        lines.append(f"    [{i}] Initial contents: "
-                                     f"{w['labware']} {well_str} ({n} wells), "
-                                     f"\"{w['substance']}\" — no volume stated")
-                        lines.append(f"        Default: {w['default_volume']:.0f}uL "
-                                     f"per well (well capacity)")
-                    else:
-                        step = next((s for s in spec.steps if s.order == w['step']), None)
-                        if step:
-                            action = step.action.upper()
-                            substance = f" ({step.substance.value})" if step.substance else ""
-                            step_desc = f"Step {w['step']} {action}{substance}"
-                        else:
-                            step_desc = f"Step {w['step']}"
-                        lines.append(f"    [{i}] {step_desc}, {w['field']}: {w['value']}")
-                        if step:
-                            reason = _find_provenance_reason(step, w['field'])
-                            if reason:
-                                lines.append(f"        Inferred: {reason}")
-                lines.append("")
-            else:
-                lines.append("  All parameters verified — no confirmation needed.")
-                lines.append("")
-
-        if spec.explicit_volumes:
-            lines.append(f"  Locked volumes (from instruction): {spec.explicit_volumes}")
-        lines.append("=" * 60)
-
-        return "\n".join(lines)
 
     @staticmethod
     def validate_schema_against_spec(spec: ProtocolSpec, schema) -> List[str]:

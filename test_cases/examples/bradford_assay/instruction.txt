@@ -1,8 +1,8 @@
 Perform a Bradford protein assay with 8 unknown samples and a BSA standard curve:
 
 Setup:
-- Tube rack A1-A8 contains 8 unknown protein samples
-- Tube rack B1 contains BSA stock solution (2 mg/mL)
+- Tube rack positions A1, A2, A3, A4, A5, A6, B1, B2 contain 8 unknown protein samples (the rack is a 24-position 4x6 layout — these 8 positions are valid)
+- Tube rack D6 contains BSA stock solution (2 mg/mL)
 - Reservoir A1 contains Bradford reagent (Coomassie Brilliant Blue G-250)
 
 Protocol:
@@ -13,7 +13,7 @@ Protocol:
    - D12: Add 1.25uL BSA stock + 8.75uL water (250 ug/mL)
    - E12: Add 1uL BSA stock + 9uL water (200 ug/mL)
    - F12: Add 10uL water only (blank, 0 ug/mL)
-2. Add 10uL of each unknown sample to wells A1-A8 (use fresh tip for each)
-3. Add 200uL of Bradford reagent to all wells containing samples (A1-A8 and A12-F12)
+2. Add 10uL of each unknown sample to wells A1-A8 of the 96-well plate (use fresh tip for each; map sample tubes A1→plate A1, A2→A2, A3→A3, A4→A4, A5→A5, A6→A6, B1→A7, B2→A8)
+3. Add 200uL of Bradford reagent to all wells containing samples (A1-A8 and A12-F12 of the 96-well plate)
 4. Mix each well gently 3 times at 100uL
 5. Pause protocol - user incubates 5 minutes at room temperature, then reads absorbance at 595nm

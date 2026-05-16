@@ -1,23 +1,67 @@
 """
 resolver.py — Resolves user-language labware descriptions to config labels.
 
-One LLM call maps all descriptions to config labels using domain knowledge
-and step context. Returns tentative assignments for user confirmation.
+One LLM call maps every unique description that appears in the spec to a
+config label (or null when no reasonable match exists). The resolver
+returns SUGGESTIONS — it does NOT mutate the spec. The pipeline's
+labware-assignments confirmation flow is the sole writer of
+`resolved_label` and `resolved_label_provenance` on LocationRef objects;
+that lets the provenance honestly reflect whether the user accepted the
+resolver's pick or overrode it (review_status="user_accepted_suggestion"
+vs "user_edited").
+
+Suggest → Confirm → Apply mirrors the orchestrator pattern: produce
+suggestions, present them to the user, then commit with truthful audit
+trail. The previous Apply → Confirm flow stamped a generic
+`source="inferred"` Provenance with `review_status="original"` before
+the user had a chance to override, and user overrides only updated
+`resolved_label` (leaving the provenance saying the resolver picked it).
 """
 
 import json
-from typing import List
+from dataclasses import dataclass
+from typing import List, Optional
 
-from nl2protocol.models.spec import ProtocolSpec, LocationRef
+from nl2protocol.models.spec import LocationRef, ProtocolSpec
 
 
-class LabwareResolver: # is below the current docstring for the class, isnt this more approporaite for the function?
-    """Resolves user-language labware descriptions to config labels.
+@dataclass(frozen=True)
+class LabwareSuggestion:
+    """The resolver's tentative pick for one labware description.
 
-    One LLM call maps all descriptions to config labels using domain knowledge
-    and step context. Returns tentative assignments for user confirmation.
-    Descriptions with no reasonable config match get null — caught by the
-    unresolved LocationRef check in the pipeline.
+    Carries the suggested label + the reasoning the resolver constructed
+    for the pick, plus the candidate list the user can pick from in the
+    confirmation UI. `suggested_label` is None when the resolver could
+    not pick (LLM returned null, or returned a label that doesn't exist
+    in config).
+
+    Used by `LabwareResolver.suggest()`; consumed by the pipeline's
+    labware-assignments confirmation flow which decides whether to
+    stamp the suggestion's reasoning into a Provenance (user accepted)
+    or construct override-reasoning (user picked a different label).
+    """
+
+    description: str
+    suggested_label: Optional[str]
+    positive_reasoning: Optional[str]
+    why_not_in_instruction: Optional[str]
+    confidence: float
+    candidates: List[str]
+
+
+class LabwareResolver:
+    """Produces labware suggestions for user-language descriptions.
+
+    One LLM call maps every unique description in the spec to a config
+    label (or null when no reasonable match exists). Returns a dict
+    `{description: LabwareSuggestion}` covering EVERY unique description
+    the spec carries; entries whose `suggested_label is None` are the
+    ones the LLM couldn't resolve and that the user will need to pick
+    in the confirmation UI.
+
+    Does NOT mutate the spec. The pipeline's labware-assignments
+    confirmation flow is the sole writer of `resolved_label` +
+    `resolved_label_provenance`.
     """
 
     def __init__(self, config: dict, client=None, model_name: str = "claude-sonnet-4-20250514"):
@@ -26,53 +70,127 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
         self.client = client
         self.model_name = model_name
 
-    def resolve(self, spec: ProtocolSpec) -> ProtocolSpec:
-        """Walk all LocationRefs in spec and fill resolved_label via LLM."""
-        spec = spec.model_copy(deep=True)
+    def suggest(self, spec: ProtocolSpec) -> dict:
+        """Build a `{description: LabwareSuggestion}` dict for every
+        unique labware description that appears in the spec.
 
-        all_refs = self._collect_refs(spec)
-        unique_descs = {ref.description for ref in all_refs}
+        Pre:    `spec` is a ProtocolSpec post-extraction. The spec is
+                NOT mutated by this call. `self.client` may be None for
+                test fakes; in that case the LLM resolution short-circuits
+                to an empty `{}` and every description's
+                `LabwareSuggestion.suggested_label` is None.
 
-        # Include prefilled_labware descriptions
-        for pf in spec.prefilled_labware:
-            unique_descs.add(pf.labware)
+        Post:   Returns a dict keyed on each unique description (from
+                step source/destination refs, initial_contents, and
+                prefilled_labware). Each value is a `LabwareSuggestion`:
+                  * `suggested_label`: the LLM's pick, OR None when
+                    unresolvable.
+                  * `positive_reasoning` / `why_not_in_instruction`:
+                    populated iff `suggested_label is not None`. Both
+                    are None for unresolvable descriptions (the user's
+                    pick in the confirm step will generate fresh
+                    reasoning).
+                  * `confidence`: 0.85 for successful picks (matches the
+                    legacy hardcoded value), 0.0 for unresolvable.
+                  * `candidates`: the full list of valid config labels,
+                    so the confirmation UI can populate dropdowns.
 
+        Side effects: One Sonnet call when `self.client` is set and the
+                spec carries at least one description. Otherwise no I/O.
+        """
+        unique_descs = self._collect_unique_descriptions(spec)
         if not unique_descs:
-            return spec
+            return {}
 
         resolved = self._llm_resolve(unique_descs, spec)
 
-        # Apply resolutions
-        for ref in all_refs:
-            if ref.description in resolved:
-                ref.resolved_label = resolved[ref.description]
+        suggestions = {}
+        for desc in unique_descs:
+            label = resolved.get(desc)
+            if label is not None:
+                suggestions[desc] = LabwareSuggestion(
+                    description=desc,
+                    suggested_label=label,
+                    positive_reasoning=self._positive_reasoning(desc, label),
+                    why_not_in_instruction=self._why_not_in_instruction(desc, label),
+                    confidence=0.85,
+                    candidates=list(self.labware_labels),
+                )
+            else:
+                suggestions[desc] = LabwareSuggestion(
+                    description=desc,
+                    suggested_label=None,
+                    positive_reasoning=None,
+                    why_not_in_instruction=None,
+                    confidence=0.0,
+                    candidates=list(self.labware_labels),
+                )
+        return suggestions
 
-        for wc in spec.initial_contents:
-            if wc.labware in resolved:
-                wc.labware = resolved[wc.labware]
-
-        for pf in spec.prefilled_labware:
-            if pf.labware in resolved:
-                pf.labware = resolved[pf.labware]
-
-        return spec
-
-    def _collect_refs(self, spec: ProtocolSpec) -> List[LocationRef]:
-        """Gather all LocationRef objects from spec steps."""
-        refs = []
+    def _collect_unique_descriptions(self, spec: ProtocolSpec) -> List[str]:
+        """Gather every unique labware description from a spec — step
+        source/destination refs, initial_contents rows, and
+        prefilled_labware rows. Preserves first-seen order so the
+        returned dict from `suggest` has a stable iteration order for
+        downstream display + test assertions.
+        """
+        seen = set()
+        ordered = []
         for step in spec.steps:
-            if step.source:
-                refs.append(step.source)
-            if step.destination:
-                refs.append(step.destination)
-        return refs
+            for ref in (step.source, step.destination):
+                if ref is None or ref.description in seen:
+                    continue
+                seen.add(ref.description)
+                ordered.append(ref.description)
+        for wc in spec.initial_contents:
+            if wc.labware not in seen:
+                seen.add(wc.labware)
+                ordered.append(wc.labware)
+        for pf in spec.prefilled_labware:
+            if pf.labware not in seen:
+                seen.add(pf.labware)
+                ordered.append(pf.labware)
+        return ordered
 
-    def _llm_resolve(self, descriptions: set, spec: ProtocolSpec) -> dict:
-        """Single LLM call to resolve all labware descriptions to config labels."""
+    def _positive_reasoning(self, description: str, label: str) -> str:
+        """The 'why is this the right pick?' sentence for a resolver
+        suggestion. Stamped into the Provenance iff the user accepts
+        the suggestion in the confirmation step.
+        """
+        load_name = self.config.get("labware", {}).get(label, {}).get("load_name", "")
+        load_hint = f" (load_name '{load_name}')" if load_name else ""
+        return (
+            f"User-language description '{description}' resolved to config "
+            f"labware '{label}'{load_hint} based on description text + "
+            f"step usage context (well names, action role)."
+        )
+
+    def _why_not_in_instruction(self, description: str, label: str) -> str:
+        """The 'why isn't this in the instruction?' sentence — names the
+        description-vs-config-key gap so the reviewer can verify the
+        translation is genuinely necessary."""
+        return (
+            f"The user wrote '{description}' rather than the config key "
+            f"'{label}' literally — natural-language vs config-key naming "
+            f"gap is expected and requires resolution."
+        )
+
+    def _llm_resolve(self, descriptions: List[str], spec: ProtocolSpec) -> dict:
+        """Single LLM call to resolve all labware descriptions to config labels.
+
+        Pre:    `descriptions` is the list of unique labware descriptions
+                to resolve. `spec` is the extracted spec; only its
+                step-context data is read (action, role, wells, substance).
+                Provenance objects are NOT used by the prompt.
+        Post:   Returns `{description: config_label}` for SUCCESSFUL picks
+                only — entries where the LLM returned null OR returned a
+                label that doesn't exist in `self.config["labware"]` are
+                filtered out. Caller fills in `None` for descriptions
+                absent from this dict.
+        """
         if not self.client:
             return {}
 
-        # Build step context for each description
         desc_context = {}
         for step in spec.steps:
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
@@ -85,7 +203,6 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
                         f"wells={wells}, substance={step.substance.value if step.substance else 'unspecified'}"
                     )
 
-        # Build config summary
         config_summary = {}
         for label, lw in self.config.get("labware", {}).items():
             config_summary[label] = {
@@ -141,7 +258,6 @@ class LabwareResolver: # is below the current docstring for the class, isnt this
             result = json.loads(result_text.strip())
             assignments = result.get("assignments", {})
 
-            # Only keep non-null assignments that reference valid config labels
             return {
                 desc: label
                 for desc, label in assignments.items()

@@ -11,7 +11,7 @@ can verify claims and route uncertain values for user confirmation.
 
 from typing import Annotated, List, Optional, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
@@ -22,24 +22,103 @@ WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 # ============================================================================
 
 class Provenance(BaseModel):
-    """Tracks where a single extracted value came from.
+    """Per-value provenance: where a single extracted/inferred value came from
+    AND where it currently sits in the human-review lifecycle.
 
-    source is the primary signal (categorical, verifiable by grounding checks).
-    confidence is secondary (rank-usable for UX routing, not absolute-calibrated).
+    Three orthogonal concerns on every Provenance:
+
+    1. **Source attribution** — `source` + (`cited_text` | `positive_reasoning`):
+         - source == "instruction":  cited_text required (verbatim quote from
+                                     the user's instruction). The citation IS
+                                     the justification — no reasoning fields.
+         - source == "domain_default" / "inferred":
+                                     positive_reasoning required.
+                                     why_not_in_instruction strongly recommended
+                                     when an instruction exists; the
+                                     extractor/suggester boundary enforces that
+                                     since the schema cannot tell on its own.
+
+    2. **Reasoning split** (ADR-0009) — `positive_reasoning` + `why_not_in_instruction`:
+       Pre-ADR-0009 used a single `reasoning` field. The split lets the
+       independent reviewer verify two distinct claims separately
+       (positive: 'why is X right?'; negative: 'why not just cite?') and lets
+       the HTML report render them as labeled rows. Backwards compatibility:
+       legacy `reasoning="..."` input migrates into positive_reasoning via
+       `_migrate_legacy_reasoning`, and the read-only `.reasoning` property
+       returns positive_reasoning so existing read-sites keep working.
+
+    3. **Review lifecycle** (ADR-0009) — `review_status` + `reviewer_objection`:
+       Tracks how this Provenance moved through the gap-resolver loop. New
+       values default to "original"; reviewer/user actions stamp the
+       appropriate state, so the audit trail survives into the spec, the
+       JSON state dumps, and the HTML report.
+
+    'config' is NOT a valid source for Provenance — the extractor LLM does
+    not see the lab config. Suggesters that look up values from config write
+    source="inferred" with positive_reasoning that cites the config path.
+    See ADR-0005.
     """
-    source: Literal["instruction", "config", "domain_default", "inferred"] = Field(..., description=(
+    source: Literal["instruction", "domain_default", "inferred"] = Field(..., description=(
         "Where this value came from. "
-        "'instruction' = user literally wrote it. "
-        "'config' = read from the lab config. "
-        "'domain_default' = standard practice for a named protocol. "
-        "'inferred' = reasoning or guess with no direct support."
+        "'instruction' = user literally wrote it (cited_text required). "
+        "'domain_default' = standard practice for a named protocol (positive_reasoning required). "
+        "'inferred' = reasoning or guess with no direct support (positive_reasoning required)."
     ))
-    reason: str = Field(..., description=(
-        "One sentence explaining why this value. "
-        "For 'instruction': cite the phrase from the text. "
-        "For 'config': cite the config key. "
+    cited_text: Optional[List[str]] = Field(None, description=(
+        "A list of verbatim substrings from the instruction that ground this value. "
+        "REQUIRED when source == 'instruction' (non-empty list, each entry a non-empty string). "
+        "Each entry must appear verbatim in the instruction (case-insensitive, "
+        "whitespace-normalized). For numbers, at least one cited substring should "
+        "contain the value (e.g., for value=100uL, cited_text might be ['100uL of buffer']). "
+        "Use multiple entries when the supporting text is spread across the instruction "
+        "(e.g., a wells list captured across four bullet points: "
+        "['Plasmid A1 to cells B1', 'Plasmid A2 to cells B2', ...]). Leave null when "
+        "source is 'domain_default' or 'inferred'."
+    ))
+    positive_reasoning: Optional[str] = Field(None, description=(
+        "One sentence answering: 'why is THIS the right value?'. "
+        "REQUIRED when source in {'domain_default', 'inferred'}. "
         "For 'domain_default': cite the protocol and standard practice. "
-        "For 'inferred': state the reasoning chain."
+        "For 'inferred': state the reasoning chain that yields this specific value. "
+        "Leave null when source is 'instruction' (the citation IS the justification)."
+    ))
+    why_not_in_instruction: Optional[str] = Field(None, description=(
+        "One sentence answering: 'why did I have to infer this instead of cite it?'. "
+        "Examples: 'instruction names the substance but not its source labware — "
+        "looked up via config' / 'instruction does not specify temperature for wait — "
+        "inherited from prior set_temperature step'. Leave null when source is "
+        "'instruction'. Strongly recommended (but not schema-enforced) for "
+        "'inferred'/'domain_default' when an instruction exists; the extractor and "
+        "suggesters enforce this at their boundary."
+    ))
+    review_status: Literal[
+        "original",
+        "reviewed_agree",
+        "reviewed_disagree",
+        "user_confirmed",
+        "user_edited",
+        "user_accepted_suggestion",
+        "user_skipped",
+        "user_overrode_fabrication",
+    ] = Field("original", description=(
+        "Where this Provenance sits in the gap-resolver review lifecycle. "
+        "'original'                  = just extracted or just suggested; not yet reviewed. "
+        "'reviewed_agree'            = independent reviewer confirmed the claims. "
+        "'reviewed_disagree'         = reviewer flagged a concern (see reviewer_objection). "
+        "'user_confirmed'            = user saw the value and kept it as-is. "
+        "'user_edited'               = user typed a new value. "
+        "'user_accepted_suggestion'  = user took the suggester's value verbatim. "
+        "'user_skipped'              = user explicitly skipped the gap (value remains original). "
+        "'user_overrode_fabrication' = system flagged the value's cited_text as fabricated, "
+        "                              the FabricationRetrySuggester couldn't resolve it, and "
+        "                              the user chose to commit the value anyway (ADR-0012). "
+        "                              Audit-visible flag: this value is ungrounded by the "
+        "                              verifier but the user has accepted responsibility."
+    ))
+    reviewer_objection: Optional[str] = Field(None, description=(
+        "The independent reviewer's stated concern. REQUIRED when "
+        "review_status == 'reviewed_disagree'; FORBIDDEN otherwise. Surfaces in the "
+        "CLI prompt and HTML report so the user can see why the reviewer pushed back."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this value is correct. "
@@ -50,34 +129,216 @@ class Provenance(BaseModel):
         "Below 0.4 = not sure."
     ))
 
+    @field_validator('cited_text', mode='before')
+    @classmethod
+    def _normalize_cited_text(cls, v):
+        """Accept either a single string (legacy / atomic-cite shape) or
+        a list of strings (multi-cite shape for values whose grounding
+        is spread across the instruction — e.g. a wells list cited from
+        multiple bullet points). Internally we always store a list, so
+        the verifier and visualization can iterate uniformly. Existing
+        callers that pass `cited_text='100uL'` keep working: this
+        validator wraps the string into `['100uL']` before field-level
+        type validation runs.
+        """
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return [v]
+        return v
+
+    @model_validator(mode='before')
+    @classmethod
+    def _migrate_legacy_reasoning(cls, data):
+        """Migrate legacy `reasoning="..."` input to `positive_reasoning="..."`.
+
+        Pre:    Raw input passed to the Provenance constructor — typically a
+                dict (from kwargs, model_validate, or JSON deserialization).
+                May also be an already-validated Provenance instance when
+                Pydantic re-runs validation; in that case this is a no-op.
+
+        Post:   When `data` is a dict containing the legacy `reasoning` key:
+                  * Removes `reasoning` from the dict.
+                  * If the legacy value is truthy AND `positive_reasoning` is
+                    not already set, copies the legacy value into
+                    `positive_reasoning`.
+                  * If `positive_reasoning` is already set, the legacy value
+                    is dropped (positive_reasoning takes precedence).
+                Returns the (possibly mutated) `data` so subsequent validation
+                operates on the migrated input.
+                When `data` is anything else: returns it unchanged.
+
+        Side effects: Mutates the input dict in place when migration applies.
+
+        Raises: Never.
+        """
+        if isinstance(data, dict) and "reasoning" in data:
+            legacy = data.pop("reasoning")
+            if legacy and not data.get("positive_reasoning"):
+                data["positive_reasoning"] = legacy
+        return data
+
+    @model_validator(mode='after')
+    def require_appropriate_field_for_source(self) -> 'Provenance':
+        """Enforce per-source field invariants on cite + reasoning fields.
+
+        Pre:    Pydantic-validated Provenance instance.
+
+        Post:   Returns self when the source/cite/reasoning fields are
+                self-consistent. Specifically:
+                  * source == 'instruction'  → cited_text required;
+                                                positive_reasoning AND
+                                                why_not_in_instruction must
+                                                both be empty (the citation
+                                                IS the justification).
+                  * source != 'instruction'  → positive_reasoning required;
+                                                cited_text must be empty
+                                                (non-instruction-sourced
+                                                values cannot ground in
+                                                user-quoted text).
+                why_not_in_instruction is allowed but not required for
+                non-instruction sources at the schema layer; the extractor
+                and suggesters enforce its presence when an instruction exists.
+
+        Raises: ValueError describing the offending field combination.
+        """
+        if self.source == "instruction":
+            if not self.cited_text:
+                raise ValueError(
+                    "Provenance with source='instruction' requires cited_text "
+                    "(the verbatim substring from the instruction). "
+                    f"Got cited_text={self.cited_text!r}."
+                )
+            if self.positive_reasoning:
+                raise ValueError(
+                    "Provenance with source='instruction' must NOT carry "
+                    "positive_reasoning — the citation IS the justification."
+                )
+            if self.why_not_in_instruction:
+                raise ValueError(
+                    "Provenance with source='instruction' must NOT carry "
+                    "why_not_in_instruction — the value WAS in the instruction "
+                    "(that's why source is 'instruction')."
+                )
+        else:  # domain_default or inferred
+            if not self.positive_reasoning:
+                raise ValueError(
+                    f"Provenance with source='{self.source}' requires "
+                    "positive_reasoning (an explanation of how this value follows "
+                    "from domain knowledge or inference). "
+                    f"Got positive_reasoning={self.positive_reasoning!r}."
+                )
+            if self.cited_text:
+                raise ValueError(
+                    f"Provenance with source='{self.source}' must NOT carry "
+                    "cited_text — non-instruction-sourced values cannot ground "
+                    "in user-quoted text."
+                )
+        return self
+
+    @model_validator(mode='after')
+    def require_reviewer_objection_iff_disagree(self) -> 'Provenance':
+        """Enforce reviewer_objection ↔ review_status == 'reviewed_disagree'.
+
+        Pre:    Pydantic-validated Provenance instance.
+
+        Post:   Returns self when EITHER:
+                  * review_status == 'reviewed_disagree' AND reviewer_objection
+                    is non-empty,
+                  OR
+                  * review_status != 'reviewed_disagree' AND reviewer_objection
+                    is None.
+                Mirrors the same biconditional that
+                gap_resolution.types.ReviewResult enforces — once a
+                disagreement has been stamped onto a Provenance, the
+                objection rationale must accompany it; conversely, no other
+                review state may carry an objection.
+
+        Raises: ValueError on either side of the biconditional being violated.
+        """
+        if self.review_status == "reviewed_disagree":
+            if not self.reviewer_objection:
+                raise ValueError(
+                    "Provenance with review_status='reviewed_disagree' requires "
+                    "reviewer_objection (the reviewer's stated concern). "
+                    f"Got reviewer_objection={self.reviewer_objection!r}."
+                )
+        else:
+            if self.reviewer_objection:
+                raise ValueError(
+                    f"Provenance with review_status='{self.review_status}' must NOT "
+                    "carry reviewer_objection — only 'reviewed_disagree' carries one."
+                )
+        return self
+
+    @property
+    def reasoning(self) -> Optional[str]:
+        """DEPRECATED read-only alias for positive_reasoning.
+
+        Pre-ADR-0009 callers read `prov.reasoning`. ADR-0009 split the field
+        into positive_reasoning + why_not_in_instruction. This property keeps
+        legacy READS working (returns positive_reasoning); legacy WRITES are
+        handled by `_migrate_legacy_reasoning`. New code should read
+        `positive_reasoning` directly. NOT a Pydantic field — does not appear
+        in model_dump() output.
+        """
+        return self.positive_reasoning
+
 
 class CompositionProvenance(BaseModel):
-    """Tracks why a step exists — what reasoning justifies linking its parameters together.
+    """Per-step provenance: answers TWO questions about why a step exists as a unit.
 
-    Unlike Provenance (single source for a single value), a step's existence
-    is a synthesis. Architectural invariant: every step MUST be grounded in
-    'instruction' — the LLM is permitted to interpret natural language and
-    expand named protocols via domain knowledge, but it is NOT permitted to
-    inject steps the user did not ask for. A step grounded only in
-    domain_default (without instruction grounding) would be a hallucination
-    — pre-validated against by the schema below.
+    Q1 (step existence): Why does a step of this kind exist at all?
+       Answered by: step_cited_text (the user phrase that triggered it)
+                  + optional step_reasoning (how a domain expansion produced this step type).
 
-    Note: 'config' is NOT a valid grounding source for extraction-stage steps
-    because the extractor LLM does not have access to the lab config. Config
-    is only visible to the labware-resolver and constraint-checker stages,
-    neither of which produces CompositionProvenance.
+    Q2 (parameter cohesion): Why do these specific parameter values belong to this same step?
+       Answered by: parameters_cited_texts (one or more user phrases grounding the values)
+                  + parameters_reasoning (how the cites combine into one operation).
+
+    Both questions must be answered. The split makes the provenance debuggable and
+    machine-renderable as visualization arrows (see HTML report Phase 3 + ADR-0005).
+
+    Architectural invariant: every step MUST be grounded in 'instruction'. The LLM
+    is permitted to interpret natural language and expand named protocols via domain
+    knowledge, but it is NOT permitted to inject steps the user did not ask for.
+
+    'config' is NOT a valid grounding source — the extractor LLM does not have
+    access to the lab config.
     """
-    justification: str = Field(..., description=(
-        "What reasoning connects these parameters into one step? "
-        "Cite the instruction phrase and (optionally) the domain knowledge "
-        "that justify this step's existence as a distinct action."
+    # Q1: Why this step exists
+    step_cited_text: str = Field(..., description=(
+        "The verbatim phrase from the instruction that triggered this kind of step "
+        "(e.g., 'Add 2uL of plasmid DNA' for a transfer step, or 'do a Bradford assay' "
+        "for a step expanded from a named protocol). MUST appear verbatim in the "
+        "instruction text."
     ))
+    step_reasoning: Optional[str] = Field(None, description=(
+        "Optional explanation of how the cited instruction phrase expanded into THIS "
+        "step type. Only used when grounding includes 'domain_default' — explains the "
+        "domain-knowledge step (e.g., 'Bradford workflow includes a 5-min incubation "
+        "between dye and absorbance read'). Leave null when the step is grounded "
+        "purely in instruction (the cite is sufficient)."
+    ))
+
+    # Q2: Why these specific parameter values cohere as one step
+    parameters_cited_texts: List[str] = Field(..., min_length=1, description=(
+        "One or more verbatim phrases from the instruction that ground the specific "
+        "parameter values for this step (volume + source + destination + substance + "
+        "duration etc.). Often a single phrase covers all parameters; for complex "
+        "steps, multiple phrases combine. Each must appear verbatim in the instruction."
+    ))
+    parameters_reasoning: str = Field(..., description=(
+        "One paragraph explaining how the parameters_cited_texts combine to fully "
+        "specify this step's parameters. For named-protocol expansions where some "
+        "parameter values come from domain defaults, explain which parts are user-stated "
+        "vs domain-defaulted."
+    ))
+
     grounding: List[Literal["instruction", "domain_default"]] = Field(..., description=(
-        "Which sources contributed to this step's existence. MUST include "
-        "'instruction' — every step traces back to something the user asked "
-        "for. May additionally include 'domain_default' when expanding a "
-        "named protocol (e.g., 'Bradford assay' → ['instruction', "
-        "'domain_default'] for steps the user implied via the named protocol)."
+        "Which sources contributed to this step's existence. MUST include 'instruction' "
+        "— every step traces back to something the user asked for. May additionally "
+        "include 'domain_default' when expanding a named protocol."
     ))
     confidence: float = Field(..., ge=0.0, le=1.0, description=(
         "How confident this step should exist. "
@@ -90,17 +351,10 @@ class CompositionProvenance(BaseModel):
     def require_instruction_grounding(self) -> 'CompositionProvenance':
         """Every step must trace back to user instruction.
 
-        Pre:    Pydantic-validated CompositionProvenance instance with
-                grounding ⊆ {'instruction', 'domain_default'} (Literal-enforced).
-
-        Post:   Raises ValueError if 'instruction' is not in self.grounding.
-                The schema invariant is: the LLM may interpret what the user
-                said, expand named protocols via domain knowledge, but MUST
-                NOT inject steps the user did not ask for. A step grounded
-                only in domain_default would violate this and is rejected
-                at parse time rather than silently inserted into the spec.
-
-        Raises: ValueError when grounding does not include 'instruction'.
+        Raises ValueError if 'instruction' is not in self.grounding. A step
+        grounded only in domain_default would be a step the LLM injected
+        without instruction backing — exactly the hallucination pattern
+        we removed Stage 8 for in ADR-0004.
         """
         if "instruction" not in self.grounding:
             raise ValueError(
@@ -109,6 +363,29 @@ class CompositionProvenance(BaseModel):
                 f"Got grounding={self.grounding}. If a step is purely domain "
                 f"knowledge with no instruction origin, it should not be added "
                 f"to the spec — surface it to the user instead."
+            )
+        return self
+
+    @model_validator(mode='after')
+    def require_step_reasoning_for_domain_expansion(self) -> 'CompositionProvenance':
+        """If the step's existence depends on domain knowledge, step_reasoning must explain why.
+
+        Pre:    Pydantic-validated CompositionProvenance with grounding populated.
+
+        Post:   When 'domain_default' is in grounding, step_reasoning is required
+                — the step exists because of domain knowledge expansion, and that
+                expansion must be explained. When grounding is just ['instruction'],
+                step_reasoning is optional (the cite is sufficient).
+
+        Raises: ValueError when domain_default is in grounding but step_reasoning
+                is missing.
+        """
+        if "domain_default" in self.grounding and not self.step_reasoning:
+            raise ValueError(
+                "composition_provenance.step_reasoning is required when "
+                "grounding includes 'domain_default' — explain how the cited "
+                "instruction phrase expanded into this step via domain knowledge. "
+                f"Got step_reasoning={self.step_reasoning!r}."
             )
         return self
 
@@ -177,9 +454,56 @@ class LocationRef(BaseModel):
     resolved_label: Optional[str] = Field(None, description=(
         "Config labware key. Filled automatically by the labware resolver — leave null during extraction."
     ))
-    provenance: Optional[Provenance] = Field(None, description=(
-        "How this location reference was determined. Covers the labware + well(s) as a unit."
+    description_provenance: Provenance = Field(..., description=(
+        "How the labware DESCRIPTION (the user's wording for the labware) was determined. "
+        "REQUIRED on every LocationRef. If the instruction names the labware (e.g. "
+        "'tube rack'), use source='instruction' with cited_text='tube rack'. If the "
+        "labware is implicit at this step (e.g. the instruction names it earlier and "
+        "this step continues with it), use source='inferred' with positive_reasoning "
+        "explaining the connection and why_not_in_instruction explaining what's missing "
+        "at this step's clause."
     ))
+    wells_provenance: Optional[Provenance] = Field(None, description=(
+        "How the WELL(S) were determined. Separate from description_provenance because "
+        "the labware label and the well positions are typically cited from different "
+        "parts of the instruction (e.g. labware named in step 1, wells named in step 5). "
+        "REQUIRED when any of well/wells/well_range is populated; null otherwise."
+    ))
+    resolved_label_provenance: Optional[Provenance] = Field(None, description=(
+        "How the resolved_label was picked from the lab config. Distinct from "
+        "`description_provenance` (which is about how the user described the location). "
+        "Filled by the labware resolver when it picks a config label; left null "
+        "during extraction. Carries the resolver's positive_reasoning / "
+        "why_not_in_instruction so the IndependentReviewSuggester can verify "
+        "the pick — same reviewer machinery as inferred spec values per ADR-0009. "
+        "Subject to the same review_status lifecycle (reviewed_agree / "
+        "reviewed_disagree / user_confirmed / user_edited)."
+    ))
+
+    @model_validator(mode='after')
+    def require_wells_provenance_when_wells_present(self) -> 'LocationRef':
+        """Wells must carry provenance when any well/wells/well_range is set.
+
+        Pre:    LocationRef instance after Pydantic field validation.
+
+        Post:   When at least one of well, wells, well_range is non-null,
+                wells_provenance must be non-null. When all three are null
+                (labware-only ref, e.g. a temperature module referenced by
+                name with no well position), wells_provenance may stay null.
+                Returns self unchanged in both valid cases.
+
+        Raises: ValueError when a well-bearing LocationRef has
+                wells_provenance=None.
+        """
+        has_wells = self.well or self.wells or self.well_range
+        if has_wells and self.wells_provenance is None:
+            raise ValueError(
+                "LocationRef.wells_provenance is required when "
+                "well/wells/well_range is populated. Got "
+                f"well={self.well!r}, wells={self.wells!r}, "
+                f"well_range={self.well_range!r}."
+            )
+        return self
 
 
 class PostAction(BaseModel):
@@ -303,8 +627,14 @@ class LabwarePrefill(BaseModel):
     substance: str = Field(..., description=(
         "What the labware is pre-filled with. Copy the user's wording."
     ))
-    volume_ul: float = Field(..., description=(
-        "Volume per well in uL. Must be explicitly stated in the instruction."
+    volume_ul: Optional[float] = Field(None, description=(
+        "Volume per well in uL. Leave null when the instruction names a "
+        "prefilled labware without stating the per-well volume — the "
+        "InitialContentsVolumeDetector flags null entries as gaps and "
+        "the orchestrator's WellCapacitySuggester proposes a default "
+        "(or the user types one in confirmation). Symmetric with "
+        "WellContents.volume_ul, which has been Optional since the "
+        "orchestrator landed."
     ))
 
 
@@ -318,7 +648,6 @@ class ProtocolSpec(BaseModel):
     summary: str = Field(..., description="One-sentence summary of what the user wants")
     reasoning: str = Field("", description="The LLM's chain-of-thought reasoning")
     steps: List[ExtractedStep] = Field(..., min_length=1)
-    explicit_volumes: List[float] = Field(default_factory=list, description="All volumes found in instruction text via regex")
     initial_contents: List[WellContents] = Field(default_factory=list, description="What's in wells/tubes before the protocol starts")
     prefilled_labware: List[LabwarePrefill] = Field(default_factory=list, description="Labware that starts uniformly pre-filled (e.g. 'cell plate has 100uL media per well')")
 
@@ -363,28 +692,42 @@ class CompleteProtocolSpec(ProtocolSpec):
 
     @model_validator(mode='after')
     def validate_completeness(self) -> 'CompleteProtocolSpec':
-        """Require every step to have all fields its action needs for codegen.
+        """Require every step to carry the fields codegen consumes for its action.
+
+        Per ADR-0006, this contract MATCHES the type's name: every action
+        defined in ActionType has an explicit per-action rule based on what
+        the schema builder actually reads. Steps not listed in any rule
+        (engage_magnets, disengage_magnets, deactivate) impose no
+        per-action requirements — those module commands take only their
+        target module label, not a parameter value.
 
         Pre:    CompleteProtocolSpec instance with `self.steps` populated.
                 `validate_step_ordering` (inherited from ProtocolSpec) has
                 already passed.
 
         Post:   For each step, action-specific completeness rules apply:
-                  * "Liquid" actions {transfer, distribute, consolidate,
+                  * Liquid-handling actions {transfer, distribute, consolidate,
                     aspirate, dispense, mix, serial_dilution} require
                     `step.volume` to be non-None.
-                  * "Transfer-like" actions {transfer, distribute,
+                  * Transfer-like actions {transfer, distribute,
                     serial_dilution, consolidate} additionally require
                     BOTH `step.source` and `step.destination` to be non-None.
-                  * Other actions (e.g. delay, set_temperature) impose no
-                    completeness requirements.
+                  * `set_temperature` and `wait_for_temperature` require
+                    `step.temperature` to be non-None.
+                  * `delay` requires `step.duration` to be non-None.
+                  * `pause` requires `step.duration` OR `step.note`
+                    (one or the other — timed pauses populate duration,
+                    user-driven pauses populate note explaining the
+                    user action).
+                  * `comment` requires `step.note` to be non-None.
+                  * Other actions impose no per-action requirements.
                 If every step satisfies its rules: returns self unchanged.
                 Otherwise: collects ALL issues across ALL steps (does not
                 short-circuit on the first), then raises a single ValueError
                 whose message starts with "Spec is incomplete (N issue(s)):"
                 followed by issues joined by "; ". When `step.substance`
-                is set, the issue message includes a `for 'X'` substance
-                hint where X is `step.substance.value`.
+                is set, liquid-action issue messages include a `for 'X'`
+                substance hint where X is `step.substance.value`.
 
         Side effects: None. Read-only validation.
 
@@ -395,6 +738,7 @@ class CompleteProtocolSpec(ProtocolSpec):
         liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
                           "dispense", "mix", "serial_dilution"}
         transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
+        temperature_actions = {"set_temperature", "wait_for_temperature"}
 
         for step in self.steps:
             prefix = f"Step {step.order} ({step.action})"
@@ -408,6 +752,18 @@ class CompleteProtocolSpec(ProtocolSpec):
                     errors.append(f"{prefix}: no source for '{step.substance.value}' — add it to your config" if step.substance else f"{prefix}: missing source location")
                 if step.destination is None:
                     errors.append(f"{prefix}: missing destination location{substance_hint}")
+
+            if step.action in temperature_actions and step.temperature is None:
+                errors.append(f"{prefix}: missing temperature target")
+
+            if step.action == "delay" and step.duration is None:
+                errors.append(f"{prefix}: missing duration")
+
+            if step.action == "pause" and step.duration is None and not step.note:
+                errors.append(f"{prefix}: pause requires either duration (timed) or note (user-driven)")
+
+            if step.action == "comment" and not step.note:
+                errors.append(f"{prefix}: missing note")
 
         if errors:
             raise ValueError(

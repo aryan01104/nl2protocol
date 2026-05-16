@@ -48,18 +48,37 @@ def serial_dilution_config():
         return json.load(f)
 
 
-def _prov(source="instruction", reason="test", confidence=1.0):
-    """Shorthand for test provenance."""
-    return Provenance(source=source, reason=reason, confidence=confidence)
+def _prov(source="instruction", text="test cited text", confidence=1.0):
+    """Shorthand for test provenance. `text` is cited_text for instruction-sourced,
+    reasoning otherwise."""
+    if source == "instruction":
+        return Provenance(source=source, cited_text=text, confidence=confidence)
+    return Provenance(source=source, reasoning=text, confidence=confidence)
 
 
-def _comp(grounding=None, justification="test step", confidence=1.0):
+def _loc(**kwargs):
+    """LocationRef with default test provenance for both the description and
+    wells slots. Lets pre-existing test fixtures construct LocationRefs
+    without each call having to spell out a fresh provenance object."""
+    kwargs.setdefault("description_provenance", _prov())
+    if any(kwargs.get(k) for k in ("well", "wells", "well_range")):
+        kwargs.setdefault("wells_provenance", _prov())
+    return LocationRef(**kwargs)
+
+
+def _comp(grounding=None, label="test step", confidence=1.0):
     """Shorthand for test composition provenance."""
-    return CompositionProvenance(
-        justification=justification,
-        grounding=grounding or ["instruction"],
+    grounding = grounding or ["instruction"]
+    kwargs = dict(
+        step_cited_text=label,
+        parameters_cited_texts=[label],
+        parameters_reasoning=label,
+        grounding=grounding,
         confidence=confidence,
     )
+    if "domain_default" in grounding:
+        kwargs["step_reasoning"] = "test domain expansion reasoning"
+    return CompositionProvenance(**kwargs)
 
 
 def _vol(value, unit="uL", exact=True, source="instruction"):
@@ -78,7 +97,6 @@ def make_spec(steps, **kwargs):
         "protocol_type": "test",
         "summary": "test protocol",
         "reasoning": "",
-        "explicit_volumes": [],
         "initial_contents": [],
     }
     defaults.update(kwargs)
@@ -386,8 +404,8 @@ class TestCheckAllOrchestration:
         return ExtractedStep(
             order=1, action="transfer",
             volume=_vol(100.0),  # within p300 range
-            source=LocationRef(description="source_plate", well="A1", resolved_label="source_plate"),
-            destination=LocationRef(description="dest_plate", well="A1", resolved_label="dest_plate"),
+            source=_loc(description="source_plate", well="A1", resolved_label="source_plate"),
+            destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp(),
         )
 
@@ -410,14 +428,14 @@ class TestCheckAllOrchestration:
         # Two steps, each requesting a volume that exceeds the only pipette
         bad_step_1 = ExtractedStep(
             order=1, action="transfer", volume=_vol(50000.0),  # 50mL — exceeds anything
-            source=LocationRef(description="source_plate", well="A1"),
-            destination=LocationRef(description="dest_plate", well="A1"),
+            source=_loc(description="source_plate", well="A1"),
+            destination=_loc(description="dest_plate", well="A1"),
             composition_provenance=_comp(),
         )
         bad_step_2 = ExtractedStep(
             order=2, action="transfer", volume=_vol(50000.0),
-            source=LocationRef(description="source_plate", well="B1"),
-            destination=LocationRef(description="dest_plate", well="B1"),
+            source=_loc(description="source_plate", well="B1"),
+            destination=_loc(description="dest_plate", well="B1"),
             composition_provenance=_comp(),
         )
         spec = make_spec([bad_step_1, bad_step_2])
@@ -431,8 +449,8 @@ class TestCheckAllOrchestration:
     def test_every_violation_has_all_structured_fields(self, simple_config):
         bad_step = ExtractedStep(
             order=1, action="transfer", volume=_vol(50000.0),
-            source=LocationRef(description="source_plate", well="A1"),
-            destination=LocationRef(description="dest_plate", well="A1"),
+            source=_loc(description="source_plate", well="A1"),
+            destination=_loc(description="dest_plate", well="A1"),
             composition_provenance=_comp(),
         )
         result = ConstraintChecker(simple_config).check_all(make_spec([bad_step]))
@@ -486,8 +504,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(10.0),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 post_actions=[PostAction(action="mix", repetitions=5,
                                          volume=_vol(50.0))],
                 tip_strategy="new_tip_each",
@@ -510,8 +528,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="A1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -526,8 +544,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(1500.0),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -543,8 +561,8 @@ class TestPipetteCapacity:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(1500.0, source="inferred"),
-                source=LocationRef(description="reagent_tube_rack", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="reagent_tube_rack", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -568,8 +586,8 @@ class TestLabwareResolution:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(10.0),
-                source=LocationRef(description="centrifuge_vial", well="A1"),
-                destination=LocationRef(description="dilution_strip", well="A1"),
+                source=_loc(description="centrifuge_vial", well="A1"),
+                destination=_loc(description="dilution_strip", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -586,8 +604,8 @@ class TestLabwareResolution:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", well="A1"),
-                destination=LocationRef(description="dest_plate", well="A1"),
+                source=_loc(description="source_plate", well="A1"),
+                destination=_loc(description="dest_plate", well="A1"),
                 composition_provenance=_comp(),
             )
         ])
@@ -643,8 +661,8 @@ class TestTipSufficiency:
             ExtractedStep(
                 order=1, action="transfer",
                 volume=_vol(100.0),
-                source=LocationRef(description="source_plate", wells=[f"A{i}" for i in range(1, 13)]),
-                destination=LocationRef(description="dest_plate", wells=[f"A{i}" for i in range(1, 13)]),
+                source=_loc(description="source_plate", wells=[f"A{i}" for i in range(1, 13)]),
+                destination=_loc(description="dest_plate", wells=[f"A{i}" for i in range(1, 13)]),
                 replicates=9,
                 tip_strategy="new_tip_each",
                 composition_provenance=_comp(),
@@ -966,32 +984,10 @@ class TestWellStateTracker:
 class TestVolumeValidation:
     """Tests that user-specified volumes are preserved through generation."""
 
-    def test_explicit_volumes_must_appear_in_schema(self, serial_dilution_config):
-        """Volumes from instruction text (explicit_volumes) must all appear in schema."""
-        from nl2protocol.extraction import SemanticExtractor
-        from nl2protocol.config import enrich_config_with_wells
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well="A1"),
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[100.0]
-        )
-
-        enriched = enrich_config_with_wells(serial_dilution_config)
-        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
-        mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
-
-        assert len(mismatches) == 0
-
     def test_inferred_mix_volume_not_treated_as_hard_constraint(self, qpcr_config):
-        """50uL mix volume (not in explicit_volumes) should NOT cause validation failure."""
+        """An inferred (source != 'instruction') mix volume must not cause a
+        validate_schema_against_spec mismatch — only instruction-sourced
+        volumes are required to appear verbatim in the generated schema."""
         from nl2protocol.extraction import SemanticExtractor
         from nl2protocol.config import enrich_config_with_wells
 
@@ -1000,14 +996,13 @@ class TestVolumeValidation:
                 ExtractedStep(
                     order=1, action="transfer",
                     volume=_vol(10.0),
-                    source=LocationRef(description="reagent_tube_rack", well="A1"),
-                    destination=LocationRef(description="dilution_strip", well="A1"),
+                    source=_loc(description="reagent_tube_rack", well="A1"),
+                    destination=_loc(description="dilution_strip", well="A1"),
                     post_actions=[PostAction(action="mix", repetitions=5,
                                              volume=_vol(50.0, source="inferred"))],
                     composition_provenance=_comp(),
                 )
             ],
-            explicit_volumes=[10.0],  # 50.0 is NOT here — it was inferred
             initial_contents=[
                 WellContents(labware="reagent_tube_rack", well="A1", substance="DNA")
             ]
@@ -1017,8 +1012,7 @@ class TestVolumeValidation:
         schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
         mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
 
-        # The old code would fail here with "50.0uL not found in schema"
-        # Now it passes because 50.0 is not in explicit_volumes
+        # 50.0uL mix is inferred, so it isn't required to appear in schema.
         assert len(mismatches) == 0
 
 
@@ -1039,8 +1033,8 @@ class TestSerialDilution:
                 ExtractedStep(
                     order=1, action="serial_dilution",
                     volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well_range="A1-A6"),
+                    source=_loc(description="reservoir", well="A1"),
+                    destination=_loc(description="plate", well_range="A1-A6"),
                     tip_strategy="new_tip_each",
                     composition_provenance=_comp(),
                 )
@@ -1080,8 +1074,8 @@ class TestSerialDilution:
                 ExtractedStep(
                     order=1, action="serial_dilution",
                     volume=_vol(100.0),
-                    source=LocationRef(description="reservoir", well="A1"),
-                    destination=LocationRef(description="plate", well_range="A1-A6"),
+                    source=_loc(description="reservoir", well="A1"),
+                    destination=_loc(description="plate", well_range="A1-A6"),
                     tip_strategy="new_tip_each",
                     composition_provenance=_comp(),
                 )
@@ -1098,116 +1092,8 @@ class TestSerialDilution:
         assert len(distributes) == 0, "Serial dilution should not auto-distribute diluent"
 
 
-# ============================================================================
-# PROVENANCE DISPLAY
-# ============================================================================
-
-class TestProvenance:
-    """Tests that the confirmation formatter shows provenance correctly."""
-
-    def test_inferred_volume_tagged(self):
-        """Inferred volumes appear in full mode with [inferred] provenance."""
-        from nl2protocol.extraction import SemanticExtractor
-
-        spec = make_spec([
-            ExtractedStep(
-                order=1, action="transfer",
-                volume=_vol(100.0, source="inferred"),
-                source=LocationRef(description="plate_a", well="A1"),
-                destination=LocationRef(description="plate_b", well="A1"),
-                composition_provenance=_comp(),
-            )
-        ])
-
-        output = SemanticExtractor.format_for_confirmation(spec, full=True)
-        assert "inferred" in output
-
-    def test_explicit_volume_no_tag(self):
-        """Explicit volumes (not inferred, not approximate) get no tag."""
-        from nl2protocol.extraction import SemanticExtractor
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(100.0),
-                    source=LocationRef(description="plate_a", well="A1"),
-                    destination=LocationRef(description="plate_b", well="A1"),
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[100.0]
-        )
-
-        output = SemanticExtractor.format_for_confirmation(spec)
-        assert "100.0uL" in output
-        assert "[INFERRED]" not in output.split("100.0uL")[0].split("\n")[-1]
-
-    def test_post_action_volume_provenance_tagged(self):
-        """Post-action volumes show their provenance source in full mode."""
-        from nl2protocol.extraction import SemanticExtractor
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(10.0),
-                    source=LocationRef(description="plate_a", well="A1"),
-                    destination=LocationRef(description="plate_b", well="A1"),
-                    post_actions=[PostAction(action="mix", repetitions=5,
-                                             volume=_vol(50.0, source="domain_default", exact=False))],
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[10.0]
-        )
-
-        output = SemanticExtractor.format_for_confirmation(spec, full=True)
-        assert "50.0uL" in output
-        assert "domain_default" in output
-
-    def test_post_action_rendered_once_in_threshold_mode(self):
-        """Regression: _format_step_line and format_for_confirmation used
-        to both render '-> mix Nx at VuL' independently, producing duplicate
-        lines. _format_step_line is now the single source of truth."""
-        from nl2protocol.extraction import SemanticExtractor
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(2.0),
-                    source=LocationRef(description="src", well="A1"),
-                    destination=LocationRef(description="dst", well="A1"),
-                    post_actions=[PostAction(action="mix", repetitions=3,
-                                             volume=_vol(10.0))],
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[2.0]
-        )
-        output = SemanticExtractor.format_for_confirmation(spec)
-        # The post-action description must appear exactly once.
-        assert output.count("-> mix") == 1
-        assert "mix 3x at 10.0uL" in output
-
-    def test_tip_strategy_surfaces_in_step_line(self):
-        """Regression: _format_step_line did not surface tip_strategy,
-        so the Stage 8 validator couldn't see it."""
-        from nl2protocol.extraction import SemanticExtractor
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(2.0),
-                    source=LocationRef(description="src", well="A1"),
-                    destination=LocationRef(description="dst", well="A1"),
-                    tip_strategy="new_tip_each",
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[2.0]
-        )
-        output = SemanticExtractor.format_for_confirmation(spec)
-        assert "new_tip_each" in output
+# PR3b deleted the legacy `format_for_confirmation` printer and the
+# `TestProvenance` class that pinned its output format. Provenance display
+# now lives in CLIConfirmationHandler (per-Gap CLI prompts) and the HTML
+# report (ADR-0009 step 5). Render-tests for the new surfaces are in
+# tests/test_reporting.py and the orchestrator/handler test files.

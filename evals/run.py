@@ -90,13 +90,23 @@ def _check_spec(spec_block: dict, spec) -> list:
             failures.append(f"spec.step_count_at_most={n} but got {len(spec.steps)}")
 
     if "explicit_volumes_include" in spec_block:
+        # Field-level explicit_volumes was removed alongside the cited-text
+        # verifier migration. Re-derive the equivalent from extracted step
+        # volumes (+ post_action volumes) so the eval contract still
+        # surfaces "did the LLM extract this volume from the instruction?"
         required = spec_block["explicit_volumes_include"]
-        present = set(spec.explicit_volumes or [])
+        present = set()
+        for step in spec.steps:
+            if step.volume:
+                present.add(step.volume.value)
+            for pa in (step.post_actions or []):
+                if pa.volume:
+                    present.add(pa.volume.value)
         missing = [v for v in required if v not in present]
         if missing:
             failures.append(
-                f"spec.explicit_volumes_include={required} but spec only had {sorted(present)}; "
-                f"missing {missing}"
+                f"spec.explicit_volumes_include={required} but extracted volumes "
+                f"were {sorted(present)}; missing {missing}"
             )
 
     if "actions_present" in spec_block:
