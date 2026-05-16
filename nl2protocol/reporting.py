@@ -406,11 +406,20 @@ def _collect_arrow_targets(spec) -> list:
                 # actual phrase the LLM quoted.
                 cite_iter = cited if isinstance(cited, list) else [cited]
                 palette = _palette_class(cited)
+                # Cites under wells_provenance target the indented wells
+                # row (its own prov_id) so the cite-span ↔ value hover
+                # pairs the right visual row. Description / atomic
+                # provenances target the parent prov_id.
+                if (field_name in ("source", "destination")
+                        and attr == "wells_provenance"):
+                    target_prov_id = f"{sid}-{field_name}-wells"
+                else:
+                    target_prov_id = f"{sid}-{field_name}"
                 for cite_idx, single_cite in enumerate(cite_iter):
                     if not single_cite:
                         continue
                     targets.append({
-                        "prov_id": f"{sid}-{field_name}",
+                        "prov_id": target_prov_id,
                         "cited_text": single_cite,
                         "kind": "atomic-color",
                         "palette_class": palette,
@@ -557,6 +566,42 @@ def _format_location(loc) -> str:
     return text
 
 
+def _format_labware_label(loc) -> str:
+    """Just the labware portion of a LocationRef: 'tube rack' or
+    'tube rack  [reagent_rack]' when resolved.
+
+    Pre:    `loc` is a LocationRef with `description` (required) and
+            an optional `resolved_label`.
+    Post:   Returns 'description' alone if resolved_label is null;
+            'description  [resolved_label]' otherwise. No well info
+            in this string — that's `_format_wells_only`'s job.
+    """
+    text = loc.description
+    if getattr(loc, "resolved_label", None):
+        text += f"  [{loc.resolved_label}]"
+    return text
+
+
+def _format_wells_only(loc) -> Optional[str]:
+    """Just the well/wells/well_range portion of a LocationRef.
+
+    Pre:    `loc` is a LocationRef with at most one of well, wells,
+            well_range populated (per the LocationRef contract).
+    Post:   Returns 'well A1' / 'wells A1, A2, A3, A4' (with '...'
+            suffix when >6 wells) / 'A1-A12'. Returns None when no
+            well field is populated — caller skips the row.
+    """
+    if loc.well:
+        return f"well {loc.well}"
+    if loc.wells:
+        head = ", ".join(loc.wells[:6])
+        suffix = "..." if len(loc.wells) > 6 else ""
+        return f"wells {head}{suffix}"
+    if loc.well_range:
+        return loc.well_range
+    return None
+
+
 _PROV_ID_RENDERABLE_FIELDS = {
     "volume", "duration", "temperature", "substance", "source", "destination",
 }
@@ -588,9 +633,19 @@ def _field_path_to_prov_id(field_path: str) -> Optional[str]:
     Side effects: None.
     """
     import re
-    m = re.match(r"steps\[(\d+)\]\.(\w+)(?:\.\w+)?$", field_path)
+    m = re.match(r"steps\[(\d+)\]\.(\w+)(?:\.(\w+))?$", field_path)
     if m and m.group(2) in _PROV_ID_RENDERABLE_FIELDS:
-        return f"s{m.group(1)}-{m.group(2)}"
+        field = m.group(2)
+        subfield = m.group(3)
+        # LocationRef subfields point at the specific sub-row in the
+        # split rendering: `wells_provenance` lands on the wells row
+        # (its own prov_id), description_provenance + resolved_label*
+        # land on the labware row (the parent prov_id). This lets
+        # resolution arrows and cite-marker spans target the correct
+        # visual row without ambiguity.
+        if field in ("source", "destination") and subfield == "wells_provenance":
+            return f"s{m.group(1)}-{field}-wells"
+        return f"s{m.group(1)}-{field}"
     return None
 
 
@@ -1013,29 +1068,49 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     elif "volume" in expected:
         detail_lines.append(_empty_field_cell(f"{sid}-volume", "volume"))
 
-    if step.source is not None:
-        loc_text = _format_location(step.source)
-        prov = step.source.description_provenance
-        if prov:
-            v = _render_provenanced_value(loc_text, prov, prov_id=f"{sid}-source", instruction=instruction)
-        else:
-            import html as _html
-            v = _html.escape(loc_text)
-        detail_lines.append(f'<span class="label">source:</span> {v}')
-    elif "source" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-source", "source"))
+    # source / destination render as TWO rows each: a labware row
+    # (description + resolved_label bracket) hovering description_provenance,
+    # and an indented wells row hovering wells_provenance. The split
+    # surfaces both provenances independently — previously they were
+    # flattened into one string with only description_provenance on hover,
+    # leaving wells_provenance unreachable. The wells row gets its own
+    # prov_id ("{sid}-source-wells") so resolution arrows targeting
+    # wells_provenance can land cleanly on that specific row.
+    for role, role_ref in (("source", step.source), ("destination", step.destination)):
+        if role_ref is not None:
+            labware_text = _format_labware_label(role_ref)
+            desc_prov = role_ref.description_provenance
+            if desc_prov:
+                v_lab = _render_provenanced_value(
+                    labware_text, desc_prov,
+                    prov_id=f"{sid}-{role}",
+                    instruction=instruction,
+                )
+            else:
+                import html as _html
+                v_lab = _html.escape(labware_text)
+            detail_lines.append(f'<span class="label">{role}:</span> {v_lab}')
 
-    if step.destination is not None:
-        loc_text = _format_location(step.destination)
-        prov = step.destination.description_provenance
-        if prov:
-            v = _render_provenanced_value(loc_text, prov, prov_id=f"{sid}-destination", instruction=instruction)
-        else:
-            import html as _html
-            v = _html.escape(loc_text)
-        detail_lines.append(f'<span class="label">destination:</span> {v}')
-    elif "destination" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-destination", "destination"))
+            wells_text = _format_wells_only(role_ref)
+            if wells_text:
+                wells_prov = getattr(role_ref, "wells_provenance", None)
+                if wells_prov:
+                    v_wells = _render_provenanced_value(
+                        wells_text, wells_prov,
+                        prov_id=f"{sid}-{role}-wells",
+                        instruction=instruction,
+                    )
+                else:
+                    import html as _html
+                    v_wells = _html.escape(wells_text)
+                # Indent the wells row visually so it reads as a child
+                # of the source/destination row above.
+                detail_lines.append(
+                    f'<span class="label" style="padding-left: 1.4em;">'
+                    f'↳ wells:</span> {v_wells}'
+                )
+        elif role in expected:
+            detail_lines.append(_empty_field_cell(f"{sid}-{role}", role))
 
     if step.substance is not None:
         v = _render_provenanced_value(step.substance.value, step.substance.provenance, prov_id=f"{sid}-substance", instruction=instruction)

@@ -2455,6 +2455,16 @@
           select.appendChild(opt);
         });
         labelCell.appendChild(select);
+        // Per-row reasoning hint surfacing the resolver's positive_reasoning.
+        // Only rendered when the resolver had a suggestion (no reasoning to
+        // show when the user is picking from scratch). Mirrors the IC
+        // modal's per-row hint shape so the two modals feel coherent.
+        if (row.positive_reasoning) {
+          const hint = document.createElement("div");
+          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+          hint.textContent = row.positive_reasoning;
+          labelCell.appendChild(hint);
+        }
         tr.appendChild(descCell);
         tr.appendChild(labelCell);
         tbody.appendChild(tr);

@@ -1292,14 +1292,17 @@ class TestCollectArrowTargets:
         # Atomic cites are color-matched in the instruction column (no arrow).
         # They still need data-cite-id ↔ data-prov-id wiring for hover emphasis.
         # LocationRef fields contribute TWO targets per field (description +
-        # wells slots), each sharing the field's prov_id so hovering the cell
-        # lights up both cite spans.
+        # wells slots), targeting DIFFERENT prov_ids: description_provenance
+        # lands on the parent prov_id ("s0-source"), wells_provenance lands
+        # on the wells row ("s0-source-wells"). This matches the split-row
+        # rendering in _step_to_render_dict where labware and wells live in
+        # separate visual rows with separate hovers.
         spec = self._spec_with_one_step()
         targets = _collect_arrow_targets(spec)
         atomic_ids = sorted(t["prov_id"] for t in targets if t["kind"] == "atomic-color")
         assert atomic_ids == [
-            "s0-destination", "s0-destination",
-            "s0-source", "s0-source",
+            "s0-destination", "s0-destination-wells",
+            "s0-source", "s0-source-wells",
             "s0-volume",
         ]
 

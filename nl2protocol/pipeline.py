@@ -746,6 +746,14 @@ class ProtocolAgent:
                     "description": ref.description,
                     "suggested_label": suggested,
                     "candidates": candidates,
+                    # Carry the resolver's reasoning through so the
+                    # modal can surface it inline per row. None when
+                    # the resolver had no suggestion (user's pick is
+                    # authoritative; nothing to explain).
+                    "positive_reasoning": (
+                        suggestion.positive_reasoning
+                        if suggestion is not None else None
+                    ),
                 })
         return self.assignments_handler.confirm(table)
 
