@@ -12,7 +12,7 @@
 # machine to sleep when idle to keep the demo free-tier-cheap; the next
 # request takes ~1s to wake it.
 
-app = 'nl2protocol-demo'  # CHANGE ME: must be globally unique on fly.io
+app = 'nl2protocol-aryan'
 primary_region = 'iad'    # us-east; change to your closest region
 
 [build]
