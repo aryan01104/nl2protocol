@@ -1182,9 +1182,6 @@ class ProtocolAgent:
             stage_name="stage_3_gap_resolver",
         ))
 
-        if spec.explicit_volumes:
-            _log(f"  {C.dim(f'Locked volumes: {spec.explicit_volumes}')}")
-
         # Phase 3f (Group D): source-container + labware-assignments
         # confirmations moved BEFORE the orchestrator (see pre-orchestrator
         # block above). Final post-orchestrator check: any LocationRef

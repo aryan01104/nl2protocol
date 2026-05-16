@@ -97,7 +97,6 @@ def make_spec(steps, **kwargs):
         "protocol_type": "test",
         "summary": "test protocol",
         "reasoning": "",
-        "explicit_volumes": [],
         "initial_contents": [],
     }
     defaults.update(kwargs)
@@ -985,32 +984,10 @@ class TestWellStateTracker:
 class TestVolumeValidation:
     """Tests that user-specified volumes are preserved through generation."""
 
-    def test_explicit_volumes_must_appear_in_schema(self, serial_dilution_config):
-        """Volumes from instruction text (explicit_volumes) must all appear in schema."""
-        from nl2protocol.extraction import SemanticExtractor
-        from nl2protocol.config import enrich_config_with_wells
-
-        spec = make_spec(
-            [
-                ExtractedStep(
-                    order=1, action="transfer",
-                    volume=_vol(100.0),
-                    source=_loc(description="reservoir", well="A1"),
-                    destination=_loc(description="plate", well="A1"),
-                    composition_provenance=_comp(),
-                )
-            ],
-            explicit_volumes=[100.0]
-        )
-
-        enriched = enrich_config_with_wells(serial_dilution_config)
-        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
-        mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
-
-        assert len(mismatches) == 0
-
     def test_inferred_mix_volume_not_treated_as_hard_constraint(self, qpcr_config):
-        """50uL mix volume (not in explicit_volumes) should NOT cause validation failure."""
+        """An inferred (source != 'instruction') mix volume must not cause a
+        validate_schema_against_spec mismatch — only instruction-sourced
+        volumes are required to appear verbatim in the generated schema."""
         from nl2protocol.extraction import SemanticExtractor
         from nl2protocol.config import enrich_config_with_wells
 
@@ -1026,7 +1003,6 @@ class TestVolumeValidation:
                     composition_provenance=_comp(),
                 )
             ],
-            explicit_volumes=[10.0],  # 50.0 is NOT here — it was inferred
             initial_contents=[
                 WellContents(labware="reagent_tube_rack", well="A1", substance="DNA")
             ]
@@ -1036,8 +1012,7 @@ class TestVolumeValidation:
         schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
         mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
 
-        # The old code would fail here with "50.0uL not found in schema"
-        # Now it passes because 50.0 is not in explicit_volumes
+        # 50.0uL mix is inferred, so it isn't required to appear in schema.
         assert len(mismatches) == 0
 
 

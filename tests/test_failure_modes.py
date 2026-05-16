@@ -50,7 +50,6 @@ def make_spec(steps, **kwargs):
         "protocol_type": "test",
         "summary": "test",
         "reasoning": "",
-        "explicit_volumes": [],
         "initial_contents": [],
     }
     defaults.update(kwargs)
@@ -403,16 +402,26 @@ class TestEquivalentNames:
                 all_descriptions.append(step.destination.description)
         assert len(all_descriptions) >= 2, f"Expected location refs, got none"
 
-        # Labware resolver should map user wording to config labels
+        # Labware resolver should map user wording to config labels.
+        # Post-refactor API: suggest() returns a {description: LabwareSuggestion}
+        # dict (NOT a mutated spec). The pipeline is the sole writer of
+        # resolved_label + resolved_label_provenance after user confirmation.
         resolver = LabwareResolver(config=config, client=client)
-        resolved = resolver.resolve(spec)
-        # All LocationRefs should have resolved_label set
-        for step in resolved.steps:
+        suggestions = resolver.suggest(spec)
+        # Every unique description should get a non-null suggested_label.
+        descriptions_seen = set()
+        for step in spec.steps:
             for ref in [step.source, step.destination]:
-                if ref:
-                    assert ref.resolved_label is not None, (
-                        f"Resolver couldn't map '{ref.description}'"
-                    )
+                if ref is None:
+                    continue
+                descriptions_seen.add(ref.description)
+                sug = suggestions.get(ref.description)
+                assert sug is not None, (
+                    f"No suggestion produced for '{ref.description}'"
+                )
+                assert sug.suggested_label is not None, (
+                    f"Resolver couldn't map '{ref.description}'"
+                )
 
 
 @requires_llm
@@ -431,7 +440,16 @@ class TestCompactInstruction:
 
         assert spec is not None
         assert len(spec.steps) >= 3  # standards + samples + reagent + mix
-        # Key volumes from instruction
-        assert 10.0 in spec.explicit_volumes
-        assert 200.0 in spec.explicit_volumes
-        assert 150.0 in spec.explicit_volumes
+        # Key volumes from instruction must appear as extracted step volumes.
+        extracted_volumes = set()
+        for step in spec.steps:
+            if step.volume:
+                extracted_volumes.add(step.volume.value)
+            for pa in (step.post_actions or []):
+                if pa.volume:
+                    extracted_volumes.add(pa.volume.value)
+        for required in (10.0, 200.0, 150.0):
+            assert required in extracted_volumes, (
+                f"Expected volume {required} to appear in extracted spec; "
+                f"got {sorted(extracted_volumes)}"
+            )

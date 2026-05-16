@@ -171,9 +171,6 @@ class SemanticExtractor:
             # Store the reasoning chain-of-thought
             spec.reasoning = reasoning
 
-            # Populate explicit_volumes from instruction text (deterministic regex)
-            spec.explicit_volumes = self._extract_volumes_from_text(instruction)
-
             return spec
 
         except Exception as e:
@@ -245,137 +242,9 @@ class SemanticExtractor:
 
         return reasoning, spec_json
 
-    @staticmethod
-    def _extract_volumes_from_text(instruction: str) -> List[float]:
-        """Regex extraction of all volumes mentioned in instruction text.
-        These are ground-truth values from the user — immutable."""
-        pattern = re.compile(r'(\d+(?:\.\d+)?)\s*(?:u[lL]|µ[lL])')
-        return sorted(set(float(m.group(1)) for m in pattern.finditer(instruction)))
-
     # ========================================================================
-    # PROVENANCE VERIFICATION (Task 5)
+    # PROVENANCE VERIFICATION
     # ========================================================================
-
-    @staticmethod
-    def _expand_well_range(start: str, end: str) -> set:
-        """Expand a well range like A1-A12 or A1-H1 to a full set."""
-        start_row, start_col = start[0], int(start[1:])
-        end_row, end_col = end[0], int(end[1:])
-
-        wells = set()
-        if start_row == end_row:
-            # Same row, column range: A1-A12
-            lo, hi = min(start_col, end_col), max(start_col, end_col)
-            for c in range(lo, hi + 1):
-                wells.add(f"{start_row}{c}")
-        elif start_col == end_col:
-            # Same column, row range: A1-H1
-            lo, hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
-            for r in range(lo, hi + 1):
-                wells.add(f"{chr(r)}{start_col}")
-        else:
-            # Block: rectangle from (min_row, min_col) to (max_row, max_col)
-            r_lo, r_hi = min(ord(start_row), ord(end_row)), max(ord(start_row), ord(end_row))
-            c_lo, c_hi = min(start_col, end_col), max(start_col, end_col)
-            for r in range(r_lo, r_hi + 1):
-                for c in range(c_lo, c_hi + 1):
-                    wells.add(f"{chr(r)}{c}")
-        return wells
-
-    @staticmethod
-    def _extract_wells_from_text(instruction: str) -> set:
-        """Extract all well positions mentioned in instruction text.
-
-        Handles:
-          - Literal wells: A1, B6, H12
-          - Ranges with dash: A1-A12, A1-H1
-          - Ranges with 'to'/'through': A1 to H1, A1 through A12
-          - Column references: column 1, columns 2-8
-          - Row references: row A, rows A-H
-        """
-        wells = set()
-
-        # 1. Explicit ranges: A1-H1, A1 to A12, A1 through H1
-        range_pattern = re.compile(
-            r'\b([A-H](?:1[0-2]|[1-9]))\s*(?:-|to|through)\s*([A-H](?:1[0-2]|[1-9]))\b',
-            re.IGNORECASE
-        )
-        for m in range_pattern.finditer(instruction):
-            wells |= SemanticExtractor._expand_well_range(m.group(1).upper(), m.group(2).upper())
-
-        # 2. Column references: "column 1", "columns 2-8", "columns 2 through 8"
-        col_single = re.compile(r'\bcolumns?\s+(1[0-2]|[1-9])\b', re.IGNORECASE)
-        for m in col_single.finditer(instruction):
-            col = int(m.group(1))
-            for row in "ABCDEFGH":
-                wells.add(f"{row}{col}")
-
-        col_range = re.compile(
-            r'\bcolumns?\s+(1[0-2]|[1-9])\s*(?:-|to|through)\s*(1[0-2]|[1-9])\b',
-            re.IGNORECASE
-        )
-        for m in col_range.finditer(instruction):
-            lo, hi = int(m.group(1)), int(m.group(2))
-            for col in range(min(lo, hi), max(lo, hi) + 1):
-                for row in "ABCDEFGH":
-                    wells.add(f"{row}{col}")
-
-        # 3. Row references: "row A", "rows A-H"
-        row_single = re.compile(r'\brows?\s+([A-H])\b', re.IGNORECASE)
-        for m in row_single.finditer(instruction):
-            row = m.group(1).upper()
-            for col in range(1, 13):
-                wells.add(f"{row}{col}")
-
-        row_range = re.compile(
-            r'\brows?\s+([A-H])\s*(?:-|to|through)\s*([A-H])\b',
-            re.IGNORECASE
-        )
-        for m in row_range.finditer(instruction):
-            lo, hi = ord(m.group(1).upper()), ord(m.group(2).upper())
-            for r in range(min(lo, hi), max(lo, hi) + 1):
-                for col in range(1, 13):
-                    wells.add(f"{chr(r)}{col}")
-
-        # 4. Literal wells (also catches range endpoints already added above)
-        literal = re.compile(r'\b([A-H](?:1[0-2]|[1-9]))\b')
-        wells |= set(literal.findall(instruction))
-
-        return wells
-
-    @staticmethod
-    def _extract_durations_from_text(instruction: str) -> List[tuple]:
-        """Extract all durations mentioned in instruction text.
-        Returns list of (value, unit) tuples."""
-        pattern = re.compile(
-            r'(\d+(?:\.\d+)?)\s*[-]?\s*'
-            r'(seconds?|minutes?|hours?|secs?|mins?|hrs?)',
-            re.IGNORECASE
-        )
-        unit_map = {
-            'second': 'seconds', 'seconds': 'seconds', 'sec': 'seconds', 'secs': 'seconds',
-            'minute': 'minutes', 'minutes': 'minutes', 'min': 'minutes', 'mins': 'minutes',
-            'hour': 'hours', 'hours': 'hours', 'hr': 'hours', 'hrs': 'hours',
-        }
-        results = []
-        for m in pattern.finditer(instruction):
-            val = float(m.group(1))
-            unit = unit_map.get(m.group(2).lower(), m.group(2).lower())
-            results.append((val, unit))
-        return results
-
-    @staticmethod
-    def _extract_non_volume_numbers(instruction: str, volume_set: set) -> set:
-        """Extract all numbers from instruction text that aren't volumes.
-
-        Finds every standalone number, removes those already identified as
-        volumes (uL/mL suffix). The remaining numbers are candidates for
-        temperatures, counts, concentrations, etc.
-        """
-        all_numbers = set()
-        for m in re.finditer(r'\b(\d+(?:\.\d+)?)\b', instruction):
-            all_numbers.add(float(m.group(1)))
-        return all_numbers - volume_set
 
     def _warn(self, step_order: int, field: str, value: str,
               claimed_source: str, severity: str, message: str) -> dict:
@@ -601,14 +470,11 @@ class SemanticExtractor:
         """Verify provenance claims across all source types.
 
         Dispatches on provenance.source for each field:
-          - instruction: value must appear in instruction text → 'fabrication' if not
+          - instruction: cited_text must appear in the instruction AND must
+            contain the value → 'fabrication' if either check fails
           - config: referenced key must exist in config → 'fabrication' if not
           - domain_default: flag if confidence < 0.8 → 'unverified'
           - inferred: always flag → 'low_confidence'
-
-        Also enforces the cross-check invariant: any source='instruction' volume
-        not in spec.explicit_volumes (regex-extracted from text) is a fabricated
-        provenance claim.
 
         Returns list of warning dicts:
           {step, field, value, claimed_source, severity, message}

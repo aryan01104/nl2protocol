@@ -62,7 +62,6 @@ def _spec(steps, **kwargs):
         "protocol_type": "test",
         "summary": "test protocol",
         "reasoning": "",
-        "explicit_volumes": [],
         "initial_contents": [],
     }
     defaults.update(kwargs)

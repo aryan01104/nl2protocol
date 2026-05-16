@@ -197,7 +197,6 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        spec.explicit_volumes = []  # 999 not in extracted volumes
         gaps = ProvenanceWarningDetector(extractor).detect(
             spec,
             context={"instruction": "Transfer some liquid.", "config": {}},

@@ -605,8 +605,14 @@ class LabwarePrefill(BaseModel):
     substance: str = Field(..., description=(
         "What the labware is pre-filled with. Copy the user's wording."
     ))
-    volume_ul: float = Field(..., description=(
-        "Volume per well in uL. Must be explicitly stated in the instruction."
+    volume_ul: Optional[float] = Field(None, description=(
+        "Volume per well in uL. Leave null when the instruction names a "
+        "prefilled labware without stating the per-well volume — the "
+        "InitialContentsVolumeDetector flags null entries as gaps and "
+        "the orchestrator's WellCapacitySuggester proposes a default "
+        "(or the user types one in confirmation). Symmetric with "
+        "WellContents.volume_ul, which has been Optional since the "
+        "orchestrator landed."
     ))
 
 
@@ -620,7 +626,6 @@ class ProtocolSpec(BaseModel):
     summary: str = Field(..., description="One-sentence summary of what the user wants")
     reasoning: str = Field("", description="The LLM's chain-of-thought reasoning")
     steps: List[ExtractedStep] = Field(..., min_length=1)
-    explicit_volumes: List[float] = Field(default_factory=list, description="All volumes found in instruction text via regex")
     initial_contents: List[WellContents] = Field(default_factory=list, description="What's in wells/tubes before the protocol starts")
     prefilled_labware: List[LabwarePrefill] = Field(default_factory=list, description="Labware that starts uniformly pre-filled (e.g. 'cell plate has 100uL media per well')")
 

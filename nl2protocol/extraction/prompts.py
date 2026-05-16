@@ -30,7 +30,6 @@ RULES:
 - Every liquid-handling step (transfer, distribute, mix, etc.) MUST have a volume
 - DO NOT choose pipette mounts — only record hints if the user mentioned a pipette
 - Leave the "reasoning" field empty in your JSON — it will be filled from your <reasoning> block
-- Leave "explicit_volumes" empty — it will be populated automatically
 
 PROVENANCE — every value you extract MUST have a provenance object:
   provenance: {{source, cited_text OR (positive_reasoning + why_not_in_instruction), confidence}}
