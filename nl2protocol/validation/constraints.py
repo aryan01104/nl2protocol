@@ -691,9 +691,22 @@ class WellStateTracker:
             load_name = lw_config.get("load_name", "")
             if load_name:
                 well_info = get_well_info(load_name)
+                # Mirror the initial_contents fallback (line 701-708): when
+                # the LLM didn't state a volume, use the labware's well
+                # capacity as an upper bound so the well-state tracker
+                # still knows the substance is present without firing
+                # false overflow warnings.
+                if pf.volume_ul is not None:
+                    vol = pf.volume_ul
+                    is_fallback = False
+                else:
+                    vol = self._get_well_capacity(pf.labware) or 15000.0
+                    is_fallback = True
                 for well in well_info["valid_wells"]:
                     self._ensure_well(pf.labware, well)
-                    self.state[pf.labware][well].add(pf.volume_ul, pf.substance)
+                    self.state[pf.labware][well].add(vol, pf.substance)
+                    if is_fallback:
+                        self._default_volume_wells.add((pf.labware, well))
 
         # Initialize from spec's initial_contents (per-well specifics)
         for ic in spec.initial_contents:

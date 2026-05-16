@@ -644,6 +644,11 @@ class ProtocolAgent:
         for idx, ic in enumerate(ic_list):
             current = getattr(ic, "volume_ul", None)
             suggested = None
+            # Capture the winning Suggestion so we can pass its reasoning
+            # through to the modal. Stays None for user-stated rows
+            # (current is non-null) — the UI suppresses the hint there
+            # because the value IS the user's word.
+            winning_sug = None
             if current is None:
                 synthetic_gap = Gap(
                     id=f"ic{idx}",
@@ -657,12 +662,13 @@ class ProtocolAgent:
                 )
                 for s in suggesters:
                     try:
-                        sug = s.suggest(synthetic_gap, spec, context)
+                        candidate = s.suggest(synthetic_gap, spec, context)
                     except Exception:
-                        sug = None
-                    if sug is not None:
+                        candidate = None
+                    if candidate is not None:
+                        winning_sug = candidate
                         try:
-                            suggested = float(sug.value)
+                            suggested = float(candidate.value)
                         except (TypeError, ValueError):
                             suggested = None
                         break
@@ -672,6 +678,18 @@ class ProtocolAgent:
                 "substance": getattr(ic, "substance", ""),
                 "current_volume_ul": current,
                 "suggested_volume_ul": suggested,
+                # Surface the suggester's reasoning into the modal so
+                # the user sees WHY a default was picked. Only populated
+                # for suggester-filled rows; user-stated rows have these
+                # null and the UI renders no per-row hint there.
+                "provenance_source": (
+                    winning_sug.provenance_source
+                    if winning_sug is not None else None
+                ),
+                "provenance_reasoning": (
+                    winning_sug.positive_reasoning
+                    if winning_sug is not None else None
+                ),
             })
         confirmed = self.initial_contents_handler.confirm(table)
         if confirmed is None:
@@ -688,19 +706,21 @@ class ProtocolAgent:
                     pass
         return True
 
-    def _confirm_labware_assignments_via_handler(self, spec) -> Optional[dict]:
+    def _confirm_labware_assignments_via_handler(
+        self, spec, labware_suggestions: dict,
+    ) -> Optional[dict]:
         """Browser-bridged variant of `_confirm_labware_assignments`.
 
-        Builds the same description→label table the CLI loop displays,
-        then delegates to `self.assignments_handler.confirm(table)`.
-        The handler blocks until the browser submits, returns either
-        the confirmed dict or None on abort/timeout.
+        Builds the description→suggested_label table from the resolver's
+        suggestions (NOT from spec, which is no longer mutated by the
+        resolver), then delegates to `self.assignments_handler.confirm`.
 
         Pre:    `spec.steps` carries LocationRefs whose `description`
-                and `resolved_label` (possibly None) drive the table.
-                `self.assignments_handler` is non-None (caller checks).
-                `self.config_loader.config["labware"]` lists the
-                available config labels the user can pick from.
+                drives the rows. `labware_suggestions` is the dict
+                returned by `LabwareResolver.suggest()`, keyed on
+                description with values exposing `.suggested_label` +
+                `.candidates`. `self.assignments_handler` is non-None
+                (caller checks).
         Post:   Returns dict {description: confirmed_label} or None
                 (None means user aborted or browser timed out).
                 Empty dict when there were no LocationRefs to confirm
@@ -716,39 +736,58 @@ class ProtocolAgent:
                 if ref is None or ref.description in seen:
                     continue
                 seen.add(ref.description)
+                suggestion = labware_suggestions.get(ref.description)
+                suggested = suggestion.suggested_label if suggestion else None
+                candidates = (
+                    suggestion.candidates if suggestion is not None
+                    else config_labels
+                )
                 table.append({
                     "description": ref.description,
-                    "suggested_label": ref.resolved_label,
-                    "candidates": config_labels,
+                    "suggested_label": suggested,
+                    "candidates": candidates,
                 })
         return self.assignments_handler.confirm(table)
 
-    def _confirm_labware_assignments(self, spec) -> Optional[dict]:
+    def _confirm_labware_assignments(
+        self, spec, labware_suggestions: dict,
+    ) -> Optional[dict]:
         """Interactive confirmation of labware description → config label assignments.
 
         Shows all assignments at once. User picks a number to change any mapping,
         or presses Enter to confirm all. Unresolved refs show as '???' and must
         be assigned before confirming.
 
-        Returns dict of {description: confirmed_label} or None if aborted.
+        Pre:    `labware_suggestions` is the dict returned by
+                `LabwareResolver.suggest()`. Drives the initial
+                description→suggested_label display; user can override
+                any row.
+        Post:   Returns dict of {description: confirmed_label} or None
+                if aborted.
         """
-        # Collect unique (description, resolved_label) pairs
+        # Collect unique descriptions from the spec; pair each with the
+        # resolver's suggestion (or None if the resolver couldn't pick).
         assignments = []
         seen = set()
         for step in spec.steps:
             for ref in [step.source, step.destination]:
                 if ref and ref.description not in seen:
                     seen.add(ref.description)
+                    suggestion = labware_suggestions.get(ref.description)
+                    suggested = (
+                        suggestion.suggested_label
+                        if suggestion is not None else None
+                    )
                     assignments.append({
                         "description": ref.description,
-                        "resolved_label": ref.resolved_label,
+                        "resolved_label": suggested,
                     })
 
         if not assignments:
             return {}
 
         available_labels = list(self.config_loader.config.get("labware", {}).keys())
-        # Start with LLM suggestions as current assignments
+        # Start with resolver suggestions as current assignments
         current = {a["description"]: a["resolved_label"] for a in assignments}
 
         while True:
@@ -816,6 +855,137 @@ class ProtocolAgent:
             else:
                 _log(f"  Invalid input. Pick a number, Enter, or q.")
 
+    def _apply_labware_assignments(
+        self, spec, labware_suggestions: dict, confirmed: dict,
+    ) -> None:
+        """Write user-confirmed labware mappings into the spec with
+        truthful provenance.
+
+        Pre:    `spec` is the post-extraction ProtocolSpec (not yet
+                mutated by labware resolution). `labware_suggestions`
+                is the resolver's `{description: LabwareSuggestion}`
+                dict — drives the "user accepted vs overrode" decision.
+                `confirmed` is `{description: label}` from the user
+                (or, in headless mode, an auto-build of the resolver's
+                non-null suggestions).
+
+        Post:   For every LocationRef whose `description` appears in
+                `confirmed` with a non-null label:
+                  * `ref.resolved_label = confirmed[description]`
+                  * `ref.resolved_label_provenance = Provenance(...)`
+                    with `review_status="user_accepted_suggestion"` iff
+                    the picked label matches the resolver's suggestion;
+                    `review_status="user_edited"` otherwise.
+                  * `initial_contents` and `prefilled_labware` rows
+                    referring to the same user-language description get
+                    their `labware` string rewritten to the confirmed
+                    config label (so the downstream well-state tracker
+                    and constraint checker see config-canonical names).
+
+                Refs whose description isn't in `confirmed` (or whose
+                picked label is null) are left untouched — `resolved_label`
+                stays `None`, the orchestrator's `LabwareAmbiguityDetector`
+                will surface them.
+
+        Side effects: Mutates `spec` in place (writes resolved_label,
+                resolved_label_provenance, and rewrites initial_contents
+                / prefilled_labware labware strings).
+        """
+        if not confirmed:
+            return
+        for step in spec.steps:
+            for ref in (step.source, step.destination):
+                if ref is None:
+                    continue
+                if ref.description not in confirmed:
+                    continue
+                label = confirmed[ref.description]
+                if label is None:
+                    continue
+                suggestion = labware_suggestions.get(ref.description)
+                ref.resolved_label = label
+                ref.resolved_label_provenance = self._build_user_action_provenance(
+                    description=ref.description,
+                    label=label,
+                    suggestion=suggestion,
+                )
+        # initial_contents and prefilled_labware store labware as plain
+        # strings (no LocationRef, no provenance slot). Rewrite them to
+        # the confirmed config label so downstream stages see
+        # config-canonical names.
+        for wc in spec.initial_contents:
+            if wc.labware in confirmed and confirmed[wc.labware] is not None:
+                wc.labware = confirmed[wc.labware]
+        for pf in spec.prefilled_labware:
+            if pf.labware in confirmed and confirmed[pf.labware] is not None:
+                pf.labware = confirmed[pf.labware]
+
+    def _build_user_action_provenance(
+        self, description: str, label: str, suggestion=None,
+    ):
+        """Build the Provenance stamped onto a confirmed labware
+        mapping. `review_status` reflects user action: accepted the
+        resolver's suggestion as-is vs overrode it (or picked when the
+        resolver had no suggestion).
+
+        Pre:    `description` is the user's labware wording. `label` is
+                the config key the user confirmed. `suggestion` is the
+                matching `LabwareSuggestion` from the resolver (or None
+                if the resolver returned nothing for this description).
+
+        Post:   Returns a `Provenance` with:
+                  * source="inferred" (labware mapping is never
+                    literally in the instruction)
+                  * review_status="user_accepted_suggestion" iff
+                    suggestion is not None AND
+                    suggestion.suggested_label == label;
+                    "user_edited" otherwise
+                  * positive_reasoning / why_not_in_instruction:
+                    the resolver's own reasoning when the user accepted,
+                    fresh override-reasoning when the user picked a
+                    different label (or the resolver had no pick).
+                  * confidence: 0.85 on accept (matches the resolver's
+                    self-assessment), 1.0 on user override (user is
+                    authoritative).
+        Side effects: None.
+        """
+        from nl2protocol.models.spec import Provenance
+
+        accepted = (
+            suggestion is not None
+            and suggestion.suggested_label == label
+            and suggestion.positive_reasoning is not None
+        )
+        if accepted:
+            return Provenance(
+                source="inferred",
+                positive_reasoning=suggestion.positive_reasoning,
+                why_not_in_instruction=suggestion.why_not_in_instruction,
+                confidence=suggestion.confidence,
+                review_status="user_accepted_suggestion",
+            )
+        suggested = suggestion.suggested_label if suggestion is not None else None
+        if suggested is not None:
+            positive = (
+                f"User picked '{label}' for description '{description}' "
+                f"over the resolver's suggestion of '{suggested}'."
+            )
+        else:
+            positive = (
+                f"User picked '{label}' for description '{description}'; "
+                f"resolver had no suggestion."
+            )
+        return Provenance(
+            source="inferred",
+            positive_reasoning=positive,
+            why_not_in_instruction=(
+                f"Labware label '{label}' is a config key, not an "
+                f"instruction phrase."
+            ),
+            confidence=1.0,
+            review_status="user_edited",
+        )
+
     def run_pipeline(self, prompt: str, csv_path: str = None,
                      full_confirmation: bool = False, confirmation_threshold: float = 0.7,
                      verbose: bool = False) -> Optional[PipelineResult]:
@@ -867,514 +1037,550 @@ class ProtocolAgent:
                 json.dump(state_log, f, indent=2, default=str)
             _log(f"  {C.dim(f'State log: {path}')}")
 
-        # Stage 1: Validate config and instruction
-        _stage("[Stage 1/8] Validating instruction and config...")
-        self._emit_stage_started(1, "Validating input")
-        self._emit_progress("loading config", stage_name="stage_1_config")
         try:
-            self.config_loader.load_config()
-            state_log["input"]["config"] = self.config_loader.config
-            _log(f"  {C.success('Config validated.')}")
-        except Exception as e:
-            _log(f"  {C.error('Config validation failed:')}")
-            _log(f"    {e}")
-            _save_state_log("stage_1_config")
-            return None
+            # Stage 1: Validate config and instruction
+            _stage("[Stage 1/8] Validating instruction and config...")
+            self._emit_stage_started(1, "Validating input")
+            self._emit_progress("loading config", stage_name="stage_1_config")
+            try:
+                self.config_loader.load_config()
+                state_log["input"]["config"] = self.config_loader.config
+                _log(f"  {C.success('Config validated.')}")
+            except Exception as e:
+                _log(f"  {C.error('Config validation failed:')}")
+                _log(f"    {e}")
+                _save_state_log("stage_1_config")
+                return None
 
-        self._emit_progress("classifying instruction (Haiku)",
-                             stage_name="stage_1_classify")
-        from .validation.input_validator import InputValidator
-        validator = InputValidator()
-        try:
-            validation = validator.classify(prompt)
-        except Exception as e:
-            _log(f"  {C.error(str(e))}")
-            return None
+            self._emit_progress("classifying instruction (Haiku)",
+                                 stage_name="stage_1_classify")
+            from .validation.input_validator import InputValidator
+            validator = InputValidator()
+            try:
+                validation = validator.classify(prompt)
+            except Exception as e:
+                _log(f"  {C.error(str(e))}")
+                return None
 
-        if not validation.is_valid_protocol:
-            if validation.classification == "QUESTION":
-                _log("  This looks like a question, not a protocol instruction.")
-                _log("  Try rephrasing as an action: 'Transfer 100uL from A1 to B1'")
-            elif validation.classification == "AMBIGUOUS":
-                _log("  This instruction is too vague to generate a protocol.")
-                _log("  Try adding specific volumes, wells, and labware names.")
-            elif validation.classification == "INVALID":
-                _log("  This doesn't appear to be a liquid-handling protocol.")
-                _log("  The OT-2 can only pipette — it can't centrifuge, read absorbance, etc.")
-            if validation.suggestion:
-                _log(f"  Suggestion: {validation.suggestion}")
-            return None
-        _log(f"  {C.success('Input validated as protocol instruction.')}")
+            if not validation.is_valid_protocol:
+                if validation.classification == "QUESTION":
+                    _log("  This looks like a question, not a protocol instruction.")
+                    _log("  Try rephrasing as an action: 'Transfer 100uL from A1 to B1'")
+                elif validation.classification == "AMBIGUOUS":
+                    _log("  This instruction is too vague to generate a protocol.")
+                    _log("  Try adding specific volumes, wells, and labware names.")
+                elif validation.classification == "INVALID":
+                    _log("  This doesn't appear to be a liquid-handling protocol.")
+                    _log("  The OT-2 can only pipette — it can't centrifuge, read absorbance, etc.")
+                if validation.suggestion:
+                    _log(f"  Suggestion: {validation.suggestion}")
+                return None
+            _log(f"  {C.success('Input validated as protocol instruction.')}")
         
 
-        # Stage 2: Reason through the instruction → ProtocolSpec
-        _stage("[Stage 2/8] Reasoning through protocol instruction...")
-        self._emit_stage_started(2, "Extracting protocol")
-        self._emit_progress("Sonnet extracting protocol from instruction",
-                             stage_name="stage_2_extraction")
-        extractor = SemanticExtractor(
-            client=self.config_loader.client,
-            model_name=self.config_loader.model_name
-        )
-        spec = extractor.extract(prompt, self.config_loader.config)
+            # Stage 2: Reason through the instruction → ProtocolSpec
+            _stage("[Stage 2/8] Reasoning through protocol instruction...")
+            self._emit_stage_started(2, "Extracting protocol")
+            self._emit_progress("Sonnet extracting protocol from instruction",
+                                 stage_name="stage_2_extraction")
+            extractor = SemanticExtractor(
+                client=self.config_loader.client,
+                model_name=self.config_loader.model_name
+            )
+            spec = extractor.extract(prompt, self.config_loader.config)
 
-        if spec is not None:
-            # Emit extracted spec event for downstream reporters.
+            if spec is not None:
+                # Emit extracted spec event for downstream reporters.
+                self.reporter.emit(StageEvent(
+                    kind="extracted_spec",
+                    data={"spec": spec},
+                    stage_name="stage_2_extraction",
+                ))
+
+            if spec is None:
+                _log("\n  Could not extract a protocol from your instruction.")
+                _log("  This can happen if:")
+                _log("    - The instruction is too vague (add volumes, wells, labware names)")
+                _log("    - The API key is invalid or out of credits")
+                _log("    - The instruction isn't about liquid handling")
+                _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
+                _save_state_log("stage_2_extraction")
+                return None
+
+            state_log["stage_2_extraction"] = spec.model_dump()
+
+            _log(f"  {C.label('Protocol type:')} {spec.protocol_type or 'ad-hoc'}")
+            _log(f"  {C.label('Steps:')} {len(spec.steps)}")
+            if spec.reasoning:
+                _log(f"  {C.label('Reasoning:')}")
+                import re
+                reasoning = spec.reasoning.strip()
+                parts = re.split(r'(?=\d+\.\s)', reasoning)
+                for part in parts:
+                    part = part.strip()
+                    if not part:
+                        continue
+                    sub_parts = re.split(r'(?=\s*-\s)', part, maxsplit=0)
+                    for i, sub in enumerate(sub_parts):
+                        sub = sub.strip()
+                        if not sub:
+                            continue
+                        if i == 0:
+                            _log(_wrap(C.info(sub), indent="    ", width=LINE_WIDTH))
+                        else:
+                            _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
+
+            if spec.initial_contents:
+                _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
+
+            # Stage 3: Validate extraction + check sufficiency + fill gaps
+            _stage("[Stage 3/8] Validating and completing specification...")
+            self._emit_stage_started(3, "Resolving labware")
+            self._emit_progress("matching descriptions to config labware",
+                                 stage_name="stage_3_labware_resolver")
+
+            # Stage 3: unified gap-resolution orchestrator (ADR-0008).
+            # PR3b deleted the legacy verify/fill/refine block and the use_gap_resolver
+            # flag — see ADR-0008's "what we replaced" appendix for the legacy → new
+            # mapping. The orchestrator handles missing fields, fabrications, initial
+            # volumes, constraint violations, and labware ambiguity in one loop.
+            # Phase 3f (Group D): IC volumes + labware-assignments + source-containers
+            # are confirmed BEFORE the orchestrator runs (three batch modals after
+            # extraction), so the orchestrator's InitialContentsVolumeDetector and
+            # LabwareAmbiguityDetector typically find 0 gaps and the loop only
+            # handles missing fields, fabrications, and constraint violations.
+            from .gap_resolution import (
+                Orchestrator, CLIConfirmationHandler, default_apply_resolution,
+                MissingFieldsDetector, ProvenanceWarningDetector,
+                InitialContentsVolumeDetector, ConstraintViolationDetector,
+                LabwareAmbiguityDetector,
+                ConfigLookupSuggester, CarryoverSuggester,
+                WellCapacitySuggester, RegexFromNoteSuggester,
+                WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
+                IndependentReviewSuggester,
+            )
+
+            # Build the suggester registry once — used by both the
+            # pre-orchestrator IC batch confirmation AND the orchestrator.
+            ic_suggesters = [
+                ConfigLookupSuggester(),
+                CarryoverSuggester(),
+                WellCapacitySuggester(),
+                RegexFromNoteSuggester(),
+                WellRangeClipSuggester(),
+                LabwareSuggester(),
+                LLMSpotSuggester(client=extractor.client,
+                                  model_name=extractor.model_name),
+            ]
+
+            # Produce labware SUGGESTIONS (not mutations). The pipeline's
+            # labware-assignments confirmation flow below is the sole writer
+            # of resolved_label + resolved_label_provenance, so the
+            # provenance honestly reflects user action (accept vs override).
+            # labware_resolution_done fires AFTER apply so its payload
+            # carries the user-confirmed final mappings, not the resolver's
+            # tentative picks.
+            from .extraction import LabwareResolver as _EarlyLabwareResolver
+            labware_suggestions = _EarlyLabwareResolver(
+                config=self.config_loader.config,
+                client=extractor.client,
+                model_name=extractor.model_name,
+            ).suggest(spec)
+
+            # ============================================================
+            # Phase 3f (Group D): pre-orchestrator confirmations
+            # ============================================================
+            # Three confirmations fire after extraction + labware resolution,
+            # BEFORE the orchestrator runs. They batch what used to live as
+            # per-Gap modals during gap resolution, plus the legacy stage 3.5
+            # labware-assignments prompt:
+            #
+            #   1. IC batch — every initial_contents row in one table modal
+            #      (was N per-Gap orchestrator prompts).
+            #   2. Source-container Y/n — informational ack of inferred sources.
+            #   3. Labware-assignments table — was stage 3.5.
+            #
+            # After this block, the orchestrator's IC + ambiguity detectors
+            # find 0 gaps; only missing-field / fabrication / constraint-
+            # violation gaps remain (each per-Gap is the right shape).
+
+            self._emit_stage_started(4, "Confirming with you")
+
+            # 1. IC batch confirm (live mode only — CLI keeps per-Gap flow).
+            if self.initial_contents_handler is not None and spec.initial_contents:
+                self._emit_progress("step 1 of 3 — initial contents",
+                                     stage_name="stage_4_initial_contents")
+                ic_ok = self._confirm_initial_contents_via_handler(
+                    spec, ic_suggesters,
+                    {"instruction": prompt, "config": self.config_loader.config},
+                )
+                if not ic_ok:
+                    _log("  Initial-contents confirmation aborted.")
+                    _save_state_log("stage_2_5_initial_contents")
+                    return None
+
+            # 2. Source-container inference + Y/n ack.
+            if self.binary_confirm_handler is not None or sys.stdin.isatty():
+                self._emit_progress("step 2 of 3 — source containers",
+                                     stage_name="stage_4_sources")
+            source_only = self._infer_source_containers(spec)
+            if source_only:
+                items = []
+                for labware, well, substance in source_only:
+                    sub = f" ({substance})" if substance else ""
+                    items.append(f"{labware} well {well}{sub}")
+                _log("\n  Inferred source containers (pre-filled by you before running):")
+                for line in items:
+                    _log(f"    - {line}")
+                user_aborted = False
+                if self.binary_confirm_handler is not None:
+                    ok = self.binary_confirm_handler.confirm(
+                        title="Confirm inferred source containers",
+                        items=items,
+                        yes_label="Yes, these are correct",
+                        no_label="No, abort",
+                    )
+                    user_aborted = not ok
+                elif sys.stdin.isatty():
+                    response = self.cm.prompt("Is this correct? [Y/n]: ").lower()
+                    user_aborted = response in ('n', 'no')
+                if user_aborted:
+                    _log("  Aborted. Adjust your instruction to clarify source containers.")
+                    state_log["stage_2_5_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
+                    _save_state_log("stage_2_5_sources")
+                    return None
+                # Add confirmed sources to initial_contents so well tracker doesn't warn.
+                from .extraction import WellContents
+                for labware, well, substance in source_only:
+                    already = any(ic.labware == labware and ic.well == well
+                                  for ic in spec.initial_contents)
+                    if not already:
+                        spec.initial_contents.append(
+                            WellContents(labware=labware, well=well,
+                                         substance=substance or "reagent")
+                        )
+
+            # 3. Labware-assignments confirm.
+            if self.assignments_handler is not None or sys.stdin.isatty():
+                self._emit_progress("step 3 of 3 — labware assignments",
+                                     stage_name="stage_4_assignments")
+            confirmed = None
+            if self.assignments_handler is not None:
+                confirmed = self._confirm_labware_assignments_via_handler(
+                    spec, labware_suggestions,
+                )
+            elif sys.stdin.isatty():
+                confirmed = self._confirm_labware_assignments(
+                    spec, labware_suggestions,
+                )
+            if confirmed is None and (self.assignments_handler is not None
+                                        or sys.stdin.isatty()):
+                _save_state_log("stage_2_5_assignments")
+                return None
+            # Apply user-confirmed picks with truthful provenance. The
+            # provenance's review_status reflects whether the user accepted
+            # the resolver's suggestion or overrode it — so a later
+            # consumer can audit which mappings were user-authoritative vs
+            # resolver-authoritative. Headless mode (no confirmation
+            # handler) falls back to applying the resolver suggestions
+            # as-is so the pipeline can still run without interactive input.
+            if confirmed is None:
+                confirmed = {
+                    desc: sug.suggested_label
+                    for desc, sug in labware_suggestions.items()
+                    if sug.suggested_label is not None
+                }
+            self._apply_labware_assignments(spec, labware_suggestions, confirmed)
+
+            # ADR-0011 Phase 1: emit labware_resolution_done so column 4
+            # (validated spec) can populate with the description→label
+            # mapping when rendered. Fires HERE (post-apply) so the payload
+            # carries the user-confirmed final mappings, not the resolver's
+            # tentative picks.
             self.reporter.emit(StageEvent(
-                kind="extracted_spec",
-                data={"spec": spec},
-                stage_name="stage_2_extraction",
+                kind="labware_resolution_done",
+                data={
+                    "resolutions": {
+                        ref.description: ref.resolved_label
+                        for step in spec.steps
+                        for ref in [step.source, step.destination]
+                        if ref and ref.resolved_label
+                    },
+                },
+                stage_name="stage_3_labware_resolver",
             ))
 
-        if spec is None:
-            _log("\n  Could not extract a protocol from your instruction.")
-            _log("  This can happen if:")
-            _log("    - The instruction is too vague (add volumes, wells, labware names)")
-            _log("    - The API key is invalid or out of credits")
-            _log("    - The instruction isn't about liquid handling")
-            _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
-            _save_state_log("stage_2_extraction")
-            return None
-
-        state_log["stage_2_extraction"] = spec.model_dump()
-
-        _log(f"  {C.label('Protocol type:')} {spec.protocol_type or 'ad-hoc'}")
-        _log(f"  {C.label('Steps:')} {len(spec.steps)}")
-        if spec.reasoning:
-            _log(f"  {C.label('Reasoning:')}")
-            import re
-            reasoning = spec.reasoning.strip()
-            parts = re.split(r'(?=\d+\.\s)', reasoning)
-            for part in parts:
-                part = part.strip()
-                if not part:
-                    continue
-                sub_parts = re.split(r'(?=\s*-\s)', part, maxsplit=0)
-                for i, sub in enumerate(sub_parts):
-                    sub = sub.strip()
-                    if not sub:
-                        continue
-                    if i == 0:
-                        _log(_wrap(C.info(sub), indent="    ", width=LINE_WIDTH))
-                    else:
-                        _log(_wrap(C.info(f"- {sub.lstrip('- ')}"), indent="      ", width=LINE_WIDTH))
-
-        if spec.initial_contents:
-            _log(f"  {C.dim(f'Initial state: {len(spec.initial_contents)} wells/tubes have contents')}")
-
-        # Stage 3: Validate extraction + check sufficiency + fill gaps
-        _stage("[Stage 3/8] Validating and completing specification...")
-        self._emit_stage_started(3, "Resolving labware")
-        self._emit_progress("matching descriptions to config labware",
-                             stage_name="stage_3_labware_resolver")
-
-        # Stage 3: unified gap-resolution orchestrator (ADR-0008).
-        # PR3b deleted the legacy verify/fill/refine block and the use_gap_resolver
-        # flag — see ADR-0008's "what we replaced" appendix for the legacy → new
-        # mapping. The orchestrator handles missing fields, fabrications, initial
-        # volumes, constraint violations, and labware ambiguity in one loop.
-        # Phase 3f (Group D): IC volumes + labware-assignments + source-containers
-        # are confirmed BEFORE the orchestrator runs (three batch modals after
-        # extraction), so the orchestrator's InitialContentsVolumeDetector and
-        # LabwareAmbiguityDetector typically find 0 gaps and the loop only
-        # handles missing fields, fabrications, and constraint violations.
-        from .gap_resolution import (
-            Orchestrator, CLIConfirmationHandler, default_apply_resolution,
-            MissingFieldsDetector, ProvenanceWarningDetector,
-            InitialContentsVolumeDetector, ConstraintViolationDetector,
-            LabwareAmbiguityDetector,
-            ConfigLookupSuggester, CarryoverSuggester,
-            WellCapacitySuggester, RegexFromNoteSuggester,
-            WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
-            IndependentReviewSuggester,
-        )
-
-        # Build the suggester registry once — used by both the
-        # pre-orchestrator IC batch confirmation AND the orchestrator.
-        ic_suggesters = [
-            ConfigLookupSuggester(),
-            CarryoverSuggester(),
-            WellCapacitySuggester(),
-            RegexFromNoteSuggester(),
-            WellRangeClipSuggester(),
-            LabwareSuggester(),
-            LLMSpotSuggester(client=extractor.client,
-                              model_name=extractor.model_name),
-        ]
-
-        # Run LabwareResolver BEFORE the orchestrator so LabwareAmbiguityDetector
-        # only flags refs the resolver couldn't pick (post-resolver state). The
-        # resolver writes resolved_label_provenance on each pick so the
-        # IndependentReviewSuggester can second-opinion the choice.
-        from .extraction import LabwareResolver as _EarlyLabwareResolver
-        spec = _EarlyLabwareResolver(
-            config=self.config_loader.config,
-            client=extractor.client,
-            model_name=extractor.model_name,
-        ).resolve(spec)
-
-        # ADR-0011 Phase 1: emit labware_resolution_done so column 4
-        # (validated spec) can populate with the description→label
-        # mapping when rendered.
-        self.reporter.emit(StageEvent(
-            kind="labware_resolution_done",
-            data={
-                "resolutions": {
-                    ref.description: ref.resolved_label
-                    for step in spec.steps
-                    for ref in [step.source, step.destination]
-                    if ref and ref.resolved_label
-                },
-            },
-            stage_name="stage_3_labware_resolver",
-        ))
-
-        # ============================================================
-        # Phase 3f (Group D): pre-orchestrator confirmations
-        # ============================================================
-        # Three confirmations fire after extraction + labware resolution,
-        # BEFORE the orchestrator runs. They batch what used to live as
-        # per-Gap modals during gap resolution, plus the legacy stage 3.5
-        # labware-assignments prompt:
-        #
-        #   1. IC batch — every initial_contents row in one table modal
-        #      (was N per-Gap orchestrator prompts).
-        #   2. Source-container Y/n — informational ack of inferred sources.
-        #   3. Labware-assignments table — was stage 3.5.
-        #
-        # After this block, the orchestrator's IC + ambiguity detectors
-        # find 0 gaps; only missing-field / fabrication / constraint-
-        # violation gaps remain (each per-Gap is the right shape).
-
-        self._emit_stage_started(4, "Confirming with you")
-
-        # 1. IC batch confirm (live mode only — CLI keeps per-Gap flow).
-        if self.initial_contents_handler is not None and spec.initial_contents:
-            self._emit_progress("step 1 of 3 — initial contents",
-                                 stage_name="stage_4_initial_contents")
-            ic_ok = self._confirm_initial_contents_via_handler(
-                spec, ic_suggesters,
-                {"instruction": prompt, "config": self.config_loader.config},
+            # Reviewer: smaller / different model than the extractor's per ADR-0008's
+            # bias-mitigation rationale. Haiku is cheap, fast, and sufficient for
+            # the structured two-claim verification task.
+            reviewer_model = "claude-haiku-4-5"
+            orch = Orchestrator(
+                detectors=[
+                    MissingFieldsDetector(),
+                    ProvenanceWarningDetector(extractor),  # only fabrications surface as Gaps
+                    InitialContentsVolumeDetector(),
+                    ConstraintViolationDetector(),
+                    LabwareAmbiguityDetector(),
+                ],
+                suggesters=ic_suggesters,
+                reviewer=IndependentReviewSuggester(
+                    client=extractor.client,
+                    model_name=reviewer_model,
+                ),
+                handler=self.confirmation_handler or CLIConfirmationHandler(cm=self.cm, log=_log),
+                apply_resolution=default_apply_resolution,
+                # ADR-0011 Phase 1: orchestrator emits storytelling events
+                # (gap_iteration_*, gap_detected, gap_resolved) into the same
+                # reporter that handles stage events.
+                reporter=self.reporter,
             )
-            if not ic_ok:
-                _log("  Initial-contents confirmation aborted.")
-                _save_state_log("stage_2_5_initial_contents")
+            self._emit_stage_started(5, "Resolving gaps")
+            outcome = orch.run(spec, context={
+                "instruction": prompt,
+                "config": self.config_loader.config,
+            })
+            state_log["stage_3_gap_resolver"] = {
+                "converged": outcome.converged,
+                "aborted": outcome.aborted,
+                "iterations": [
+                    {
+                        "iteration": it.iteration,
+                        "gap_count": len(it.records),
+                        "auto_accepted": sum(1 for r in it.records if r.auto_accepted),
+                    }
+                    for it in outcome.iterations
+                ],
+            }
+            if outcome.aborted:
+                _log(f"  {C.error('Gap resolution aborted.')}")
+                _save_state_log("stage_3_gap_resolver")
                 return None
-
-        # 2. Source-container inference + Y/n ack.
-        if self.binary_confirm_handler is not None or sys.stdin.isatty():
-            self._emit_progress("step 2 of 3 — source containers",
-                                 stage_name="stage_4_sources")
-        source_only = self._infer_source_containers(spec)
-        if source_only:
-            items = []
-            for labware, well, substance in source_only:
-                sub = f" ({substance})" if substance else ""
-                items.append(f"{labware} well {well}{sub}")
-            _log("\n  Inferred source containers (pre-filled by you before running):")
-            for line in items:
-                _log(f"    - {line}")
-            user_aborted = False
-            if self.binary_confirm_handler is not None:
-                ok = self.binary_confirm_handler.confirm(
-                    title="Confirm inferred source containers",
-                    items=items,
-                    yes_label="Yes, these are correct",
-                    no_label="No, abort",
-                )
-                user_aborted = not ok
-            elif sys.stdin.isatty():
-                response = self.cm.prompt("Is this correct? [Y/n]: ").lower()
-                user_aborted = response in ('n', 'no')
-            if user_aborted:
-                _log("  Aborted. Adjust your instruction to clarify source containers.")
-                state_log["stage_2_5_sources"] = [{"labware": lw, "well": w, "substance": s} for lw, w, s in source_only]
-                _save_state_log("stage_2_5_sources")
+            if not outcome.converged:
+                _log(f"  {C.error('Gap resolution hit iteration cap without converging.')}")
+                _save_state_log("stage_3_gap_resolver")
                 return None
-            # Add confirmed sources to initial_contents so well tracker doesn't warn.
-            from .extraction import WellContents
-            for labware, well, substance in source_only:
-                already = any(ic.labware == labware and ic.well == well
-                              for ic in spec.initial_contents)
-                if not already:
-                    spec.initial_contents.append(
-                        WellContents(labware=labware, well=well,
-                                     substance=substance or "reagent")
-                    )
+            _log(f"  {C.success('Gap resolution converged.')}")
+            spec = outcome.spec
 
-        # 3. Labware-assignments confirm.
-        if self.assignments_handler is not None or sys.stdin.isatty():
-            self._emit_progress("step 3 of 3 — labware assignments",
-                                 stage_name="stage_4_assignments")
-        confirmed = None
-        if self.assignments_handler is not None:
-            confirmed = self._confirm_labware_assignments_via_handler(spec)
-        elif sys.stdin.isatty():
-            confirmed = self._confirm_labware_assignments(spec)
-        if confirmed is None and (self.assignments_handler is not None
-                                    or sys.stdin.isatty()):
-            _save_state_log("stage_2_5_assignments")
-            return None
-        if confirmed:
+            # ADR-0011 Phase 2a: emit resolved_spec so column 3 (post-orchestrator)
+            # can render. Distinct from completed_spec which is emitted later
+            # (post-stage-5 CompleteProtocolSpec promotion); column 4 reads that.
+            self.reporter.emit(StageEvent(
+                kind="resolved_spec",
+                data={"spec": spec},
+                stage_name="stage_3_gap_resolver",
+            ))
+
+            # Phase 3f (Group D): source-container + labware-assignments
+            # confirmations moved BEFORE the orchestrator (see pre-orchestrator
+            # block above). Final post-orchestrator check: any LocationRef
+            # still unresolved (e.g., user picked an empty config or the
+            # resolver couldn't match) is a hard error — surface and abort.
+            unresolved_refs = []
             for step in spec.steps:
                 for ref in [step.source, step.destination]:
-                    if ref and ref.description in confirmed:
-                        ref.resolved_label = confirmed[ref.description]
-
-        # Reviewer: smaller / different model than the extractor's per ADR-0008's
-        # bias-mitigation rationale. Haiku is cheap, fast, and sufficient for
-        # the structured two-claim verification task.
-        reviewer_model = "claude-haiku-4-5"
-        orch = Orchestrator(
-            detectors=[
-                MissingFieldsDetector(),
-                ProvenanceWarningDetector(extractor),  # only fabrications surface as Gaps
-                InitialContentsVolumeDetector(),
-                ConstraintViolationDetector(),
-                LabwareAmbiguityDetector(),
-            ],
-            suggesters=ic_suggesters,
-            reviewer=IndependentReviewSuggester(
-                client=extractor.client,
-                model_name=reviewer_model,
-            ),
-            handler=self.confirmation_handler or CLIConfirmationHandler(cm=self.cm, log=_log),
-            apply_resolution=default_apply_resolution,
-            # ADR-0011 Phase 1: orchestrator emits storytelling events
-            # (gap_iteration_*, gap_detected, gap_resolved) into the same
-            # reporter that handles stage events.
-            reporter=self.reporter,
-        )
-        self._emit_stage_started(5, "Resolving gaps")
-        outcome = orch.run(spec, context={
-            "instruction": prompt,
-            "config": self.config_loader.config,
-        })
-        state_log["stage_3_gap_resolver"] = {
-            "converged": outcome.converged,
-            "aborted": outcome.aborted,
-            "iterations": [
-                {
-                    "iteration": it.iteration,
-                    "gap_count": len(it.records),
-                    "auto_accepted": sum(1 for r in it.records if r.auto_accepted),
-                }
-                for it in outcome.iterations
-            ],
-        }
-        if outcome.aborted:
-            _log(f"  {C.error('Gap resolution aborted.')}")
-            _save_state_log("stage_3_gap_resolver")
-            return None
-        if not outcome.converged:
-            _log(f"  {C.error('Gap resolution hit iteration cap without converging.')}")
-            _save_state_log("stage_3_gap_resolver")
-            return None
-        _log(f"  {C.success('Gap resolution converged.')}")
-        spec = outcome.spec
-
-        # ADR-0011 Phase 2a: emit resolved_spec so column 3 (post-orchestrator)
-        # can render. Distinct from completed_spec which is emitted later
-        # (post-stage-5 CompleteProtocolSpec promotion); column 4 reads that.
-        self.reporter.emit(StageEvent(
-            kind="resolved_spec",
-            data={"spec": spec},
-            stage_name="stage_3_gap_resolver",
-        ))
-
-        # Phase 3f (Group D): source-container + labware-assignments
-        # confirmations moved BEFORE the orchestrator (see pre-orchestrator
-        # block above). Final post-orchestrator check: any LocationRef
-        # still unresolved (e.g., user picked an empty config or the
-        # resolver couldn't match) is a hard error — surface and abort.
-        unresolved_refs = []
-        for step in spec.steps:
-            for ref in [step.source, step.destination]:
-                if ref and not ref.resolved_label and ref.description not in unresolved_refs:
-                    unresolved_refs.append(ref.description)
-        if unresolved_refs:
-            _log(f"\n  {C.error('No config match for:')} {unresolved_refs}")
-            _log(f"  Add appropriate labware to your config.json for these, then re-run.")
-            _save_state_log("stage_3_unresolved_labware")
-            return None
-
-        # Stage 4: Constraint checking (deterministic, no LLM)
-        _stage("[Stage 4/8] Checking hardware constraints...")
-        self._emit_stage_started(6, "Checking hardware")
-        # No per-check progress events — the indicator's catalog cycles
-        # client-side through the constraint-checker categories while
-        # this stage is active.
-        from .validation.constraints import ConstraintChecker
-        checker = ConstraintChecker(self.config_loader.config)
-        constraint_result = checker.check_all(spec)
-
-        state_log["stage_4_constraints"] = {
-            "errors": [str(v) for v in constraint_result.errors],
-            "warnings": [str(w) for w in constraint_result.warnings],
-        }
-
-        # ADR-0011 Phase 1: emit constraint_check_done so column 4
-        # (validated spec) can show whether the spec passed constraint
-        # checks cleanly. Most ERROR violations should already be 0
-        # (orchestrator's ConstraintViolationDetector resolved them);
-        # this event captures the residual + any WARNING-severity items.
-        self.reporter.emit(StageEvent(
-            kind="constraint_check_done",
-            data={
-                "violation_count": len(constraint_result.errors),
-                "warnings": [str(w) for w in constraint_result.warnings],
-            },
-            stage_name="stage_4_constraints",
-        ))
-
-        if constraint_result.warnings:
-            for w in constraint_result.warnings:
-                _log(f"  {w}")
-
-        if constraint_result.has_errors:
-            _log(f"\n  {C.error('HARDWARE CONFLICTS DETECTED')} ({len(constraint_result.errors)}):")
-            _log("  " + "-" * 56)
-            error_items = [str(v) for v in constraint_result.errors]
-            for v in error_items:
-                _log(f"  {v}")
-                _log()
-
-            # Live mode → browser handler; CLI/TTY → stdin prompt;
-            # non-TTY → halt (existing behavior). Default action is
-            # NO/abort here (CLI prompt was [y/N]) so the user has to
-            # explicitly opt in to a known-broken protocol.
-            proceed = False
-            if self.binary_confirm_handler is not None:
-                _log("  These conflicts mean the protocol may not execute correctly.")
-                proceed = self.binary_confirm_handler.confirm(
-                    title="Hardware conflicts detected",
-                    items=error_items,
-                    yes_label="Proceed anyway",
-                    no_label="Abort",
-                )
-            elif sys.stdin.isatty():
-                _log("  These conflicts mean the protocol may not execute correctly.")
-                response = self.cm.prompt("Proceed anyway? [y/N]: ").lower()
-                proceed = response in ('y', 'yes')
-            else:
-                _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
-            if not proceed:
-                _log("  Aborted. Fix your config or instruction and retry.")
-                _save_state_log("stage_4_constraints")
+                    if ref and not ref.resolved_label and ref.description not in unresolved_refs:
+                        unresolved_refs.append(ref.description)
+            if unresolved_refs:
+                _log(f"\n  {C.error('No config match for:')} {unresolved_refs}")
+                _log(f"  Add appropriate labware to your config.json for these, then re-run.")
+                _save_state_log("stage_3_unresolved_labware")
                 return None
-            _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
-        else:
-            _log(f"  {C.success('All constraints satisfied.')}")
 
-        # PR3b removed the pre-stage-5 confirmation queue. The orchestrator
-        # in stage 3 already routed every confirmable through CLIConfirmationHandler
-        # (initial volumes via InitialContentsVolumeDetector, provenance warnings
-        # via ProvenanceWarningDetector, etc.). No bulk-print pass needed; the
-        # HTML report (ADR-0009) replaces it for visual review.
+            # Stage 4: Constraint checking (deterministic, no LLM)
+            _stage("[Stage 4/8] Checking hardware constraints...")
+            self._emit_stage_started(6, "Checking hardware")
+            # No per-check progress events — the indicator's catalog cycles
+            # client-side through the constraint-checker categories while
+            # this stage is active.
+            from .validation.constraints import ConstraintChecker
+            checker = ConstraintChecker(self.config_loader.config)
+            constraint_result = checker.check_all(spec)
 
-        # Stage 5: Deterministic spec → ProtocolSchema
-        _stage("[Stage 5/8] Converting specification to protocol schema...")
-        self._emit_stage_started(7, "Building & simulating")
-        self._emit_progress("building protocol schema",
-                             stage_name="stage_7_schema")
+            state_log["stage_4_constraints"] = {
+                "errors": [str(v) for v in constraint_result.errors],
+                "warnings": [str(w) for w in constraint_result.warnings],
+            }
 
-        state_log["stage_5_spec"] = spec.model_dump()
-
-        try:
-            from .extraction import CompleteProtocolSpec
-            complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
-            # Emit completed spec event for downstream reporters.
+            # ADR-0011 Phase 1: emit constraint_check_done so column 4
+            # (validated spec) can show whether the spec passed constraint
+            # checks cleanly. Most ERROR violations should already be 0
+            # (orchestrator's ConstraintViolationDetector resolved them);
+            # this event captures the residual + any WARNING-severity items.
             self.reporter.emit(StageEvent(
-                kind="completed_spec",
-                data={"spec": complete_spec},
-                stage_name="stage_5_spec",
+                kind="constraint_check_done",
+                data={
+                    "violation_count": len(constraint_result.errors),
+                    "warnings": [str(w) for w in constraint_result.warnings],
+                },
+                stage_name="stage_4_constraints",
             ))
-            protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
-                complete_spec, self.config_loader.config)
-            _log(f"  {C.dim('Schema generated.')}")
-        except Exception as e:
-            err = str(e)
-            _log(f"  Schema conversion failed.")
-            if "not found" in err.lower():
-                _log(f"    A labware or module reference could not be resolved: {err}")
-                _log(f"    Check that your config labels match the specification above.")
+
+            if constraint_result.warnings:
+                for w in constraint_result.warnings:
+                    _log(f"  {w}")
+
+            if constraint_result.has_errors:
+                _log(f"\n  {C.error('HARDWARE CONFLICTS DETECTED')} ({len(constraint_result.errors)}):")
+                _log("  " + "-" * 56)
+                error_items = [str(v) for v in constraint_result.errors]
+                for v in error_items:
+                    _log(f"  {v}")
+                    _log()
+
+                # Live mode → browser handler; CLI/TTY → stdin prompt;
+                # non-TTY → halt (existing behavior). Default action is
+                # NO/abort here (CLI prompt was [y/N]) so the user has to
+                # explicitly opt in to a known-broken protocol.
+                proceed = False
+                if self.binary_confirm_handler is not None:
+                    _log("  These conflicts mean the protocol may not execute correctly.")
+                    proceed = self.binary_confirm_handler.confirm(
+                        title="Hardware conflicts detected",
+                        items=error_items,
+                        yes_label="Proceed anyway",
+                        no_label="Abort",
+                    )
+                elif sys.stdin.isatty():
+                    _log("  These conflicts mean the protocol may not execute correctly.")
+                    response = self.cm.prompt("Proceed anyway? [y/N]: ").lower()
+                    proceed = response in ('y', 'yes')
+                else:
+                    _log("  Cannot proceed with hardware conflicts in non-interactive mode.")
+                if not proceed:
+                    _log("  Aborted. Fix your config or instruction and retry.")
+                    _save_state_log("stage_4_constraints")
+                    return None
+                _log(f"  {C.dim('Proceeding with constraint adjustments.')}")
             else:
+                _log(f"  {C.success('All constraints satisfied.')}")
+
+            # PR3b removed the pre-stage-5 confirmation queue. The orchestrator
+            # in stage 3 already routed every confirmable through CLIConfirmationHandler
+            # (initial volumes via InitialContentsVolumeDetector, provenance warnings
+            # via ProvenanceWarningDetector, etc.). No bulk-print pass needed; the
+            # HTML report (ADR-0009) replaces it for visual review.
+
+            # Stage 5: Deterministic spec → ProtocolSchema
+            _stage("[Stage 5/8] Converting specification to protocol schema...")
+            self._emit_stage_started(7, "Building & simulating")
+            self._emit_progress("building protocol schema",
+                                 stage_name="stage_7_schema")
+
+            state_log["stage_5_spec"] = spec.model_dump()
+
+            try:
+                from .extraction import CompleteProtocolSpec
+                complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
+                # Emit completed spec event for downstream reporters.
+                self.reporter.emit(StageEvent(
+                    kind="completed_spec",
+                    data={"spec": complete_spec},
+                    stage_name="stage_5_spec",
+                ))
+                protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
+                    complete_spec, self.config_loader.config)
+                _log(f"  {C.dim('Schema generated.')}")
+            except Exception as e:
+                err = str(e)
+                _log(f"  Schema conversion failed.")
+                if "not found" in err.lower():
+                    _log(f"    A labware or module reference could not be resolved: {err}")
+                    _log(f"    Check that your config labels match the specification above.")
+                else:
+                    _log(f"    Detail: {err}")
+                _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
+                _save_state_log("stage_5_schema")
+                return None
+
+            # Stage 6: Deterministic schema → Python script
+            _stage("[Stage 6/8] Generating Python script...")
+            self._emit_progress("generating Python script",
+                                 stage_name="stage_7_codegen")
+            try:
+                script, step_line_map = generate_python_script(
+                    protocol_schema, step_summaries=step_summaries,
+                )
+                _log(f"  {C.dim('Script generated.')}")
+                # Emit generated script event for downstream reporters.
+                # `step_line_map` lets the live + static surfaces hover-pair
+                # Validated Spec blocks ↔ script lines (#72).
+                self.reporter.emit(StageEvent(
+                    kind="generated_script",
+                    data={"script": script, "step_line_map": step_line_map},
+                    stage_name="stage_6_script",
+                ))
+            except ValueError as e:
+                err = str(e)
+                _log(f"  Script generation failed.")
                 _log(f"    Detail: {err}")
-            _log(f"    This is a deterministic step — the specification likely has an inconsistency.")
-            _save_state_log("stage_5_schema")
-            return None
+                _log(f"    Try: simplify your instruction or check config slot assignments.")
+                _save_state_log("stage_6_script")
+                return None
 
-        # Stage 6: Deterministic schema → Python script
-        _stage("[Stage 6/8] Generating Python script...")
-        self._emit_progress("generating Python script",
-                             stage_name="stage_7_codegen")
-        try:
-            script, step_line_map = generate_python_script(
-                protocol_schema, step_summaries=step_summaries,
+            # Save script for debugging regardless of simulation outcome
+            debug_script = os.path.join(output_dir, f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
+            with open(debug_script, 'w') as f:
+                f.write(script)
+            _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
+
+            # Stage 7: Opentrons simulation
+            _stage("[Stage 7/8] Running Opentrons simulation...")
+            self._emit_progress("Opentrons simulator running",
+                                 stage_name="stage_7_simulate")
+            success, simulation_log, runlog = simulate_script(script)
+
+            if not success:
+                if "errorType=" in simulation_log:
+                    import re
+                    error_match = re.search(r"errorType='([^']+)'", simulation_log)
+                    error_detail_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
+                    error_type = error_match.group(1) if error_match else "Unknown"
+                    error_detail = error_detail_match.group(1) if error_detail_match else simulation_log[:300]
+                    _log(f"  Simulation failed: {error_type}")
+                    _log(f"    Detail: {error_detail[:200]}")
+                else:
+                    _log(f"  Simulation failed: {simulation_log[:500]}")
+                _log(f"  The generated Python script did not pass the Opentrons simulator.")
+                _log(f"  Check {debug_script} to see the generated code.")
+                _save_state_log("stage_7_simulation")
+                return None
+
+            _log(f"  {C.success('Simulation passed.')}")
+
+            # Pipeline complete. (Stage 8 — LLM intent verification — was removed
+            # in ADR-0004; the deterministic constraint checker (Stage 4) and
+            # Opentrons simulator (Stage 7) cover the load-bearing checks reliably,
+            # while the intent verifier had a ~95% false-positive rate that eroded
+            # user trust. See docs/adr/0004-remove-intent-verifier.md.)
+            _save_state_log()
+            # Flush buffered events for any reporter that batches (HTMLReporter etc.).
+            # ConsoleReporter (default) is a no-op here.
+            self.reporter.finalize()
+            return PipelineResult(
+                script=script,
+                simulation_log=simulation_log,
+                protocol_schema=protocol_schema,
+                runlog=runlog,
+                config=self.config_loader.config
             )
-            _log(f"  {C.dim('Script generated.')}")
-            # Emit generated script event for downstream reporters.
-            # `step_line_map` lets the live + static surfaces hover-pair
-            # Validated Spec blocks ↔ script lines (#72).
-            self.reporter.emit(StageEvent(
-                kind="generated_script",
-                data={"script": script, "step_line_map": step_line_map},
-                stage_name="stage_6_script",
+        except Exception as exc:
+            # Uncaught exception escaped every per-stage failure save.
+            # Dump the accumulated state_log (which already carries
+            # whatever stage snapshots succeeded before the crash) plus
+            # traceback so the failure is auditable. Re-raise so the
+            # server's wrapper still sees the original exception.
+            import traceback as _tb
+            state_log["exception_type"] = type(exc).__name__
+            state_log["exception_message"] = str(exc)
+            state_log["traceback"] = "".join(_tb.format_exception(
+                type(exc), exc, exc.__traceback__,
             ))
-        except ValueError as e:
-            err = str(e)
-            _log(f"  Script generation failed.")
-            _log(f"    Detail: {err}")
-            _log(f"    Try: simplify your instruction or check config slot assignments.")
-            _save_state_log("stage_6_script")
-            return None
-
-        # Save script for debugging regardless of simulation outcome
-        debug_script = os.path.join(output_dir, f"debug_script_{datetime.now().strftime('%Y%m%d_%H%M%S')}.py")
-        with open(debug_script, 'w') as f:
-            f.write(script)
-        _log(f"  {C.dim(f'Debug: script saved to {debug_script}')}")
-
-        # Stage 7: Opentrons simulation
-        _stage("[Stage 7/8] Running Opentrons simulation...")
-        self._emit_progress("Opentrons simulator running",
-                             stage_name="stage_7_simulate")
-        success, simulation_log, runlog = simulate_script(script)
-
-        if not success:
-            if "errorType=" in simulation_log:
-                import re
-                error_match = re.search(r"errorType='([^']+)'", simulation_log)
-                error_detail_match = re.search(r"errorInfo=\{[^}]*'detail':\s*'([^']+)'", simulation_log)
-                error_type = error_match.group(1) if error_match else "Unknown"
-                error_detail = error_detail_match.group(1) if error_detail_match else simulation_log[:300]
-                _log(f"  Simulation failed: {error_type}")
-                _log(f"    Detail: {error_detail[:200]}")
-            else:
-                _log(f"  Simulation failed: {simulation_log[:500]}")
-            _log(f"  The generated Python script did not pass the Opentrons simulator.")
-            _log(f"  Check {debug_script} to see the generated code.")
-            _save_state_log("stage_7_simulation")
-            return None
-
-        _log(f"  {C.success('Simulation passed.')}")
-
-        # Pipeline complete. (Stage 8 — LLM intent verification — was removed
-        # in ADR-0004; the deterministic constraint checker (Stage 4) and
-        # Opentrons simulator (Stage 7) cover the load-bearing checks reliably,
-        # while the intent verifier had a ~95% false-positive rate that eroded
-        # user trust. See docs/adr/0004-remove-intent-verifier.md.)
-        _save_state_log()
-        # Flush buffered events for any reporter that batches (HTMLReporter etc.).
-        # ConsoleReporter (default) is a no-op here.
-        self.reporter.finalize()
-        return PipelineResult(
-            script=script,
-            simulation_log=simulation_log,
-            protocol_schema=protocol_schema,
-            runlog=runlog,
-            config=self.config_loader.config
-        )
+            try:
+                _save_state_log("uncaught_exception")
+            except Exception:
+                pass
+            raise
 
 
 if __name__ == "__main__":

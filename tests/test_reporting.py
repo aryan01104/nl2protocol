@@ -625,8 +625,10 @@ class TestADR0011FiveColumnLayout:
         rendered = out_path.read_text()
         # The CSS rule for the grid declares five columns. We assert on a
         # substring pattern that's unique to our 5-col grid declaration to
-        # avoid coupling the test to specific fr ratios.
-        assert "1fr 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
+        # avoid coupling the test to specific fr ratios. The instruction
+        # column is capped to a prose-readable width via minmax(); the
+        # remaining four use fr units.
+        assert "minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
 
 
 class TestADR0011Phase2bResolutionArrows:

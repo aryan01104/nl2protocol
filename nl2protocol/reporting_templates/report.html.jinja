@@ -74,7 +74,11 @@
      adds cross-column arrows showing each value's resolution journey. */
   .grid {
     display: grid;
-    grid-template-columns: 1fr 1.15fr 1.15fr 1.15fr 1.4fr;
+    /* Instruction column capped at a prose-readable width (≤640px,
+       ~66 chars/line per Bringhurst). Other columns absorb the remaining
+       width via their fr shares. Min 420px so it doesn't collapse on
+       narrow viewports. */
+    grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr;
     gap: 14px;
     padding: 24px 32px;
     min-height: calc(100vh - 200px);
@@ -83,12 +87,13 @@
      show all 5 columns; live mode starts with only column 1 (Instruction)
      visible and reveals each subsequent column as its stage's first
      event arrives. The grid template adapts to the visible column count
-     so hidden columns don't leave empty tracks. */
-  .grid.cols-1 { grid-template-columns: 1fr; }
-  .grid.cols-2 { grid-template-columns: 1fr 1.15fr; }
-  .grid.cols-3 { grid-template-columns: 1fr 1.15fr 1.15fr; }
-  .grid.cols-4 { grid-template-columns: 1fr 1.15fr 1.15fr 1.15fr; }
-  .grid.cols-5 { grid-template-columns: 1fr 1.15fr 1.15fr 1.15fr 1.4fr; }
+     so hidden columns don't leave empty tracks. The instruction-column
+     cap is preserved in every reveal state. */
+  .grid.cols-1 { grid-template-columns: minmax(420px, 640px); }
+  .grid.cols-2 { grid-template-columns: minmax(420px, 640px) 1.15fr; }
+  .grid.cols-3 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr; }
+  .grid.cols-4 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr; }
+  .grid.cols-5 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr; }
   .col.is-pending { display: none; }
   .col {
     background: var(--panel);
@@ -330,20 +335,23 @@
     border-left-color: var(--col-instruction);
   }
 
-  /* ───────── Phase 3h (#68): staggered fade-in for live-mode blocks ─────────
+  /* ───────── Phase 3h (#68) + 2026-05-06 polish: fade-in for live-mode blocks ─────────
      Live-mode appendStepBlocks adds .fade-in (opacity 0) to each new
      step, then schedules .is-visible with a per-index stagger so blocks
      reveal one-by-one in step order rather than all at once. Static
      reports never apply .fade-in — the Jinja loop renders blocks
-     without these classes, so archived reports have no opacity tricks. */
+     without these classes, so archived reports have no opacity tricks.
+
+     Per ADR-0011 animation-timing addendum (2026-05-06): opacity-only.
+     The previous translateY(2px) slide caused arrow tips captured
+     mid-slide to land 2px below the block's settled position. Block
+     positions are now stable from frame 1; only opacity transitions. */
   .step.fade-in {
     opacity: 0;
-    transform: translateY(2px);
-    transition: opacity 0.22s ease, transform 0.22s ease;
+    transition: opacity 0.605s ease;
   }
   .step.fade-in.is-visible {
     opacity: 1;
-    transform: translateY(0);
   }
 
   /* ───────── Phase 3i (#72): validated-spec constraint summary banner ─────────
@@ -810,6 +818,9 @@
         Confirm initial contents
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 1 of 3 · accept defaults or edit any row</span>
       </div>
+      <div style="padding: 10px 18px; border-bottom: 1px solid var(--grid); font-size: 12px; color: var(--dim); line-height: 1.5;">
+        Wells that need to be pre-filled <em>before</em> the protocol runs. Each row was inferred from your instruction. The volume is how much you'll physically load into that well — the bot will aspirate from it later. Italic values were defaulted by the system; user-stated values appear in normal weight.
+      </div>
       <div id="live-ic-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
         <button id="live-ic-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
@@ -880,7 +891,7 @@
      (data-target-cells) so hovering a row still highlights matching
      spec cells across the columns. -->
 <section class="panels">
-  <div class="panel panel-lab-state{% if not lab_state_rows %} is-collapsed is-empty{% endif %}">
+  <div class="panel panel-lab-state is-collapsed{% if not lab_state_rows %} is-empty{% endif %}">
     <div class="panel-header" data-panel-toggle>
       <span class="panel-chevron">▾</span>
       <h3>Lab state before run</h3>
@@ -914,7 +925,7 @@
     </div>
   </div>
 
-  <div class="panel panel-labware-mapping{% if not labware_mapping_rows %} is-collapsed is-empty{% endif %}">
+  <div class="panel panel-labware-mapping is-collapsed{% if not labware_mapping_rows %} is-empty{% endif %}">
     <div class="panel-header" data-panel-toggle>
       <span class="panel-chevron">▾</span>
       <h3>Labware assignments</h3>
@@ -1128,10 +1139,14 @@
 
   const overlay = document.getElementById("arrow-overlay");
   const tip = document.getElementById("hover-tip");
-  // Phase 3h (#68): trace-once memory for instruction→spec arrows so
-  // re-renders (scroll, resize, etc.) don't re-trigger the trace.
-  const seenArrowIds = new Set();
-  const seenResolutionArrowIds = new Set();
+  // Per ADR-0011 animation-timing addendum (2026-05-06): path maps for
+  // the two arrow renderers. Each maps id → SVGPathElement. Path elements
+  // SURVIVE across renders — their continued presence in the DOM is the
+  // "this id has already traced" signal, replacing the previous
+  // seenArrowIds Set. Re-renders mutate `d` to track scrolled cells; the
+  // trace state (stroke-dasharray + stroke-dashoffset transition) survives.
+  const arrowPathMap = new Map();           // composite-step ids
+  const resolutionArrowPathMap = new Map(); // resolution prov_ids
   if (!overlay) return;
 
   // Token-match selector: a span's data-cite-id may carry multiple
@@ -1149,11 +1164,62 @@
     return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   }
 
+  // Auto-scroll helper. Given a step index and one or two columns,
+  // ensure the step's `.step` block is fully visible in EACH column.
+  // For a single column (red-arrow case) this just scrolls that column.
+  // For two columns (green-arrow case) we compute the required scrollTop
+  // per column and apply the MAX of the two to BOTH — so step i lands
+  // fully visible in extracted AND resolved, and the columns stay in
+  // lockstep (source / destination endpoints aligned vertically).
+  // Already-visible steps produce a no-op; smooth scroll handles the rest.
+  function scrollColumnsForStep(stepIdx, columns) {
+    const margin = 16;
+    const targets = columns.map((col) => {
+      if (!col) return null;
+      const stepEl = col.querySelectorAll(".step")[stepIdx];
+      if (!stepEl) return null;
+      const colH = col.clientHeight;
+      const stepTop = stepEl.offsetTop;
+      const stepBottom = stepTop + stepEl.offsetHeight;
+      const curScroll = col.scrollTop;
+      if (stepTop < curScroll + margin) {
+        return Math.max(0, stepTop - margin);
+      }
+      if (stepBottom > curScroll + colH - margin) {
+        return stepBottom - colH + margin;
+      }
+      return curScroll;  // already in view
+    });
+    const valid = targets.filter((t) => t != null);
+    if (valid.length === 0) return;
+    // Lockstep: pick the larger target so the step is fully visible in
+    // every column even when block heights differ slightly between
+    // extracted and resolved (resolved cells often carry an extra
+    // `[label]` suffix).
+    const targetScroll = Math.max(...valid);
+    columns.forEach((col, idx) => {
+      if (!col || targets[idx] == null) return;
+      if (Math.abs(col.scrollTop - targetScroll) < 4) return;  // already there
+      try {
+        col.scrollTo({ top: targetScroll, behavior: "smooth" });
+      } catch (e) {
+        col.scrollTop = targetScroll;  // older browsers
+      }
+    });
+  }
+
+  // Per ADR-0011 animation-timing addendum (strict-serial revision):
+  // each per-step slot is TRACE + FADE = 1375ms. Arrow takes the first
+  // 770ms of the slot; block takes the next 605ms. The next slot begins
+  // exactly when the previous block finishes fading. Both renderers
+  // (col 1→2 and col 2→3) use this same slot duration.
+  const ARROW_TRACE_MS = 770;
+  const COLUMN_FADE_MS = 605;        // matches CSS .step.fade-in transition (0.605s)
+  const ARROW_STAGGER_MS = ARROW_TRACE_MS + COLUMN_FADE_MS;   // 1375 — slot duration
+
   function renderArrows() {
     const arrowGroup = document.getElementById("arrow-paths");
-    if (arrowGroup) {
-      while (arrowGroup.firstChild) arrowGroup.removeChild(arrowGroup.firstChild);
-    }
+    if (!arrowGroup) return;
     // Update the clip-path rect to match the spec column's visible bounds.
     // Arrows that would extend above/below the column get clipped without
     // changing their bezier shape.
@@ -1185,39 +1251,61 @@
         }
       });
     });
+    // Track which mapped ids we resolved this render so we can prune
+    // entries whose ids no longer exist (rare — only on re-runs that
+    // shrink the spec).
+    const resolvedThisRender = new Set();
     anchorByStepId.forEach(({ rect: srcRect }, id) => {
       const target = document.querySelector(`.step${sel("data-prov-id", id)}`);
       if (!target) return;
       const dstRect = target.getBoundingClientRect();
       if (!dstRect.width) return;
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", bezierPath(srcRect, dstRect));
-      path.dataset.citeId = id;
-      (arrowGroup || overlay).appendChild(path);
-      // Phase 3h (#68): trace-on-first-appearance. The first time we
-      // see an id, animate the path drawing itself from cite to step
-      // by transitioning stroke-dashoffset from path-length to 0.
-      // Subsequent re-renders (scroll, resize, dom mutation) skip the
-      // animation and render the path statically — otherwise the
-      // arrows would re-trace on every event.
-      if (!seenArrowIds.has(id)) {
-        seenArrowIds.add(id);
+      const d = bezierPath(srcRect, dstRect);
+      let path = arrowPathMap.get(id);
+      if (path && path.parentNode === arrowGroup) {
+        // Existing path — mutate `d` to follow scrolled / repositioned
+        // cells. Trace state (dasharray, dashoffset transition) survives.
+        path.setAttribute("d", d);
+      } else {
+        // First-sight: create + run the trace. Stagger by step index
+        // (ID format "s{idx}-step-trigger") so arrows trace one-by-one
+        // in step order at the river-flow cadence.
+        path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.dataset.citeId = id;
+        arrowGroup.appendChild(path);
+        arrowPathMap.set(id, path);
         try {
           const len = path.getTotalLength();
           if (len > 0) {
             path.style.strokeDasharray = String(len);
             path.style.strokeDashoffset = String(len);
-            // Stagger by step index so arrows trace one-by-one in
-            // step order. ID format is "s{idx}-step-trigger".
             const m = id.match(/^s(\d+)/);
             const stepIdx = m ? parseInt(m[1], 10) : 0;
-            const delay = stepIdx * 150;
+            const delay = stepIdx * ARROW_STAGGER_MS;
             setTimeout(() => {
-              path.style.transition = "stroke-dashoffset 0.28s ease-out";
+              // Bring the destination step block into view in the
+              // extracted column before/while the arrow traces. Smooth
+              // scroll glides in parallel with the 770ms trace; the
+              // scheduleRender attached to column-scroll keeps the arrow
+              // path tracking the cell as it moves.
+              scrollColumnsForStep(
+                stepIdx,
+                [document.querySelector(".col-extracted-spec")],
+              );
+              path.style.transition = `stroke-dashoffset ${ARROW_TRACE_MS}ms ease-out`;
               path.style.strokeDashoffset = "0";
             }, delay);
           }
         } catch (e) { /* defensive — getTotalLength may not be available */ }
+      }
+      resolvedThisRender.add(id);
+    });
+    // Prune mapped paths whose ids no longer exist (re-run shrinks).
+    arrowPathMap.forEach((path, id) => {
+      if (!resolvedThisRender.has(id)) {
+        if (path.parentNode === arrowGroup) arrowGroup.removeChild(path);
+        arrowPathMap.delete(id);
       }
     });
   }
@@ -1435,55 +1523,131 @@
     }
   }
 
+  // Per ADR-0011 animation-timing addendum (strict-serial revision):
+  // resolution arrows DO NOT auto-trace at path-creation time. Paths are
+  // created with an invisible initial state (full strokeDashoffset). The
+  // `runResolutionColumnAnimation` function — invoked from the live-mode
+  // col 2→3 gate or from init() in static mode — triggers traces grouped
+  // by step_order so each step's arrows fire at slot start (i × STAGGER)
+  // and the corresponding step block fades in at slot start + TRACE_MS.
+  // The previous queue + pump pattern was independent of step ordering,
+  // which the user observed as wrong: blocks could appear before their
+  // arrows, and arrows for step i+1 could trace before step i's block
+  // appeared.
+
+  function triggerResolutionTrace(path, delayMs) {
+    if (!path) return;
+    if (path.dataset.traced === "1") return;
+    path.dataset.traced = "1";
+    try {
+      const len = path.getTotalLength();
+      if (!(len > 0)) return;
+      path.style.strokeDasharray = String(len);
+      path.style.strokeDashoffset = String(len);
+      setTimeout(() => {
+        path.style.transition = `stroke-dashoffset ${ARROW_TRACE_MS}ms ease-out`;
+        path.style.strokeDashoffset = "0";
+      }, delayMs);
+    } catch (e) { /* defensive */ }
+  }
+
+  function runResolutionColumnAnimation() {
+    // Group resolution paths by step_order (1-based); paths missing a
+    // step_order land in slot 0. For each step's slot at i × STAGGER,
+    // trigger all of that step's arrows in parallel — they share the
+    // arrow-trace window and the corresponding step block fades in
+    // (via appendStepBlocks's per-step setTimeout) at slot start +
+    // TRACE_MS, right when arrows finish.
+    const byStep = new Map();
+    resolutionArrowPathMap.forEach((path) => {
+      const so = parseInt(path.dataset.stepOrder || "0", 10);
+      const stepIdx = Math.max(0, so - 1);
+      if (!byStep.has(stepIdx)) byStep.set(stepIdx, []);
+      byStep.get(stepIdx).push(path);
+    });
+    const extractedCol = document.querySelector(".col-extracted-spec");
+    const resolvedCol  = document.querySelector(".col-resolved-spec");
+    byStep.forEach((paths, stepIdx) => {
+      const slotStart = stepIdx * ARROW_STAGGER_MS;
+      // Scroll both columns in lockstep so step i's source row and
+      // destination row are both visible when this step's arrows trace.
+      setTimeout(() => {
+        scrollColumnsForStep(stepIdx, [extractedCol, resolvedCol]);
+      }, slotStart);
+      paths.forEach((path) => triggerResolutionTrace(path, slotStart));
+    });
+  }
+
   function renderResolutionArrows() {
     const group = document.getElementById("resolution-arrow-paths");
     if (!group) return;
-    while (group.firstChild) group.removeChild(group.firstChild);
     const arrows = readResolutionArrowData();
-    if (arrows.length === 0) return;
     const extractedCol = document.querySelector(".col-extracted-spec");
     const resolvedCol  = document.querySelector(".col-resolved-spec");
-    if (!extractedCol || !resolvedCol) return;
+    if (!extractedCol || !resolvedCol) {
+      // Columns not yet rendered — nothing to anchor against.
+      return;
+    }
+    const seenThisRender = new Set();
     arrows.forEach((arrow) => {
       const pid = arrow.prov_id;
-      // Source: the value cell in the extracted-spec column with the
-      // matching data-prov-id. Destination: the value cell in the
-      // resolved-spec column with the same id. Per-column scoping
-      // keeps the cross-column lookup unambiguous (same prov_id appears
-      // once per column).
-      const src = extractedCol.querySelector(sel("data-prov-id", pid));
-      const dst = resolvedCol.querySelector(sel("data-prov-id", pid));
-      if (!src || !dst) return;
+      if (!pid) return;
+      // Source: extracted-spec column cell. Destination: resolved-spec
+      // column cell. Same data-prov-id appears in both columns; per-column
+      // scoping disambiguates.
+      const srcVal = extractedCol.querySelector(sel("data-prov-id", pid));
+      const dstVal = resolvedCol.querySelector(sel("data-prov-id", pid));
+      if (!srcVal || !dstVal) return;
+      // Anchor the arrow to the FIELD ROW (.step-detail div) rather than
+      // the value span itself. The arrow then enters/leaves the row from
+      // its left/right edge and never overlaps the label or value text.
+      // Falls back to the value span if no .step-detail ancestor exists.
+      const src = srcVal.closest(".step-detail") || srcVal;
+      const dst = dstVal.closest(".step-detail") || dstVal;
       const srcRect = src.getBoundingClientRect();
       const dstRect = dst.getBoundingClientRect();
       if (!srcRect.width || !dstRect.width) return;
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.setAttribute("d", bezierPath(srcRect, dstRect));
-      path.setAttribute("class", `resolution-arrow res-${arrow.resolution_kind}`);
-      path.dataset.provId = pid;
-      path.dataset.resolutionKind = arrow.resolution_kind;
-      group.appendChild(path);
-      // Phase 3h (#68): same trace-once treatment as the step-trigger
-      // arrows. Stagger by step_order so the resolution arrows stream
-      // in alongside the resolved column's blocks rather than all at
-      // once.
-      if (!seenResolutionArrowIds.has(pid)) {
-        seenResolutionArrowIds.add(pid);
+      const d = bezierPath(srcRect, dstRect);
+      let path = resolutionArrowPathMap.get(pid);
+      if (path && path.parentNode === group) {
+        // Existing — just refresh geometry. Trace state (dasharray /
+        // dashoffset / transition) survives so a partial trace keeps
+        // playing toward a moving target without restart.
+        path.setAttribute("d", d);
+      } else {
+        // First-sight: create the path, set it invisible (full dashoffset).
+        // Tag it with step_order so runResolutionColumnAnimation can group
+        // paths by step and trigger them in step-ordered slots.
+        path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("class", `resolution-arrow res-${arrow.resolution_kind}`);
+        path.dataset.provId = pid;
+        path.dataset.resolutionKind = arrow.resolution_kind;
+        path.dataset.stepOrder = String(arrow.step_order || 0);
+        group.appendChild(path);
+        resolutionArrowPathMap.set(pid, path);
         try {
           const len = path.getTotalLength();
           if (len > 0) {
             path.style.strokeDasharray = String(len);
             path.style.strokeDashoffset = String(len);
-            const stepIdx = (typeof arrow.step_order === "number") ? arrow.step_order : 0;
-            const delay = stepIdx * 150;
-            setTimeout(() => {
-              path.style.transition = "stroke-dashoffset 0.32s ease-out";
-              path.style.strokeDashoffset = "0";
-            }, delay);
           }
         } catch (e) { /* defensive */ }
       }
+      seenThisRender.add(pid);
     });
+    // Prune mapped paths whose ids no longer appear in the data.
+    // (Rare in practice — server emits cumulative arrow set per
+    // gap_resolved event; ids only get added.)
+    resolutionArrowPathMap.forEach((path, pid) => {
+      if (!seenThisRender.has(pid)) {
+        if (path.parentNode === group) group.removeChild(path);
+        resolutionArrowPathMap.delete(pid);
+      }
+    });
+    // No automatic trace trigger here. runResolutionColumnAnimation is
+    // the only thing that starts traces, and it's invoked from the col
+    // 2→3 gate (live mode) or init() (static mode).
   }
 
   function scheduleRender() {
@@ -1541,8 +1705,13 @@
         // Arrow paths anchor to cells inside the columns; the panels
         // are in their own section but layout shifts when collapsing
         // can change column box positions. Reschedule a render so
-        // arrows track.
+        // arrows track. Schedule once at click time AND once after the
+        // 200ms max-height transition completes so the final geometry
+        // is also captured.
         try { scheduleRender(); } catch (e) { /* defensive */ }
+        setTimeout(() => {
+          try { scheduleRender(); } catch (e) { /* defensive */ }
+        }, 240);
       });
     });
   }
@@ -1550,6 +1719,10 @@
   function init() {
     renderArrows();
     renderResolutionArrows();
+    // Trigger the resolution arrows' traces grouped by step_order. In
+    // static mode this is the only call site; in live mode it's
+    // re-triggered from the col 2→3 gate after resolved_spec arrives.
+    runResolutionColumnAnimation();
     wireHover();
     wirePanelToggles();
     wireScriptLinkage();
@@ -1580,7 +1753,19 @@
 
     let activeWS = null;   // populated by connectWS so panel button clicks can reach it
 
+    // Status changes are sticky in the failure direction: once we've set
+    // "error", `pipeline_done` (which fires unconditionally in the server's
+    // finally block) must NOT downgrade the status back to a success-looking
+    // "done". Without this, an uncaught exception sequence — error event
+    // first, then pipeline_done sentinel — paints the indicator green and
+    // makes a real crash look like a clean run.
+    let statusIsTerminalError = false;
     function setStatus(text, bg, fg) {
+      if (text === "error") {
+        statusIsTerminalError = true;
+      } else if (statusIsTerminalError && text === "done") {
+        return;
+      }
       status.textContent = text;
       status.style.background = bg;
       status.style.color = fg;
@@ -1673,7 +1858,15 @@
       // visible (display:block above) so getBoundingClientRect is
       // accurate. Falls back to the default bottom-right position
       // (left untouched) when no targets are onscreen.
+      // Defensive guard: if something hid the panel between the
+      // synchronous show and this rAF callback (e.g. pipeline_done
+      // arriving in the same tick and calling hidePanel), bail. Without
+      // this, getBoundingClientRect on a display:none panel returns
+      // (0,0,0,0), and drawAttachArrows draws orphan arrows from the
+      // viewport's top-left corner out to each spotlight cell.
       requestAnimationFrame(() => {
+        if (!panel || panel.style.display === "none") return;
+        if (activeReq !== req) return;
         if (anchorPanelToTargets(spotlight)) {
           installAnchorListeners();
         }
@@ -1990,21 +2183,26 @@
       hidePanel();
     }
 
-    function appendStepBlocks(colSelector, stepDicts) {
+    function appendStepBlocks(colSelector, stepDicts, opts) {
       // Replace the column's "(stage not reached)" placeholder with
       // step blocks. Mirrors the Jinja loop's HTML structure exactly
       // so all existing CSS + hover JS apply unchanged.
-      // Phase 3h (#68): each new block is staggered. Adds .fade-in
-      // (opacity 0) on append + schedules .is-visible at index*150ms
-      // so blocks reveal one-by-one in step order, not all at once.
+      //
+      // Per ADR-0011 animation-timing addendum (strict-serial): each
+      // step gets a slot of duration `stagger`; its block fades in at
+      // `slotStart + fadeOffset`. Defaults match the col 1→2 / col 2→3
+      // shape (stagger=ARROW_STAGGER, fadeOffset=ARROW_TRACE) — block
+      // appears immediately after its arrow finishes. For columns with
+      // no arrows (col 3→4), pass stagger=COLUMN_FADE, fadeOffset=0.
+      opts = opts || {};
+      const stagger = (opts.stagger != null) ? opts.stagger : ARROW_STAGGER_MS;
+      const fadeOffset = (opts.fadeOffset != null) ? opts.fadeOffset : ARROW_TRACE_MS;
       const col = document.querySelector(colSelector);
       if (!col || !stepDicts) return;
       // Drop any "(...) not reached" placeholder paragraph.
       col.querySelectorAll("p").forEach((p) => p.remove());
       // Drop any existing step blocks (so re-runs don't duplicate).
       col.querySelectorAll(".step").forEach((s) => s.remove());
-      const STAGGER_MS = 150;
-      const ARROW_TRACE_MS = 280;   // approx duration of arrow trace
       const isValidatedCol = colSelector.includes("validated");
       stepDicts.forEach((step, idx) => {
         const div = document.createElement("div");
@@ -2026,10 +2224,7 @@
         if (step.note_line) html += step.note_line;
         div.innerHTML = html;
         col.appendChild(div);
-        // Stagger the reveal. Block fades in just AFTER the arrow
-        // would finish tracing (so the visual reads as "arrow draws
-        // in, block lands at its destination").
-        const blockDelay = idx * STAGGER_MS + ARROW_TRACE_MS;
+        const blockDelay = idx * stagger + fadeOffset;
         setTimeout(() => div.classList.add("is-visible"), blockDelay);
       });
       // Re-wire hover handlers so newly-added cells get listeners.
@@ -2095,9 +2290,12 @@
         input.value = initial === "" ? "" : String(initial);
         // Visual hint: italic + dim for suggester defaults so user sees
         // they were filled by the system, not the instruction.
-        if ((row.current_volume_ul === null || row.current_volume_ul === undefined)
-              && row.suggested_volume_ul !== null
-              && row.suggested_volume_ul !== undefined) {
+        const isDefault = (
+          (row.current_volume_ul === null || row.current_volume_ul === undefined)
+          && row.suggested_volume_ul !== null
+          && row.suggested_volume_ul !== undefined
+        );
+        if (isDefault) {
           input.style.color = "var(--col-inferred)";
           input.style.fontStyle = "italic";
           input.addEventListener("input", () => {
@@ -2106,6 +2304,18 @@
           }, { once: true });
         }
         tdVol.appendChild(input);
+        // Per-row reasoning caption — ONLY on suggester-defaulted rows
+        // (user-stated rows don't get one; the value IS the user's
+        // word, no system reasoning to surface). Caption text is the
+        // suggester's own positive_reasoning, so different rows can
+        // carry different explanations (capacity default vs carryover
+        // vs config lookup) instead of identical boilerplate.
+        if (isDefault && row.provenance_reasoning) {
+          const hint = document.createElement("div");
+          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+          hint.textContent = row.provenance_reasoning;
+          tdVol.appendChild(hint);
+        }
         tr.appendChild(tdLabware);
         tr.appendChild(tdWell);
         tr.appendChild(tdSubstance);
@@ -2284,11 +2494,12 @@
     }
 
     function updatePanelMeta(panel, rows, singularLabel, pluralLabel) {
-      // Refresh the count badge + is-empty class. If the panel was
-      // empty (and thus collapsed-by-default per the Jinja-time class
-      // assignment), auto-expand it the first time real data arrives;
-      // user-initiated collapses thereafter take precedence (we don't
-      // re-collapse on subsequent updates).
+      // Refresh the count badge + is-empty class. Per ADR-0011
+      // animation-timing addendum (2026-05-06), panels stay collapsed
+      // by default regardless of populated state — auto-expanding on
+      // first-row arrival shifts the column grid downward and offsets
+      // any arrows already drawn against the pre-shift layout. The
+      // user can still expand manually via chevron toggle.
       if (!panel) return;
       const count = rows ? rows.length : 0;
       const countEl = panel.querySelector(".panel-count");
@@ -2296,15 +2507,10 @@
         const word = count === 1 ? singularLabel : pluralLabel;
         countEl.textContent = count + " " + word;
       }
-      const wasEmpty = panel.classList.contains("is-empty");
       if (count === 0) {
         panel.classList.add("is-empty");
       } else {
         panel.classList.remove("is-empty");
-        // First-row arrival: auto-expand if we were collapsed-because-empty.
-        if (wasEmpty && panel.classList.contains("is-collapsed")) {
-          panel.classList.remove("is-collapsed");
-        }
       }
     }
 
@@ -2553,6 +2759,48 @@
       el.textContent = JSON.stringify(arrows);
     }
 
+    // Column-animation gate. Per ADR-0011 strict-serial spec: each
+    // spec/script event triggering a column animation queues behind
+    // the previous one. `columnAnimationDoneAt` is the performance.now()
+    // timestamp when the most-recently-scheduled column finishes; the
+    // next column's animation starts at exactly that time (or now, if
+    // the previous already finished).
+    let columnAnimationDoneAt = 0;
+
+    function gateColumn(fn, durationMs) {
+      const now = performance.now();
+      const startAt = Math.max(now, columnAnimationDoneAt);
+      const wait = startAt - now;
+      setTimeout(fn, wait);
+      columnAnimationDoneAt = startAt + durationMs;
+    }
+
+    // Modal gating: defer a modal show until the most-recent spec
+    // column has finished animating. The pipeline thread on the server
+    // is already blocked waiting for the user's response — the modal
+    // arrives over the WebSocket as soon as the pipeline emits it,
+    // but if column N is still mid-animation we hold the modal back
+    // so the user can finish reading the column first. Avoids
+    // confusion where a modal asks about cells that haven't rendered
+    // yet (e.g. IC volumes referencing labware whose step block is
+    // still 5 slots away from fading in).
+    function gateModal(showFn) {
+      const delay = Math.max(0, columnAnimationDoneAt - performance.now());
+      if (delay <= 0) {
+        showFn();
+      } else {
+        setTimeout(showFn, delay);
+      }
+    }
+
+    // Per-column duration formula. Slot is per-step time; tail is the
+    // last block's fade. For col 3→4 (no arrows) callers pass smaller
+    // slot via opts to appendStepBlocks AND a matching duration here.
+    function colDurationMs(stepCount, slotMs) {
+      const slot = (slotMs != null) ? slotMs : ARROW_STAGGER_MS;
+      return Math.max(0, stepCount) * slot + COLUMN_FADE_MS;
+    }
+
     function handleEvent(e) {
       switch (e.kind) {
         case "raw_instruction":
@@ -2570,30 +2818,53 @@
         case "pipeline_progress":
           handlePipelineProgress(e.data);
           break;
-        case "extracted_spec":
-          revealCol(".col-extracted-spec");
-          appendStepBlocks(".col-extracted-spec", e.data && e.data.steps);
-          if (e.data && e.data.instruction_html) {
-            updateInstructionColumn(e.data.instruction_html);
-          }
-          updateBulkPanels(e.data);
+        case "extracted_spec": {
+          const data = e.data || {};
+          const steps = data.steps || [];
+          gateColumn(() => {
+            revealCol(".col-extracted-spec");
+            appendStepBlocks(".col-extracted-spec", steps);
+            if (data.instruction_html) updateInstructionColumn(data.instruction_html);
+            updateBulkPanels(data);
+            try { scheduleRender(); } catch (err) { /* defensive */ }
+          }, colDurationMs(steps.length));
           break;
-        case "resolved_spec":
-          revealCol(".col-resolved-spec");
-          appendStepBlocks(".col-resolved-spec", e.data && e.data.steps);
-          if (e.data && e.data.instruction_html) {
-            updateInstructionColumn(e.data.instruction_html);
-          }
-          updateBulkPanels(e.data);
+        }
+        case "resolved_spec": {
+          const data = e.data || {};
+          const steps = data.steps || [];
+          gateColumn(() => {
+            revealCol(".col-resolved-spec");
+            appendStepBlocks(".col-resolved-spec", steps);
+            if (data.instruction_html) updateInstructionColumn(data.instruction_html);
+            updateBulkPanels(data);
+            // Schedule a render + step-keyed arrow trigger on next rAF
+            // so the just-appended blocks have layout positions before
+            // we anchor + start arrow traces.
+            requestAnimationFrame(() => {
+              try { renderArrows(); } catch (err) {}
+              try { renderResolutionArrows(); } catch (err) {}
+              try { runResolutionColumnAnimation(); } catch (err) {}
+            });
+          }, colDurationMs(steps.length));
           break;
-        case "completed_spec":
-          revealCol(".col-validated-spec");
-          appendStepBlocks(".col-validated-spec", e.data && e.data.steps);
-          if (e.data && e.data.instruction_html) {
-            updateInstructionColumn(e.data.instruction_html);
-          }
-          updateBulkPanels(e.data);
+        }
+        case "completed_spec": {
+          const data = e.data || {};
+          const steps = data.steps || [];
+          // Col 3→4 has no arrows. Compress the slot to just the fade
+          // duration so blocks reveal one-by-one without the dead
+          // arrow-trace gap.
+          gateColumn(() => {
+            revealCol(".col-validated-spec");
+            appendStepBlocks(".col-validated-spec", steps,
+              { stagger: COLUMN_FADE_MS, fadeOffset: 0 });
+            if (data.instruction_html) updateInstructionColumn(data.instruction_html);
+            updateBulkPanels(data);
+            try { scheduleRender(); } catch (err) { /* defensive */ }
+          }, colDurationMs(steps.length, COLUMN_FADE_MS));
           break;
+        }
         case "gap_resolved":
           if (e.data && Array.isArray(e.data.resolution_arrows)) {
             updateResolutionArrows(e.data.resolution_arrows);
@@ -2602,39 +2873,40 @@
         case "constraint_check_done":
           updateValidatedSummary(e.data);
           break;
-        case "generated_script":
-          revealCol(".col-generated-code");
-          // Replace the placeholder paragraph in column 5 with a <pre>.
-          // Prefer server-rendered script_html (Phase 3i — per-line
-          // spans tagged with their step id for hover-pair linkage).
-          // Fall back to plain script text if the html field is missing.
-          const codeCol = document.querySelector(".col-generated-code")
-                         || document.querySelectorAll(".col")[4];
-          if (codeCol && e.data && (e.data.script_html || e.data.script)) {
-            codeCol.querySelectorAll("p").forEach((p) => p.remove());
-            codeCol.querySelectorAll("pre.code").forEach((p) => p.remove());
-            const pre = document.createElement("pre");
-            pre.className = "code";
-            if (e.data.script_html) {
-              pre.innerHTML = e.data.script_html;
-            } else {
-              pre.textContent = e.data.script;
+        case "generated_script": {
+          const data = e.data || {};
+          gateColumn(() => {
+            revealCol(".col-generated-code");
+            const codeCol = document.querySelector(".col-generated-code")
+                           || document.querySelectorAll(".col")[4];
+            if (codeCol && (data.script_html || data.script)) {
+              codeCol.querySelectorAll("p").forEach((p) => p.remove());
+              codeCol.querySelectorAll("pre.code").forEach((p) => p.remove());
+              const pre = document.createElement("pre");
+              pre.className = "code";
+              if (data.script_html) {
+                pre.innerHTML = data.script_html;
+              } else {
+                pre.textContent = data.script;
+              }
+              codeCol.appendChild(pre);
+              try { wireScriptLinkage(); } catch (err) { /* defensive */ }
             }
-            codeCol.appendChild(pre);
-            try { wireScriptLinkage(); } catch (err) { /* defensive */ }
-          }
+            try { scheduleRender(); } catch (err) { /* defensive */ }
+          }, COLUMN_FADE_MS + 200);
           break;
+        }
         case "panel_request":
-          if (e.data) showPanel(e.data);
+          if (e.data) gateModal(() => showPanel(e.data));
           break;
         case "labware_assignments_request":
-          if (e.data) showAssignmentsModal(e.data);
+          if (e.data) gateModal(() => showAssignmentsModal(e.data));
           break;
         case "binary_confirm_request":
-          if (e.data) showBinaryModal(e.data);
+          if (e.data) gateModal(() => showBinaryModal(e.data));
           break;
         case "initial_contents_request":
-          if (e.data) showIcModal(e.data);
+          if (e.data) gateModal(() => showIcModal(e.data));
           break;
         case "pipeline_done":
           setStatus("done", "#d4edda", "#155724");
@@ -2647,7 +2919,10 @@
           break;
       }
       // After any DOM mutation, re-render arrows so existing red
-      // composite-step arrows track their new anchors.
+      // composite-step arrows track their new anchors. Note: gated
+      // events do their own scheduleRender inside the gate's fn; this
+      // trailing call only matters for non-gated events (gap_resolved,
+      // panel_request, etc.).
       try { scheduleRender(); } catch (err) { /* defensive */ }
     }
 

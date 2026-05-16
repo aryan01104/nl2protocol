@@ -703,6 +703,11 @@ class LiveModeApp:
             )
             agent.run_pipeline(instruction)
         except Exception as e:
+            # Surface the error to the browser. The status indicator
+            # in handleEvent now sticks once "error" is set, so the
+            # PIPELINE_DONE_SENTINEL that follows can't paint over it.
+            # run_pipeline's own crash handler saves a rich state log
+            # with accumulated spec snapshots before re-raising.
             self._event_queue.put_nowait(_make_error_event(
                 f"Pipeline error: {e}",
             ))

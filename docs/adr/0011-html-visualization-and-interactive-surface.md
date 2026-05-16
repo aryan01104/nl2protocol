@@ -325,7 +325,6 @@ Phases 1, 2 land first as a self-contained replay improvement. Phase 3 is its ow
 
 ## What this ADR does NOT specify
 
-- **Animation timing** at CSS-level — picked at implementation time, calibrated against real Bradford runs.
 - **Exact column widths and breakpoints** — depends on real content density.
 - **Mobile/narrow viewport behavior** — desktop-first; mobile is out of scope.
 - **Internationalization** — English only.
@@ -386,5 +385,101 @@ Per-palette text-contrast pairing (chosen by visual-contrast against each palett
 | `palette-7` (magenta)         | `#b62f7a` | white   |
 
 Plus categorical sources without a palette (`prov-config` purple, `prov-domain_default` gold/dark, `prov-inferred` orange/white, `prov-instruction` red/white as fallback when cite isn't recoverable).
+
+## Addendum: Animation timing — river-flow spec (2026-05-06)
+
+The original ADR deferred animation timing to "implementation time, calibrated against real Bradford runs." Three review rounds on 2026-05-06 walked the spec from drift → river-flow → strict-serial:
+
+- **Round 1**: arrows appeared all at once, resolution arrows fired at server-event-arrival time, blocks were misaligned 2 px from translateY slide. Fixed with path-maps + queue pump + opacity-only fade.
+- **Round 2**: pacing felt rushed at 200/280 ms; calibrated up to 550/770 ms (2.75× original).
+- **Round 3 (this revision)**: even at the slower pace, three things still felt wrong:
+  1. Block_i was fading in while arrow_i was still tracing — they should be **strictly sequential** (block waits for arrow to finish).
+  2. Col 2→3 resolution arrows ran at their own pump cadence independent of col 3 step blocks — step 2's block could appear before step 1's arrows finished. They should be **step-keyed**: step i's arrows trace together, then step i's block fades, then move to step i+1.
+  3. Col 5 (generated script) appeared while col 4 (validated spec) was still animating. Columns should **gate** — column N+1 doesn't begin until column N completes.
+
+This revision pins the strict-serial spec.
+
+### Pacing primitives
+
+| Symbol | Value | Purpose |
+|---|---|---|
+| `ARROW_TRACE_MS` | **770 ms** | Stroke-dashoffset transition for one arrow. |
+| `COLUMN_FADE_MS` | **605 ms** | Opacity transition for one step block. |
+| `ARROW_STAGGER_MS` | **1375 ms** (`= TRACE + FADE`) | Per-step slot duration when a column has arrows. Arrow occupies slot's first 770 ms; block fade occupies the next 605 ms. Next slot begins when previous block finishes. |
+
+For columns without arrows (col 3→4), the slot collapses to `COLUMN_FADE_MS` (605 ms) — block fades immediately at slot start, no dead trace gap.
+
+### Strict-serial within a column
+
+When a spec event triggers a column animation:
+
+| Slot index | Arrow phase (`0 → TRACE`) | Block phase (`TRACE → TRACE+FADE`) |
+|---|---|---|
+| 0 | arrow(s) for step 0 trace | step 0 block fades in |
+| 1 | arrow(s) for step 1 trace | step 1 block fades in |
+| ... | ... | ... |
+| N-1 | arrow(s) for step N-1 trace | step N-1 block fades in |
+
+Within a slot:
+- For **col 1→2** (cite-composite arrows): one arrow per step. Arrow traces start at `slotStart`; block fades at `slotStart + TRACE`.
+- For **col 2→3** (resolution arrows): zero, one, or many arrows per step (one per resolved field). All of step i's arrows trace **in parallel** during the arrow phase; block fades when arrow phase ends.
+- For **col 3→4** (validated spec): no arrows. Block fades at `slotStart`. Slot duration = `COLUMN_FADE_MS`.
+
+No overlap between successive slots. Slot `i+1` starts exactly when slot `i` finishes. Eye reads one ripple at a time, not a continuous flow.
+
+### Column-to-column gating
+
+Spec/script events that trigger column animations (`extracted_spec`, `resolved_spec`, `completed_spec`, `generated_script`) serialize through a single deadline (`columnAnimationDoneAt`). Each event's handler:
+
+1. Computes the column's animation duration (`stepCount × slot + tail`).
+2. Schedules its DOM mutations at `max(now, columnAnimationDoneAt)`.
+3. Updates the deadline to `startAt + duration`.
+
+If `resolved_spec` arrives while col 1→2 is still animating, the resolved-spec handler waits. By the time it fires, col 1→2's last block has fully faded in. The user sees columns populate one at a time, never two animations in flight at once.
+
+`gap_resolved` events don't gate — they just update the cumulative arrows JSON. The col 2→3 animator reads the JSON when it fires (post-gate) and groups paths by `step_order` for its slot-keyed traces.
+
+### Resolution arrows: step-keyed traces
+
+The previous queue-pump pattern (FIFO, one trace every 550 ms) is removed. Replaced by `runResolutionColumnAnimation()`:
+
+1. Group resolution paths by `step_order` (1-based; tagged on each path's `data-step-order`).
+2. For each step `i`, schedule a setTimeout at `i × ARROW_STAGGER_MS` that triggers traces for all of step i's paths in parallel.
+3. Step blocks fade at `i × ARROW_STAGGER_MS + ARROW_TRACE_MS` via the existing `appendStepBlocks` schedule — same slot, same offset.
+
+Steps with zero resolution arrows still consume their slot (the block phase still runs); the arrow phase is just empty. Step ordering of the column is preserved regardless of how the resolution events arrived.
+
+Static mode runs `runResolutionColumnAnimation()` once on init() so the static replay shows the same step-keyed sequence as live mode.
+
+### Total run-time examples
+
+For 5 steps (synthetic replay): col 1→2 = `5 × 1375 + 605 ≈ 7.5 s`. Col 2→3 = same. Col 3→4 = `5 × 605 + 605 ≈ 3.6 s`. Col 4→5 = `0.8 s`. Total animation chain ≈ **19 s** end-to-end.
+
+For 14 steps (Bradford): col 1→2 ≈ 19.9 s; col 2→3 ≈ 19.9 s; col 3→4 ≈ 9.1 s; col 4→5 ≈ 0.8 s. Total ≈ **50 s**.
+
+Slow by web-page standards; deliberate by storytelling standards. The user is here to read the pipeline, not skim it. Future polish: prefers-reduced-motion override, optional skip-to-end button.
+
+### Once-traced-stays-stable invariant
+
+After an arrow has traced, it must never re-animate, even if subsequent events trigger `scheduleRender()`. Implementation: maintain `id → SVGPathElement` maps for both renderers. On re-render, mutate the existing path's `d` attribute rather than recreating the element. The path element survives across renders; its trace state (`stroke-dasharray`, `stroke-dashoffset`) survives with it. Re-renders only update path geometry to track scrolled or repositioned cells.
+
+The `seenArrowIds` Set pattern (track-which-ids-have-traced as a guard) is replaced by the path-map pattern (the element's continued existence IS the "have traced" signal). Cleaner and race-free.
+
+### Block fade-in: opacity-only
+
+Drop the `transform: translateY(2px)` from `.step.fade-in`. Block sits at its final layout position from frame 1; only opacity transitions. Arrow tips captured during fade-in land at the block's settled position with no offset. Tradeoff: lose the small "settle into place" flourish; gain alignment correctness.
+
+### Bar-box panels: default-collapsed
+
+The two bar-box panels above the column grid (`Lab state before run` and `Labware assignments`) start COLLAPSED by default in both live and static modes, regardless of populated/empty state. Reason: in live mode, panels start empty (collapsed) and populate after spec events arrive. If they auto-expand at populate-time, the column grid below shifts downward by the panel's height — and any arrows already drawn against the pre-shift layout end up offset by that height. Default-collapsed eliminates this layout-shift class of misalignment.
+
+Users can still expand panels manually (chevron toggle); the existing `data-panel-toggle` handler triggers `scheduleRender()` on toggle so arrows re-anchor correctly.
+
+### What this addendum does NOT specify
+
+- Easing curves beyond ease-out / ease-in-out. Future polish if needed.
+- Reduce-motion override (`prefers-reduced-motion`) — out of scope for v1; future accessibility pass.
+- Behavior on multi-run servers (currently one run per server invocation, so single-pass).
+
 
 The `.cell-empty` placeholder has its own subdued hover treatment — a dim red outline + light tint — so it still feels like a hover target without the loud color-fill (the cell's content is just `✗`; nothing to color-flip on).

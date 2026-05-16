@@ -1033,6 +1033,31 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     if step.replicates is not None:
         detail_lines.append(f'<span class="label">replicates:</span> {step.replicates}×')
 
+    # Post-actions (mix / blow_out / touch_tip applied AFTER the main
+    # action) are semantic compression: the LLM folds "Mix each well
+    # 3 times at 10uL after adding template" into a transfer's
+    # post_actions instead of emitting a separate mix step. Without
+    # rendering them here, a user reading the spec column would
+    # legitimately think the mix was dropped — even though codegen
+    # consumes the post-action and emits mix_after=(3, 10). Each post
+    # action gets one detail row; numeric fields stay provenance-
+    # colored so the cite linkage works.
+    post_actions = getattr(step, "post_actions", None) or []
+    for pa_idx, pa in enumerate(post_actions):
+        bits = []
+        if pa.repetitions is not None:
+            bits.append(f"×{pa.repetitions}")
+        if pa.volume is not None:
+            v = _render_provenanced_value(
+                f"{pa.volume.value} {pa.volume.unit}",
+                pa.volume.provenance,
+                prov_id=f"{sid}-{pa.action}-{pa_idx}-volume",
+                instruction=instruction,
+            )
+            bits.append(v)
+        rhs = " ".join(bits) if bits else '<em class="dim">(no parameters)</em>'
+        detail_lines.append(f'<span class="label">{pa.action}:</span> {rhs}')
+
     # Surface the step's `note` field as a footnote inside the step block.
     # Pause/comment steps usually carry their content here (e.g. the
     # incubation message, the comment text, the user-action prompt) — without
