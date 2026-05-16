@@ -653,16 +653,20 @@ def main(argv: list = None) -> int:
             html_report_path = args.html_report
         reporter = HTMLReporter(output_path=html_report_path)
 
+    from dotenv import find_dotenv, load_dotenv
+    load_dotenv(find_dotenv(usecwd=True))
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
     try:
-        agent = ProtocolAgent(config_path=config_path, reporter=reporter)
+        agent = ProtocolAgent(api_key=api_key, config_path=config_path, reporter=reporter)
     except APIKeyError as e:
         # Offer interactive setup if key is missing
         if offer_setup_on_missing_key():
             # Retry with new key
+            load_dotenv(find_dotenv(usecwd=True), override=True)
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
             try:
-                from dotenv import find_dotenv, load_dotenv
-                load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
-                agent = ProtocolAgent(config_path=config_path, reporter=reporter)
+                agent = ProtocolAgent(api_key=api_key, config_path=config_path, reporter=reporter)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)
                 return 1

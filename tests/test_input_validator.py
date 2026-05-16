@@ -55,14 +55,13 @@ class TestCheckInputLengthTooLong:
 # ============================================================================
 
 @pytest.fixture
-def validator(monkeypatch):
+def validator():
     """Construct an InputValidator with a stubbed API key + mocked client.
 
     The mocked client raises on any call, so tests can assert that the
     length-pre-check short-circuited (LLM was NOT invoked).
     """
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-stub-key")
-    v = InputValidator()
+    v = InputValidator(api_key="test-stub-key")
     mock_client = MagicMock()
     mock_client.messages.create.side_effect = AssertionError("LLM should not be called")
     v.client = mock_client

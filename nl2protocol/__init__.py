@@ -8,7 +8,7 @@ Usage:
 Or programmatically:
     from nl2protocol import ProtocolAgent
 
-    agent = ProtocolAgent(config_path="lab_config.json")
+    agent = ProtocolAgent(api_key=os.getenv("ANTHROPIC_API_KEY"), config_path="lab_config.json")
     result = agent.run_pipeline(prompt="Your intent here")
     print(result.script)
 """

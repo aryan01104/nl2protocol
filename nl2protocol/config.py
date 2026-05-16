@@ -92,26 +92,25 @@ class ConfigLoader:
     Provides: validated config, Anthropic client, model name
     """
 
-    def __init__(self, config_path: str = "lab_config.json", model_name: str = "claude-sonnet-4-20250514"):
-        """Construct a ConfigLoader with a config path and a Claude model name.
+    def __init__(self, api_key: str, config_path: str = "lab_config.json",
+                 model_name: str = "claude-sonnet-4-20250514"):
+        """Construct a ConfigLoader with an explicit API key, config path, and model name.
 
-        Pre:    `config_path` is a string (file path; not required to exist
-                yet — existence is checked in `load_config`). `model_name`
-                is an Anthropic model identifier string.
+        Pre:    `api_key` is a non-empty Anthropic API key string supplied by
+                the caller. `config_path` is a string (file path; not required
+                to exist yet — existence is checked in `load_config`).
+                `model_name` is an Anthropic model identifier string.
 
         Post:   Sets `self.config_path`, `self.model_name`. Initializes
                 `self.config` to None (set later by `load_config`).
                 Initializes `self.client` to a constructed `Anthropic`
-                instance using `ANTHROPIC_API_KEY` from environment.
+                instance using the supplied `api_key`.
 
-        Side effects: Loads environment variables from a `.env` file via
-                      `load_dotenv(find_dotenv(usecwd=True))` — searches
-                      from the current working directory upward.
-
-        Raises: APIKeyError if `ANTHROPIC_API_KEY` is not set in the
-                environment after `.env` is loaded.
+        Raises: APIKeyError if `api_key` is empty or whitespace.
         """
-        load_dotenv(find_dotenv(usecwd=True))
+        if not api_key or not api_key.strip():
+            raise APIKeyError("ANTHROPIC_API_KEY")
+        self._api_key = api_key
         self.model_name = model_name
         self.config_path = config_path
         self.config = None
@@ -156,8 +155,5 @@ class ConfigLoader:
         return self.config
 
     def _setup_claude(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise APIKeyError("ANTHROPIC_API_KEY")
-        self.client = Anthropic(api_key=api_key)
+        self.client = Anthropic(api_key=self._api_key)
 

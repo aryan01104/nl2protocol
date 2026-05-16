@@ -445,7 +445,8 @@ def simulate_script(script_code: str) -> tuple[bool, str, list]:
 
 
 class ProtocolAgent:
-    def __init__(self, config_path: str = "lab_config.json",
+    def __init__(self, api_key: str,
+                 config_path: str = "lab_config.json",
                  confirmation_manager=None,
                  reporter=None,
                  confirmation_handler=None,
@@ -499,7 +500,8 @@ class ProtocolAgent:
         from nl2protocol.confirmation import InteractiveCM
         from nl2protocol.reporting import ConsoleReporter
         self.config_path = config_path
-        self.config_loader = ConfigLoader(config_path=config_path)
+        self._api_key = api_key
+        self.config_loader = ConfigLoader(api_key=api_key, config_path=config_path)
         self.cm = confirmation_manager or InteractiveCM()
         self.reporter = reporter or ConsoleReporter()
         self.confirmation_handler = confirmation_handler
@@ -1063,7 +1065,7 @@ class ProtocolAgent:
             self._emit_progress("classifying instruction (Haiku)",
                                  stage_name="stage_1_classify")
             from .validation.input_validator import InputValidator
-            validator = InputValidator()
+            validator = InputValidator(api_key=self._api_key)
             try:
                 validation = validator.classify(prompt)
             except Exception as e:

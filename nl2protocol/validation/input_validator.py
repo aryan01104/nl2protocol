@@ -106,16 +106,25 @@ Input to classify:
 class InputValidator:
     """Validates user inputs before protocol generation using LLM classification."""
 
-    def __init__(self, model_name: str = "claude-sonnet-4-20250514"):
-        load_dotenv(find_dotenv(usecwd=True))
+    def __init__(self, api_key: str, model_name: str = "claude-sonnet-4-20250514"):
+        """Construct an InputValidator with an explicit API key.
+
+        Pre:    `api_key` is a non-empty Anthropic API key supplied by the
+                caller. `model_name` is an Anthropic model identifier.
+
+        Post:   `self.client` is a constructed `Anthropic` instance using
+                `api_key`. `self.model_name` is stored for use in classify().
+
+        Raises: APIKeyError if `api_key` is empty or whitespace.
+        """
+        if not api_key or not api_key.strip():
+            raise APIKeyError("ANTHROPIC_API_KEY")
+        self._api_key = api_key
         self.model_name = model_name
         self._setup_client()
 
     def _setup_client(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise APIKeyError("ANTHROPIC_API_KEY")
-        self.client = Anthropic(api_key=api_key)
+        self.client = Anthropic(api_key=self._api_key)
 
     def classify(self, user_input: str) -> InputValidationResult:
         """Classify `user_input` as PROTOCOL / QUESTION / AMBIGUOUS / INVALID.
@@ -176,15 +185,16 @@ class InputValidator:
             raise RuntimeError(f"Input validation failed: {format_api_error(e)}") from e
 
 
-def validate_input(user_input: str) -> InputValidationResult:
+def validate_input(user_input: str, api_key: str) -> InputValidationResult:
     """
     Convenience function to validate input without creating validator instance.
 
     Args:
         user_input: The raw user input string
+        api_key: Anthropic API key (required; caller reads from env or request)
 
     Returns:
         InputValidationResult with classification details
     """
-    validator = InputValidator()
+    validator = InputValidator(api_key=api_key)
     return validator.classify(user_input)
