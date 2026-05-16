@@ -331,6 +331,28 @@ class Orchestrator:
                 if resolution.action == "skip":
                     self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                     continue
+                # For fabricated gaps, "accept_suggestion" means "trust
+                # the suggester's reasoning, restate the provenance as
+                # inferred." Transform the Resolution so the apply path
+                # receives a Provenance object to write into the
+                # provenance slot at gap.field_path — NOT a raw value.
+                # The underlying value is left untouched. See
+                # _apply_at_path's fabrication-shaped path branch.
+                if (resolution.action == "accept_suggestion"
+                        and gap.kind == "fabricated"
+                        and suggestion is not None):
+                    from nl2protocol.models.spec import Provenance
+                    resolution = Resolution(
+                        action="accept_suggestion",
+                        new_value=Provenance(
+                            source="inferred",
+                            positive_reasoning=suggestion.positive_reasoning,
+                            why_not_in_instruction=suggestion.why_not_in_instruction,
+                            confidence=suggestion.confidence,
+                            review_status="user_accepted_suggestion",
+                        ),
+                        user_action_provenance="user_accepted_suggestion",
+                    )
                 # accept_suggestion or edit → apply
                 self._apply(spec, gap, resolution, suggestion)
                 self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
@@ -784,6 +806,63 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
 
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
+
+    # steps[N].<field>.<...provenance> — fabrication-shaped path. The
+    # verifier produces this when a cited_text fails the substring
+    # check; the broken slot is the provenance itself, not the value.
+    # Resolutions:
+    #   accept_suggestion → new_value is a Provenance object (the
+    #     orchestrator built it from the suggester's reasoning). Write
+    #     it into the slot directly. Underlying value is left alone.
+    #   override          → keep value AND existing provenance object,
+    #     but stamp review_status=user_overrode_fabrication (the user
+    #     accepted responsibility for the fabricated cite).
+    #   edit              → for atomic Provenanced* fields (volume,
+    #     substance, duration, temperature) where the parent has a
+    #     `.value` slot, write the typed value AND replace the
+    #     provenance slot with a fresh inferred+user_edited Provenance.
+    #     LocationRef edits (description, wells) deferred — silent
+    #     no-op until we add list/range parsing.
+    m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w*provenance)$", path)
+    if m:
+        idx, fname, slot = int(m.group(1)), m.group(2), m.group(3)
+        parent = getattr(spec.steps[idx], fname, None)
+        if parent is None:
+            return
+        from nl2protocol.models.spec import Provenance
+        if resolution.action == "accept_suggestion":
+            # new_value is expected to be a Provenance built by the
+            # orchestrator from the suggester's reasoning. Replace
+            # the slot; review_status already correct on the new prov.
+            setattr(parent, slot, new_value)
+            return
+        if resolution.action == "override":
+            existing_prov = getattr(parent, slot, None)
+            if existing_prov is not None:
+                setattr(parent, slot, Provenance.model_validate({
+                    **existing_prov.model_dump(),
+                    "review_status": "user_overrode_fabrication",
+                    "reviewer_objection": None,
+                }))
+            return
+        if resolution.action == "edit" and hasattr(parent, "value"):
+            parent.value = new_value
+            setattr(parent, slot, Provenance(
+                source="inferred",
+                positive_reasoning=(
+                    "User-typed value during fabrication resolution."
+                ),
+                why_not_in_instruction=(
+                    "User edited the value; original citation was malformed."
+                ),
+                confidence=1.0,
+                review_status="user_edited",
+            ))
+            return
+        # edit on LocationRef sub-slots, or unknown action: silent
+        # no-op (better than crashing). Follow-up: parse list/range
+        # input from the modal so edits land cleanly.
+        return
 
     # ADR-0012: action="override" means the user kept the existing value
     # AS-IS but committed to it despite a fabrication flag. Don't write

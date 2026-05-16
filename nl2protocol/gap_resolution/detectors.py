@@ -148,18 +148,26 @@ _SEVERITY_MAP = {
 
 
 def _warning_to_field_path(warning: dict) -> str:
-    """Best-effort dotted-path for a provenance warning."""
+    """Return the spec field-path the apply layer can write to.
+
+    The verifier now emits `field_path` directly in each warning
+    dict because it already knows the spec address when it walks
+    the value (e.g. `steps[2].source.wells_provenance`). We just
+    read that. The legacy fallback path (space→underscore on the
+    display label) is preserved for any warning that doesn't
+    carry an explicit field_path — apply layer silently no-ops
+    on those.
+    """
+    explicit = warning.get("field_path")
+    if explicit:
+        return explicit
     step = warning.get("step")
     field = (warning.get("field") or "").strip()
     if step == 0:
-        # Cross-check warnings have step=0 — they're spec-level.
-        return f"cross_check.{field}"
+        return f"cross_check.{field.replace(' ', '_')}"
     if not field:
         return f"steps[{step - 1}].unknown"
-    # Field strings include things like "source labware", "source wells",
-    # "mix volume". Normalize to a dotted suffix.
-    field_norm = field.replace(" ", "_")
-    return f"steps[{step - 1}].{field_norm}"
+    return f"steps[{step - 1}].{field.replace(' ', '_')}"
 
 
 def _warning_id(warning: dict) -> str:

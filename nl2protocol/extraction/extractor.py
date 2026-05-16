@@ -247,11 +247,21 @@ class SemanticExtractor:
     # ========================================================================
 
     def _warn(self, step_order: int, field: str, value: str,
-              claimed_source: str, severity: str, message: str) -> dict:
-        """Build a structured provenance warning."""
+              claimed_source: str, severity: str, message: str,
+              field_path: Optional[str] = None) -> dict:
+        """Build a structured provenance warning.
+
+        `field_path` is the spec address the warning is about (e.g.
+        `steps[2].source.wells_provenance`). The verifier already
+        knows this when it walks the spec — emitting it here means
+        downstream consumers (the orchestrator's Gap detector) don't
+        have to translate the human-readable `field` label back into
+        a path. `field` stays as the display label.
+        """
         return {
             "step": step_order,
             "field": field,
+            "field_path": field_path,
             "value": value,
             "claimed_source": claimed_source,
             "severity": severity,
@@ -292,7 +302,8 @@ class SemanticExtractor:
 
         warnings = []
 
-        def check(step_order: int, field_name: str, value, prov):
+        def check(step_order: int, field_name: str, field_path: str,
+                  value, prov):
             if not prov or prov.source != "instruction":
                 return
             quote = prov.cited_text
@@ -300,40 +311,59 @@ class SemanticExtractor:
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
                     f"Step {step_order} {field_name}: source='instruction' but cited_text missing",
+                    field_path=field_path,
                 ))
                 return
             if find_cite_position(instruction, quote) is None:
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
                     f"Step {step_order} {field_name}: cited_text {quote!r} not found in instruction",
+                    field_path=field_path,
                 ))
                 return
             if not self._value_in_quote(value, quote):
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
                     f"Step {step_order} {field_name}: value {value!r} not present in cited_text {quote!r}",
+                    field_path=field_path,
                 ))
 
-        for step in spec.steps:
+        for step_idx, step in enumerate(spec.steps):
             if step.volume:
-                check(step.order, "volume", step.volume.value, step.volume.provenance)
+                check(step.order, "volume",
+                      f"steps[{step_idx}].volume.provenance",
+                      step.volume.value, step.volume.provenance)
             if step.substance:
-                check(step.order, "substance", step.substance.value, step.substance.provenance)
+                check(step.order, "substance",
+                      f"steps[{step_idx}].substance.provenance",
+                      step.substance.value, step.substance.provenance)
             if step.duration:
-                check(step.order, "duration", step.duration.value, step.duration.provenance)
+                check(step.order, "duration",
+                      f"steps[{step_idx}].duration.provenance",
+                      step.duration.value, step.duration.provenance)
             if step.temperature:
-                check(step.order, "temperature", step.temperature.value, step.temperature.provenance)
+                check(step.order, "temperature",
+                      f"steps[{step_idx}].temperature.provenance",
+                      step.temperature.value, step.temperature.provenance)
             for ref, role in [(step.source, "source"), (step.destination, "destination")]:
                 if not ref:
                     continue
-                check(step.order, f"{role} labware", ref.description, ref.description_provenance)
+                check(step.order, f"{role} labware",
+                      f"steps[{step_idx}].{role}.description_provenance",
+                      ref.description, ref.description_provenance)
                 wells = list(ref.wells or ([ref.well] if ref.well else []))
                 for w in wells:
-                    check(step.order, f"{role} well", w, ref.wells_provenance)
+                    # Every well on a ref shares one wells_provenance, so all
+                    # well-fabrication warnings point at the SAME slot. Gap
+                    # dedup by id collapses them into one Gap.
+                    check(step.order, f"{role} well",
+                          f"steps[{step_idx}].{role}.wells_provenance",
+                          w, ref.wells_provenance)
             if step.post_actions:
-                for pa in step.post_actions:
+                for pa_idx, pa in enumerate(step.post_actions):
                     if pa.volume:
                         check(step.order, f"{pa.action} volume",
+                              f"steps[{step_idx}].post_actions[{pa_idx}].volume.provenance",
                               pa.volume.value, pa.volume.provenance)
 
         return warnings
