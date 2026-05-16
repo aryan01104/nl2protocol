@@ -306,25 +306,37 @@ class SemanticExtractor:
                   value, prov):
             if not prov or prov.source != "instruction":
                 return
-            quote = prov.cited_text
-            if not quote:
+            quotes = prov.cited_text  # List[str] (normalizer wraps str → [str])
+            if not quotes:
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
                     f"Step {step_order} {field_name}: source='instruction' but cited_text missing",
                     field_path=field_path,
                 ))
                 return
-            if find_cite_position(instruction, quote) is None:
+            # Every cite must appear in the instruction. A list of cites is
+            # only honest if all of them are real verbatim quotes — one
+            # bogus entry means the LLM confabulated.
+            missing = next(
+                (q for q in quotes if find_cite_position(instruction, q) is None),
+                None,
+            )
+            if missing is not None:
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
-                    f"Step {step_order} {field_name}: cited_text {quote!r} not found in instruction",
+                    f"Step {step_order} {field_name}: cited_text {missing!r} not found in instruction",
                     field_path=field_path,
                 ))
                 return
-            if not self._value_in_quote(value, quote):
+            # At least one cite must contain THIS specific value. For a
+            # wells list where each well has its own cite ("Plasmid A1 to
+            # cells B1", "Plasmid A2 to cells B2", ...), the verifier is
+            # called once per well; A1 should match its own cite, A2 its
+            # own, etc. — at-least-one-contains is the right relaxation.
+            if not any(self._value_in_quote(value, q) for q in quotes):
                 warnings.append(self._warn(
                     step_order, field_name, str(value), "instruction", "fabrication",
-                    f"Step {step_order} {field_name}: value {value!r} not present in cited_text {quote!r}",
+                    f"Step {step_order} {field_name}: value {value!r} not present in any cited_text {quotes!r}",
                     field_path=field_path,
                 ))
 

@@ -81,19 +81,34 @@ PROVENANCE — every value you extract MUST have a provenance object:
   you missed it) drags down the verdict on the positive. Keep them
   independent so each can be checked on its own.
 
-  cited_text: a verbatim substring from the instruction that grounds this value.
-              The substring MUST appear character-for-character in the instruction text
-              (case-insensitive, whitespace-normalized). For numbers, the cited substring
-              should contain the value as written (e.g., "100uL of buffer" cites "100uL").
-              Used ONLY when source = "instruction".
+  cited_text: a list of verbatim substrings from the instruction that ground
+              this value. Each entry MUST appear character-for-character in the
+              instruction (case-insensitive, whitespace-normalized). Used ONLY
+              when source = "instruction".
 
-              VERBATIM IS NON-NEGOTIABLE. Do NOT paraphrase, summarize, or reword.
-              Pick the SHORTEST substring that uniquely grounds the value — long
-              cites overlap badly with neighbors. Good: "100uL". Bad:
-              "transfer 100uL from source to destination". If the same substring
-              appears multiple times with different intents (e.g. "2uL" cited
-              twice), pick the shortest CONTAINING context that disambiguates
-              (e.g. "Add 2uL of plasmid" vs "mix at 2uL").
+              SHAPE — list or single string:
+                - For most atomic values, ONE substring is enough. Emit a single
+                  string OR a one-element list — both accepted. Example:
+                  cited_text: "100uL"   OR   cited_text: ["100uL"]
+                - When the value's grounding is SPREAD across the instruction
+                  (e.g. a wells list captured from bullet-listed mappings),
+                  emit one entry per substring. Example for source.wells =
+                  [A1, A2, A3, A4]:
+                  cited_text: ["Plasmid A1 to cells B1",
+                               "Plasmid A2 to cells B2",
+                               "Plasmid A3 to cells B3",
+                               "Plasmid A4 to cells B4"]
+                  Do NOT comma-join those bullets into one fake substring —
+                  the verifier checks each entry verbatim and will reject a
+                  concatenation that doesn't appear in your text.
+
+              VERBATIM IS NON-NEGOTIABLE for every entry. Do NOT paraphrase,
+              summarize, or reword. Pick the SHORTEST substring per entry that
+              uniquely grounds its part of the value. Good: "100uL". Bad:
+              "transfer 100uL from source to destination". If the same
+              substring appears multiple times with different intents (e.g.
+              "2uL" cited twice), pick the shortest CONTAINING context that
+              disambiguates (e.g. "Add 2uL of plasmid" vs "mix at 2uL").
 
   positive_reasoning:
               ONE sentence answering: "why is THIS the right value?"

@@ -11,7 +11,7 @@ can verify claims and route uncertain values for user confirmation.
 
 from typing import Annotated, List, Optional, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
@@ -64,12 +64,16 @@ class Provenance(BaseModel):
         "'domain_default' = standard practice for a named protocol (positive_reasoning required). "
         "'inferred' = reasoning or guess with no direct support (positive_reasoning required)."
     ))
-    cited_text: Optional[str] = Field(None, description=(
-        "The verbatim substring from the instruction text that grounds this value. "
-        "REQUIRED when source == 'instruction'. Must appear verbatim in the instruction "
-        "(case-insensitive, whitespace-normalized). For numbers, the cited substring "
-        "should contain the value (e.g., for value=100uL, cited_text might be "
-        "'100uL of buffer'). Leave null when source is 'domain_default' or 'inferred'."
+    cited_text: Optional[List[str]] = Field(None, description=(
+        "A list of verbatim substrings from the instruction that ground this value. "
+        "REQUIRED when source == 'instruction' (non-empty list, each entry a non-empty string). "
+        "Each entry must appear verbatim in the instruction (case-insensitive, "
+        "whitespace-normalized). For numbers, at least one cited substring should "
+        "contain the value (e.g., for value=100uL, cited_text might be ['100uL of buffer']). "
+        "Use multiple entries when the supporting text is spread across the instruction "
+        "(e.g., a wells list captured across four bullet points: "
+        "['Plasmid A1 to cells B1', 'Plasmid A2 to cells B2', ...]). Leave null when "
+        "source is 'domain_default' or 'inferred'."
     ))
     positive_reasoning: Optional[str] = Field(None, description=(
         "One sentence answering: 'why is THIS the right value?'. "
@@ -124,6 +128,24 @@ class Provenance(BaseModel):
         "0.4 = plausible guess with weak support. "
         "Below 0.4 = not sure."
     ))
+
+    @field_validator('cited_text', mode='before')
+    @classmethod
+    def _normalize_cited_text(cls, v):
+        """Accept either a single string (legacy / atomic-cite shape) or
+        a list of strings (multi-cite shape for values whose grounding
+        is spread across the instruction — e.g. a wells list cited from
+        multiple bullet points). Internally we always store a list, so
+        the verifier and visualization can iterate uniformly. Existing
+        callers that pass `cited_text='100uL'` keep working: this
+        validator wraps the string into `['100uL']` before field-level
+        type validation runs.
+        """
+        if v is None:
+            return None
+        if isinstance(v, str):
+            return [v]
+        return v
 
     @model_validator(mode='before')
     @classmethod

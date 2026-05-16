@@ -175,16 +175,25 @@ _PROV_CLASS = {
 _PALETTE_SIZE = 8
 
 
-def _palette_class(cited_text: str) -> str:
+def _palette_class(cited_text) -> str:
     """Deterministic hash of `cited_text` → one of `palette-0` .. `palette-N`.
 
     md5-based so the same cite always lands on the same hue across runs
     (Python's built-in hash() randomizes per-process via PYTHONHASHSEED).
+    Accepts either a single string (atomic / step-level cites) OR a list
+    of strings (multi-cite atomic-value cites — wells lists spread across
+    bullet points). The hash key is the joined list so different cite
+    lists produce different colors; a single-string input is equivalent
+    to a one-element list under the join.
     """
     import hashlib
     if not cited_text:
         return "palette-0"
-    digest = hashlib.md5(cited_text.encode("utf-8")).digest()
+    if isinstance(cited_text, list):
+        key = "\u0001".join(cited_text)
+    else:
+        key = str(cited_text)
+    digest = hashlib.md5(key.encode("utf-8")).digest()
     return f"palette-{digest[0] % _PALETTE_SIZE}"
 
 
@@ -245,17 +254,27 @@ def _render_provenanced_value(
 
     classes = [_PROV_CLASS.get(source, "prov-inferred")]
 
+    # cited_text is List[str] post-normalizer. Drop empties just in case.
+    cite_list = list(cited_text) if isinstance(cited_text, list) else (
+        [cited_text] if cited_text else []
+    )
+    cite_list = [c for c in cite_list if c]
+
     # Decide whether the cite is recoverable (drives both palette + linkage).
+    # For a multi-cite list, "recoverable" means EVERY cite resolves in the
+    # instruction. If any fails, the value is fabrication-flagged elsewhere
+    # so we don't want to claim a clean color-match here.
     cite_recoverable = False
-    if source == "instruction" and cited_text:
+    if source == "instruction" and cite_list:
         if instruction is None:
-            # Caller didn't pass instruction — assume recoverable (legacy).
             cite_recoverable = True
         else:
-            cite_recoverable = _find_cite_position(instruction, cited_text) is not None
+            cite_recoverable = all(
+                _find_cite_position(instruction, c) is not None for c in cite_list
+            )
 
-    if cite_recoverable and cited_text:
-        classes.append(_palette_class(cited_text))
+    if cite_recoverable and cite_list:
+        classes.append(_palette_class(cite_list))
 
     # Review-lifecycle class. The CSS pseudo-element on this class draws
     # the inline ⚠ / ✎ badge for the two attention-worthy states; other
@@ -279,8 +298,11 @@ def _render_provenanced_value(
     extra_attrs += f' data-prov-source="{html.escape(source, quote=True)}"'
     extra_attrs += f' data-prov-confidence="{confidence:.2f}"'
     extra_attrs += f' data-prov-review-status="{html.escape(review_status, quote=True)}"'
-    if cited_text:
-        extra_attrs += f' data-prov-cited="{html.escape(cited_text, quote=True)}"'
+    if cite_list:
+        # Join with " | " so a multi-cite tooltip can show all cites
+        # at a glance. Single-cite case shows exactly the original.
+        joined_cites = " | ".join(cite_list)
+        extra_attrs += f' data-prov-cited="{html.escape(joined_cites, quote=True)}"'
     if positive_reasoning:
         extra_attrs += f' data-prov-positive-reasoning="{html.escape(positive_reasoning, quote=True)}"'
         # Backwards-compat alias for any external consumer that still reads
@@ -374,12 +396,25 @@ def _collect_arrow_targets(spec) -> list:
                 cited = getattr(prov, "cited_text", None)
                 if not cited:
                     continue
-                targets.append({
-                    "prov_id": f"{sid}-{field_name}",
-                    "cited_text": cited,
-                    "kind": "atomic-color",
-                    "palette_class": _palette_class(cited),
-                })
+                # cited_text is List[str] post-normalizer. Emit one target
+                # per cite so each substring gets its own colored span in
+                # the instruction. All cites for the same field share the
+                # palette derived from the FULL list (the hash key is the
+                # joined list), so a wells-list with N cites colors all N
+                # spans the same hue — connecting them visually as one
+                # logical citation cluster while still highlighting each
+                # actual phrase the LLM quoted.
+                cite_iter = cited if isinstance(cited, list) else [cited]
+                palette = _palette_class(cited)
+                for cite_idx, single_cite in enumerate(cite_iter):
+                    if not single_cite:
+                        continue
+                    targets.append({
+                        "prov_id": f"{sid}-{field_name}",
+                        "cited_text": single_cite,
+                        "kind": "atomic-color",
+                        "palette_class": palette,
+                    })
     return targets
 
 
