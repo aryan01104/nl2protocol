@@ -26,6 +26,8 @@ import os
 import queue
 import tempfile
 import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -371,7 +373,49 @@ class LiveModeApp:
         # (replaces N per-Gap modals during gap resolution). Same
         # dict-by-rid pattern.
         self._pending_initial_contents: Dict[str, InitialContentsConfirmation] = {}
+        # Per-IP rate limit. Defense in depth on top of BYO-key: even if a
+        # visitor brings their own key, we don't want a bot to spam /start
+        # 100x and exhaust our Fly machine's CPU. Dict grows with unique
+        # IPs — fine for a portfolio demo; LRU-evict if this ever scales.
+        self._rate_limit_window_s: int = 3600
+        self._rate_limit_max: int = 5
+        self._rate_limit_history: Dict[str, deque] = defaultdict(deque)
         self._setup_routes()
+
+    @staticmethod
+    def _client_ip(request: "Request") -> str:
+        """Resolve the real client IP behind Fly's proxy.
+
+        Pre:    `request` is a FastAPI Request. Fly's edge sets
+                `Fly-Client-IP`; standard HTTP proxies set
+                `X-Forwarded-For` (comma-separated, first entry is origin).
+        Post:   Returns the best-available client IP string. Falls back
+                to the immediate socket peer if no proxy headers are set
+                (local dev). Returns "unknown" if nothing resolves.
+        """
+        return (
+            request.headers.get("fly-client-ip")
+            or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else "")
+            or "unknown"
+        )
+
+    def _is_rate_limited(self, client_ip: str) -> bool:
+        """Read-only check: is `client_ip` over the per-IP limit right now?
+        Purges expired entries as a side effect; does not record the
+        current attempt."""
+        now = time.monotonic()
+        history = self._rate_limit_history[client_ip]
+        while history and now - history[0] > self._rate_limit_window_s:
+            history.popleft()
+        return len(history) >= self._rate_limit_max
+
+    def _record_rate_limit_attempt(self, client_ip: str) -> None:
+        """Record a real pipeline-kickoff attempt for `client_ip`. Only
+        called after all validation passes and a worker thread is about
+        to start, so noise attempts (busy server, bad body) don't burn
+        a visitor's quota."""
+        self._rate_limit_history[client_ip].append(time.monotonic())
 
     def _render_live_page(self) -> str:
         """Render the existing Jinja template with empty data + live_mode
@@ -479,6 +523,19 @@ class LiveModeApp:
             if self._pipeline_thread and self._pipeline_thread.is_alive():
                 return {"status": "already_running"}
 
+            client_ip = self._client_ip(request)
+            if self._is_rate_limited(client_ip):
+                return JSONResponse(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"rate limit exceeded ({self._rate_limit_max} runs/hour per IP); "
+                            "try again later"
+                        ),
+                    },
+                    status_code=429,
+                )
+
             try:
                 body = await request.json()
             except Exception:
@@ -518,6 +575,10 @@ class LiveModeApp:
             self._config_path = tmp.name
             self._api_key = api_key
             self._reset_per_run_state()
+
+            # Record the rate-limit attempt now that all checks have passed
+            # and we're committed to actually kicking off a real run.
+            self._record_rate_limit_attempt(client_ip)
 
             self._pipeline_thread = threading.Thread(
                 target=self._run_pipeline, daemon=True,
