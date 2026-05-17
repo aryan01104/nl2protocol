@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limitations — nl2protocol</title>
+<meta name="description" content="What nl2protocol supports today: labware, pipettes, instruction requirements, and what's out of scope. Honest about where extractions go wrong.">
+
+<meta property="og:title" content="nl2protocol — limitations & recommendations">
+<meta property="og:description" content="What nl2protocol supports, what it doesn't, and how to write instructions that produce clean extractions.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://nl2protocol.com/limitations/">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f7f6f3'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='700' fill='%230f172a'%3En2p%3C/text%3E%3Crect x='6' y='23' width='20' height='2' fill='%232563eb'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="brand" aria-label="nl2protocol home">
+    <span class="brand-mark">nl2protocol</span>
+  </a>
+  <nav class="primary-nav" aria-label="Primary">
+    <a href="/docs/">docs</a>
+    <a href="/limitations/" aria-current="page">limitations</a>
+    <a href="/log/">log</a>
+    <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============================================================
+       PAGE HERO
+       ============================================================ -->
+  <section class="page-hero">
+
+    <p class="page-eyebrow">
+      <span class="back-link"><a href="/">← back to home</a></span>
+      <span class="sep">·</span>
+      <span class="meta-tag">limitations</span>
+    </p>
+
+    <h1 class="page-title">
+      What you can run
+      <span class="dash">&mdash;</span>
+      and how to write instructions that work.
+    </h1>
+
+    <p class="page-lede">
+      The scope of what nl2protocol can produce, what your config needs
+      to declare, and the patterns in your instruction that produce
+      clean extractions. Architectural limits live in the
+      <a href="/log/">engineering log</a>; this page is what you need
+      to know <em>before you run it</em>.
+    </p>
+
+    <!-- Tag legend -->
+    <dl class="tag-legend" aria-label="Tag meanings">
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-hard">hard limit</span></dt>
+        <dd>physical or API constraint you can&rsquo;t bypass</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-required">required</span></dt>
+        <dd>something your instruction or config must provide</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-rec">recommendation</span></dt>
+        <dd>not enforced, but gives noticeably better extractions</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-watch">watch for</span></dt>
+        <dd>known extraction failure mode &mdash; check column 2 before proceeding</dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ============================================================
+       CLASS 1 — Robot & hardware scope
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">01 &middot; Robot &amp; hardware scope</h2>
+    <p class="class-lede">
+      What kind of physical setup the generated scripts target.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Opentrons OT-2 only (no Flex yet).</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Generated scripts target the OT-2 Python API. The Opentrons Flex
+        has a different protocol API surface; nl2protocol doesn&rsquo;t
+        emit Flex-compatible code in this version.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Maximum two pipettes mounted.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Like the physical OT-2, your config can declare at most one
+        left-mounted and one right-mounted pipette. Each must be paired
+        with a tip rack also declared in the config.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Pipette volume ranges are checked at constraint time.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Each Opentrons pipette has a fixed range (e.g. P20:
+        <code>1&ndash;20uL</code>, P300: <code>20&ndash;300uL</code>,
+        P1000: <code>100&ndash;1000uL</code>). If your instruction asks
+        for a volume outside any mounted pipette&rsquo;s range, the
+        constraint checker will surface a violation and ask you what to
+        do &mdash; not silently generate broken code.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Modules supported only if declared in your config.</h3>
+        <span class="tag tag-required">required</span>
+      </header>
+      <p>
+        Heater-shaker, thermocycler, magnetic, temperature modules: the
+        extractor will reference them only when your config lists them.
+        Mentioning <em>&ldquo;heat to 95C&rdquo;</em> in your instruction
+        without a thermocycler or temperature module in the config
+        produces a constraint violation rather than a fabricated
+        module reference.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 2 — Labware
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">02 &middot; Labware</h2>
+    <p class="class-lede">
+      The system can only reference labware your config declares.
+      Everything else surfaces as an ambiguity for you to resolve.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Only standard Opentrons load_names are supported.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Your config&rsquo;s labware entries must use Opentrons&rsquo; official
+        labware names (e.g.
+        <code>corning_96_wellplate_360ul_flat</code>,
+        <code>opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap</code>).
+        Custom or third-party labware isn&rsquo;t supported in v1.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Every labware referenced in your instruction must map to your config.</h3>
+        <span class="tag tag-required">required</span>
+      </header>
+      <p>
+        The labware resolver tries to map your instruction&rsquo;s wording
+        (<em>&ldquo;tube rack&rdquo;</em>, <em>&ldquo;the reservoir&rdquo;</em>) to
+        a config-declared label. Anything it can&rsquo;t map confidently
+        becomes a per-piece confirmation you resolve in the UI.
+        Anything truly absent from the config halts the pipeline.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Wells are addressed using standard plate notation.</h3>
+        <span class="tag tag-rec">recommendation</span>
+      </header>
+      <p>
+        <code>A1</code>, <code>B2</code>, <code>H12</code> &mdash; column
+        letters A&ndash;H (or A&ndash;P for 384-well), row numbers 1&ndash;12 (or
+        1&ndash;24). The extractor can sometimes infer wells from
+        descriptions like <em>&ldquo;tube 1&rdquo;</em>, but explicit
+        notation is more reliable.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 3 — Instruction shape
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">03 &middot; Instruction shape</h2>
+    <p class="class-lede">
+      What your natural-language instruction needs to look like.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Must pass the input validator.</h3>
+        <span class="tag tag-required">required</span>
+      </header>
+      <p>
+        Stage 1 is a Haiku classifier that decides whether your text is
+        a plausible protocol instruction. Questions
+        (<em>&ldquo;what&rsquo;s a transfer?&rdquo;</em>), pure vagueness
+        (<em>&ldquo;do an experiment&rdquo;</em>), and non-liquid-handling
+        operations (<em>&ldquo;centrifuge this&rdquo;</em>) get rejected
+        cheaply before any expensive call runs.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>English only.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Prompts and few-shot examples are written in English. Other
+        languages may work in theory but aren&rsquo;t tested and may produce
+        worse extractions.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Quantitative volumes work better than hedged ones.</h3>
+        <span class="tag tag-rec">recommendation</span>
+      </header>
+      <p>
+        <em>&ldquo;100uL&rdquo;</em> is grounded; the extractor cites
+        it verbatim. <em>&ldquo;about 100uL&rdquo;</em> is still cited but
+        flagged <code>exact: false</code>. <em>&ldquo;a little&rdquo;</em> or
+        <em>&ldquo;some&rdquo;</em> forces the extractor to either infer
+        a default (which you&rsquo;ll see flagged in the UI) or leave the
+        volume blank (which becomes a gap to resolve).
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Multi-step protocols benefit from explicit numbering.</h3>
+        <span class="tag tag-rec">recommendation</span>
+      </header>
+      <p>
+        Bullet points, numbered lists, or clear paragraph boundaries
+        per step. Run-on paragraphs with multiple actions in one
+        sentence make it more likely the extractor drops or merges
+        steps.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Match labware wording to your config when you can.</h3>
+        <span class="tag tag-rec">recommendation</span>
+      </header>
+      <p>
+        If your config labels a labware <code>"sample_rack"</code>, calling
+        it <em>&ldquo;the sample rack&rdquo;</em> in the instruction (rather
+        than <em>&ldquo;the tube holder&rdquo;</em>) gives the labware resolver
+        a much higher-confidence match. Not required, but reduces the
+        number of per-piece confirmations you have to make.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 4 — Erroneous extractions to watch for
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">04 &middot; Erroneous extractions to watch for</h2>
+    <p class="class-lede">
+      LLM-driven extraction has predictable failure modes. The visual
+      surface exists so you can catch these in column 2 (extracted spec)
+      before the pipeline proceeds.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Dropped steps in long protocols.</h3>
+        <span class="tag tag-watch">watch for</span>
+      </header>
+      <p>
+        Sonnet sometimes silently omits a step in protocols longer than
+        ~15 steps. Nothing in the downstream pipeline catches this &mdash;
+        the orchestrator and constraint checker only see what was
+        extracted. Always count steps in column 2 against your original
+        instruction.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Mix vs transfer misclassification.</h3>
+        <span class="tag tag-watch">watch for</span>
+      </header>
+      <p>
+        Ambiguous wording like <em>&ldquo;pipette up and down 3 times in
+        well A1&rdquo;</em> may extract as a <code>transfer</code>
+        (source=A1, dest=A1) rather than a <code>mix</code>. The
+        generated code still runs but the action semantics differ. Look
+        for steps where source and destination are the same well.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Range expressions can mis-expand.</h3>
+        <span class="tag tag-watch">watch for</span>
+      </header>
+      <p>
+        <em>&ldquo;wells B1 through B4&rdquo;</em> usually expands cleanly to
+        <code>[B1, B2, B3, B4]</code>. <em>&ldquo;wells B1-D4&rdquo;</em> can
+        be ambiguous &mdash; row-by-row vs column-by-column expansion order
+        is not always inferred correctly. Use explicit lists for
+        non-contiguous or large ranges.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Invented wells when the instruction is vague.</h3>
+        <span class="tag tag-watch">watch for</span>
+      </header>
+      <p>
+        <em>&ldquo;Distribute the buffer&rdquo;</em> without naming targets
+        can make the extractor invent a well set (often <code>A1&ndash;A12</code>
+        on a 96-well). Always be explicit about destinations when
+        distributing.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Spread citations can trigger spurious fabrication warnings.</h3>
+        <span class="tag tag-watch">watch for</span>
+      </header>
+      <p>
+        When wells in a transfer step were cited from multiple bullet
+        points and the cite phrasing doesn&rsquo;t literally name each well,
+        the verifier may complain. Real extraction was fine; verifier is
+        too strict in this shape. If you see a fabrication gap on a
+        wells field that visibly matches your instruction, accept the
+        suggestion to move on. (Tracked as a known bug; see the
+        <a href="/log/">engineering log</a> for the fix plan.)
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 5 — Out of scope
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">05 &middot; Out of scope</h2>
+    <p class="class-lede">
+      Categories of protocol the system isn&rsquo;t designed for. If your
+      protocol falls in here, the system will either reject the
+      instruction at Stage 1 or produce a constraint violation.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Multi-day workflows.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Generated scripts are single-session. Anything that requires
+        the user to step away for hours and come back to continue
+        (overnight incubation, multi-day cell culture) needs to be
+        split into separate scripts, one per session.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Manual intervention beyond pauses.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        The Opentrons API exposes <code>pause</code> with an optional
+        note ("user monitors heat shock timing", "swap tube rack")
+        for manual steps. Anything more elaborate &mdash; physical
+        rearrangement of decks, custom hardware operations &mdash; is
+        outside the API surface and the generated script.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Operations the Opentrons API doesn&rsquo;t cover.</h3>
+        <span class="tag tag-hard">hard limit</span>
+      </header>
+      <p>
+        Centrifugation, gel electrophoresis, autoclave cycles, plate
+        readers, manual cell counting &mdash; the OT-2 doesn&rsquo;t do these,
+        and the extractor will reject the instruction if it&rsquo;s
+        fundamentally a non-liquid-handling protocol. Workflows that
+        combine liquid handling with external equipment work as long
+        as the external steps map to <code>pause</code> calls.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLOSER
+       ============================================================ -->
+  <section class="section page-closer">
+    <p class="closer-lede">
+      Architectural and internal-engineering limits (where the
+      implementation drifts from intent, contract gaps, known internal
+      bugs) live in the <a href="/log/">engineering log</a>. The full
+      pipeline walkthrough is in the
+      <a href="https://github.com/aryan01104/nl2protocol/blob/main/docs/PIPELINE.md">architecture doc</a>
+      on GitHub.
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <span class="brand-mark brand-mark-sm">nl2protocol</span>
+      <span class="dim">v0.3 &middot; alpha</span>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/docs/">documentation</a>
+      <a href="/limitations/">known limitations</a>
+      <a href="/log/">engineering log</a>
+      <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+    </nav>
+    <p class="attribution">
+      Built by <a href="https://github.com/aryan01104" target="_blank" rel="noopener">Aryan Agarwal</a>.
+      Source on <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

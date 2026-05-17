@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nl2protocol — natural-language lab protocols to Opentrons scripts</title>
+<meta name="description" content="Turn natural-language lab protocols into Opentrons Python scripts with auditable provenance for every extracted value. Open source.">
+
+<meta property="og:title" content="nl2protocol — lab protocols, with citations">
+<meta property="og:description" content="Natural-language to Opentrons. Every value the system extracts carries a citation back to your instruction or an explicit reasoning trace.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://nl2protocol.com">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23f7f6f3'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='700' fill='%230f172a'%3En2p%3C/text%3E%3Crect x='6' y='23' width='20' height='2' fill='%232563eb'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="brand" aria-label="nl2protocol home">
+    <span class="brand-mark">nl2protocol</span>
+  </a>
+  <nav class="primary-nav" aria-label="Primary">
+    <a href="/docs">docs</a>
+    <a href="/limitations">limitations</a>
+    <a href="/log">log</a>
+    <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============================================================
+       HERO — self-annotated pitch.
+       The pitch itself uses the same cited-span motif the product
+       applies to extracted spec values. Visitors see the principle
+       by reading the headline; hover reveals the "provenance."
+       ============================================================ -->
+  <section class="hero">
+
+    <p class="meta">
+      <span class="live-indicator"><span class="live-dot" aria-hidden="true"></span>live</span>
+      <span class="sep">·</span>
+      <span>v0.3</span>
+      <span class="sep">·</span>
+      <span>open source</span>
+      <span class="sep">·</span>
+      <span>alpha</span>
+    </p>
+
+    <h1 class="hero-pitch">
+      Turn
+      <span class="cite cite-instr" tabindex="0" data-prov="from instruction">natural-language lab protocols</span>
+      into
+      <span class="cite cite-instr" tabindex="0" data-prov="from instruction">Opentrons scripts</span>
+      <span class="dash">&mdash;</span>
+      <span class="cite cite-infer" tabindex="0" data-prov="inferred: this is the differentiator and the whole point of the project">with citations for every extracted value</span>.
+    </h1>
+
+    <p class="hero-aside">
+      Hover the marked phrases. Every value in the spec carries a citation
+      like that <span class="aside-note">&mdash; that&rsquo;s the point.</span>
+    </p>
+
+    <div class="hero-cta">
+      <a href="https://demo.nl2protocol.com/" class="btn btn-primary">Try the demo <span class="arrow">→</span></a>
+      <a href="https://github.com/aryan01104/nl2protocol" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+
+    <!-- Palette legend, doubles as a soft introduction to the colors -->
+    <ul class="legend" aria-label="What the citation colors mean">
+      <li><span class="swatch sw-instr"></span> from instruction</li>
+      <li><span class="swatch sw-domain"></span> domain default</li>
+      <li><span class="swatch sw-infer"></span> inferred</li>
+      <li><span class="swatch sw-agree"></span> reviewer agreed</li>
+    </ul>
+
+    <!-- Stats bar — quantitative anchor for the hero -->
+    <dl class="stats-bar" aria-label="By the numbers">
+      <div class="stat">
+        <dt class="stat-label">pipeline stages</dt>
+        <dd class="stat-value">9</dd>
+      </div>
+      <div class="stat">
+        <dt class="stat-label">gap detectors + suggesters</dt>
+        <dd class="stat-value">12</dd>
+      </div>
+      <div class="stat">
+        <dt class="stat-label">worked example protocols</dt>
+        <dd class="stat-value">11</dd>
+      </div>
+      <div class="stat">
+        <dt class="stat-label">typical run cost</dt>
+        <dd class="stat-value">~$0.20</dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ============================================================
+       HOW IT WORKS — three panels.
+       Each panel gets a colored top border matching the provenance
+       family that stage produces. Cohesive but visually distinct.
+       ============================================================ -->
+  <section class="section how">
+    <h2 class="section-label">How it works</h2>
+
+    <ol class="how-grid" role="list">
+
+      <li class="how-panel how-panel-1">
+        <header class="how-header">
+          <span class="step-num">01</span>
+          <h3 class="how-title">Extract</h3>
+        </header>
+        <p class="how-body">
+          Sonnet reads your instruction and emits a structured spec.
+          Every extracted value carries a claim: <em>this came from the
+          instruction, here&rsquo;s the verbatim quote</em>, or <em>this was
+          inferred, here&rsquo;s the reasoning</em>.
+        </p>
+        <footer class="how-meta">
+          <span class="how-meta-key">model</span>
+          <code class="how-meta-val">claude-sonnet-4</code>
+        </footer>
+      </li>
+
+      <li class="how-panel how-panel-2">
+        <header class="how-header">
+          <span class="step-num">02</span>
+          <h3 class="how-title">Resolve gaps</h3>
+        </header>
+        <p class="how-body">
+          Deterministic suggesters fill what they can (config lookups, well-capacity
+          defaults). Haiku audits non-deterministic suggestions against your
+          instruction. Anything the system can&rsquo;t decide goes to you, one
+          decision at a time.
+        </p>
+        <footer class="how-meta">
+          <span class="how-meta-key">reviewer</span>
+          <code class="how-meta-val">claude-haiku-4</code>
+        </footer>
+      </li>
+
+      <li class="how-panel how-panel-3">
+        <header class="how-header">
+          <span class="step-num">03</span>
+          <h3 class="how-title">Simulate</h3>
+        </header>
+        <p class="how-body">
+          The generated Python script runs through Opentrons&rsquo; own
+          simulator before output. If the simulator rejects the script,
+          we surface the failure loudly &mdash; no silent broken protocols.
+        </p>
+        <footer class="how-meta">
+          <span class="how-meta-key">verifier</span>
+          <code class="how-meta-val">opentrons.simulate</code>
+        </footer>
+      </li>
+
+    </ol>
+  </section>
+
+  <!-- ============================================================
+       DIFFERENTIATION — what's different from RAG-based tools.
+       Numbered like an academic paper's enumerated claims.
+       ============================================================ -->
+  <section class="section diff">
+    <h2 class="section-label">What&rsquo;s different</h2>
+
+    <ol class="diff-list">
+
+      <li class="diff-item">
+        <h3 class="diff-title">Every value carries provenance.</h3>
+        <p class="diff-body">
+          Other tools generate code and hope. Here, every extracted volume,
+          well, labware, and substance comes with either the verbatim quote
+          from your instruction or explicit reasoning if it was inferred.
+          You can audit any decision the system makes.
+        </p>
+      </li>
+
+      <li class="diff-item">
+        <h3 class="diff-title">An independent reviewer audits the LLM.</h3>
+        <p class="diff-body">
+          A smaller, separate model verifies every non-cited claim against
+          your instruction. If it disagrees, you see the objection in the
+          UI before deciding &mdash; not after the protocol fails on the robot.
+        </p>
+      </li>
+
+      <li class="diff-item">
+        <h3 class="diff-title">The script is simulator-verified.</h3>
+        <p class="diff-body">
+          Opentrons&rsquo; own simulator runs the generated Python before output.
+          Code that wouldn&rsquo;t actually load on the robot never reaches you.
+        </p>
+      </li>
+
+    </ol>
+  </section>
+
+  <!-- ============================================================
+       FIGURE — placeholder for live UI screenshot.
+       Framed like a figure in a paper, with caption.
+       ============================================================ -->
+  <section class="section figure">
+    <figure class="screenshot">
+      <div class="screenshot-frame">
+        <img
+          src="/static/demo-screenshot.png"
+          alt="The live-mode visual surface showing five columns from instruction to script, with cross-column resolution arrows"
+          loading="lazy">
+        <!-- Placeholder caption while the real screenshot isn't wired -->
+        <div class="screenshot-placeholder" aria-hidden="true">
+          <span>live-mode UI screenshot</span>
+          <small>wire <code>/static/demo-screenshot.png</code></small>
+        </div>
+      </div>
+      <figcaption>
+        <span class="fig-num">Figure 1.</span>
+        The live-mode visual surface &mdash; five columns from instruction
+        to generated script, with cross-column resolution arrows
+        connecting each extracted value to its citation in the original
+        instruction.
+      </figcaption>
+    </figure>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <span class="brand-mark brand-mark-sm">nl2protocol</span>
+      <span class="dim">v0.3 &middot; alpha</span>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/docs">documentation</a>
+      <a href="/limitations">known limitations</a>
+      <a href="/log">engineering log</a>
+      <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+    </nav>
+    <p class="attribution">
+      Built by <a href="https://github.com/aryan01104" target="_blank" rel="noopener">Aryan Agarwal</a>.
+      Source on <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
