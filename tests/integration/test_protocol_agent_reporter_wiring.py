@@ -18,17 +18,13 @@ from nl2protocol.reporting import (
 )
 
 
-@pytest.fixture(autouse=True)
-def stub_api_key(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-stub-key")
-
-
 class TestProtocolAgentReporterWiring:
     """Verifies the Reporter dependency-injection wiring on ProtocolAgent."""
 
     def _agent(self, **kwargs):
         from nl2protocol.pipeline import ProtocolAgent
         return ProtocolAgent(
+            api_key="test-stub-key",
             config_path="test_cases/examples/simple_transfer/config.json",
             **kwargs,
         )

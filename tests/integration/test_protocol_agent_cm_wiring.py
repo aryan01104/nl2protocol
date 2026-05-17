@@ -22,18 +22,13 @@ from nl2protocol.confirmation import (
 )
 
 
-@pytest.fixture(autouse=True)
-def stub_api_key(monkeypatch):
-    """ProtocolAgent's ConfigLoader requires ANTHROPIC_API_KEY at construction."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-stub-key")
-
-
 class TestProtocolAgentCMWiring:
     """Verifies the ConfirmationManager dependency-injection wiring on ProtocolAgent."""
 
     def _agent(self, **kwargs):
         from nl2protocol.pipeline import ProtocolAgent
         return ProtocolAgent(
+            api_key="test-stub-key",
             config_path="test_cases/examples/simple_transfer/config.json",
             **kwargs,
         )

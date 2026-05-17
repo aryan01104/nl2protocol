@@ -182,7 +182,8 @@ def run_one_eval(eval_dir: Path) -> EvalResult:
     # pipeline (Stage 3.5); skipping it would cause LABWARE_NOT_FOUND on every
     # eval whose instruction uses any user-language labware description.
     try:
-        loader = ConfigLoader(config_path=str(config_path))
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        loader = ConfigLoader(api_key=api_key, config_path=str(config_path))
         loader.load_config()
         extractor = SemanticExtractor(client=loader.client, model_name=loader.model_name)
         spec = extractor.extract(instruction, loader.config)

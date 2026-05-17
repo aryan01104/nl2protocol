@@ -530,7 +530,30 @@ def main(argv: list = None) -> int:
     if args.init:
         return handle_init()
 
-    # For protocol generation, --intent is required
+    # ADR-0013 + hosted-deploy: when --serve is set, hand off to the
+    # FastAPI server. Instruction + config + api_key come from the
+    # browser form (POST /start), not from CLI args, so -i/-c are
+    # not required here.
+    if args.serve:
+        # Load .env so the server can see NL2PROTOCOL_LOCAL_DEV (local
+        # convenience: when set, server falls back to ANTHROPIC_API_KEY
+        # from env if the form omits the key). Non-serve path loads .env
+        # later in this function; the serve path needs it loaded BEFORE
+        # LiveModeApp.__init__ runs and reads the flag.
+        from dotenv import find_dotenv, load_dotenv
+        load_dotenv(find_dotenv(usecwd=True))
+        from .server import run_serve
+        try:
+            run_serve(
+                host=args.serve_host,
+                port=args.serve_port,
+                open_browser=not args.no_open_browser,
+            )
+        except KeyboardInterrupt:
+            print("\n  Server stopped.")
+        return 0
+
+    # For protocol generation (non-serve), --intent is required.
     if not args.intent:
         print("Error: -i/--intent is required for protocol generation", file=sys.stderr)
         parser.print_usage(sys.stderr)
@@ -541,37 +564,6 @@ def main(argv: list = None) -> int:
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
-    # ADR-0013 Phase 3a: live-mode server. When --serve is set, hand off
-    # to the FastAPI server. The pipeline runs server-side; the browser
-    # is the user surface. Static-CLI mode (without --serve) remains
-    # available for non-interactive runs.
-    if args.serve:
-        # The serve path needs an instruction file path (not resolved
-        # text); the server reads the file itself in its worker thread.
-        # If the user passed literal instruction text, write it to a
-        # temp file for the server to read.
-        instruction_path = args.intent
-        if not os.path.isfile(instruction_path):
-            import tempfile
-            tmp = tempfile.NamedTemporaryFile(
-                mode='w', suffix='.txt', delete=False, encoding='utf-8',
-            )
-            tmp.write(args.intent)
-            tmp.close()
-            instruction_path = tmp.name
-        from .server import run_serve
-        try:
-            run_serve(
-                instruction_path=instruction_path,
-                config_path=args.config,
-                host=args.serve_host,
-                port=args.serve_port,
-                open_browser=not args.no_open_browser,
-            )
-        except KeyboardInterrupt:
-            print("\n  Server stopped.")
-        return 0
 
     # Resolve intent (read from file if .txt or .pdf)
     try:
@@ -653,16 +645,20 @@ def main(argv: list = None) -> int:
             html_report_path = args.html_report
         reporter = HTMLReporter(output_path=html_report_path)
 
+    from dotenv import find_dotenv, load_dotenv
+    load_dotenv(find_dotenv(usecwd=True))
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+
     try:
-        agent = ProtocolAgent(config_path=config_path, reporter=reporter)
+        agent = ProtocolAgent(api_key=api_key, config_path=config_path, reporter=reporter)
     except APIKeyError as e:
         # Offer interactive setup if key is missing
         if offer_setup_on_missing_key():
             # Retry with new key
+            load_dotenv(find_dotenv(usecwd=True), override=True)
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
             try:
-                from dotenv import find_dotenv, load_dotenv
-                load_dotenv(find_dotenv(usecwd=True), override=True)  # Reload .env
-                agent = ProtocolAgent(config_path=config_path, reporter=reporter)
+                agent = ProtocolAgent(api_key=api_key, config_path=config_path, reporter=reporter)
             except APIKeyError:
                 print("API key still not working. Please check your key.", file=sys.stderr)
                 return 1

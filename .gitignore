@@ -59,3 +59,6 @@ docs/*
 !docs/adr/
 !docs/plans/
 !docs/TESTING.md
+!docs/PIPELINE.md
+!docs/PIPELINE_CALL_GRAPH.md
+!docs/GAP_LIFECYCLE.md

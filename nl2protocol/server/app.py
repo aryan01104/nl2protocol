@@ -22,14 +22,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import queue
+import tempfile
 import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from nl2protocol.server.handlers import (
     AssignmentsConfirmation,
@@ -284,40 +288,71 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
 
 
 class LiveModeApp:
-    """FastAPI app + per-run pipeline state. One instance per
-    `nl2protocol serve` invocation.
+    """FastAPI app + per-request pipeline state. One instance per
+    `nl2protocol --serve` invocation; many pipeline runs over its lifetime.
 
-    Pre:    `instruction_path` and `config_path` point at readable
-            files. `output_dir` is where the static HTMLReporter
-            artifact will land at end-of-run.
+    Pre:    `output_dir` is where the static HTMLReporter artifact lands
+            at end of each run. `examples_dir` is the directory containing
+            example subdirs (each with `instruction.txt` + `config.json`),
+            exposed via `GET /examples`. A relative `examples_dir` is
+            anchored to the project root so working-directory drift
+            (e.g., uvicorn launched from a different cwd, Docker WORKDIR)
+            doesn't strand the examples.
 
-    Post:   `self.app` is a FastAPI instance with three routes wired:
-              GET /        → live-mode HTML page (Phase 3b-1: full
-                             5-column template with empty data +
-                             live-mode JS that consumes WebSocket
-                             events and inserts step blocks as they
-                             arrive)
-              POST /start  → kicks off pipeline in a worker thread
-              WS /events   → streams events from the pipeline thread
-                             to the browser via the queue bridge,
-                             with spec-event payloads enriched with
-                             pre-rendered step dicts (Phase 3b-1)
+    Post:   `self.app` is a FastAPI instance with these routes wired:
+              GET /                        → live-mode HTML page (form
+                                              for instruction/config/key)
+              GET /examples                → list of example names
+              GET /examples/{name}/...     → example file content
+              POST /start                  → JSON body
+                                              {instruction, config, api_key};
+                                              kicks off pipeline in a
+                                              worker thread (single global
+                                              lock: 409-equivalent if a
+                                              run is already in flight)
+              WS /events                   → streams events from the
+                                              pipeline thread with
+                                              spec-event payloads
+                                              enriched with pre-rendered
+                                              step dicts (Phase 3b-1)
 
-            The pipeline thread runs `ProtocolAgent.run_pipeline` with
-            a CompositeReporter that fans events out to BOTH the
-            WebSocketReporter (live stream) AND an HTMLReporter (static
-            archive at end-of-run).
+            Each POST /start: validates inputs, writes config to a temp
+            JSON file (cleaned up on completion), resets per-run state,
+            and spawns a pipeline thread. The thread runs
+            `ProtocolAgent.run_pipeline` with a CompositeReporter that
+            fans events out to BOTH the WebSocketReporter (live stream)
+            AND an HTMLReporter (static archive at end-of-run).
     """
 
-    def __init__(self, instruction_path: str, config_path: str,
-                 output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output",
+                 examples_dir: str = "test_cases/examples"):
         self.app = FastAPI(title="nl2protocol live mode")
         self._event_queue: "queue.Queue[Any]" = queue.Queue(maxsize=10000)
         self._pipeline_thread: Optional[threading.Thread] = None
-        self._instruction_path = instruction_path
-        self._config_path = config_path
         self._output_dir = output_dir
+        # Local-dev convenience: when NL2PROTOCOL_LOCAL_DEV is truthy, the
+        # POST /start handler falls back to ANTHROPIC_API_KEY from the server's
+        # environment when the request omits api_key. Opt-in flag so a
+        # deployed instance (Fly, etc.) — where we don't want to silently
+        # bill the operator's key — must NOT set this. Read once at startup
+        # so the value is fixed for the process's lifetime.
+        self._local_dev_mode = (
+            os.getenv("NL2PROTOCOL_LOCAL_DEV", "").strip().lower()
+            in ("1", "true", "yes")
+        )
+        # Anchor a relative examples_dir to the project root so cwd drift
+        # (Docker WORKDIR, uvicorn from elsewhere) doesn't strand it.
+        examples_path = Path(examples_dir)
+        if not examples_path.is_absolute():
+            project_root = Path(__file__).resolve().parents[2]
+            examples_path = project_root / examples_dir
+        self._examples_dir = examples_path
         self._html_report_path: Optional[str] = None
+        # Per-request inputs (set by POST /start, cleared between runs).
+        # _config_path points at a temp file written from the uploaded JSON.
+        self._instruction: str = ""
+        self._config_path: Optional[str] = None
+        self._api_key: str = ""
         # Phase 3b-1: track the most recent raw_instruction text so spec
         # events can be enriched with pre-rendered step dicts (which need
         # the instruction for cite-recoverability decisions).
@@ -348,7 +383,49 @@ class LiveModeApp:
         # (replaces N per-Gap modals during gap resolution). Same
         # dict-by-rid pattern.
         self._pending_initial_contents: Dict[str, InitialContentsConfirmation] = {}
+        # Per-IP rate limit. Defense in depth on top of BYO-key: even if a
+        # visitor brings their own key, we don't want a bot to spam /start
+        # 100x and exhaust our Fly machine's CPU. Dict grows with unique
+        # IPs — fine for a portfolio demo; LRU-evict if this ever scales.
+        self._rate_limit_window_s: int = 3600
+        self._rate_limit_max: int = 5
+        self._rate_limit_history: Dict[str, deque] = defaultdict(deque)
         self._setup_routes()
+
+    @staticmethod
+    def _client_ip(request: "Request") -> str:
+        """Resolve the real client IP behind Fly's proxy.
+
+        Pre:    `request` is a FastAPI Request. Fly's edge sets
+                `Fly-Client-IP`; standard HTTP proxies set
+                `X-Forwarded-For` (comma-separated, first entry is origin).
+        Post:   Returns the best-available client IP string. Falls back
+                to the immediate socket peer if no proxy headers are set
+                (local dev). Returns "unknown" if nothing resolves.
+        """
+        return (
+            request.headers.get("fly-client-ip")
+            or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+            or (request.client.host if request.client else "")
+            or "unknown"
+        )
+
+    def _is_rate_limited(self, client_ip: str) -> bool:
+        """Read-only check: is `client_ip` over the per-IP limit right now?
+        Purges expired entries as a side effect; does not record the
+        current attempt."""
+        now = time.monotonic()
+        history = self._rate_limit_history[client_ip]
+        while history and now - history[0] > self._rate_limit_window_s:
+            history.popleft()
+        return len(history) >= self._rate_limit_max
+
+    def _record_rate_limit_attempt(self, client_ip: str) -> None:
+        """Record a real pipeline-kickoff attempt for `client_ip`. Only
+        called after all validation passes and a worker thread is about
+        to start, so noise attempts (busy server, bad body) don't burn
+        a visitor's quota."""
+        self._rate_limit_history[client_ip].append(time.monotonic())
 
     def _render_live_page(self) -> str:
         """Render the existing Jinja template with empty data + live_mode
@@ -390,17 +467,136 @@ class LiveModeApp:
             generated_script_html="",
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             live_mode=True,
+            local_dev_mode=self._local_dev_mode,
         )
+
+    def _reset_per_run_state(self) -> None:
+        """Drain the event queue + clear per-run accumulators so a fresh
+        POST /start starts clean. Confirmation dicts are also cleared
+        defensively, though they should already be empty if the prior
+        pipeline thread completed normally."""
+        while not self._event_queue.empty():
+            try:
+                self._event_queue.get_nowait()
+            except queue.Empty:
+                break
+        self._instruction_text = ""
+        self._gap_resolved_events = []
+        self._pending_requests.clear()
+        self._pending_assignments.clear()
+        self._pending_binary_confirms.clear()
+        self._pending_initial_contents.clear()
+
+    def _list_examples(self) -> list:
+        if not self._examples_dir.exists():
+            return []
+        return sorted([
+            d.name for d in self._examples_dir.iterdir()
+            if d.is_dir()
+            and (d / "instruction.txt").exists()
+            and (d / "config.json").exists()
+        ])
+
+    def _example_path(self, name: str, filename: str) -> Optional[Path]:
+        # Path-traversal guard: name must be a single safe directory component.
+        if not name or "/" in name or "\\" in name or ".." in name:
+            return None
+        path = self._examples_dir / name / filename
+        if not path.exists() or not path.is_file():
+            return None
+        return path
 
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
             return HTMLResponse(self._render_live_page())
 
+        @self.app.get("/examples")
+        async def list_examples():
+            return {"examples": self._list_examples()}
+
+        @self.app.get("/examples/{name}/instruction")
+        async def example_instruction(name: str):
+            path = self._example_path(name, "instruction.txt")
+            if path is None:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            return PlainTextResponse(path.read_text())
+
+        @self.app.get("/examples/{name}/config")
+        async def example_config(name: str):
+            path = self._example_path(name, "config.json")
+            if path is None:
+                return JSONResponse({"error": "not found"}, status_code=404)
+            return FileResponse(path, media_type="application/json")
+
         @self.app.post("/start")
-        async def start_pipeline():
+        async def start_pipeline(request: Request):
             if self._pipeline_thread and self._pipeline_thread.is_alive():
                 return {"status": "already_running"}
+
+            client_ip = self._client_ip(request)
+            if self._is_rate_limited(client_ip):
+                return JSONResponse(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"rate limit exceeded ({self._rate_limit_max} runs/hour per IP); "
+                            "try again later"
+                        ),
+                    },
+                    status_code=429,
+                )
+
+            try:
+                body = await request.json()
+            except Exception:
+                return JSONResponse(
+                    {"status": "error", "message": "request body must be JSON"},
+                    status_code=400,
+                )
+
+            instruction = (body.get("instruction") or "").strip()
+            config = body.get("config")
+            api_key = (body.get("api_key") or "").strip()
+
+            # Local-dev fallback: when the operator opted in via env flag AND
+            # the request didn't carry a key, use the server's env key. Never
+            # fires on a Fly deploy because the flag isn't set there.
+            if not api_key and self._local_dev_mode:
+                api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+
+            if not instruction:
+                return JSONResponse(
+                    {"status": "error", "message": "instruction is required"},
+                    status_code=400,
+                )
+            if not isinstance(config, dict) or not config:
+                return JSONResponse(
+                    {"status": "error", "message": "config must be a non-empty JSON object"},
+                    status_code=400,
+                )
+            if not api_key:
+                return JSONResponse(
+                    {"status": "error", "message": "api_key is required"},
+                    status_code=400,
+                )
+
+            # Write config to a temp file so ConfigLoader (path-based) can read it.
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False, encoding="utf-8",
+            )
+            json.dump(config, tmp)
+            tmp.close()
+
+            self._instruction = instruction
+            self._config_path = tmp.name
+            self._api_key = api_key
+            self._reset_per_run_state()
+
+            # Record the rate-limit attempt now that all checks have passed
+            # and we're committed to actually kicking off a real run.
+            self._record_rate_limit_attempt(client_ip)
+
             self._pipeline_thread = threading.Thread(
                 target=self._run_pipeline, daemon=True,
             )
@@ -641,21 +837,16 @@ class LiveModeApp:
             pass
 
     def _run_pipeline(self):
-        """Worker-thread entry point. Reads instruction, builds reporters,
-        runs the pipeline, finalizes."""
+        """Worker-thread entry point. Reads request-scoped state set by
+        POST /start (instruction, config_path, api_key), builds reporters,
+        runs the pipeline, finalizes, and cleans up the temp config file."""
         from nl2protocol.confirmation import AutoConfirmCM
         from nl2protocol.pipeline import ProtocolAgent
         from nl2protocol.reporting import HTMLReporter
 
-        try:
-            with open(self._instruction_path) as f:
-                instruction = f.read()
-        except Exception as e:
-            self._event_queue.put_nowait(_make_error_event(
-                f"Failed to read instruction file: {e}",
-            ))
-            self._event_queue.put_nowait(PIPELINE_DONE_SENTINEL)
-            return
+        instruction = self._instruction
+        config_path = self._config_path
+        api_key = self._api_key
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         Path(self._output_dir).mkdir(parents=True, exist_ok=True)
@@ -693,7 +884,8 @@ class LiveModeApp:
 
         try:
             agent = ProtocolAgent(
-                config_path=self._config_path,
+                api_key=api_key,
+                config_path=config_path,
                 confirmation_manager=AutoConfirmCM(),
                 reporter=composite,
                 confirmation_handler=confirmation_handler,
@@ -713,6 +905,12 @@ class LiveModeApp:
             ))
         finally:
             composite.finalize()
+            # Clean up the per-request temp config file.
+            if config_path and config_path.startswith(tempfile.gettempdir()):
+                try:
+                    os.unlink(config_path)
+                except OSError:
+                    pass
 
 
 def _make_error_event(message: str):
@@ -722,38 +920,40 @@ def _make_error_event(message: str):
     return StageEvent(kind="error", data={"message": message})
 
 
-def run_serve(instruction_path: str, config_path: str,
-              host: str = "127.0.0.1", port: int = 8000,
-              output_dir: str = "output", open_browser: bool = True) -> None:
-    """Entry point for `nl2protocol serve`. Starts uvicorn on the given
+def run_serve(host: str = "127.0.0.1", port: int = 8000,
+              output_dir: str = "output",
+              examples_dir: str = "test_cases/examples",
+              open_browser: bool = True) -> None:
+    """Entry point for `nl2protocol --serve`. Starts uvicorn on the given
     host:port, opens the default browser to the page, blocks until the
-    server is killed (Ctrl-C).
+    server is killed (Ctrl-C). Instruction + config + api_key come from
+    the browser form (POST /start), not from CLI args.
 
-    Pre:    `instruction_path` and `config_path` point at existing files.
-            `host`/`port` define where the server listens. `open_browser`
-            controls whether the browser auto-opens (CI/headless contexts
-            should pass False).
+    Pre:    `host`/`port` define where the server listens. `output_dir`
+            is where each run's static HTMLReporter artifact is written.
+            `examples_dir` is the on-disk directory containing example
+            subdirs (each with instruction.txt + config.json), exposed
+            via GET /examples. `open_browser` controls auto-open
+            (CI/headless contexts should pass False).
 
-    Post:   Blocks until uvicorn exits. The pipeline runs server-side
-            in a worker thread spawned via POST /start; the worker writes
-            its static HTMLReporter artifact to `output_dir` at end-of-run.
+    Post:   Blocks until uvicorn exits. Each POST /start kicks off one
+            pipeline run on a worker thread; the previous run must be
+            done before the next one is accepted (global single-pipeline
+            lock).
 
     Side effects:
       - Starts a uvicorn server (network listener)
       - Optionally opens a browser tab
-      - Spawns a pipeline thread when the user clicks "Start pipeline"
+      - Spawns a pipeline thread per POST /start
       - Writes a static HTML report at the end of each run
+      - Writes a per-request temp config file (cleaned up on completion)
     """
     import uvicorn
     import webbrowser
     import threading as _threading
     import time as _time
 
-    live = LiveModeApp(
-        instruction_path=instruction_path,
-        config_path=config_path,
-        output_dir=output_dir,
-    )
+    live = LiveModeApp(output_dir=output_dir, examples_dir=examples_dir)
 
     if open_browser:
         # Delay slightly so the server is up before the browser tries

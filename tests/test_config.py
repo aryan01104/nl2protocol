@@ -30,8 +30,8 @@ def labware_config():
 
 
 @pytest.fixture
-def stub_api_key(monkeypatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-stub-key")
+def stub_api_key():
+    return "test-stub-key"
 
 
 # ============================================================================
@@ -136,9 +136,9 @@ class TestEnrichConfigWithWells:
 class TestConfigLoaderInit:
     """Contract tests for ConfigLoader.__init__."""
 
-    # Post: with valid env, fields are set correctly
+    # Post: with explicit api_key, fields are set correctly
     def test_constructs_with_default_model(self, stub_api_key):
-        loader = ConfigLoader(config_path="some_path.json")
+        loader = ConfigLoader(api_key=stub_api_key, config_path="some_path.json")
         assert loader.config_path == "some_path.json"
         assert loader.model_name == "claude-sonnet-4-20250514"  # default
         assert loader.config is None
@@ -146,17 +146,18 @@ class TestConfigLoaderInit:
 
     # Post: model_name override
     def test_constructs_with_custom_model(self, stub_api_key):
-        loader = ConfigLoader(model_name="claude-opus-4-20250514")
+        loader = ConfigLoader(api_key=stub_api_key, model_name="claude-opus-4-20250514")
         assert loader.model_name == "claude-opus-4-20250514"
 
-    # Raises: APIKeyError if ANTHROPIC_API_KEY missing
-    def test_raises_api_key_error_when_env_missing(self, monkeypatch, tmp_path):
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        # Also block .env discovery from picking up a real key by chdir-ing
-        # to an empty temp dir (no .env present).
-        monkeypatch.chdir(tmp_path)
+    # Raises: APIKeyError if api_key is empty
+    def test_raises_api_key_error_when_key_empty(self):
         with pytest.raises(APIKeyError):
-            ConfigLoader()
+            ConfigLoader(api_key="")
+
+    # Raises: APIKeyError if api_key is whitespace
+    def test_raises_api_key_error_when_key_whitespace(self):
+        with pytest.raises(APIKeyError):
+            ConfigLoader(api_key="   ")
 
 
 # ============================================================================
@@ -168,7 +169,7 @@ class TestConfigLoaderLoadConfig:
 
     # Raises: ConfigFileError if file does not exist
     def test_raises_when_file_does_not_exist(self, stub_api_key, tmp_path):
-        loader = ConfigLoader(config_path=str(tmp_path / "nope.json"))
+        loader = ConfigLoader(api_key=stub_api_key, config_path=str(tmp_path / "nope.json"))
         with pytest.raises(ConfigFileError) as exc_info:
             loader.load_config()
         assert "not found" in str(exc_info.value).lower()
@@ -189,7 +190,7 @@ class TestConfigLoaderLoadConfig:
 
         path = tmp_path / "bad.json"
         path.write_text("{not valid json")
-        loader = ConfigLoader(config_path=str(path))
+        loader = ConfigLoader(api_key=stub_api_key, config_path=str(path))
 
         with pytest.raises(ConfigFileError) as exc_info:
             loader.load_config()
@@ -198,6 +199,7 @@ class TestConfigLoaderLoadConfig:
     # Post: returns normalized dict on success; sets self.config
     def test_returns_normalized_config_on_success(self, stub_api_key):
         loader = ConfigLoader(
+            api_key=stub_api_key,
             config_path="test_cases/examples/simple_transfer/config.json"
         )
         result = loader.load_config()
@@ -223,7 +225,7 @@ class TestConfigLoaderLoadConfig:
 
         path = tmp_path / "valid_json_bad_schema.json"
         path.write_text('{"some": "json"}')
-        loader = ConfigLoader(config_path=str(path))
+        loader = ConfigLoader(api_key=stub_api_key, config_path=str(path))
 
         with pytest.raises(ConfigFileError) as exc_info:
             loader.load_config()
