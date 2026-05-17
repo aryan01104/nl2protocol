@@ -409,97 +409,117 @@ The wells_provenance schema change is the load-bearing fix for the "weird Gap Sp
 
 ---
 
-## Part 5 — Sequence diagrams (Mermaid, renders on GitHub)
+## Part 5 — Sequence diagrams (Mermaid)
 
-Three diagrams. All file:line references are against `add-hosted-deploy` HEAD. Read top-to-bottom; numbered messages match the order calls actually happen. Conventions:
+Three diagrams. Read top-to-bottom; numbered messages match the order calls actually happen. Conventions:
 
-- `A->>B` — synchronous call from A to B.
-- `A-->>B` — return value from A back to B.
-- `alt / else / end` — conditional branches; the condition is in the alt header.
-- `loop / end` — iteration; the loop range is in the header.
-- `opt / end` — optional block (only runs if condition holds).
-- `Note over X` — inline annotation about something subtle happening.
+- `A->>B` — synchronous call from A to B
+- `A-->>B` — return value from A back to B
+- `alt / else / end` — conditional branches; condition is in the alt header
+- `loop / end` — iteration; range is in the header
+- `opt / end` — optional block (only runs if condition holds)
+- `Note over X` — inline annotation
+
+Mermaid is fussy about some characters in participant aliases and alt headers (colons, curly braces, `<br/>` in headers all break the parser). To stay parseable, the diagrams use short participant names — the lookup table below maps each to its actual code location.
+
+### Participants (where to find each in code)
+
+| Diagram name | File:line |
+|---|---|
+| Pipeline | `pipeline.py:1348` (the `orch.run` call site) |
+| Orchestrator | `gap_resolution/orchestrator.py:199` (`run` method) |
+| detect_all | `gap_resolution/registry.py` |
+| Detectors | `gap_resolution/detectors.py` (5 classes) |
+| verify_provenance_claims | `extraction/extractor.py:285` |
+| Suggesters | `gap_resolution/suggesters.py` (7 classes, registry order) |
+| Reviewer | `IndependentReviewSuggester` in `gap_resolution/suggesters.py` (Haiku-backed) |
+| stamp_reviewer_verdicts | `gap_resolution/orchestrator.py:459` |
+| ConfirmationHandler | `gap_resolution/handlers.py` (CLI) or `server/handlers.py` (live mode) |
+| default_apply_resolution | `gap_resolution/orchestrator.py:748` |
+| _apply_at_path | `gap_resolution/orchestrator.py:802` |
+| _stamp_user_action | `gap_resolution/orchestrator.py:642` |
+| _stamp_resolution_action | `gap_resolution/orchestrator.py:684` |
+| ConstraintChecker | `validation/constraints.py` |
+| CompleteProtocolSpec.model_validate | `models/spec.py` |
+| spec_to_schema | `extraction/extractor.py` |
+| generate_python_script | `pipeline.py` |
+| simulate_script | `pipeline.py` |
 
 ### Diagram 1 — Stage 5 (orchestrator loop), end to end
-
-The full sequence for one `Orchestrator.run` call. Includes all 5 detectors, the suggester chain, reviewer, auto-accept gate, per-gap modal, the fabrication-accept transform, and re-detect.
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Pipeline as ProtocolAgent.run_pipeline<br/>(pipeline.py:1348)
-  participant Orch as Orchestrator.run<br/>(orchestrator.py:199)
-  participant Reg as detect_all<br/>(registry.py)
-  participant Det as Detectors (5)
-  participant Verify as extractor.verify_provenance_claims<br/>(extractor.py:285)
-  participant Sugg as Suggesters (7, registry order)
-  participant Rev as IndependentReviewSuggester<br/>(Haiku call)
-  participant Stamp as stamp_reviewer_verdicts<br/>(orchestrator.py:459)
-  participant Handler as ConfirmationHandler.present<br/>(per-Gap modal)
-  participant Apply as default_apply_resolution<br/>(orchestrator.py:748)
-  participant Spec as ProtocolSpec<br/>(mutated in place)
+  participant Pipeline
+  participant Orch as Orchestrator
+  participant Reg as detect_all
+  participant Det as Detectors
+  participant Verify as verify_provenance_claims
+  participant Sugg as Suggesters
+  participant Rev as Reviewer
+  participant Stamp as stamp_reviewer_verdicts
+  participant Handler as ConfirmationHandler
+  participant Apply as default_apply_resolution
+  participant Spec as ProtocolSpec
 
   Pipeline->>Orch: run(spec, context)
 
-  loop iteration i in 1..max_iterations (default 3)
+  loop iteration i in 1 to max_iterations (default 3)
     Orch->>Reg: detect_all(spec, context, detectors)
     Reg->>Det: detect(spec, context) for each detector
-    Note over Det: 5 detectors fire in registered order:<br/>MissingFields, ProvenanceWarning,<br/>InitialContentsVolume,<br/>ConstraintViolation, LabwareAmbiguity
-    Det->>Verify: verify_provenance_claims(spec, instruction, config)<br/>(only ProvenanceWarningDetector calls this)
-    Verify-->>Det: warnings[] (one per offending value)
-    Note over Verify: For wells: iterates each well in the list,<br/>but ALL warnings share the same field_path<br/>(wells_provenance is one slot for the whole list)
-    Det-->>Reg: gaps[] (warnings collapse by id;<br/>multi-well warnings deduplicate to ONE Gap<br/>with current_value = last offending well)
-    Reg-->>Orch: combined gaps[]
+    Note over Det: 5 detectors - MissingFields, ProvenanceWarning, InitialContentsVolume, ConstraintViolation, LabwareAmbiguity
+    Det->>Verify: verify_provenance_claims (only ProvenanceWarningDetector)
+    Verify-->>Det: warnings
+    Note over Verify: For wells, iterates each well; all share one field_path and one Provenance slot
+    Det-->>Reg: gaps (warnings collapse by id; multi-well becomes one Gap)
+    Reg-->>Orch: combined gaps
 
     alt gaps is empty
-      Orch-->>Pipeline: OrchestratorOutcome(converged=True, aborted=False)
+      Orch-->>Pipeline: OrchestratorOutcome converged=True
     end
 
-    Orch->>Orch: topo_sort_gaps(gaps)<br/>(orchestrator.py:82)
-    Note over Orch: stable-sort by field suffix priority:<br/>0: .temperature, .substance<br/>1: .source, .destination<br/>2: .duration, .volume, .note<br/>3: initial_contents<br/>9: everything else
+    Orch->>Orch: topo_sort_gaps(gaps)
+    Note over Orch: priority by field suffix - temperature/substance first, then source/destination, then volume/duration, then initial_contents
 
-    Note over Orch: SUGGEST pass — try suggesters per gap, first non-None wins
     loop per gap in sorted order
       Orch->>Sugg: _first_suggestion(gap, spec, context)
-      Note over Sugg: order: ConfigLookup, Carryover,<br/>WellCapacity, RegexFromNote,<br/>WellRangeClip, LabwareSuggester,<br/>LLMSpotSuggester (LLM, last resort)
-      Sugg-->>Orch: Suggestion | None
+      Note over Sugg: order - ConfigLookup, Carryover, WellCapacity, RegexFromNote, WellRangeClip, LabwareSuggester, LLMSpotSuggester
+      Sugg-->>Orch: Suggestion or None
     end
 
-    opt any suggestion has provenance_source ∈ {inferred, domain_default}
+    opt any suggestion has provenance_source inferred or domain_default
       Orch->>Rev: review(spec, context)
-      Note over Rev: Haiku batches the review for all<br/>non-deterministic suggestions in one call
-      Rev-->>Orch: reviews[field_path → ReviewResult]
+      Note over Rev: Haiku batches review for all non-deterministic suggestions in one call
+      Rev-->>Orch: reviews
       Orch->>Stamp: stamp_reviewer_verdicts(spec, reviews)
-      Stamp->>Spec: REPLACE Provenance objects with copies<br/>carrying review_status + reviewer_objection
-      Note over Stamp,Spec: Old Provenance object is gone.<br/>For LocationRefs: ONE verdict stamps<br/>BOTH description_provenance AND<br/>wells_provenance (single review, two slots).
+      Stamp->>Spec: REPLACE Provenance objects with copies carrying review_status
+      Note over Stamp,Spec: Old Provenance gone. For LocationRefs, ONE verdict stamps BOTH description_provenance AND wells_provenance
     end
 
-    Note over Orch: CLASSIFY + PRESENT + APPLY pass
     loop per gap in sorted order
-      Orch->>Orch: _is_auto_acceptable(gap, suggestion, review)<br/>(orchestrator.py:437)
-      alt auto-accept gate passes<br/>suggestion exists AND<br/>kind ∉ {fabricated, ambiguous, constraint_violation} AND<br/>suggestion.confidence ≥ 0.85 AND<br/>(review is None OR both confirms_* True)
-        Orch->>Apply: default_apply_resolution(spec, gap,<br/>Resolution(accept_suggestion, suggestion.value, user_accepted_suggestion),<br/>suggestion)
-        Apply->>Spec: mutate (see Diagram 2 for routing)
-        Note over Apply,Spec: auto_accepted=True in the record;<br/>user_action_provenance still says<br/>"user_accepted_suggestion" (no separate auto label)
-      else gate fails — escalate to user
-        opt review exists AND review.objection set
-          Orch->>Orch: gap.metadata["reviewer_objection"] = review.objection
+      Orch->>Orch: _is_auto_acceptable(gap, suggestion, review)
+      alt auto-accept gate passes
+        Note over Orch: gate requires suggestion exists AND kind not in always-confirm set AND confidence at least 0.85 AND review verdicts both True
+        Orch->>Apply: default_apply_resolution with synthesized accept Resolution
+        Apply->>Spec: mutate (see Diagram 2 for path routing)
+      else escalate to user
+        opt review.objection set
+          Orch->>Orch: stamp reviewer_objection on gap.metadata
         end
-        Orch->>Orch: _stamp_spotlight_prov_ids(gap, spec)<br/>(prov-id hints for the modal's spotlight UI)
+        Orch->>Orch: _stamp_spotlight_prov_ids(gap, spec)
         Orch->>Handler: present(gap, suggestion)
-        Handler-->>Orch: Resolution(action, new_value, user_action_provenance)
-
-        alt resolution.action == "abort"
-          Orch-->>Pipeline: OrchestratorOutcome(aborted=True, converged=False)
-        else resolution.action == "skip"
-          Note over Orch: no apply; gap stays unresolved<br/>(only valid for severity="quality")
-        else accept_suggestion AND gap.kind == "fabricated"
-          Note over Orch: SPECIAL TRANSFORM (orchestrator.py:341):<br/>new_value is rebuilt as a Provenance object<br/>(source="inferred", positive_reasoning + why_not from suggestion,<br/>CONFIDENCE OVERWRITTEN to suggestion.confidence,<br/>review_status="user_accepted_suggestion")<br/>Original value left alone — only provenance slot replaced.
-          Orch->>Apply: default_apply_resolution(spec, gap, transformed Resolution, suggestion)
-          Apply->>Spec: mutate (path is fabrication-shaped — see Diagram 2)
-        else action ∈ {accept_suggestion (non-fab), edit, override}
-          Orch->>Apply: default_apply_resolution(spec, gap, resolution, suggestion)
-          Apply->>Spec: mutate (see Diagram 2)
+        Handler-->>Orch: Resolution
+        alt resolution.action is abort
+          Orch-->>Pipeline: OrchestratorOutcome aborted=True
+        else resolution.action is skip
+          Note over Orch: no apply; gap stays unresolved (severity=quality only)
+        else accept_suggestion AND gap.kind is fabricated
+          Note over Orch: SPECIAL TRANSFORM. new_value rebuilt as Provenance object. source=inferred, suggester reasoning, CONFIDENCE OVERWRITTEN to suggestion.confidence, review_status=user_accepted_suggestion. Original value unchanged
+          Orch->>Apply: default_apply_resolution with transformed Resolution
+          Apply->>Spec: mutate (fabrication-shaped path)
+        else other accept or edit or override
+          Orch->>Apply: default_apply_resolution
+          Apply->>Spec: mutate
         end
       end
     end
@@ -507,85 +527,83 @@ sequenceDiagram
     Note over Orch: iteration end; loop top re-runs detect_all
   end
 
-  Note over Orch: hit iteration cap (max_iterations) without converging
-  Orch->>Reg: detect_all (final check)
-  Reg-->>Orch: final_gaps[]
-  Orch-->>Pipeline: OrchestratorOutcome(converged=(final_gaps == []), aborted=False)
+  Note over Orch: hit iteration cap; final detect to determine convergence
+  Orch->>Reg: detect_all (final)
+  Reg-->>Orch: final_gaps
+  Orch-->>Pipeline: OrchestratorOutcome converged equals (final_gaps empty)
 ```
 
 ### Diagram 2 — Apply detail (path-shape routing)
 
-What `_apply_at_path` does (`orchestrator.py:802`) when called with a gap's field_path and a Resolution. The regex routing is where the actual spec mutation happens. Every branch shown.
+What `_apply_at_path` does when called with a gap's field_path and a Resolution. Every branch shown.
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant Orch as Orchestrator
-  participant Apply as default_apply_resolution<br/>(orchestrator.py:748)
-  participant APath as _apply_at_path<br/>(orchestrator.py:802)
-  participant Stamp as _stamp_user_action /<br/>_stamp_resolution_action
+  participant Apply as default_apply_resolution
+  participant APath as _apply_at_path
+  participant Stamp as stamping helpers
   participant Spec as ProtocolSpec
 
   Orch->>Apply: default_apply_resolution(spec, gap, resolution, suggestion)
 
-  opt gap.metadata["affected_paths"] (constraint-violation dedupe, len > 1)
-    Note over Apply: One Gap stood for N affected steps.<br/>Apply to ALL paths — user answered once;<br/>answer propagates everywhere.
+  opt gap.metadata affected_paths exists and len greater than 1
+    Note over Apply: One Gap stood for N affected steps. Apply to ALL paths - user answered once, answer propagates
     loop per affected path
       Apply->>APath: _apply_at_path(spec, path, resolution)
     end
-    Note over Apply: return early
   end
   Apply->>APath: _apply_at_path(spec, gap.field_path, resolution)
 
-  Note over APath: regex match field_path against 5 shapes:
+  Note over APath: regex match field_path against 5 path shapes
 
-  alt steps[N].<field>.<...provenance>$ (fabrication-shaped)
-    Note over APath: parent = step.<field><br/>slot = the matching provenance attr
-    alt resolution.action == "accept_suggestion"
+  alt path is steps N field provenance suffix (fabrication-shaped)
+    alt action is accept_suggestion
       APath->>Spec: setattr(parent, slot, new_value)
-      Note over APath,Spec: new_value is a fresh Provenance object<br/>built by orchestrator from suggestion.<br/>OLD PROVENANCE GONE — no history.
-    else resolution.action == "override"
-      APath->>Spec: replace existing Provenance with copy<br/>where review_status = "user_overrode_fabrication"<br/>reviewer_objection cleared<br/>(value untouched)
-    else resolution.action == "edit" AND hasattr(parent, "value")
+      Note over APath,Spec: new_value is a fresh Provenance built by orchestrator. OLD PROVENANCE GONE
+    else action is override
+      APath->>Spec: replace existing Provenance with copy carrying review_status=user_overrode_fabrication. Value unchanged
+    else action is edit and parent has .value
       APath->>Spec: parent.value = new_value
-      APath->>Spec: setattr(parent, slot, fresh Provenance:<br/>source="inferred", positive_reasoning="User-typed value<br/>during fabrication resolution",<br/>review_status="user_edited", confidence=1.0)
-    else other (e.g. edit on LocationRef sub-slot)
+      APath->>Spec: replace provenance slot with fresh Provenance, source=inferred, review_status=user_edited
+    else other (e.g. LocationRef sub-slot edits)
       Note over APath: silent no-op (defensive)
     end
 
-  else action == "override" AND path matches steps[N].<field>$
-    Note over APath: ADR-0012 override on a top-level field
-    APath->>Stamp: _stamp_user_action(existing, "user_overrode_fabrication")
-    Stamp->>Spec: replace all provenance slots with copies<br/>carrying review_status
+  else action is override AND path is top-level step field
+    Note over APath: ADR-0012 override on top-level field
+    APath->>Stamp: _stamp_user_action(existing, user_overrode_fabrication)
+    Stamp->>Spec: replace all provenance slots
 
-  else initial_contents[N].volume_ul$
-    APath->>Spec: spec.initial_contents[idx].volume_ul = float(new_value)
-    Note over APath,Spec: bare float field — NO Provenance to stamp
+  else path is initial_contents N volume_ul
+    APath->>Spec: spec.initial_contents idx volume_ul = float(new_value)
+    Note over APath,Spec: bare float field - NO Provenance to stamp
 
-  else steps[N].<field>$ (top-level step field)
-    alt resolution.action == "accept_suggestion"
-      APath->>Spec: setattr(spec.steps[idx], fname, new_value)
-      Note over APath,Spec: new_value is a Provenance-bearing model<br/>from the suggester
+  else path is steps N field (top-level step field)
+    alt action is accept_suggestion
+      APath->>Spec: setattr(spec.steps idx, fname, new_value)
+      Note over APath,Spec: new_value is a Provenance-bearing model from the suggester
       APath->>Stamp: _stamp_user_action(new_value, user_action)
-      Stamp->>Spec: REPLACE every provenance slot on new_value<br/>with copies carrying review_status
-    else resolution.action == "edit"
+      Stamp->>Spec: REPLACE every provenance slot on new_value
+    else action is edit
       alt existing has .value attribute
         APath->>Spec: existing.value = new_value (preserves model shape)
-        APath->>Stamp: _stamp_user_action(existing, "user_edited")
-      else fallback (LocationRef edits without .value, etc.)
-        APath->>Spec: setattr(spec.steps[idx], fname, new_value)
-        APath->>Stamp: _stamp_user_action(new_value, "user_edited")
+        APath->>Stamp: _stamp_user_action(existing, user_edited)
+      else fallback (LocationRef edits without .value)
+        APath->>Spec: setattr raw
+        APath->>Stamp: _stamp_user_action(new_value, user_edited)
       end
     else other action
       APath->>Spec: setattr raw (defensive)
     end
 
-  else steps[N].<field>.<subfield>$ (nested write, e.g. resolved_label)
+  else path is steps N field subfield (nested write)
     APath->>Spec: setattr(target, subfield, new_value)
-    alt subfield == "resolved_label"
+    alt subfield is resolved_label
       APath->>Stamp: _stamp_resolution_action(target, user_action, new_value)
-      Stamp->>Spec: REPLACE resolved_label_provenance<br/>with copy carrying review_status
-      Note over Stamp,Spec: distinct from primary provenance<br/>(which is about location/wells)
+      Stamp->>Spec: REPLACE resolved_label_provenance
+      Note over Stamp,Spec: distinct from primary provenance (which is about location/wells)
     else other subfield
       APath->>Stamp: _stamp_user_action(target, user_action)
     end
@@ -595,87 +613,87 @@ sequenceDiagram
   end
 ```
 
-### Diagram 3 — Stages 6–9 (constraint check → simulate)
+### Diagram 3 — Stages 6 to 9 (constraint check, promote, codegen, simulate)
 
 Linear and deterministic after the orchestrator returns. No LLM calls in these stages.
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Pipeline as ProtocolAgent.run_pipeline
-  participant CC as ConstraintChecker.check_all<br/>(validation/constraints.py)
-  participant Handler as binary_confirm_handler<br/>(optional)
-  participant Promote as CompleteProtocolSpec.model_validate<br/>(models/spec.py)
-  participant S2S as extractor.spec_to_schema
+  participant Pipeline
+  participant CC as ConstraintChecker
+  participant Handler as binary_confirm_handler
+  participant Promote as CompleteProtocolSpec validator
+  participant S2S as spec_to_schema
   participant Codegen as generate_python_script
-  participant Sim as simulate_script (Opentrons)
-  participant Reporter as reporter +<br/>state_log writer
+  participant Sim as simulate_script
+  participant Reporter as reporter and state_log
 
-  Note over Pipeline: Stage 6 — Constraint check (deterministic)
-  Pipeline->>Pipeline: _emit_stage_started(6, "Checking hardware")
+  Note over Pipeline: Stage 6 - Constraint check (deterministic)
+  Pipeline->>Pipeline: emit stage_started 6
   Pipeline->>CC: check_all(spec)
-  CC-->>Pipeline: ConstraintCheckResult(violations[], warnings[])
-  Pipeline->>Reporter: state_log["stage_4_constraints"] = {errors, warnings}
-  Pipeline->>Reporter: emit("constraint_check_done")
-  opt result.warnings
+  CC-->>Pipeline: ConstraintCheckResult with violations and warnings
+  Pipeline->>Reporter: state_log stage_4_constraints = result
+  Pipeline->>Reporter: emit constraint_check_done
+  opt result has warnings
     Pipeline->>Pipeline: log warnings (non-blocking)
   end
-  alt result.has_errors
+  alt result has errors
     alt binary_confirm_handler available (live mode)
-      Pipeline->>Handler: confirm("proceed despite errors?")
+      Pipeline->>Handler: confirm proceed despite errors
       Handler-->>Pipeline: bool
     else TTY available (CLI)
-      Pipeline->>Pipeline: stdin prompt [y/N] (default no)
+      Pipeline->>Pipeline: stdin prompt y or N, default no
     else non-TTY no handler
       Pipeline->>Pipeline: halt
     end
     alt user did NOT proceed
-      Pipeline->>Reporter: _save_state_log("stage_4_constraints")
-      Note over Pipeline: return None — halt
+      Pipeline->>Reporter: _save_state_log stage_4_constraints
+      Note over Pipeline: return None - halt
     end
   end
 
-  Note over Pipeline: Stage 7 — Promote + schema build (no LLM)
-  Pipeline->>Pipeline: _emit_stage_started(7, "Building & simulating")
-  Pipeline->>Reporter: state_log["stage_5_spec"] = spec.model_dump()
-  Pipeline->>Promote: model_validate(spec.model_dump())
-  Note over Promote: enforces per-action completeness<br/>(transfer needs source+dest+volume;<br/>mix needs volume; set_temp needs temp;<br/>pause needs duration OR note; etc.)
-  alt validation fails (a required field is still null)
+  Note over Pipeline: Stage 7 - Promote and schema build (no LLM)
+  Pipeline->>Pipeline: emit stage_started 7
+  Pipeline->>Reporter: state_log stage_5_spec = spec dump
+  Pipeline->>Promote: model_validate(spec dump)
+  Note over Promote: enforces per-action completeness. transfer needs source+dest+volume, mix needs volume, set_temp needs temperature, pause needs duration or note
+  alt validation fails (required field still null)
     Promote-->>Pipeline: raises ValidationError
-    Pipeline->>Reporter: _save_state_log("stage_5_schema")
-    Note over Pipeline: return None — halt
+    Pipeline->>Reporter: _save_state_log stage_5_schema
+    Note over Pipeline: return None - halt
   end
   Promote-->>Pipeline: complete_spec
-  Pipeline->>Reporter: emit("completed_spec")
+  Pipeline->>Reporter: emit completed_spec
   Pipeline->>S2S: spec_to_schema(complete_spec, config)
-  S2S-->>Pipeline: ProtocolSchema (deterministic; step→line map included)
+  S2S-->>Pipeline: ProtocolSchema (deterministic, step to line map included)
 
-  Note over Pipeline: Stage 8 — Codegen (no LLM)
+  Note over Pipeline: Stage 8 - Codegen (no LLM)
   Pipeline->>Codegen: generate_python_script(schema, step_summaries)
   alt codegen raises ValueError
     Codegen-->>Pipeline: error
-    Pipeline->>Reporter: _save_state_log("stage_6_script")
-    Note over Pipeline: return None — halt
+    Pipeline->>Reporter: _save_state_log stage_6_script
+    Note over Pipeline: return None - halt
   end
-  Codegen-->>Pipeline: script (str)
-  Pipeline->>Reporter: emit("generated_script")
-  Pipeline->>Pipeline: write output/debug_script_*.py (UNCONDITIONAL)
+  Codegen-->>Pipeline: script string
+  Pipeline->>Reporter: emit generated_script
+  Pipeline->>Pipeline: write debug_script py file UNCONDITIONALLY
 
-  Note over Pipeline: Stage 9 — Opentrons simulate
+  Note over Pipeline: Stage 9 - Opentrons simulate
   Pipeline->>Sim: simulate_script(script)
-  Sim-->>Pipeline: (ok: bool, log: str, runlog: list)
-  alt ok
-    Pipeline->>Reporter: _save_state_log()  ← success path, no failed_at marker
-    Pipeline->>Reporter: composite.finalize()
-    Pipeline-->>Pipeline: PipelineResult(script, sim_log, schema, runlog, config)
+  Sim-->>Pipeline: ok bool, log str, runlog list
+  alt simulator ok
+    Pipeline->>Reporter: _save_state_log (success path, no failed_at marker)
+    Pipeline->>Reporter: composite.finalize
+    Pipeline-->>Pipeline: PipelineResult
   else simulator failed
-    Pipeline->>Reporter: _save_state_log("stage_7_simulation")
-    Note over Pipeline: return None — halt
+    Pipeline->>Reporter: _save_state_log stage_7_simulation
+    Note over Pipeline: return None - halt
   end
 
-  Note over Pipeline,Reporter: Any uncaught exception anywhere above<br/>is caught by the outer try/except (pipeline.py:1577):<br/>state_log gets exception_type/message/traceback,<br/>_save_state_log("uncaught_exception"), then RE-RAISES.
+  Note over Pipeline,Reporter: Any uncaught exception is caught by the outer try/except. state_log gets exception details. _save_state_log uncaught_exception. Then RE-RAISES.
 ```
 
 ---
 
-These diagrams are point-in-time against the `add-hosted-deploy` branch. Line numbers shift; the function names and condition shapes are the stable references. If a future change moves a function or adds a branch, the prose in Parts 1–4 stays roughly correct longer than the diagrams do — diagrams are the precise reading; prose is the durable summary.
+These diagrams are point-in-time against the `add-hosted-deploy` branch. Function names and condition shapes are the stable references; line numbers in the participants table will shift over time. If a future change moves a function or adds a branch, Parts 1–4 prose stay roughly correct longer than the diagrams do — diagrams are the precise reading; prose is the durable summary.
