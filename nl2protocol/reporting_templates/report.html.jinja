@@ -804,7 +804,7 @@
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <label for="live-api-key" style="font-size: 13px; color: var(--ink);">Anthropic key:</label>
-      <input type="password" id="live-api-key" placeholder="sk-ant-…" autocomplete="off" style="font: 13px ui-monospace, 'SF Mono', Menlo, monospace; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 280px;">
+      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px ui-monospace, 'SF Mono', Menlo, monospace; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 280px;">
       <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
       <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
     </div>
@@ -3026,9 +3026,11 @@
       return await input.files[0].text();
     }
 
+    const LOCAL_DEV_MODE = {{ local_dev_mode|tojson if local_dev_mode is defined else 'false' }};
+
     startBtn.addEventListener("click", async () => {
       const apiKey = (document.getElementById("live-api-key").value || "").trim();
-      if (!apiKey) {
+      if (!apiKey && !LOCAL_DEV_MODE) {
         setStatus("API key required", "#f8d7da", "#721c24");
         return;
       }

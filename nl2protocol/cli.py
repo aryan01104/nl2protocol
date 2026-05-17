@@ -535,6 +535,13 @@ def main(argv: list = None) -> int:
     # browser form (POST /start), not from CLI args, so -i/-c are
     # not required here.
     if args.serve:
+        # Load .env so the server can see NL2PROTOCOL_LOCAL_DEV (local
+        # convenience: when set, server falls back to ANTHROPIC_API_KEY
+        # from env if the form omits the key). Non-serve path loads .env
+        # later in this function; the serve path needs it loaded BEFORE
+        # LiveModeApp.__init__ runs and reads the flag.
+        from dotenv import find_dotenv, load_dotenv
+        load_dotenv(find_dotenv(usecwd=True))
         from .server import run_serve
         try:
             run_serve(

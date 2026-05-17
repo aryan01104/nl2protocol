@@ -330,6 +330,16 @@ class LiveModeApp:
         self._event_queue: "queue.Queue[Any]" = queue.Queue(maxsize=10000)
         self._pipeline_thread: Optional[threading.Thread] = None
         self._output_dir = output_dir
+        # Local-dev convenience: when NL2PROTOCOL_LOCAL_DEV is truthy, the
+        # POST /start handler falls back to ANTHROPIC_API_KEY from the server's
+        # environment when the request omits api_key. Opt-in flag so a
+        # deployed instance (Fly, etc.) — where we don't want to silently
+        # bill the operator's key — must NOT set this. Read once at startup
+        # so the value is fixed for the process's lifetime.
+        self._local_dev_mode = (
+            os.getenv("NL2PROTOCOL_LOCAL_DEV", "").strip().lower()
+            in ("1", "true", "yes")
+        )
         # Anchor a relative examples_dir to the project root so cwd drift
         # (Docker WORKDIR, uvicorn from elsewhere) doesn't strand it.
         examples_path = Path(examples_dir)
@@ -457,6 +467,7 @@ class LiveModeApp:
             generated_script_html="",
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             live_mode=True,
+            local_dev_mode=self._local_dev_mode,
         )
 
     def _reset_per_run_state(self) -> None:
@@ -547,6 +558,12 @@ class LiveModeApp:
             instruction = (body.get("instruction") or "").strip()
             config = body.get("config")
             api_key = (body.get("api_key") or "").strip()
+
+            # Local-dev fallback: when the operator opted in via env flag AND
+            # the request didn't carry a key, use the server's env key. Never
+            # fires on a Fly deploy because the flag isn't set there.
+            if not api_key and self._local_dev_mode:
+                api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
             if not instruction:
                 return JSONResponse(
