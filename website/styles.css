@@ -1,0 +1,1203 @@
+/* ============================================================
+   nl2protocol — landing page styles
+   Aesthetic: academic paper meets terminal.
+   Palette: solarized-light family (echoes the live-mode report).
+   Type: EB Garamond (display + body), JetBrains Mono (code, nav).
+   ============================================================ */
+
+:root {
+  /* Solarized-light surface tones */
+  --bg:       #fdf6e3;
+  --panel:    #faf6e8;
+  --panel-2:  #f5efd9;
+  --ink:      #073642;
+  --ink-2:    #002b36;
+  --dim:      #586e75;
+  --dim-2:    #93a1a1;
+  --grid:     #e8e0c7;
+  --rule:     #d8cfb1;
+
+  /* Provenance hues — match the live-mode report */
+  --cite-instr:    #268bd2;  /* blue   — from instruction          */
+  --cite-domain:   #b58900;  /* yellow — domain default            */
+  --cite-infer:    #cb4b16;  /* orange — inferred                  */
+  --cite-agree:    #859900;  /* green  — reviewer agree            */
+  --cite-disagree: #dc322f;  /* red    — reviewer disagree         */
+
+  /* Typography */
+  --font-serif: "EB Garamond", "Iowan Old Style", "Apple Garamond",
+                Garamond, "Times New Roman", Times, serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
+                Consolas, monospace;
+
+  /* Layout */
+  --width-page: 1120px;
+  --width-text: 680px;
+  --gutter: 2rem;
+}
+
+/* ---------- Reset / base ---------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 19px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* Subtle paper warmth — a single radial that sits behind everything,
+     just enough to keep the background from looking flat. */
+  background:
+    radial-gradient(ellipse at top, rgba(181, 137, 0, 0.04), transparent 60%),
+    var(--bg);
+}
+
+a { color: inherit; }
+
+::selection {
+  background: color-mix(in srgb, var(--cite-instr) 25%, transparent);
+  color: var(--ink-2);
+}
+
+/* ---------- Layout containers ---------- */
+
+.site-header,
+main > section,
+.site-footer > * {
+  max-width: var(--width-page);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* ---------- Header ---------- */
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 1.6rem;
+  padding-bottom: 1.6rem;
+  border-bottom: 1px solid var(--grid);
+}
+
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.96rem;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-mark {
+  position: relative;
+}
+
+.brand-mark::after {
+  /* The signature: a colored underline echoing the cited-text motif */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 2px;
+  background: var(--cite-instr);
+}
+
+.brand:hover .brand-mark::after {
+  background: var(--cite-infer);
+  transition: background 200ms ease;
+}
+
+.primary-nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.primary-nav a {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--dim);
+  text-decoration: none;
+  text-transform: lowercase;
+  letter-spacing: 0.01em;
+  padding: 0.2rem 0;
+  position: relative;
+  transition: color 150ms ease;
+}
+
+.primary-nav a:hover {
+  color: var(--ink);
+}
+
+.primary-nav a:hover::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: var(--cite-instr);
+}
+
+.ext {
+  display: inline-block;
+  font-size: 0.85em;
+  color: var(--dim-2);
+  margin-left: 0.05em;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  padding-top: 6rem;
+  padding-bottom: 5rem;
+  max-width: 880px;
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--dim);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  margin: 0 0 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem 1rem;
+  align-items: center;
+}
+
+.meta .sep {
+  color: var(--dim-2);
+  opacity: 0.7;
+}
+
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--cite-agree);
+  font-weight: 500;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--cite-agree);
+  border-radius: 50%;
+  animation: pulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cite-agree) 50%, transparent);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--cite-agree) 40%, transparent); }
+  50%      { opacity: 0.5; box-shadow: 0 0 0 6px color-mix(in srgb, var(--cite-agree) 0%, transparent); }
+}
+
+.hero-pitch {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(1.6rem, 3.8vw, 2.55rem);
+  line-height: 1.22;
+  letter-spacing: -0.012em;
+  margin: 0 0 1.5rem;
+  color: var(--ink-2);
+}
+
+.hero-pitch .dash {
+  color: var(--dim);
+  font-weight: 400;
+  margin: 0 0.1em;
+}
+
+/* ---------- Cited text — the visual signature ---------- */
+
+.cite {
+  position: relative;
+  cursor: help;
+  text-decoration: none;
+  border-bottom: 2.5px solid;
+  padding-bottom: 1px;
+  transition: background-color 180ms ease, border-color 180ms ease;
+  outline: none;
+}
+
+.cite-instr  { border-color: var(--cite-instr); }
+.cite-domain { border-color: var(--cite-domain); }
+.cite-infer  { border-color: var(--cite-infer); }
+.cite-agree  { border-color: var(--cite-agree); }
+
+.cite-instr:hover,
+.cite-instr:focus  { background: color-mix(in srgb, var(--cite-instr)  14%, transparent); }
+.cite-domain:hover,
+.cite-domain:focus { background: color-mix(in srgb, var(--cite-domain) 14%, transparent); }
+.cite-infer:hover,
+.cite-infer:focus  { background: color-mix(in srgb, var(--cite-infer)  14%, transparent); }
+.cite-agree:hover,
+.cite-agree:focus  { background: color-mix(in srgb, var(--cite-agree)  14%, transparent); }
+
+/* Tooltip — appears above the cite on hover/focus */
+.cite::after {
+  content: attr(data-prov);
+  position: absolute;
+  bottom: calc(100% + 0.65rem);
+  left: 0;
+  background: var(--ink-2);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0.4rem 0.7rem;
+  white-space: nowrap;
+  max-width: 90vw;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  border-radius: 2px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  z-index: 10;
+  /* Small arrow */
+  border-bottom: 4px solid transparent; /* spacing trick — actual arrow via ::before */
+}
+
+.cite::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  left: 1rem;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid var(--ink-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  z-index: 11;
+}
+
+.cite:hover::after,
+.cite:focus::after,
+.cite:hover::before,
+.cite:focus::before {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Tooltip text may be long; allow wrapping when needed */
+.cite[data-prov*=" "]:hover::after {
+  white-space: normal;
+  max-width: 320px;
+}
+
+/* ---------- Hero aside + CTA + legend ---------- */
+
+.hero-aside {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.0rem;
+  color: var(--dim);
+  margin: 0 0 2.5rem;
+  max-width: 42ch;
+}
+
+.hero-aside .aside-note {
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-bottom: 3.5rem;
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 500;
+  padding: 0.75rem 1.4rem;
+  text-decoration: none;
+  border: 1.5px solid transparent;
+  text-transform: lowercase;
+  letter-spacing: 0.025em;
+  transition: background 180ms ease, color 180ms ease,
+              border-color 180ms ease, transform 100ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--ink-2);
+  color: var(--bg);
+  border-color: var(--ink-2);
+}
+
+.btn-primary:hover {
+  background: var(--cite-instr);
+  border-color: var(--cite-instr);
+}
+
+.btn-primary .arrow {
+  transition: transform 200ms ease;
+}
+
+.btn-primary:hover .arrow {
+  transform: translateX(3px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--ink-2);
+  border-color: var(--rule);
+}
+
+.btn-secondary:hover {
+  border-color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* Legend — soft introduction to the cite palette */
+.legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--dim);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.swatch {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+.sw-instr  { background: var(--cite-instr); }
+.sw-domain { background: var(--cite-domain); }
+.sw-infer  { background: var(--cite-infer); }
+.sw-agree  { background: var(--cite-agree); }
+
+/* ---------- Generic section ---------- */
+
+.section {
+  padding-top: 5rem;
+  padding-bottom: 5rem;
+  border-top: 1px solid var(--grid);
+}
+
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--dim);
+  margin: 0 0 3rem;
+  /* Marginal label — sits on the left margin like an academic paper section */
+  display: inline-block;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--grid);
+}
+
+/* ---------- How it works ---------- */
+
+.how-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.how-panel {
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-top-width: 3px;
+  padding: 1.6rem 1.6rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  position: relative;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.how-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -16px rgba(7, 54, 66, 0.25);
+}
+
+.how-panel-1 { border-top-color: var(--cite-instr); }
+.how-panel-2 { border-top-color: var(--cite-domain); }
+.how-panel-3 { border-top-color: var(--cite-agree); }
+
+.how-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.step-num {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--dim-2);
+  letter-spacing: 0.04em;
+}
+
+.how-title {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.how-body {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  margin: 0 0 1.5rem;
+  color: var(--ink);
+}
+
+.how-body em {
+  font-style: italic;
+  color: var(--ink-2);
+}
+
+.how-meta {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--rule);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--dim);
+}
+
+.how-meta-key {
+  text-transform: lowercase;
+  letter-spacing: 0.06em;
+}
+
+.how-meta-val {
+  font-family: var(--font-mono);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+  color: var(--ink-2);
+  font-size: 0.74rem;
+}
+
+/* ---------- Differentiation list ---------- */
+
+.diff {
+  max-width: 820px;
+}
+
+.diff-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: diff;
+}
+
+.diff-item {
+  counter-increment: diff;
+  margin: 0 0 2.4rem;
+  padding-left: 4rem;
+  position: relative;
+}
+
+.diff-item::before {
+  content: counter(diff, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--dim-2);
+  letter-spacing: 0.04em;
+  /* Subtle underline accent in the cite palette per item */
+}
+
+.diff-item:nth-child(1)::after,
+.diff-item:nth-child(2)::after,
+.diff-item:nth-child(3)::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.5rem;
+  width: 28px;
+  height: 2px;
+}
+
+.diff-item:nth-child(1)::after { background: var(--cite-instr); }
+.diff-item:nth-child(2)::after { background: var(--cite-domain); }
+.diff-item:nth-child(3)::after { background: var(--cite-agree); }
+
+.diff-title {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.005em;
+  color: var(--ink-2);
+}
+
+.diff-body {
+  font-size: 1.0rem;
+  line-height: 1.65;
+  margin: 0;
+  color: var(--ink);
+}
+
+/* ---------- Figure ---------- */
+
+.figure {
+  /* Wider than text column — let the screenshot breathe */
+}
+
+.screenshot {
+  margin: 0;
+}
+
+.screenshot-frame {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  /* Subtle frame shadow to feel like a printed plate */
+  box-shadow:
+    0 1px 0 var(--rule),
+    0 24px 48px -24px rgba(7, 54, 66, 0.18);
+  overflow: hidden;
+}
+
+.screenshot-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Placeholder shown until the real screenshot is wired.
+   Hides automatically once the <img> loads (broken-img fallback below
+   replaces it visually). */
+.screenshot-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--dim);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--panel) 0 14px,
+      var(--panel-2) 14px 28px
+    );
+  min-height: 320px;
+  letter-spacing: 0.02em;
+}
+
+.screenshot-placeholder small {
+  font-size: 0.72rem;
+  color: var(--dim-2);
+}
+
+.screenshot-placeholder code {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  color: var(--ink-2);
+}
+
+/* When the actual image successfully loads, it stacks ON TOP of
+   the placeholder (z-index default). Place a covering layer so the
+   placeholder isn't visible behind transparent corners of a real
+   screenshot. */
+.screenshot-frame img:not([alt=""]) {
+  position: relative;
+  z-index: 2;
+  background: var(--panel);
+}
+
+figcaption {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: var(--dim);
+  margin: 1.2rem 0 0;
+  max-width: var(--width-text);
+}
+
+.fig-num {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  margin-right: 0.5rem;
+}
+
+/* ---------- Footer ---------- */
+
+.site-footer {
+  border-top: 1px solid var(--grid);
+  margin-top: 3rem;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+  background: linear-gradient(to bottom,
+    var(--bg) 0%,
+    color-mix(in srgb, var(--bg) 92%, var(--panel-2)) 100%);
+}
+
+.footer-grid {
+  max-width: var(--width-page);
+  margin: 0 auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2rem 3rem;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+.brand-mark-sm {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink);
+  position: relative;
+}
+
+.brand-mark-sm::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  height: 1.5px;
+  background: var(--cite-instr);
+}
+
+.dim {
+  color: var(--dim);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+}
+
+.footer-nav a {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--dim);
+  text-decoration: none;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  transition: color 150ms ease;
+}
+
+.footer-nav a:hover {
+  color: var(--ink-2);
+}
+
+.attribution {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--dim);
+  margin: 0;
+  width: 100%;
+  text-align: right;
+}
+
+.attribution a {
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--cite-instr);
+  padding-bottom: 1px;
+  transition: border-color 200ms ease;
+}
+
+.attribution a:hover {
+  border-bottom-color: var(--cite-infer);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 880px) {
+  html { font-size: 17px; }
+
+  .hero {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  .how-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .how-panel {
+    min-height: 0;
+  }
+
+  .diff-item {
+    padding-left: 3.2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  :root { --gutter: 1.25rem; }
+
+  html { font-size: 16px; }
+
+  .site-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
+  }
+
+  .primary-nav {
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .hero-pitch {
+    line-height: 1.28;
+  }
+
+  .footer-grid {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.5rem;
+  }
+
+  .attribution {
+    text-align: left;
+  }
+
+  /* Mobile tooltip: anchor centered & wrap */
+  .cite::after {
+    max-width: 80vw;
+    white-space: normal;
+    left: 0;
+    right: auto;
+  }
+}
+
+/* ---------- Print friendliness (someone might want to print as a brief) ---------- */
+
+@media print {
+  body { background: white; }
+  .site-header, .site-footer, .hero-cta, .live-indicator, .legend { display: none; }
+  .cite { border-bottom: none; }
+  .cite::after, .cite::before { display: none; }
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+/* ============================================================
+   ----------  SUB-PAGE STYLES  ----------
+   Shared across non-landing pages: limitations, docs, log.
+   Designed to inherit the landing page's typography + palette
+   while giving sub-pages a slightly different rhythm
+   (smaller hero, scannable content blocks).
+   ============================================================ */
+
+/* ---------- Page hero (smaller than landing hero) ---------- */
+
+.page-hero {
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+  max-width: 820px;
+}
+
+.page-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--dim);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 1.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.9rem;
+}
+
+.back-link a {
+  color: var(--dim);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+  padding-bottom: 1px;
+}
+
+.back-link a:hover {
+  color: var(--cite-instr);
+  border-bottom-color: var(--cite-instr);
+}
+
+.meta-tag {
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.page-title {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 3.2vw, 2.15rem);
+  line-height: 1.22;
+  letter-spacing: -0.012em;
+  margin: 0 0 1.2rem;
+  color: var(--ink-2);
+}
+
+.page-title .dash {
+  color: var(--dim);
+  font-weight: 400;
+  margin: 0 0.15em;
+}
+
+.page-lede {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0 0 2rem;
+  max-width: 60ch;
+}
+
+/* ---------- Tag legend (dl-based; one dt+dd per row) ---------- */
+
+.tag-legend {
+  margin: 1.5rem 0 0;
+  padding: 1.1rem 1.3rem;
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-left: 3px solid var(--cite-domain);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tag-legend-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+}
+
+.tag-legend dt {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.tag-legend dd {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  color: var(--dim);
+  line-height: 1.5;
+}
+
+/* ---------- The tag itself ---------- */
+
+.tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid;
+  border-radius: 2px;
+  white-space: nowrap;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* User-facing tag system on /limitations/ */
+
+.tag-hard {
+  /* hard limit — physical/API constraint, can't bypass */
+  color: var(--cite-disagree);
+  border-color: color-mix(in srgb, var(--cite-disagree) 50%, transparent);
+  background: color-mix(in srgb, var(--cite-disagree) 7%, transparent);
+}
+
+.tag-required {
+  /* required — something user must provide */
+  color: var(--cite-instr);
+  border-color: color-mix(in srgb, var(--cite-instr) 50%, transparent);
+  background: color-mix(in srgb, var(--cite-instr) 7%, transparent);
+}
+
+.tag-rec {
+  /* recommendation — best practice */
+  color: #8a6800; /* darker than var(--cite-domain) for legibility */
+  border-color: color-mix(in srgb, var(--cite-domain) 55%, transparent);
+  background: color-mix(in srgb, var(--cite-domain) 10%, transparent);
+}
+
+.tag-watch {
+  /* watch for — known extraction failure mode */
+  color: var(--cite-infer);
+  border-color: color-mix(in srgb, var(--cite-infer) 50%, transparent);
+  background: color-mix(in srgb, var(--cite-infer) 7%, transparent);
+}
+
+/* Architectural tag system — kept for the engineering log post draft.
+   Same color assignments, different labels. */
+
+.tag-bug      { color: var(--cite-disagree);
+                border-color: color-mix(in srgb, var(--cite-disagree) 50%, transparent);
+                background: color-mix(in srgb, var(--cite-disagree) 7%, transparent); }
+.tag-intent   { color: var(--cite-infer);
+                border-color: color-mix(in srgb, var(--cite-infer) 50%, transparent);
+                background: color-mix(in srgb, var(--cite-infer) 7%, transparent); }
+.tag-capacity { color: #8a6800;
+                border-color: color-mix(in srgb, var(--cite-domain) 55%, transparent);
+                background: color-mix(in srgb, var(--cite-domain) 10%, transparent); }
+.tag-infra    { color: var(--cite-instr);
+                border-color: color-mix(in srgb, var(--cite-instr) 50%, transparent);
+                background: color-mix(in srgb, var(--cite-instr) 7%, transparent); }
+
+/* ---------- Sub-page section spacing override ---------- */
+
+.limit-class {
+  padding-top: 3.5rem;
+  padding-bottom: 1.5rem;
+  max-width: 820px;
+}
+
+.class-lede {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--dim);
+  margin: -1.5rem 0 2rem; /* tightens up under the section label */
+  max-width: 58ch;
+}
+
+/* ---------- Limit card ---------- */
+
+.limit {
+  padding: 1.4rem 1.6rem;
+  background: var(--panel);
+  border: 1px solid var(--grid);
+  border-left: 3px solid var(--rule);
+  margin: 0 0 1rem;
+  transition: border-left-color 200ms ease, transform 200ms ease;
+}
+
+.limit:hover {
+  transform: translateX(2px);
+}
+
+/* Color the left edge based on the contained tag — uses :has() which
+   works in all evergreen browsers. Graceful: falls back to neutral
+   when :has() isn't supported. */
+.limit:has(.tag-hard)     { border-left-color: var(--cite-disagree); }
+.limit:has(.tag-required) { border-left-color: var(--cite-instr); }
+.limit:has(.tag-rec)      { border-left-color: var(--cite-domain); }
+.limit:has(.tag-watch)    { border-left-color: var(--cite-infer); }
+.limit:has(.tag-bug)      { border-left-color: var(--cite-disagree); }
+.limit:has(.tag-intent)   { border-left-color: var(--cite-infer); }
+.limit:has(.tag-capacity) { border-left-color: var(--cite-domain); }
+.limit:has(.tag-infra)    { border-left-color: var(--cite-instr); }
+
+.limit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin: 0 0 0.7rem;
+}
+
+.limit-header h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 1.08rem;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  margin: 0;
+  color: var(--ink-2);
+  flex: 1 1 auto;
+}
+
+.limit p {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+}
+
+.limit p code {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  padding: 0.1rem 0.35rem;
+  border-radius: 2px;
+  color: var(--ink-2);
+}
+
+.limit p em {
+  font-style: italic;
+  color: var(--ink-2);
+}
+
+/* ---------- Active-page indicator in nav ---------- */
+
+.primary-nav a[aria-current="page"] {
+  color: var(--ink);
+  position: relative;
+}
+
+.primary-nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1.5px;
+  background: var(--cite-instr);
+}
+
+/* ---------- Page closer (small pointer block at the bottom) ---------- */
+
+.page-closer {
+  padding-top: 2.5rem;
+  padding-bottom: 4rem;
+  max-width: 820px;
+}
+
+.closer-lede {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--dim);
+  margin: 0;
+}
+
+.closer-lede a {
+  color: var(--ink-2);
+  text-decoration: none;
+  border-bottom: 1px solid var(--cite-instr);
+  padding-bottom: 1px;
+  transition: border-color 200ms ease;
+}
+
+.closer-lede a:hover {
+  border-bottom-color: var(--cite-infer);
+}
+
+/* ---------- Sub-page responsive overrides ---------- */
+
+@media (max-width: 880px) {
+  .page-hero {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .limit-class {
+    padding-top: 2.5rem;
+  }
+
+  .tag-legend {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .limit-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .tag-legend-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+}
