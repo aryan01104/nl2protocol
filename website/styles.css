@@ -6,23 +6,28 @@
    ============================================================ */
 
 :root {
-  /* Solarized-light surface tones */
-  --bg:       #fdf6e3;
-  --panel:    #faf6e8;
-  --panel-2:  #f5efd9;
-  --ink:      #073642;
-  --ink-2:    #002b36;
-  --dim:      #586e75;
-  --dim-2:    #93a1a1;
-  --grid:     #e8e0c7;
-  --rule:     #d8cfb1;
+  /* Cool slate palette — biotech / lab-software register
+     (Benchling / Latch / Inductive Bio family).
+     Replaced solarized-warm with Tailwind's slate scale for the
+     surfaces, more-saturated accents for the cite hues. */
+  --bg:       #f7f6f3;  /* Notion off-white — tiny warm cast      */
+  --panel:    #ffffff;  /* pure white — cards/panels              */
+  --panel-2:  #efeeea;  /* warm-neutral — alternate panel         */
+  --ink:      #0f172a;  /* slate-900 — primary text               */
+  --ink-2:    #020617;  /* slate-950 — emphasized text            */
+  --dim:      #475569;  /* slate-600 — secondary text             */
+  --dim-2:    #94a3b8;  /* slate-400 — tertiary text              */
+  --grid:     #e2e8f0;  /* slate-200 — borders                    */
+  --rule:     #cbd5e1;  /* slate-300 — stronger rules             */
 
-  /* Provenance hues — match the live-mode report */
-  --cite-instr:    #268bd2;  /* blue   — from instruction          */
-  --cite-domain:   #b58900;  /* yellow — domain default            */
-  --cite-infer:    #cb4b16;  /* orange — inferred                  */
-  --cite-agree:    #859900;  /* green  — reviewer agree            */
-  --cite-disagree: #dc322f;  /* red    — reviewer disagree         */
+  /* Provenance hues — saturated to fit the cooler palette.
+     Same semantic mapping as v1/v2 (blue=instruction, yellow=domain
+     default, orange=inferred, green=reviewer agree, red=disagree). */
+  --cite-instr:    #2563eb;  /* blue-600   — from instruction      */
+  --cite-domain:   #d97706;  /* amber-600  — domain default        */
+  --cite-infer:    #ea580c;  /* orange-600 — inferred              */
+  --cite-agree:    #16a34a;  /* green-600  — reviewer agree        */
+  --cite-disagree: #dc2626;  /* red-600    — reviewer disagree     */
 
   /* Typography — sans-forward for "technical product" feel.
      Variable name is legacy (was "serif" pre-experiment); kept to
@@ -59,11 +64,9 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  /* Subtle paper warmth — a single radial that sits behind everything,
-     just enough to keep the background from looking flat. */
-  background:
-    radial-gradient(ellipse at top, rgba(181, 137, 0, 0.04), transparent 60%),
-    var(--bg);
+  /* Cool palette doesn't want the warm radial; flat surface reads
+     "lab software" cleaner. */
+  background: var(--bg);
 }
 
 a { color: inherit; }
@@ -759,9 +762,10 @@ figcaption {
   margin-top: 3rem;
   padding-top: 3rem;
   padding-bottom: 4rem;
+  /* Subtle cool gradient — slightly more saturated than the page bg */
   background: linear-gradient(to bottom,
     var(--bg) 0%,
-    color-mix(in srgb, var(--bg) 92%, var(--panel-2)) 100%);
+    var(--panel-2) 100%);
 }
 
 .footer-grid {
