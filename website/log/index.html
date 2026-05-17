@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Engineering log — nl2protocol</title>
+<meta name="description" content="Engineering posts about how nl2protocol works under the hood, what's broken inside, and how it gets fixed.">
+
+<meta property="og:title" content="nl2protocol — engineering log">
+<meta property="og:description" content="Engineering posts about how nl2protocol works under the hood, what's broken inside, and how it gets fixed.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://nl2protocol.com/log/">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fdf6e3'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='700' fill='%23073642'%3En2p%3C/text%3E%3Crect x='6' y='23' width='20' height='2' fill='%23268bd2'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="brand" aria-label="nl2protocol home">
+    <span class="brand-mark">nl2protocol</span>
+  </a>
+  <nav class="primary-nav" aria-label="Primary">
+    <a href="/docs/">docs</a>
+    <a href="/limitations/">limitations</a>
+    <a href="/log/" aria-current="page">log</a>
+    <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============================================================
+       PAGE HERO
+       ============================================================ -->
+  <section class="page-hero">
+
+    <p class="page-eyebrow">
+      <span class="back-link"><a href="/">← back to home</a></span>
+      <span class="sep">·</span>
+      <span class="meta-tag">engineering log</span>
+    </p>
+
+    <h1 class="page-title">
+      Engineering log.
+    </h1>
+
+    <p class="page-lede">
+      Posts about how nl2protocol works under the hood, what&rsquo;s broken
+      inside, and what the fix looks like. Architectural drift,
+      contract gaps, design tradeoffs &mdash; the stuff that doesn&rsquo;t
+      belong on the
+      <a href="/limitations/">user-facing limitations page</a>.
+      Written for engineers reading the project who want depth.
+    </p>
+
+  </section>
+
+  <!-- ============================================================
+       POST LIST
+       ============================================================ -->
+  <section class="section docs-class">
+    <h2 class="section-label">Posts</h2>
+
+    <ol class="post-list" role="list">
+
+      <li class="post-item">
+        <article>
+          <header class="post-header">
+            <p class="post-meta">
+              <time datetime="2026-05-17">May 17, 2026</time>
+              <span class="sep">·</span>
+              <span class="post-num">post 01</span>
+              <span class="sep">·</span>
+              <span class="post-reading">~10 min read</span>
+            </p>
+            <h3 class="post-title">
+              <a href="/log/01-architectural-limits/">Architectural limits we know about</a>
+            </h3>
+          </header>
+          <p class="post-excerpt">
+            What&rsquo;s broken inside the implementation: where the spec can
+            be wrong without anyone noticing, why the verifier sometimes
+            flags legitimate citations as fabricated, what gets
+            overwritten when the gap-resolver applies a fix, and which
+            limits are operational versus structural. Catalogued from a
+            session of reading the actual code against the architectural
+            doc.
+          </p>
+        </article>
+      </li>
+
+    </ol>
+
+    <p class="docs-aside" style="margin-top: 2rem;">
+      More posts coming as the implementation evolves. Next likely
+      topics: <em>fixing the wells_provenance schema</em>,
+      <em>what the eval set surfaced</em>,
+      <em>processing the first batch of user-testing feedback</em>.
+    </p>
+
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <span class="brand-mark brand-mark-sm">nl2protocol</span>
+      <span class="dim">v0.3 &middot; alpha</span>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/docs/">documentation</a>
+      <a href="/limitations/">known limitations</a>
+      <a href="/log/">engineering log</a>
+      <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+    </nav>
+    <p class="attribution">
+      Built by <a href="https://github.com/aryan01104" target="_blank" rel="noopener">Aryan Agarwal</a>.
+      Source on <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>

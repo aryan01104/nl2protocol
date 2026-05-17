@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architectural limits we know about — nl2protocol</title>
+<meta name="description" content="What's broken inside nl2protocol's implementation: semantic-correctness gaps, false-positive fabrications, capacity limits, infrastructure shortcuts.">
+
+<meta property="og:title" content="Architectural limits we know about — nl2protocol log">
+<meta property="og:description" content="Catalogued from a session of reading the code against the architecture doc. Semantic correctness, false-positives, capacity, infrastructure.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://nl2protocol.com/log/01-architectural-limits/">
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23fdf6e3'/%3E%3Ctext x='16' y='21' text-anchor='middle' font-family='ui-monospace,monospace' font-size='12' font-weight='700' fill='%23073642'%3En2p%3C/text%3E%3Crect x='6' y='23' width='20' height='2' fill='%23268bd2'/%3E%3C/svg%3E">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="brand" aria-label="nl2protocol home">
+    <span class="brand-mark">nl2protocol</span>
+  </a>
+  <nav class="primary-nav" aria-label="Primary">
+    <a href="/docs/">docs</a>
+    <a href="/limitations/">limitations</a>
+    <a href="/log/" aria-current="page">log</a>
+    <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ============================================================
+       POST HERO
+       ============================================================ -->
+  <section class="page-hero post-hero">
+
+    <p class="page-eyebrow">
+      <span class="back-link"><a href="/log/">← back to log</a></span>
+      <span class="sep">·</span>
+      <time datetime="2026-05-17">May 17, 2026</time>
+      <span class="sep">·</span>
+      <span class="meta-tag">post 01</span>
+    </p>
+
+    <h1 class="page-title post-title-page">
+      Architectural limits we know about.
+    </h1>
+
+    <p class="page-lede">
+      Honest engineering means documenting where the implementation
+      knows it falls short. This post catalogues the architectural
+      limits I&rsquo;ve verified by reading the code against the
+      <a href="https://github.com/aryan01104/nl2protocol/blob/main/docs/PIPELINE.md">architecture doc</a>.
+      Organized in four classes by what kind of limit it is, tagged by
+      whether the fix is on the roadmap, intentional at this scope, an
+      operational constraint, or an infrastructure gap that needs
+      bigger work.
+    </p>
+
+    <p class="docs-para" style="font-style: italic; color: var(--dim);">
+      The motivating frame: <em>publishing this</em> is the differentiator.
+      RAG-based natural-language-to-code tools produce output and hope
+      you don&rsquo;t look closely. The value here is that you can look
+      closely and the system has receipts &mdash; including for the parts
+      that don&rsquo;t work yet.
+    </p>
+
+    <!-- Tag legend (architectural-tag system) -->
+    <dl class="tag-legend" aria-label="Tag meanings">
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-bug">known bug</span></dt>
+        <dd>fix planned; just hasn&rsquo;t landed yet</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-intent">intentional</span></dt>
+        <dd>by design at the current scope; may revisit</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-capacity">capacity</span></dt>
+        <dd>operational limit (rate, concurrency, iteration cap)</dd>
+      </div>
+      <div class="tag-legend-row">
+        <dt><span class="tag tag-infra">infra gap</span></dt>
+        <dd>needs bigger architectural work; not on the immediate roadmap</dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ============================================================
+       CLASS 1 — Semantic correctness
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">01 &middot; Semantic correctness</h2>
+    <p class="class-lede">
+      Cases where the system can produce wrong output even when
+      nothing complains. Load-bearing weaknesses, mitigated only by
+      the visual surface giving you a chance to review extracted
+      state before the pipeline proceeds.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>The spec can be wrong without anyone noticing.</h3>
+        <span class="tag tag-intent">intentional</span>
+      </header>
+      <p>
+        Nothing in the pipeline checks <em>&ldquo;did the LLM extract every
+        step the user asked for, in the right action types?&rdquo;</em>
+        If the LLM silently drops a step or misclassifies one, the
+        orchestrator and constraint checker see a smaller, well-formed
+        spec and won&rsquo;t object. The visual surface (column 2,
+        extracted spec) exists specifically so you can catch this before
+        the pipeline runs further. The user&rsquo;s eye is the only check.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> an automated
+        retry-with-feedback loop at extraction time would cost real
+        tokens and may not improve precision enough to justify until
+        we have an eval set to measure against.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Citation disambiguation is not handled.</h3>
+        <span class="tag tag-intent">intentional</span>
+      </header>
+      <p>
+        If your instruction contains the substring <code>&ldquo;100uL&rdquo;</code>
+        multiple times in different roles (e.g.
+        <code>&ldquo;Add 100uL of sample, then mix at 100uL volume&rdquo;</code>),
+        the LLM picks one occurrence as the cite and the verifier
+        trusts that pick. There&rsquo;s no formal check that the cited
+        instance is the right instance.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> a positional cite
+        format (cite by character offset instead of substring) would
+        eliminate the class entirely. Real schema change.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Null fields carry no provenance.</h3>
+        <span class="tag tag-intent">intentional</span>
+      </header>
+      <p>
+        A populated value carries a provenance object. A null value
+        carries nothing. So <code>step.source = None</code> could mean
+        <em>&ldquo;the LLM correctly inferred there was no source mentioned&rdquo;</em>
+        or <em>&ldquo;the LLM forgot to extract a source that was actually
+        there.&rdquo;</em> Both look identical to downstream stages.
+        Mitigated by the orchestrator&rsquo;s gap detectors flagging
+        missing <em>required</em> fields, so protocols-with-required-source
+        aren&rsquo;t silently broken &mdash; but truly-optional null fields
+        are unauditable.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> a separate
+        <code>OmittedField</code> Provenance subtype that carries the
+        reasoning for the null. Modest schema addition.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>No semantic-equivalence check between spec and generated script.</h3>
+        <span class="tag tag-intent">intentional</span>
+      </header>
+      <p>
+        The Opentrons simulator catches code-execution problems
+        (loading failures, well-out-of-range, pipette mismatch). It
+        does <em>not</em> validate that the script does what the user
+        asked for. The user&rsquo;s eye is the final arbiter on intent
+        fidelity.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 2 — Known false-positives
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">02 &middot; Known false-positives</h2>
+    <p class="class-lede">
+      Verifier complaints that fire on legitimate extractions. Annoying
+      when you hit them; the root causes are tracked.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Spread-citation wells trigger spurious fabrication warnings.</h3>
+        <span class="tag tag-bug">known bug</span>
+      </header>
+      <p>
+        <code>LocationRef.wells</code> is a list, but
+        <code>LocationRef.wells_provenance</code> is ONE Provenance for
+        the whole list. The verifier checks each well against any cite
+        entry via substring match. When wells extracted from
+        multi-bullet instructions have cites that don&rsquo;t literally
+        name each well, false-positive fabrication fires per missing
+        well. The detector deduplicates these into one Gap, but the
+        gap modal&rsquo;s &ldquo;Current:&rdquo; label shows the last
+        offending element instead of the full field state.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> migrate
+        <code>wells_provenance</code> from one Provenance to
+        <code>List[Provenance]</code> aligned with <code>wells</code>.
+        Per-well grounding, per-well verification. Cascading schema
+        change &mdash; touches the extractor prompt, the verifier, the
+        apply layer, and the visual surface. Highest-impact fix on the
+        roadmap.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Citation values that don&rsquo;t literally appear in the cite text.</h3>
+        <span class="tag tag-bug">known bug</span>
+      </header>
+      <p>
+        Substring matching, no semantic understanding. Cite says
+        <code>&ldquo;top row&rdquo;</code>, value is <code>A1</code>
+        &rarr; false positive. Synonyms, paraphrases, abbreviations all
+        hit this. Fix requires either per-element cite alignment (see
+        the wells fix above) or a semantic check; both non-trivial.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Confidence gets overwritten on fabrication-gap accept.</h3>
+        <span class="tag tag-bug">known bug</span>
+      </header>
+      <p>
+        When you click <strong>Accept</strong> on a fabrication gap,
+        the system restates the provenance as <code>source=&ldquo;inferred&rdquo;</code>
+        with the suggester&rsquo;s reasoning. The architecture doc says
+        <em>&ldquo;value untouched.&rdquo;</em> But the code also overwrites
+        <code>confidence</code> with the suggester&rsquo;s confidence
+        &mdash; the user endorsed the reasoning, not necessarily the
+        suggester&rsquo;s confidence calibration. Unauthorized rewrite.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> one-line code
+        change &mdash; preserve the existing confidence and only update
+        source/reasoning/review_status. Trivial.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 3 — Capacity limits
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">03 &middot; Capacity limits</h2>
+    <p class="class-lede">
+      Operational limits on the live demo at <code>nl2protocol.com</code>.
+      Lift each by deploying on heavier infrastructure; intentional for
+      a portfolio-scale free demo.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>One pipeline at a time, demo-wide.</h3>
+        <span class="tag tag-capacity">capacity</span>
+      </header>
+      <p>
+        The live demo runs on a single small Fly machine; pipeline
+        state is per-process. If someone&rsquo;s mid-run when you hit
+        Start, you get a <em>&ldquo;demo busy, try in a few
+        minutes&rdquo;</em> page. Lifting this requires session-keyed
+        thread bridges and a worker queue.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>5 pipeline runs per IP per hour.</h3>
+        <span class="tag tag-capacity">capacity</span>
+      </header>
+      <p>
+        Per-IP rate limit on <code>POST /start</code>. Defense in
+        depth on top of bring-your-own-key &mdash; even though
+        visitors pay their own Anthropic costs, we don&rsquo;t want a bot
+        to exhaust the demo machine&rsquo;s CPU. Plenty of headroom for
+        a real human clicking around.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Gap-resolution loop caps at 3 iterations.</h3>
+        <span class="tag tag-capacity">capacity</span>
+      </header>
+      <p>
+        The orchestrator&rsquo;s detect &rarr; suggest &rarr; review
+        &rarr; apply loop runs at most 3 passes. If gaps still remain,
+        the pipeline halts with an error. In practice convergence
+        happens in 1 pass for most protocols; the cap is a safety net
+        against pathological loops.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLASS 4 — Infrastructure gaps
+       ============================================================ -->
+  <section class="section limit-class">
+    <h2 class="section-label">04 &middot; Infrastructure gaps</h2>
+    <p class="class-lede">
+      Architectural shortcuts taken to ship a working portfolio demo.
+      Each is real and will need to be addressed before any paid /
+      multi-user deployment.
+    </p>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Single-user assumption baked into the live-mode model.</h3>
+        <span class="tag tag-infra">infra gap</span>
+      </header>
+      <p>
+        The thread-bridge between the orchestrator and the browser
+        confirmation handler assumes one pipeline per process. Two
+        concurrent users would race for the bridge. The single-pipeline
+        lock prevents this from breaking, but a multi-user shape
+        requires session-keyed bridges &mdash; a real refactor.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>No persistence.</h3>
+        <span class="tag tag-infra">infra gap</span>
+      </header>
+      <p>
+        Pipeline state lives in memory during a run; static HTML
+        reports are written to the local disk on the Fly machine.
+        Cloud-scale deployment needs a database for run history and
+        object storage for artifacts.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>No authentication.</h3>
+        <span class="tag tag-infra">infra gap</span>
+      </header>
+      <p>
+        Bring-your-own-key is the only access-control mechanism today.
+        Anyone with an Anthropic key can run the demo. Acceptable at
+        portfolio scale; not at paid-tier scale.
+      </p>
+    </article>
+
+    <article class="limit">
+      <header class="limit-header">
+        <h3>Stage 4 confirmations are only logged to state_log on abort.</h3>
+        <span class="tag tag-bug">known bug</span>
+      </header>
+      <p>
+        The three pre-orchestrator confirmation modals (initial
+        contents, source containers, labware assignments) write a
+        state_log entry only when the user aborts. On success, the
+        downstream spec reflects their choices but no audit-trail
+        entry records what they kept versus edited. Audit gap.
+      </p>
+      <p class="limit-fix">
+        <strong>What fixing this looks like:</strong> three lines per
+        modal &mdash; after each successful confirmation, write
+        <code>state_log[&ldquo;stage_2_5_&lt;modal&gt;_confirmed&rdquo;] = &lt;choices&gt;</code>.
+        Trivial.
+      </p>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       CLOSER — turn the documentation into a roadmap
+       ============================================================ -->
+  <section class="section page-closer">
+    <h2 class="section-label">What this becomes</h2>
+    <p class="closer-lede">
+      Each item above is also a roadmap entry. The
+      <code>known bug</code>-tagged ones are sized by how invasive
+      the fix is: trivial (confidence overwrite, state_log additions),
+      medium (per-element cite alignment for non-wells fields),
+      cascading (the wells_provenance schema migration). The
+      <code>intentional</code> ones are dial-tuning calls that get
+      revisited as the project shape changes. The
+      <code>infra gap</code> ones unlock with deploy shape decisions
+      (multi-user, paid).
+    </p>
+    <p class="closer-lede" style="margin-top: 1rem;">
+      The function-level trace of stages 5-7 (where most of these
+      live) is in the
+      <a href="https://github.com/aryan01104/nl2protocol/blob/main/docs/GAP_LIFECYCLE.md">GAP_LIFECYCLE.md</a>
+      doc with three Mermaid sequence diagrams &mdash; the work this
+      post came out of.
+    </p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <span class="brand-mark brand-mark-sm">nl2protocol</span>
+      <span class="dim">v0.3 &middot; alpha</span>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <a href="/docs/">documentation</a>
+      <a href="/limitations/">known limitations</a>
+      <a href="/log/">engineering log</a>
+      <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">github <span class="ext">↗</span></a>
+    </nav>
+    <p class="attribution">
+      Built by <a href="https://github.com/aryan01104" target="_blank" rel="noopener">Aryan Agarwal</a>.
+      Source on <a href="https://github.com/aryan01104/nl2protocol" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
