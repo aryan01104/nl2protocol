@@ -309,8 +309,11 @@ main > section,
   transform: translateY(0);
 }
 
-/* Tooltip text may be long; allow wrapping when needed */
-.cite[data-prov*=" "]:hover::after {
+/* Tooltip text may be long; allow wrapping when needed. Includes
+   :focus and :focus-visible so keyboard users get the same wrap. */
+.cite[data-prov*=" "]:hover::after,
+.cite[data-prov*=" "]:focus::after,
+.cite[data-prov*=" "]:focus-visible::after {
   white-space: normal;
   max-width: 320px;
 }
@@ -939,6 +942,7 @@ figcaption {
 /* ---------- Reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after {
     animation-duration: 0ms !important;
     transition-duration: 0ms !important;
