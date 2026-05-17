@@ -663,7 +663,16 @@ main > section,
 /* ---------- Figure ---------- */
 
 .figure {
-  /* Wider than text column — let the screenshot breathe */
+  /* Wider than text column — let the screenshot breathe.
+     On large viewports, break out of the page max-width and span
+     ~75% of the viewport. Capped at 1700px so ultrawide monitors
+     don't make the image absurdly large. min() floor keeps the
+     figure at the default page-width on smaller viewports so this
+     override never NARROWS the figure. */
+}
+
+main > section.figure {
+  max-width: min(max(var(--width-page), 75vw), 1700px);
 }
 
 .screenshot {
