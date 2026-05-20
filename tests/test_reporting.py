@@ -1244,6 +1244,39 @@ class TestRenderInstructionWithMarks:
         # The shared segment carries both ids in one data-cite-id attribute.
         assert 'data-cite-id="long short"' in out or 'data-cite-id="short long"' in out
 
+    def test_atomic_color_target_emits_palette_class_on_cite_span(self):
+        # Regression: PDF p.3 hover-flip-invisible bug. atomic-color targets
+        # carry palette_class; the sweep-line layer must preserve it so the
+        # emitted <span> gets `palette-N`. Without that class, the strong-flip
+        # CSS (.cite-marker.cite-atomic-color.palette-N.cite-active) never
+        # matches and only the faint .cite-active fallback shows.
+        targets = [
+            {
+                "prov_id": "s0-volume",
+                "cited_text": "100uL",
+                "kind": "atomic-color",
+                "palette_class": "palette-3",
+            }
+        ]
+        out = _render_instruction_with_marks("Transfer 100uL from A1.", targets)
+        assert 'data-cite-id="s0-volume"' in out
+        assert "palette-3" in out
+
+    def test_non_atomic_color_target_does_not_emit_palette_class(self):
+        # composite-step kind never carries a palette (composite uses its
+        # own cite-composite-step styling). palette_class either absent or
+        # set to None → no palette-N class on the span.
+        targets = [
+            {
+                "prov_id": "s0-step-trigger",
+                "cited_text": "Transfer 100uL",
+                "kind": "composite-step",
+            }
+        ]
+        out = _render_instruction_with_marks("Transfer 100uL from A1.", targets)
+        assert 'data-cite-id="s0-step-trigger"' in out
+        assert "palette-" not in out
+
 
 class TestCollectArrowTargets:
     """_collect_arrow_targets walks a spec and produces a list of

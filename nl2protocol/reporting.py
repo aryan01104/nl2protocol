@@ -548,6 +548,13 @@ def _render_instruction_with_marks(instruction: str, targets: list) -> str:
             "prov_id": t["prov_id"],
             "kind": t["kind"],
             "step_id": t.get("step_id"),
+            # Carry palette_class through to the sweep-line layer so
+            # _wrap_overlapping_segment can emit `.palette-N` on the cite
+            # <span>. Without this, the cite-side hover-flip CSS rule
+            # (.cite-marker.cite-atomic-color.palette-N.cite-active) never
+            # matches, leaving only the faint .cite-active fallback —
+            # the visual-attribution-invisible bug from PDF p.3.
+            "palette_class": t.get("palette_class"),
         })
 
     if not spans:
