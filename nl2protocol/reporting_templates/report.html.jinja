@@ -4,40 +4,110 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>nl2protocol report — {{ timestamp }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
   /* ───────── Layout ───────── */
   :root {
-    --col-instruction: #e63946;   /* vivid red, arrow color */
-    --col-config:      #9d4edd;   /* purple, reserved for labware-resolver viz */
-    --col-domain:      #ffb703;   /* gold */
-    --col-inferred:    #fb8500;   /* orange */
-    --bg:              #fdf6e3;   /* warm off-white */
-    --indicator-tan:   #b08846;   /* live-mode progress indicator */
-    --panel:           #ffffff;
-    --ink:             #1a1a1a;
-    --dim:             #6b6b6b;
-    --grid:            #e5e0d4;
+    /* ───────── Semantic provenance hues ─────────
+       Aligned with website palette (cool slate + Tailwind 600s).
+       Mapping:
+         instruction → blue-600   (was red — semantic moved to disagree)
+         config      → indigo-600 (kept distinct from domain)
+         domain      → amber-600
+         inferred    → orange-600
+       Red now carries one meaning project-wide: reviewer-disagree. */
+    --col-instruction: #2563eb;
+    --col-config:      #4f46e5;
+    --col-domain:      #d97706;
+    --col-inferred:    #ea580c;
 
-    /* Per-citation palette (8 vivid, distinguishable hues). Each unique
-       cited_text in the instruction hashes to one slot; both the cite
-       span (instruction column) and the atomic value span (spec column)
-       share the hue. Saturated for legibility against the off-white
-       background — designed to be picked out at a glance. */
-    --palette-0: #c1272d;   /* deep red */
-    --palette-1: #e76f1c;   /* burnt orange */
-    --palette-2: #c79100;   /* mustard */
-    --palette-3: #4f8a2b;   /* leaf green */
-    --palette-4: #168a8a;   /* teal */
-    --palette-5: #1f5fa6;   /* deep blue */
-    --palette-6: #5d3fa8;   /* indigo */
-    --palette-7: #b62f7a;   /* magenta */
+    /* ───────── Surfaces (Notion off-white + slate ink, per website) ───────── */
+    --bg:              #f7f6f3;
+    --panel:           #ffffff;
+    --ink:             #0f172a;   /* slate-900                       */
+    --dim:             #475569;   /* slate-600                       */
+    --grid:            #e2e8f0;   /* slate-200 — borders             */
+    --rule:            #cbd5e1;   /* slate-300 — stronger separators */
+
+    /* ───────── Typography (IBM Plex Sans body, JetBrains Mono code) ───────── */
+    --font-body:  "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
+                  Consolas, monospace;
+
+    /* ───────── Action buttons (slate-ink primary, slate-300 outline) ───────── */
+    --btn-primary:           #0f172a;   /* matches --ink              */
+    --btn-primary-fg:        #ffffff;
+    --btn-secondary-border:  #cbd5e1;   /* slate-300                  */
+
+    /* ───────── Status pills (Tailwind 100 bg / 800 fg pairs) ───────── */
+    --status-success-bg:  #dcfce7;
+    --status-success-fg:  #166534;
+    --status-error-bg:    #fee2e2;
+    --status-error-fg:    #991b1b;
+    --status-warn-bg:     #fef3c7;
+    --status-warn-fg:     #92400e;
+    --status-neutral-bg:  #f1f5f9;
+    --status-neutral-fg:  #475569;
+
+    /* ───────── Modal / panel chrome (slate-100 header, slate-200 hover) ───────── */
+    --modal-header-bg:        #f1f5f9;
+    --panel-header-hover-bg:  #e2e8f0;
+    --panel-empty-text:       #94a3b8;   /* slate-400                 */
+
+    /* ───────── Warning chrome (amber family) ───────── */
+    --warning-bg:        #fef3c7;   /* amber-100                     */
+    --warning-text:      #78350f;   /* amber-900                     */
+    --warning-accent:    #d97706;   /* amber-600 (= --col-domain)    */
+
+    /* ───────── Live-mode stage indicator (amber working, green done) ───────── */
+    --indicator-tan:     #d97706;
+    --indicator-done:    #16a34a;
+
+    /* ───────── Reviewer-disagree wash (red-100) ───────── */
+    --disagree-bg:       #fee2e2;
+
+    /* ───────── Resolution-arrow colors ───────── */
+    --res-auto-accepted:        #16a34a;   /* green-600  */
+    --res-user-accepted:        #15803d;   /* green-700  */
+    --res-user-edited:          #2563eb;   /* blue-600   */
+    --res-user-confirmed:       #94a3b8;   /* slate-400  */
+
+    /* ───────── Inline-check pill (green family) ───────── */
+    --check-pill-fg:     #166534;   /* green-800                      */
+    --check-pill-glyph:  #16a34a;   /* green-600                      */
+
+    /* ───────── Hover tooltip (slate-950 surface) ───────── */
+    --tip-bg:            #020617;   /* slate-950                     */
+    --tip-fg:            #f8fafc;   /* slate-50                      */
+    --tip-dim:           #cbd5e1;   /* slate-300                     */
+    --tip-cite-quote:    #fbbf24;   /* amber-400 (warm on dark)      */
+    --tip-reasoning:     #e2e8f0;   /* slate-200                     */
+
+    /* ───────── Per-citation palette (8 hues, Tailwind 600 family) ─────────
+       Each unique cited_text in the instruction hashes to one slot;
+       both the cite span (instruction column) and the atomic value
+       span (spec column) share the hue. Uniform saturation level
+       across the family for visual coherence. */
+    --palette-0: #dc2626;   /* red-600     */
+    --palette-1: #ea580c;   /* orange-600  */
+    --palette-2: #d97706;   /* amber-600   */
+    --palette-3: #16a34a;   /* green-600   */
+    --palette-4: #0d9488;   /* teal-600    */
+    --palette-5: #2563eb;   /* blue-600    */
+    --palette-6: #7c3aed;   /* violet-600  */
+    --palette-7: #db2777;   /* pink-600    */
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    font: 14px/1.55 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   header {
     padding: 24px 32px 16px;
@@ -74,11 +144,18 @@
      adds cross-column arrows showing each value's resolution journey. */
   .grid {
     display: grid;
-    /* Instruction column capped at a prose-readable width (≤640px,
-       ~66 chars/line per Bringhurst). Other columns absorb the remaining
-       width via their fr shares. Min 420px so it doesn't collapse on
-       narrow viewports. */
-    grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr;
+    /* Each column is capped so the report stays scannable at wide
+       viewports — column lines are unread above ~640px (prose) /
+       ~600px (spec) / ~720px (code). Without the caps, on a 2K
+       monitor the extracted spec would span the entire width of
+       what should be a 5-column comparison view (CARRY-F2, PDF
+       p.1). Mins keep each column readable when the viewport
+       is narrow; defaults below get applied for each cols-N
+       variant the live-mode gating reveals incrementally. */
+    grid-template-columns:
+      minmax(420px, 640px)
+      minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px)
+      minmax(380px, 720px);
     gap: 14px;
     padding: 24px 32px;
     min-height: calc(100vh - 200px);
@@ -90,10 +167,10 @@
      so hidden columns don't leave empty tracks. The instruction-column
      cap is preserved in every reveal state. */
   .grid.cols-1 { grid-template-columns: minmax(420px, 640px); }
-  .grid.cols-2 { grid-template-columns: minmax(420px, 640px) 1.15fr; }
-  .grid.cols-3 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr; }
-  .grid.cols-4 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr; }
-  .grid.cols-5 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr; }
+  .grid.cols-2 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px); }
+  .grid.cols-3 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px); }
+  .grid.cols-4 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px); }
+  .grid.cols-5 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px) minmax(380px, 720px); }
   .col.is-pending { display: none; }
   .col {
     background: var(--panel);
@@ -162,7 +239,7 @@
     content: "⚠";
     margin-left: 3px;
     font-size: 10px;
-    color: var(--col-instruction);
+    color: var(--status-error-fg);
     vertical-align: super;
     font-weight: 700;
   }
@@ -170,7 +247,7 @@
     content: "✎";
     margin-left: 3px;
     font-size: 11px;
-    color: #1f5fa6;
+    color: var(--res-user-edited);
     vertical-align: baseline;
   }
 
@@ -195,19 +272,19 @@
      The flip is done by overriding text color and adding a strong bg
      of the same palette hue. Per-palette contrast is hardcoded — chosen
      once for legibility, not computed. */
-  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: #1a1a1a; }
-  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: var(--ink); }
+  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: var(--panel); }
 
   /* ───────── Instruction column ───────── */
   .instruction-text {
     white-space: pre-wrap;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-body);
     font-size: 14px;
     line-height: 1.6;
   }
@@ -238,7 +315,7 @@
   .step-detail {
     margin-left: 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--ink);
   }
   .step-detail .label { color: var(--dim); margin-right: 4px; }
   /* Footnote inside a step block — used for the `note` field on
@@ -267,8 +344,8 @@
     margin-left: 8px;
     padding: 1px 6px;
     border-radius: 2px;
-    background: rgba(79, 138, 43, 0.08);
-    color: #2d5d2b;
+    background: color-mix(in srgb, var(--check-pill-glyph) 8%, transparent);
+    color: var(--check-pill-fg);
     font-size: 11px;
     font-style: normal;
     white-space: nowrap;
@@ -276,7 +353,7 @@
   }
   .inline-check::before {
     content: "\2713 ";   /* ✓ */
-    color: #4f8a2b;
+    color: var(--check-pill-glyph);
     font-weight: 700;
   }
   .col.checks-hidden .inline-check { display: none; }
@@ -295,29 +372,29 @@
     color: var(--dim);
   }
   .checks-toggle-btn {
-    background: rgba(79, 138, 43, 0.08);
-    border: 1px solid rgba(79, 138, 43, 0.4);
-    color: #2d5d2b;
+    background: color-mix(in srgb, var(--check-pill-glyph) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--check-pill-glyph) 40%, transparent);
+    color: var(--check-pill-fg);
     padding: 3px 9px;
     border-radius: 3px;
     font: inherit;
     cursor: pointer;
   }
-  .checks-toggle-btn:hover { background: rgba(79, 138, 43, 0.15); }
+  .checks-toggle-btn:hover { background: color-mix(in srgb, var(--check-pill-glyph) 15%, transparent); }
 
   /* P1-9: per-step constraint warning, rendered inline at the bottom
      of the step row in the validated-spec column. Tan left-border +
-     subtle background tint matches the WARNING legend color
-     (`#b08846`) added in Task #8. Slightly larger font than the
-     global summary list to address the "very small text" feedback. */
+     subtle background tint matches the WARNING legend color added
+     in Task #8. Slightly larger font than the global summary list
+     to address the "very small text" feedback. */
   .step-warning {
     margin-top: 8px;
     padding: 6px 10px;
-    border-left: 3px solid #b08846;
-    background: #fdf3df;
+    border-left: 3px solid var(--warning-accent);
+    background: var(--warning-bg);
     font-size: 13px;
     line-height: 1.45;
-    color: #5a4a1f;
+    color: var(--warning-text);
     border-radius: 2px;
   }
   .step-warning-line {
@@ -329,18 +406,18 @@
   .step-warning-line + .step-warning-line {
     margin-top: 4px;
     padding-top: 4px;
-    border-top: 1px solid rgba(176, 136, 70, 0.25);
+    border-top: 1px solid color-mix(in srgb, var(--warning-accent) 25%, transparent);
   }
 
   /* ───────── Code column ───────── */
   pre.code {
     margin: 0;
-    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.45;
     white-space: pre;
     overflow-x: auto;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   /* Phase 3i (#72): per-line spans inside <pre.code>. Each <span> ends
      in a literal newline so the <pre> still wraps line-by-line. The
@@ -407,7 +484,7 @@
     border-radius: 2px;
   }
   .step.step-active {
-    background: rgba(184, 68, 79, 0.06);
+    background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     border-left-color: var(--col-instruction);
   }
 
@@ -447,9 +524,9 @@
   }
   .validated-summary.is-empty { display: none; }
   .validated-summary-line { color: var(--ink); }
-  .validated-summary-line.all-clear { border-left: 3px solid #4f8a2b; padding-left: 6px; }
-  .validated-summary-line.has-warnings { border-left: 3px solid #b08846; padding-left: 6px; }
-  .validated-summary-line.has-errors { border-left: 3px solid var(--col-instruction); padding-left: 6px; }
+  .validated-summary-line.all-clear { border-left: 3px solid var(--check-pill-glyph); padding-left: 6px; }
+  .validated-summary-line.has-warnings { border-left: 3px solid var(--warning-accent); padding-left: 6px; }
+  .validated-summary-line.has-errors { border-left: 3px solid var(--status-error-fg); padding-left: 6px; }
   .validated-summary-warnings {
     margin: 6px 0 0;
     padding-left: 18px;
@@ -501,25 +578,25 @@
      marks it .prov-active), the cell fills with its color and the text
      flips to white/black for contrast. Same visual language on both
      sides of the cite ↔ value pair. */
-  span.palette-0.prov-active, span.palette-0.prov-spotlight, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-1.prov-active, span.palette-1.prov-spotlight, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-2.prov-active, span.palette-2.prov-spotlight, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: #1a1a1a;  outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-3.prov-active, span.palette-3.prov-spotlight, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-4.prov-active, span.palette-4.prov-spotlight, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-5.prov-active, span.palette-5.prov-spotlight, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-6.prov-active, span.palette-6.prov-spotlight, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-7.prov-active, span.palette-7.prov-spotlight, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-0.prov-active, span.palette-0.prov-spotlight, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-1.prov-active, span.palette-1.prov-spotlight, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-2.prov-active, span.palette-2.prov-spotlight, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-3.prov-active, span.palette-3.prov-spotlight, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-4.prov-active, span.palette-4.prov-spotlight, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-5.prov-active, span.palette-5.prov-spotlight, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-6.prov-active, span.palette-6.prov-spotlight, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-7.prov-active, span.palette-7.prov-spotlight, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* Non-instruction sources without palette: use their categorical hue. */
-  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: #1a1a1a; outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* Instruction-sourced spans WITHOUT a palette (cite not recoverable):
      fall back to instruction-red. Spans WITH a palette take the palette
      rules above (later in the cascade with the same specificity, so
      palette wins by source order). */
-  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* ───────── ADR-0011 Phase 2b/4 polish: ✗ placeholder cells ─────────
      For action-expected fields that are null on the step, the renderer
@@ -540,9 +617,9 @@
   .cell-empty.prov-active,
   .cell-empty.prov-spotlight,
   .cell-empty[data-prov-id]:hover {
-    background: rgba(184, 68, 79, 0.08);
+    background: color-mix(in srgb, var(--status-error-fg) 8%, transparent);
     border-radius: 2px;
-    outline: 1px solid rgba(184, 68, 79, 0.35);
+    outline: 1px solid color-mix(in srgb, var(--status-error-fg) 35%, transparent);
     outline-offset: 1px;
   }
 
@@ -552,8 +629,8 @@
     z-index: 100;
     max-width: 360px;
     padding: 10px 12px;
-    background: #2a2a2a;
-    color: #f5f5f5;
+    background: var(--tip-bg);
+    color: var(--tip-fg);
     font-size: 12px;
     line-height: 1.45;
     border-radius: 4px;
@@ -565,7 +642,7 @@
   }
   #hover-tip.visible { opacity: 1; }
   #hover-tip .tip-meta {
-    color: #b8b8b8;
+    color: var(--tip-dim);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -573,10 +650,10 @@
   }
   #hover-tip .tip-cite {
     font-style: italic;
-    color: #ffd9c2;
+    color: var(--tip-cite-quote);
     margin-bottom: 6px;
   }
-  #hover-tip .tip-reasoning { color: #f0f0f0; }
+  #hover-tip .tip-reasoning { color: var(--tip-reasoning); }
   #hover-tip .tip-section { margin-top: 8px; }
   /* Indented blockquote of the step's cited text. The left bar uses the
      step-trigger color (vivid red for instruction grounding) so readers
@@ -586,7 +663,7 @@
     margin: 8px 0 0;
     padding: 4px 0 4px 10px;
     border-left: 3px solid var(--col-instruction);
-    color: #ffd9c2;
+    color: var(--tip-cite-quote);
     font-style: italic;
     line-height: 1.4;
   }
@@ -604,8 +681,8 @@
   #hover-tip .tip-objection {
     margin: 8px 0 0;
     padding: 4px 0 4px 10px;
-    border-left: 3px solid var(--col-instruction);
-    color: #ffd9c2;
+    border-left: 3px solid var(--status-error-fg);
+    color: var(--tip-cite-quote);
     font-style: italic;
     line-height: 1.4;
   }
@@ -614,7 +691,8 @@
      The overlay hosts TWO arrow categories:
        - Composite-step arrows (instruction → extracted spec block).
          Reserved for step-existence grounding; existing pre-Phase-2b
-         language. Default red (--col-instruction).
+         language. Stroke is var(--col-instruction) so the arrow hue
+         tracks the instruction-source provenance token.
        - Resolution arrows (extracted spec atomic value → resolved
          spec atomic value). One per gap_resolved event with a
          drawable resolution_kind. Per ADR-0011 Phase 2b. Color-coded
@@ -654,10 +732,10 @@
     stroke-opacity: 0.9;
     stroke-width: 3;
   }
-  #arrow-overlay path.res-auto_accepted            { stroke: #4f8a2b; }  /* leaf green */
-  #arrow-overlay path.res-user_accepted_suggestion { stroke: #6b8e3d; }  /* gray-green */
-  #arrow-overlay path.res-user_edited              { stroke: #1f5fa6; }  /* deep blue */
-  #arrow-overlay path.res-user_confirmed           { stroke: #6b6b6b; }  /* dim gray */
+  #arrow-overlay path.res-auto_accepted            { stroke: var(--res-auto-accepted); }
+  #arrow-overlay path.res-user_accepted_suggestion { stroke: var(--res-user-accepted); }
+  #arrow-overlay path.res-user_edited              { stroke: var(--res-user-edited); }
+  #arrow-overlay path.res-user_confirmed           { stroke: var(--res-user-confirmed); }
 
   /* ───────── ADR-0011 Phase 2c: confirmation summary panels ─────────
      Two read-only audit tables rendered below the 5-col grid:
@@ -685,11 +763,11 @@
     cursor: pointer;
     padding: 10px 14px;
     user-select: none;
-    background: #faf6e8;
+    background: var(--modal-header-bg);
     border-bottom: 1px solid var(--grid);
     transition: background 0.15s;
   }
-  .panel-header:hover { background: #f3edd6; }
+  .panel-header:hover { background: var(--panel-header-hover-bg); }
   .panel-chevron {
     font-size: 11px;
     color: var(--dim);
@@ -706,7 +784,7 @@
     color: var(--dim);
     font-weight: 500;
   }
-  .panel.is-empty .panel-count { color: #b9b3a4; }
+  .panel.is-empty .panel-count { color: var(--panel-empty-text); }
   .panel-body {
     padding: 12px 16px 14px;
     max-height: 400px;
@@ -748,18 +826,18 @@
     letter-spacing: 0.04em;
   }
   .panel td.col-volume {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-family: var(--font-mono);
     text-align: right;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel td.col-substance,
   .panel td.col-description {
     font-style: italic;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel td.col-label {
     font-weight: 500;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel .empty {
     color: var(--dim);
@@ -771,7 +849,7 @@
      via the existing data-prov-id system. */
   .panel tbody tr[data-target-cells]:hover,
   .panel tbody tr.row-active {
-    background: rgba(184, 68, 79, 0.06);
+    background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     cursor: help;
   }
 
@@ -787,7 +865,7 @@
     top: 18px;
     right: 22px;
     z-index: 1100;
-    font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    font: 13px/1.35 var(--font-body);
     color: var(--indicator-tan);
     text-align: right;
     user-select: none;
@@ -810,7 +888,7 @@
   }
   #live-stage-indicator.is-done .indicator-dot {
     animation: none;
-    background: #4f8a2b;
+    background: var(--indicator-done);
   }
   #live-stage-indicator .indicator-line-sub {
     font-size: 12px;
@@ -856,7 +934,7 @@
   <h1>nl2protocol</h1>
   <div class="meta">
     {{ timestamp }} ·
-    {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+    {% if success %}<strong style="color:var(--status-success-fg)">success</strong>{% else %}<strong style="color:var(--status-error-fg)">failed</strong>{% endif %}
     {% if prov_stats and prov_stats.total %}
       · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
     {% endif %}
@@ -882,21 +960,21 @@
   <div class="live-controls" style="margin-top: 10px; padding: 12px 14px; border: 1px solid var(--grid); border-radius: 6px; background: var(--panel); display: flex; flex-direction: column; gap: 10px;">
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <label for="live-example-select" style="font-size: 13px; color: var(--ink);">Protocol:</label>
-      <select id="live-example-select" style="font: 13px -apple-system, sans-serif; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 220px;">
+      <select id="live-example-select" style="font: 13px var(--font-body); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 220px;">
         <option value="">— choose —</option>
       </select>
       <span style="color: var(--dim); font-size: 12px;">or</span>
-      <button type="button" id="live-upload-toggle" style="font: 13px -apple-system, sans-serif; padding: 5px 10px; border: 1px solid #c0c0c0; background: white; cursor: pointer; border-radius: 4px;">Upload your own…</button>
+      <button type="button" id="live-upload-toggle" style="font: 13px var(--font-body); padding: 5px 10px; border: 1px solid var(--btn-secondary-border); background: var(--panel); cursor: pointer; border-radius: 4px;">Upload your own…</button>
     </div>
-    <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: #faf6e8; border-radius: 4px;">
+    <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: var(--modal-header-bg); border-radius: 4px;">
       <label style="font-size: 12px; color: var(--ink);">Instruction (.txt): <input type="file" id="live-instruction-file" accept=".txt,.md,text/plain" style="font-size: 12px;"></label>
       <label style="font-size: 12px; color: var(--ink);">Config (.json): <input type="file" id="live-config-file" accept=".json,application/json" style="font-size: 12px;"></label>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <label for="live-api-key" style="font-size: 13px; color: var(--ink);">Anthropic key:</label>
-      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px ui-monospace, 'SF Mono', Menlo, monospace; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 280px;">
-      <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
-      <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
+      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px var(--font-mono); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 280px;">
+      <button id="live-start-btn" style="font: 14px var(--font-body); padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
+      <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: var(--status-success-bg); color: var(--status-success-fg);">idle</span>
     </div>
     <div style="color: var(--dim); font-size: 11px; line-height: 1.5;">
       Your key is used only for this request and never stored. Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.
@@ -908,11 +986,11 @@
        assignments modal — typically just a list + 2 buttons. -->
   <div id="live-binary-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.30); z-index: 1050; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 10px 32px rgba(0,0,0,0.22); width: min(520px, 92vw); max-height: 80vh; overflow-y: auto; font-size: 13px;">
-      <div id="live-binary-title" style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;"></div>
+      <div id="live-binary-title" style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;"></div>
       <div id="live-binary-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-binary-no" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">No</button>
-        <button id="live-binary-yes" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Yes</button>
+        <button id="live-binary-no" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">No</button>
+        <button id="live-binary-yes" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Yes</button>
       </div>
     </div>
   </div>
@@ -924,7 +1002,7 @@
        1 of 3 in the post-extraction confirmation sequence. -->
   <div id="live-ic-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
-      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
         Confirm initial contents
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 1 of 3 · accept defaults or edit any row</span>
       </div>
@@ -933,8 +1011,8 @@
       </div>
       <div id="live-ic-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-ic-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
-        <button id="live-ic-confirm" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+        <button id="live-ic-abort" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-ic-confirm" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
       </div>
     </div>
   </div>
@@ -946,23 +1024,23 @@
        JS in initLiveMode wires up populate + submit. -->
   <div id="live-assignments-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
-      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
         Confirm labware assignments
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 3 of 3 · change any row, or confirm to accept all</span>
       </div>
       <div id="live-assignments-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-assignments-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
-        <button id="live-assignments-confirm" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+        <button id="live-assignments-abort" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-assignments-confirm" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
       </div>
     </div>
   </div>
   <!-- ADR-0013 Phase 3c: gap-prompt modal. Hidden until a panel_request
        arrives over the WebSocket. Anchored bottom-right per ADR-0013. -->
   <div id="live-panel" style="display: none; position: fixed; right: 24px; bottom: 24px; width: 380px; max-height: 70vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 1000; font-size: 13px;">
-    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
       <span id="live-panel-title">Confirm gap</span>
-      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: #f0e6d2; color: var(--dim); font-weight: 500;"></span>
+      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: var(--status-neutral-bg); color: var(--dim); font-weight: 500;"></span>
     </div>
     <div style="padding: 12px 14px;">
       <div id="live-panel-description" style="margin-bottom: 8px;"></div>
@@ -973,7 +1051,7 @@
            gap.metadata.reviewer_objection field is non-empty. Orange-tinted
            to match the legend's "⚠ reviewer disagreed" marker. Hidden by
            default; showPanel toggles display. -->
-      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--col-instruction); background: #fff4e6; font-size: 12px;"></div>
+      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--status-error-fg); background: var(--disagree-bg); font-size: 12px;"></div>
     </div>
     <div id="live-panel-buttons" style="padding: 10px 14px; border-top: 1px solid var(--grid); display: flex; gap: 8px; flex-wrap: wrap;">
       <!-- buttons injected per-gap by JS (accept / skip / override / abort) -->
@@ -991,11 +1069,11 @@
 
     <span><span class="non-instr-marker">▴</span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (marker + dotted underline + categorical color — three cues for one fact):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
 
-    <span><span style="color: var(--col-instruction); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: #1f5fa6;">✎</span> user-edited during gap resolution</span>
+    <span><span style="color: var(--status-error-fg); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
     <span>step-block left border signals grounding:<span class="swatch" style="background: var(--col-instruction); margin-left: 8px;"></span>grounded ·<span class="swatch" style="background: var(--col-domain);"></span>mixed ·<span class="swatch" style="background: var(--col-inferred);"></span>orphan</span>
 
-    <span><span style="color: #4f8a2b; font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
+    <span><span style="color: var(--res-auto-accepted); font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
   </div>
 </header>
 
@@ -1157,12 +1235,13 @@
     </div>
     {# P1-7: column-local legend so the user can decode the constraint-
        summary line below without having to infer from color alone. Inline
-       glyph hues match the summary-state colors (red `--col-instruction`,
-       tan `#b08846`) so the user binds definition to visual cue. Always
-       rendered regardless of summary state. #}
+       glyph hues track the summary-state colors (var(--status-error-fg)
+       for violations, var(--warning-accent) for warnings) so the user
+       binds definition to visual cue. Always rendered regardless of
+       summary state. #}
     <div class="validated-summary-legend" style="font-size: 12px; color: var(--dim); margin: 2px 0 8px; line-height: 1.5;">
-      <strong style="color: var(--col-instruction);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
-      <strong style="color: #b08846;">⚠ warning</strong> = concern flagged for your review; pipeline continues.
+      <strong style="color: var(--status-error-fg);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
+      <strong style="color: var(--warning-accent);">⚠ warning</strong> = concern flagged for your review; pipeline continues.
     </div>
     <!-- Phase 3i (#72): constraint-check summary. Static path renders
          from constraint_summary; live path's JS replaces #validated-summary's
@@ -1173,11 +1252,11 @@
         {% set wc = constraint_summary.warnings|length %}
         <div class="validated-summary-line {% if vc > 0 %}has-errors{% elif wc > 0 %}has-warnings{% else %}all-clear{% endif %}">
           {% if vc > 0 %}
-            <strong style="color: var(--col-instruction);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
+            <strong style="color: var(--status-error-fg);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
           {% elif wc > 0 %}
-            <strong style="color: #b08846;">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
+            <strong style="color: var(--warning-accent);">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
           {% else %}
-            <strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated
+            <strong style="color: var(--check-pill-glyph);">✓ 0 violations</strong> — protocol validated
           {% endif %}
         </div>
         {# P1-9: top list shows only protocol-level (Step 0) or unparseable
@@ -1959,22 +2038,32 @@
 
     let activeWS = null;   // populated by connectWS so panel button clicks can reach it
 
+    // Read a CSS custom property off :root. Used to keep JS color
+    // literals in sync with the design-token palette in <style>:root.
+    const cssVar = (name) =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
     // Status changes are sticky in the failure direction: once we've set
     // "error", `pipeline_done` (which fires unconditionally in the server's
     // finally block) must NOT downgrade the status back to a success-looking
     // "done". Without this, an uncaught exception sequence — error event
     // first, then pipeline_done sentinel — paints the indicator green and
     // makes a real crash look like a clean run.
+    //
+    // Signature: setStatus(text, tier) where tier ∈
+    // {"success", "error", "warn", "neutral"}. The tier resolves to a
+    // (--status-{tier}-bg, --status-{tier}-fg) pair on :root so every
+    // pill color tracks the central palette tokens.
     let statusIsTerminalError = false;
-    function setStatus(text, bg, fg) {
+    function setStatus(text, tier) {
       if (text === "error") {
         statusIsTerminalError = true;
       } else if (statusIsTerminalError && text === "done") {
         return;
       }
       status.textContent = text;
-      status.style.background = bg;
-      status.style.color = fg;
+      status.style.background = cssVar(`--status-${tier}-bg`);
+      status.style.color = cssVar(`--status-${tier}-fg`);
     }
 
     // ADR-0013 Phase 3c: gap-prompt modal helpers.
@@ -1986,10 +2075,12 @@
 
     // Severity → (label, bg, fg). Keys must match GapSeverity literals
     // ("blocker"/"suggestion"/"quality"); CLI maps these same three.
+    // Colors come from the central palette tokens via cssVar() so the
+    // badges shift automatically when the palette swaps.
     const SEVERITY_TAG = {
-      "blocker":    { label: "MUST RESOLVE", bg: "#f8d7da", fg: "#721c24" },
-      "suggestion": { label: "needs review", bg: "#fff3cd", fg: "#856404" },
-      "quality":    { label: "optional",     bg: "#f0e6d2", fg: "#6b6b6b" },
+      "blocker":    { label: "MUST RESOLVE", bg: cssVar("--status-error-bg"),   fg: cssVar("--status-error-fg") },
+      "suggestion": { label: "needs review", bg: cssVar("--status-warn-bg"),    fg: cssVar("--status-warn-fg") },
+      "quality":    { label: "optional",     bg: cssVar("--status-neutral-bg"), fg: cssVar("--status-neutral-fg") },
     };
 
     function showPanel(req) {
@@ -2001,7 +2092,9 @@
         gap.kind ? "Gap: " + gap.kind : "Confirm gap";
       const sev = document.getElementById("live-panel-severity");
       const sevTag = SEVERITY_TAG[gap.severity]
-                     || { label: gap.severity || "", bg: "#f0e6d2", fg: "#6b6b6b" };
+                     || { label: gap.severity || "",
+                          bg: cssVar("--status-neutral-bg"),
+                          fg: cssVar("--status-neutral-fg") };
       sev.textContent = sevTag.label;
       sev.style.background = sevTag.bg;
       sev.style.color = sevTag.fg;
@@ -2047,7 +2140,7 @@
       const objDiv = document.getElementById("live-panel-objection");
       const objection = gap.metadata && gap.metadata.reviewer_objection;
       if (objection) {
-        objDiv.innerHTML = '<strong style="color:var(--col-instruction)">⚠ reviewer pushed back:</strong> '
+        objDiv.innerHTML = '<strong style="color:var(--status-error-fg)">⚠ reviewer pushed back:</strong> '
           + escapeHtml(String(objection));
         objDiv.style.display = "block";
       } else {
@@ -2096,8 +2189,8 @@
         const el = document.createElement("button");
         el.textContent = b.label;
         el.style.cssText = b.primary
-          ? "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;"
-          : "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+          ? "padding:6px 14px;border:1px solid var(--btn-primary);background:var(--btn-primary);color:var(--btn-primary-fg);border-radius:4px;cursor:pointer;font-size:13px;"
+          : "padding:6px 14px;border:1px solid var(--btn-secondary-border);background:var(--panel);color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
         el.addEventListener("click", () => triggerAction(b.action));
         btnRow.appendChild(el);
       });
@@ -2164,13 +2257,13 @@
       const input = document.createElement("input");
       input.type = "text";
       input.value = String(initial);
-      input.style.cssText = "flex:1;min-width:0;padding:6px 8px;border:1px solid #c0c0c0;border-radius:4px;font-size:13px;";
+      input.style.cssText = "flex:1;min-width:0;padding:6px 8px;border:1px solid var(--btn-secondary-border);border-radius:4px;font-size:13px;";
       const save = document.createElement("button");
       save.textContent = "Save";
-      save.style.cssText = "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;";
+      save.style.cssText = "padding:6px 14px;border:1px solid var(--btn-primary);background:var(--btn-primary);color:var(--btn-primary-fg);border-radius:4px;cursor:pointer;font-size:13px;";
       const cancel = document.createElement("button");
       cancel.textContent = "Cancel";
-      cancel.style.cssText = "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+      cancel.style.cssText = "padding:6px 14px;border:1px solid var(--btn-secondary-border);background:var(--panel);color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
       function submit() {
         if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
         activeWS.send(JSON.stringify({
@@ -2445,80 +2538,110 @@
         + '</tr>';
       table.appendChild(thead);
       const tbody = document.createElement("tbody");
+      // Group rows by labware, preserving order-of-first-appearance.
+      // PDF p.1 Diagram 1: rows belonging to the same container should
+      // visually cluster under one labware label, with a clear border
+      // separating one group from the next, so the user can scan
+      // "everything in tube rack" without re-reading the labware name
+      // on every line.
+      const groupOrder = [];
+      const groups = new Map();
       (req.rows || []).forEach((row) => {
-        const tr = document.createElement("tr");
-        tr.style.cssText = "border-bottom: 1px solid var(--grid);";
-        const tdLabware = document.createElement("td");
-        tdLabware.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        tdLabware.textContent = row.labware || "";
-        const tdWell = document.createElement("td");
-        tdWell.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        tdWell.textContent = row.well || "(all wells)";
-        const tdSubstance = document.createElement("td");
-        tdSubstance.style.cssText = "padding: 6px 8px; vertical-align: top; font-style: italic; color: var(--dim);";
-        tdSubstance.textContent = row.substance || "";
-        const tdVol = document.createElement("td");
-        tdVol.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        const input = document.createElement("input");
-        input.type = "number";
-        input.step = "any";
-        input.min = "0";
-        input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid #c0c0c0; border-radius: 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace;";
-        // Pre-fill: extracted current value wins; else suggester output;
-        // else empty for the user to type.
-        const initial = (row.current_volume_ul !== null && row.current_volume_ul !== undefined)
-          ? row.current_volume_ul
-          : (row.suggested_volume_ul !== null && row.suggested_volume_ul !== undefined)
-              ? row.suggested_volume_ul
-              : "";
-        input.value = initial === "" ? "" : String(initial);
-        // Visual hint: italic + dim for suggester defaults so user sees
-        // they were filled by the system, not the instruction.
-        const isDefault = (
-          (row.current_volume_ul === null || row.current_volume_ul === undefined)
-          && row.suggested_volume_ul !== null
-          && row.suggested_volume_ul !== undefined
-        );
-        if (isDefault) {
-          input.style.color = "var(--col-inferred)";
-          input.style.fontStyle = "italic";
-          input.addEventListener("input", () => {
-            input.style.color = "var(--ink)";
-            input.style.fontStyle = "normal";
-          }, { once: true });
+        const key = row.labware || "";
+        if (!groups.has(key)) {
+          groupOrder.push(key);
+          groups.set(key, []);
         }
-        tdVol.appendChild(input);
-        // Per-row caption. Two mutually-exclusive branches:
-        //   (a) Suggester-defaulted rows: surface the suggester's own
-        //       positive_reasoning so different rows can carry different
-        //       explanations (capacity default vs carryover vs config
-        //       lookup) instead of identical boilerplate.
-        //   (b) User-stated rows: surface the verbatim instruction
-        //       substring the LLM cited when extracting volume_ul, so
-        //       the user can cross-check the system's reading against
-        //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
-        //       for user to cross-check"). Falls back to no caption if
-        //       the LLM didn't populate volume_ul_provenance.
-        if (isDefault && row.provenance_reasoning) {
-          const hint = document.createElement("div");
-          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
-          hint.textContent = row.provenance_reasoning;
-          tdVol.appendChild(hint);
-        } else if (!isDefault && row.user_cited_text) {
-          const hint = document.createElement("div");
-          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
-          hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
-          tdVol.appendChild(hint);
-        }
-        tr.appendChild(tdLabware);
-        tr.appendChild(tdWell);
-        tr.appendChild(tdSubstance);
-        tr.appendChild(tdVol);
-        tbody.appendChild(tr);
-        activeIcInputs.push({
-          labware: row.labware,
-          well: row.well,
-          inputEl: input,
+        groups.get(key).push(row);
+      });
+      groupOrder.forEach((labware, groupIdx) => {
+        const members = groups.get(labware);
+        members.forEach((row, memberIdx) => {
+          const tr = document.createElement("tr");
+          tr.style.cssText = "border-bottom: 1px solid var(--grid);";
+          // First row of each group after the first carries a thicker
+          // top border so the eye registers the group boundary.
+          if (memberIdx === 0 && groupIdx > 0) {
+            tr.style.borderTop = "2px solid var(--rule, var(--grid))";
+          }
+          // Labware cell is rendered once per group, spanning every
+          // member row via rowspan. Subsequent rows skip the cell
+          // entirely so the rowspan visually fills the column.
+          if (memberIdx === 0) {
+            const tdLabware = document.createElement("td");
+            tdLabware.rowSpan = members.length;
+            tdLabware.style.cssText = "padding: 6px 8px; vertical-align: top; font-weight: 500;";
+            tdLabware.textContent = labware;
+            tr.appendChild(tdLabware);
+          }
+          const tdWell = document.createElement("td");
+          tdWell.style.cssText = "padding: 6px 8px; vertical-align: top;";
+          tdWell.textContent = row.well || "(all wells)";
+          const tdSubstance = document.createElement("td");
+          tdSubstance.style.cssText = "padding: 6px 8px; vertical-align: top; font-style: italic; color: var(--dim);";
+          tdSubstance.textContent = row.substance || "";
+          const tdVol = document.createElement("td");
+          tdVol.style.cssText = "padding: 6px 8px; vertical-align: top;";
+          const input = document.createElement("input");
+          input.type = "number";
+          input.step = "any";
+          input.min = "0";
+          input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; font-family: var(--font-mono);";
+          // Pre-fill: extracted current value wins; else suggester output;
+          // else empty for the user to type.
+          const initial = (row.current_volume_ul !== null && row.current_volume_ul !== undefined)
+            ? row.current_volume_ul
+            : (row.suggested_volume_ul !== null && row.suggested_volume_ul !== undefined)
+                ? row.suggested_volume_ul
+                : "";
+          input.value = initial === "" ? "" : String(initial);
+          // Visual hint: italic + dim for suggester defaults so user sees
+          // they were filled by the system, not the instruction.
+          const isDefault = (
+            (row.current_volume_ul === null || row.current_volume_ul === undefined)
+            && row.suggested_volume_ul !== null
+            && row.suggested_volume_ul !== undefined
+          );
+          if (isDefault) {
+            input.style.color = "var(--col-inferred)";
+            input.style.fontStyle = "italic";
+            input.addEventListener("input", () => {
+              input.style.color = "var(--ink)";
+              input.style.fontStyle = "normal";
+            }, { once: true });
+          }
+          tdVol.appendChild(input);
+          // Per-row caption. Two mutually-exclusive branches:
+          //   (a) Suggester-defaulted rows: surface the suggester's own
+          //       positive_reasoning so different rows can carry different
+          //       explanations (capacity default vs carryover vs config
+          //       lookup) instead of identical boilerplate.
+          //   (b) User-stated rows: surface the verbatim instruction
+          //       substring the LLM cited when extracting volume_ul, so
+          //       the user can cross-check the system's reading against
+          //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
+          //       for user to cross-check"). Falls back to no caption if
+          //       the LLM didn't populate volume_ul_provenance.
+          if (isDefault && row.provenance_reasoning) {
+            const hint = document.createElement("div");
+            hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+            hint.textContent = row.provenance_reasoning;
+            tdVol.appendChild(hint);
+          } else if (!isDefault && row.user_cited_text) {
+            const hint = document.createElement("div");
+            hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+            hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
+            tdVol.appendChild(hint);
+          }
+          tr.appendChild(tdWell);
+          tr.appendChild(tdSubstance);
+          tr.appendChild(tdVol);
+          tbody.appendChild(tr);
+          activeIcInputs.push({
+            labware: row.labware,
+            well: row.well,
+            inputEl: input,
+          });
         });
       });
       table.appendChild(tbody);
@@ -2632,7 +2755,7 @@
         const labelCell = document.createElement("td");
         labelCell.style.cssText = "padding: 6px 8px; vertical-align: top;";
         const select = document.createElement("select");
-        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid #c0c0c0; border-radius: 4px;";
+        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px;";
         // Empty option for unresolved; only used when no candidates match.
         if (!row.suggested_label) {
           const opt = document.createElement("option");
@@ -2847,13 +2970,13 @@
       let lineClass, html;
       if (vc > 0) {
         lineClass = "has-errors";
-        html = '<strong style="color: var(--col-instruction);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
+        html = '<strong style="color: var(--status-error-fg);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
       } else if (wc > 0) {
         lineClass = "has-warnings";
-        html = '<strong style="color: #b08846;">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
+        html = '<strong style="color: var(--warning-accent);">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
       } else {
         lineClass = "all-clear";
-        html = '<strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated';
+        html = '<strong style="color: var(--check-pill-glyph);">✓ 0 violations</strong> — protocol validated';
       }
       let body = '<div class="validated-summary-line ' + lineClass + '">' + html + '</div>';
       if (globalWarns.length > 0) {
@@ -3157,13 +3280,22 @@
           if (e.data) gateModal(() => showIcModal(e.data));
           break;
         case "pipeline_done":
-          setStatus("done", "#d4edda", "#155724");
+          // pipeline_done fires from the server's finally block too,
+          // so reaching this case does NOT mean success. Honor the
+          // sticky failure flag: setStatus already short-circuits the
+          // "done" pill text when we're in terminal-error mode (and
+          // the user-visible pill stays "error"); markIndicatorDone()
+          // needs the same guard or the top-right indicator flips to
+          // its green ✓ even after a crash.
           startBtn.disabled = false;
           hidePanel();
-          markIndicatorDone();
+          if (!statusIsTerminalError) {
+            setStatus("done", "success");
+            markIndicatorDone();
+          }
           break;
         case "error":
-          setStatus("error", "#f8d7da", "#721c24");
+          setStatus("error", "error");
           break;
       }
       // After any DOM mutation, re-render arrows so existing red
@@ -3185,7 +3317,7 @@
           handleEvent(JSON.parse(msg.data));
         } catch (err) { /* parse error — skip */ }
       };
-      ws.onerror = () => { setStatus("ws error", "#f8d7da", "#721c24"); };
+      ws.onerror = () => { setStatus("ws error", "error"); };
       ws.onclose = () => { activeWS = null; };
     }
 
@@ -3249,7 +3381,7 @@
     startBtn.addEventListener("click", async () => {
       const apiKey = (document.getElementById("live-api-key").value || "").trim();
       if (!apiKey && !LOCAL_DEV_MODE) {
-        setStatus("API key required", "#f8d7da", "#721c24");
+        setStatus("API key required", "error");
         return;
       }
 
@@ -3258,33 +3390,33 @@
         if (uploadMode) {
           const instText = await readFileText(document.getElementById("live-instruction-file"));
           const configText = await readFileText(document.getElementById("live-config-file"));
-          if (!instText) { setStatus("instruction file required", "#f8d7da", "#721c24"); return; }
-          if (!configText) { setStatus("config file required", "#f8d7da", "#721c24"); return; }
+          if (!instText) { setStatus("instruction file required", "error"); return; }
+          if (!configText) { setStatus("config file required", "error"); return; }
           instruction = instText;
           try { config = JSON.parse(configText); }
-          catch (e) { setStatus("invalid config JSON", "#f8d7da", "#721c24"); return; }
+          catch (e) { setStatus("invalid config JSON", "error"); return; }
         } else if (exampleSelect.value) {
           const [instResp, configResp] = await Promise.all([
             fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/instruction"),
             fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/config"),
           ]);
           if (!instResp.ok || !configResp.ok) {
-            setStatus("failed to load example", "#f8d7da", "#721c24");
+            setStatus("failed to load example", "error");
             return;
           }
           instruction = await instResp.text();
           config = await configResp.json();
         } else {
-          setStatus("pick an example or upload files", "#f8d7da", "#721c24");
+          setStatus("pick an example or upload files", "error");
           return;
         }
       } catch (err) {
-        setStatus("input read error", "#f8d7da", "#721c24");
+        setStatus("input read error", "error");
         return;
       }
 
       startBtn.disabled = true;
-      setStatus("starting...", "#fff3cd", "#856404");
+      setStatus("starting...", "warn");
       try {
         const r = await fetch("/start", {
           method: "POST",
@@ -3293,16 +3425,16 @@
         });
         const j = await r.json();
         if (j.status === "started") {
-          setStatus("running", "#fff3cd", "#856404");
+          setStatus("running", "warn");
         } else if (j.status === "already_running") {
-          setStatus("demo busy — try again in a few minutes", "#fff3cd", "#856404");
+          setStatus("demo busy — try again in a few minutes", "warn");
           startBtn.disabled = false;
         } else {
-          setStatus("error: " + (j.message || "start failed"), "#f8d7da", "#721c24");
+          setStatus("error: " + (j.message || "start failed"), "error");
           startBtn.disabled = false;
         }
       } catch (err) {
-        setStatus("network error", "#f8d7da", "#721c24");
+        setStatus("network error", "error");
         startBtn.disabled = false;
       }
     });

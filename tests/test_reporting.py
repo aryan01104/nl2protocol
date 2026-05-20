@@ -651,12 +651,16 @@ class TestADR0011FiveColumnLayout:
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # The CSS rule for the grid declares five columns. We assert on a
-        # substring pattern that's unique to our 5-col grid declaration to
-        # avoid coupling the test to specific fr ratios. The instruction
-        # column is capped to a prose-readable width via minmax(); the
-        # remaining four use fr units.
-        assert "minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
+        # The CSS rule for the grid declares five columns. Refresh
+        # 2026-05-20 caps each column at a max-width via minmax() so
+        # the report stays scannable at wide viewports (CARRY-F2). The
+        # .grid.cols-5 declaration is what we assert against — instruction
+        # column has a tighter range, spec columns share one range, code
+        # column has the widest range.
+        assert (
+            "minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) "
+            "minmax(340px, 600px) minmax(380px, 720px)"
+        ) in rendered
 
 
 class TestADR0011Phase2bResolutionArrows:
@@ -1508,15 +1512,30 @@ class TestHTMLReporterArrowsEnd2End:
         assert "success" in out_success.read_text()
 
     def test_html_is_self_contained_no_external_resources(self, tmp_path):
-        """The report should be a single file with no external CSS/JS/images."""
+        """The report should be a single file with no external CSS/JS/images.
+
+        One deliberate exception (refresh-website-parity, 2026-05-20):
+        exactly one Google Fonts CSS link, pulling IBM Plex Sans +
+        JetBrains Mono to match the website's font stack. When opened
+        offline the fonts fall back through the system stack
+        (-apple-system, etc.) so the report still renders — just
+        without the website fonts.
+
+        Strictness: assert the EXACT shape of the allowed link so a
+        future change that adds another external stylesheet (or quietly
+        drops the IBM Plex/JetBrains Mono families) fails this test.
+        """
+        import re
         out = tmp_path / "report.html"
         HTMLReporter(str(out)).finalize()
         content = out.read_text()
-        # Inline CSS only — no <link rel="stylesheet">
-        assert "<link rel=\"stylesheet\"" not in content.lower()
-        # No external scripts (Phase 2 has no JS at all)
+        links = re.findall(r'<link[^>]*rel="stylesheet"[^>]*>', content, re.IGNORECASE)
+        assert len(links) == 1, f"expected exactly one stylesheet link; got {len(links)}: {links}"
+        link = links[0]
+        assert "fonts.googleapis.com/css2?" in link
+        assert "family=IBM+Plex+Sans" in link
+        assert "family=JetBrains+Mono" in link
         assert "<script src=" not in content.lower()
-        # No external images either
         assert "<img " not in content.lower()
 
 
