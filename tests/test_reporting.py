@@ -1568,14 +1568,14 @@ class TestPassesToInlineChecks:
     def test_basic_routing(self):
         passes = [
             {"step": 3, "check_type": "pipette_capacity",
-             "detail_label": "volume", "what": "within p20 range (1–20 µL)"},
+             "detail_label": "volume", "what": "within p20 range (1-20 µL)"},
             {"step": 3, "check_type": "labware_not_found",
              "detail_label": "source_labware", "what": "loaded at slot 2"},
         ]
         out = _passes_to_inline_checks(passes)
         assert out == {
             3: {
-                "volume": "within p20 range (1–20 µL)",
+                "volume": "within p20 range (1-20 µL)",
                 "source_labware": "loaded at slot 2",
             },
         }

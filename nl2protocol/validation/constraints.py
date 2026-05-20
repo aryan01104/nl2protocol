@@ -324,26 +324,34 @@ class PhysicalConstraintsChecker:
                 this method should not be called.)
 
         Post:   Returns a string of the form
-                "within p20 range (1–20 µL)" — uses the smallest pipette
+                "within p20 range (1-20 uL)" - uses the smallest pipette
                 spec key (p10/p20/p50/p300/p1000) that covers the volume,
                 with the pipette's accurate range. Returns None when the
                 configured pipette's model isn't recognized by
-                `get_pipette_range` (defensive — caller should treat as
+                `get_pipette_range` (defensive - caller should treat as
                 "no pass tag to emit").
+
+                CodeRabbit P2 fix: this picks the SMALLEST covering
+                pipette (lowest upper bound), not the first-in-config-
+                order. Without this, a 20 uL transfer in a config with
+                both p20 and p300 mounted could be tagged "within p300
+                range (20-300 uL)" if p300 happened to come first in
+                the dict.
         """
-        mount = get_pipette_for_volume(volume, self.config)
-        if not mount:
+        covering = []
+        for mount, (lo, hi) in self.pipette_ranges.items():
+            if lo <= volume <= hi:
+                covering.append((hi, lo, mount))
+        if not covering:
             return None
+        covering.sort()  # smallest upper bound first
+        hi, lo, mount = covering[0]
         model_full = self.config["pipettes"][mount]["model"]
-        rng = get_pipette_range(model_full)
-        if not rng:
-            return None
         spec_key = next(
             (k for k in PIPETTE_SPECS if model_full.lower().startswith(k + "_")),
             model_full,
         )
-        lo, hi = rng
-        return f"within {spec_key} range ({lo:g}\u2013{hi:g} \u00b5L)"
+        return f"within {spec_key} range ({lo:g}-{hi:g} \u00b5L)"
 
     def _verify_step_volumes_fit_pipette(self, step: ExtractedStep, result: PhysicalConstraintsCheckResult):
         """Check that every volume in this step can be handled by available pipettes."""
@@ -559,7 +567,7 @@ class PhysicalConstraintsChecker:
             # Track whether any well-validity issue was raised on this
             # (step, role). If none, a single PASSED record covers the
             # entire wells row in the spec view ("wells: A1, A2, A3, A4
-            # ✓ exist on reagent_rack (4×6)").
+            # ✓ exist on reagent_rack (4x6)").
             wells_passed = True
 
             # Check single well
@@ -593,7 +601,7 @@ class PhysicalConstraintsChecker:
             # Pass branch: every referenced well exists on the labware
             # AND the ref actually referenced at least one well (an
             # empty ref doesn't earn a pass tag). The phrase ("exist
-            # on reagent_rack (4×6)" / "exists on ...") matches the
+            # on reagent_rack (4x6)" / "exists on ...") matches the
             # row's plurality.
             ref_has_well = bool(ref.well or ref.wells)
             if ref_has_well and wells_passed:
@@ -1042,7 +1050,7 @@ class WellStateTracker:
                 Equivalently: True iff the (labware, well) lookup has been
                 seen by the tracker AND its tracked volume strictly exceeds
                 the 0.01uL float-tolerance threshold. False for unseen
-                lookups or for wells tracked at 0.0–0.01uL.
+                lookups or for wells tracked at 0.0-0.01uL.
 
         Side effects: None. Pure read.
 

@@ -345,15 +345,24 @@ class WellCapacitySuggester:
         Side effects: None.
         """
         label: Optional[str] = None
+        labware_map = config.get("labware", {})
         if labware_suggestions:
             sug = labware_suggestions.get(description)
-            if sug is not None and getattr(sug, "suggested_label", None) is not None:
-                label = sug.suggested_label
-        if label is None and description in config.get("labware", {}):
+            suggested = (getattr(sug, "suggested_label", None)
+                         if sug is not None else None)
+            # CodeRabbit P1: the suggested_label must actually exist in
+            # the active config. A stale label (resolver suggested a
+            # value not present anymore) would otherwise be propagated
+            # through to load_name lookup → empty load_name →
+            # conservative-fallback capacity, with no chance to try
+            # the legacy direct-config-key path below.
+            if isinstance(suggested, str) and suggested in labware_map:
+                label = suggested
+        if label is None and description in labware_map:
             label = description
         if label is None:
             return None, ""
-        load_name = config.get("labware", {}).get(label, {}).get("load_name", "")
+        load_name = labware_map.get(label, {}).get("load_name", "")
         return label, load_name
 
 

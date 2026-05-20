@@ -288,10 +288,25 @@ class SemanticExtractor:
             if float(value).is_integer() and str(int(value)) in quote:
                 return True
             return str(value) in quote
-        s = str(value)
-        if s.lower() in quote.lower():
+        s = str(value).strip()
+        # Range path: a well like 'B2' is grounded by a cite that names
+        # the range 'B1-B4' (or 'column 1', 'rows A-D'). Cite_covers_well
+        # only fires for cites containing range syntax; literal-well
+        # cites fall through to the boundary/substring path below.
+        if cite_covers_well(quote, s):
             return True
-        return cite_covers_well(quote, s)
+        # Well-name literals (`[A-P]\d+`) must match the cite with word
+        # boundaries — otherwise "B2" would match a cite containing
+        # "B20", silently hiding fabricated wells (CodeRabbit P1).
+        if re.fullmatch(r"[A-Pa-p]\d+", s):
+            return re.search(
+                rf"(?<![A-Za-z0-9]){re.escape(s)}(?![A-Za-z0-9])",
+                quote,
+                re.IGNORECASE,
+            ) is not None
+        # Non-well-shaped strings (substance names, etc.): plain
+        # case-insensitive substring match, as before.
+        return s.lower() in quote.lower()
 
     def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
         """Verify every source='instruction' provenance via cited_text.

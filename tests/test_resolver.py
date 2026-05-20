@@ -150,9 +150,11 @@ class TestParseAssignment_LegacyShape:
 
     def test_empty_string(self):
         result = LabwareResolver._parse_assignment("")
-        # Empty string is preserved as the "label"; caller's
-        # `label in valid_labels` check will filter it out.
-        assert result == ("", None)
+        # Empty / whitespace-only labels collapse to None at parse
+        # time (CodeRabbit P1 strictening) so they never reach a
+        # downstream `config[""]` lookup. Pre-fix this returned
+        # ("", None); see also `TestParseAssignment_TypeGuards`.
+        assert result == (None, None)
 
 
 class TestParseAssignment_OtherShapes:
@@ -168,6 +170,48 @@ class TestParseAssignment_OtherShapes:
 
     def test_list(self):
         assert LabwareResolver._parse_assignment(["reagent_rack"]) == (None, None)
+
+
+class TestParseAssignment_TypeGuards:
+    """CodeRabbit P1: an LLM may return label / reasoning as a non-string
+    inside the new {label, reasoning} dict shape. Without guards, the
+    downstream `label in valid_labels` check (unhashable types like list/
+    dict) or `reasoning.strip()` (no .strip on int) crashes the entire
+    parse pass, dropping ALL descriptions to the empty fallback."""
+
+    def test_non_string_label_in_dict_becomes_none(self):
+        # Label as list → not a real config label; treat as missing.
+        result = LabwareResolver._parse_assignment(
+            {"label": ["reagent_rack"], "reasoning": "ok"}
+        )
+        assert result == (None, "ok")
+
+    def test_non_string_reasoning_in_dict_becomes_none(self):
+        # Reasoning as int → no .strip(); treat as missing reasoning
+        # (label still parses if it's a string).
+        result = LabwareResolver._parse_assignment(
+            {"label": "reagent_rack", "reasoning": 42}
+        )
+        assert result == ("reagent_rack", None)
+
+    def test_empty_string_label_becomes_none(self):
+        # Whitespace-only / empty label is not a real label.
+        result = LabwareResolver._parse_assignment(
+            {"label": "   ", "reasoning": "ok"}
+        )
+        assert result == (None, "ok")
+
+    def test_legacy_string_shape_strips_whitespace(self):
+        # Existing bare-string callers get whitespace normalization for free.
+        result = LabwareResolver._parse_assignment("  reagent_rack  ")
+        assert result == ("reagent_rack", None)
+
+    def test_legacy_empty_string_becomes_none(self):
+        # Pre-fix: ("", None). Post-fix: (None, None) — empty string
+        # isn't a real label, treating as missing prevents it slipping
+        # through to a config[""] lookup downstream.
+        assert LabwareResolver._parse_assignment("") == (None, None)
+        assert LabwareResolver._parse_assignment("   ") == (None, None)
 
 
 # ============================================================================

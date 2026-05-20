@@ -224,3 +224,17 @@ class TestValueInQuote_RangeRelaxation:
         assert SemanticExtractor._value_in_quote("A1", "column 1") is True
         assert SemanticExtractor._value_in_quote("H1", "column 1") is True
         assert SemanticExtractor._value_in_quote("A2", "column 1") is False
+
+    def test_well_name_uses_word_boundaries_not_substring(self):
+        # CodeRabbit P1: 'B2' must NOT match a cite containing 'B20',
+        # which would otherwise hide a fabricated well. The fallback for
+        # well-name-shaped values now requires word boundaries on both
+        # sides instead of plain substring containment.
+        assert SemanticExtractor._value_in_quote("B2", "cells B20") is False
+        assert SemanticExtractor._value_in_quote("A1", "wells A10, A11") is False
+        # Sanity: a real boundary match still passes.
+        assert SemanticExtractor._value_in_quote("B2", "cells B2 here") is True
+        assert SemanticExtractor._value_in_quote("B2", "(B1, B2, B3)") is True
+        # Well at the start / end of the cite still passes.
+        assert SemanticExtractor._value_in_quote("A1", "A1") is True
+        assert SemanticExtractor._value_in_quote("B5", "cells in B5") is True

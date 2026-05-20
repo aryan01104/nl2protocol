@@ -424,6 +424,47 @@ class TestWellCapacitySuggester:
         assert "sample_rack" in s.positive_reasoning
         assert "opentrons_24_tuberack" in s.positive_reasoning
 
+    def test_stale_suggested_label_falls_back_to_direct_lookup(self):
+        # CodeRabbit P1: a suggested_label that's no longer in the
+        # active config must be ignored, not propagated through to a
+        # broken load_name lookup. The suggester should fall back to
+        # the legacy direct-config path when the suggestion is stale.
+        spec = ProtocolSpec(summary="t",
+                            steps=[ExtractedStep(order=1, action="comment",
+                                                 note="x",
+                                                 composition_provenance=_comp())],
+                            initial_contents=[
+                                WellContents(labware="sample_rack",
+                                             well="A1", substance="x",
+                                             volume_ul=None)
+                            ])
+        # Config has `sample_rack` as a real key — but suggestion
+        # points at `nonexistent_label`, which isn't in config.
+        config = {"labware": {"sample_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        }}}
+
+        class _FakeSug:
+            suggested_label = "nonexistent_label"
+        labware_suggestions = {"sample_rack": _FakeSug()}
+
+        gap = Gap(id="ic0.volume_ul", step_order=None,
+                  field_path="initial_contents[0].volume_ul",
+                  kind="missing", current_value=None,
+                  description="x", severity="suggestion")
+        s = WellCapacitySuggester().suggest(
+            spec=spec, gap=gap,
+            context={"config": config,
+                     "labware_suggestions": labware_suggestions},
+        )
+        assert s is not None
+        assert s.value == 1500.0
+        # Direct-lookup path succeeded — reasoning names `sample_rack`,
+        # NOT the stale `nonexistent_label`.
+        assert "sample_rack" in s.positive_reasoning
+        assert "opentrons_24_tuberack" in s.positive_reasoning
+        assert "nonexistent_label" not in s.positive_reasoning
+
 
 # ============================================================================
 # RegexFromNoteSuggester

@@ -220,10 +220,23 @@ class LabwareResolver:
         Side effects: None.
         """
         if isinstance(value, str):
-            return value, None
+            stripped = value.strip()
+            return (stripped if stripped else None), None
         if isinstance(value, dict):
-            label = value.get("label")
-            reasoning = value.get("reasoning")
+            # Defensive normalization: an LLM may return label / reasoning
+            # as a non-string (list, int, dict). Without these guards the
+            # downstream `label in valid_labels` check (unhashable types)
+            # or `reasoning.strip()` (no .strip on int) crashes the
+            # parse, dropping ALL descriptions to the empty fallback
+            # (CodeRabbit P1).
+            raw_label = value.get("label")
+            label = (raw_label.strip()
+                     if isinstance(raw_label, str) and raw_label.strip()
+                     else None)
+            raw_reasoning = value.get("reasoning")
+            reasoning = (raw_reasoning.strip()
+                         if isinstance(raw_reasoning, str) and raw_reasoning.strip()
+                         else None)
             return label, reasoning
         return None, None
 
