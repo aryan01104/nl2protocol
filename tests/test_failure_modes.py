@@ -18,7 +18,7 @@ import pytest
 from pathlib import Path
 
 from nl2protocol.validation.constraints import (
-    ConstraintChecker, ViolationType, Severity, WellStateTracker
+    PhysicalConstraintsChecker, ViolationType, Severity, WellStateTracker
 )
 from nl2protocol.extraction import (
     ProtocolSpec, ExtractedStep, ProvenancedVolume, ProvenancedDuration,
@@ -139,7 +139,7 @@ class TestPipetteInsufficient:
                 composition_provenance=_comp(),
             ),
         ])
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
 
         assert result.has_errors
         errors = [v for v in result.errors if v.violation_type == ViolationType.PIPETTE_CAPACITY]
@@ -167,7 +167,7 @@ class TestLabwareMissing:
                 )
             ],
         )
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
 
 
 # ============================================================================
@@ -189,7 +189,7 @@ class TestModuleMissing:
                 composition_provenance=_comp(),
             ),
         ])
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
 
         module_errors = [v for v in result.errors if v.violation_type == ViolationType.MODULE_NOT_FOUND]
         assert len(module_errors) == 1
@@ -218,7 +218,7 @@ class TestCombinedConfigGaps:
                 ),
             ],
         )
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
 
         assert result.has_errors
         # Should have: missing modules (temp + magnetic)
@@ -308,7 +308,7 @@ class TestMismatchedProtocol:
             )
         ])
 
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
 
         assert result.has_errors
         # Should flag: volume exceeds p20

@@ -34,10 +34,17 @@ from nl2protocol.models.spec import ProtocolSpec, ExtractedStep, ProvenancedVolu
 # ============================================================================
 
 class Severity(Enum):
-    """How bad is this violation?"""
-    ERROR = "error"        # Cannot proceed — physically impossible
+    """The outcome of one constraint check on one (step, check_type) cell.
+
+    Tagged-union discriminator for `CheckResult` — see `notes/cs-concepts.md`
+    ("Tagged union: one class + discriminator, not N parallel classes")
+    and the sibling `Gap.kind` field in `gap_resolution/types.py` for the
+    same pattern applied to the orchestrator's gap pipeline.
+    """
+    ERROR   = "error"      # Cannot proceed — physically impossible
     WARNING = "warning"    # Can proceed but result may be suboptimal
-    INFO = "info"          # FYI — scientist should be aware
+    INFO    = "info"       # FYI — scientist should be aware
+    PASSED  = "passed"     # Check ran, the spec satisfied it
 
 
 class ViolationType(Enum):
@@ -54,41 +61,105 @@ class ViolationType(Enum):
 
 
 @dataclass
-class ConstraintViolation:
-    """A single constraint violation with full context for the scientist."""
-    violation_type: ViolationType
-    severity: Severity
-    step: int                          # Which step has the problem
-    what: str                          # What's wrong (factual, short)
-    why: str                           # Why it matters (domain context)
-    suggestion: str                    # How to fix it
-    values: Dict[str, object] = field(default_factory=dict)  # Machine-readable details
+class CheckResult:
+    """The outcome of one constraint check on one (step, check_type) cell.
+
+    Tagged-union shape: shared fields up front; outcome-specific fields
+    are `Optional` and filled by the side of the union the record
+    represents. Every (step, check_type) cell that the checker visits
+    appears as exactly one `CheckResult` — never zero, never two.
+
+    Failure variants (`severity` in {ERROR, WARNING, INFO}) carry
+    user-actionable text: `what` / `why` / `suggestion` + machine-
+    readable `values`. Pass variants (`severity == PASSED`) carry
+    `detail_label` + `what` — the row in the spec view the inline tag
+    anchors to, and the short positive phrase shown there.
+
+    Naming: kept the historical name in the public API via the
+    `ConstraintViolation` alias just below so existing callers don't
+    have to migrate; new code should reach for `CheckResult` directly.
+    The pattern is documented in `notes/cs-concepts.md`.
+    """
+    violation_type: ViolationType        # for passes, names the check that ran
+    severity: Severity                   # discriminator
+    step: int                            # 0 for protocol-level checks
+    what: str                            # failure: what's wrong; pass: inline phrase
+    why: str = ""                        # failure-only
+    suggestion: str = ""                 # failure-only
+    values: Dict[str, object] = field(default_factory=dict)
+    # Pass-only: the detail row the inline tag attaches to. Logical
+    # labels (the rendering layer maps these to displayed rows):
+    #   "volume" / "source_labware" / "source_wells" /
+    #   "destination_labware" / "destination_wells".
+    detail_label: Optional[str] = None
 
     def __str__(self) -> str:
-        icon = {"error": "ERROR", "warning": "WARN", "info": "INFO"}[self.severity.value]
-        return f"[{icon}] Step {self.step}: {self.what}\n       Why: {self.why}\n       Suggestion: {self.suggestion}"
+        icon = {
+            "error":   "ERROR",
+            "warning": "WARN",
+            "info":    "INFO",
+            "passed":  "PASS",
+        }[self.severity.value]
+        if self.severity == Severity.PASSED:
+            anchor = f" ({self.detail_label})" if self.detail_label else ""
+            return f"[{icon}] Step {self.step}{anchor}: {self.what}"
+        return (f"[{icon}] Step {self.step}: {self.what}\n"
+                f"       Why: {self.why}\n"
+                f"       Suggestion: {self.suggestion}")
+
+
+# Backward-compat alias. Pre-refactor name; kept so existing imports,
+# `isinstance(..., ConstraintViolation)` checks, and test fixtures
+# continue to work without churn. New code should use `CheckResult`.
+ConstraintViolation = CheckResult
 
 
 @dataclass
-class ConstraintCheckResult:
-    """Result of running all constraint checks."""
-    violations: List[ConstraintViolation] = field(default_factory=list)
+class PhysicalConstraintsCheckResult:
+    """Result of running all constraint checks.
+
+    Backing store is a single `_checks` list; the historical `violations`
+    accessor is now a property that returns only the non-`PASSED` entries
+    (preserving its meaning for every existing reader). Passes are
+    accessed via the new `passes` property.
+    """
+    # Internal: every CheckResult emitted by the checker, including passes.
+    # External callers read via the properties below.
+    _checks: List[CheckResult] = field(default_factory=list)
+
+    @property
+    def violations(self) -> List[CheckResult]:
+        """Failure-side records only. Preserves pre-refactor semantics —
+        an existing caller reading `result.violations` sees the same
+        list shape it always did (errors + warnings + infos, never
+        passes)."""
+        return [c for c in self._checks if c.severity != Severity.PASSED]
+
+    @property
+    def passes(self) -> List[CheckResult]:
+        """PASSED records only — what the inline-check renderer reads."""
+        return [c for c in self._checks if c.severity == Severity.PASSED]
+
+    @property
+    def checks(self) -> List[CheckResult]:
+        """Every check the checker ran, regardless of outcome."""
+        return list(self._checks)
 
     @property
     def has_errors(self) -> bool:
-        return any(v.severity == Severity.ERROR for v in self.violations)
+        return any(c.severity == Severity.ERROR for c in self._checks)
 
     @property
     def has_warnings(self) -> bool:
-        return any(v.severity == Severity.WARNING for v in self.violations)
+        return any(c.severity == Severity.WARNING for c in self._checks)
 
     @property
-    def errors(self) -> List[ConstraintViolation]:
-        return [v for v in self.violations if v.severity == Severity.ERROR]
+    def errors(self) -> List[CheckResult]:
+        return [c for c in self._checks if c.severity == Severity.ERROR]
 
     @property
-    def warnings(self) -> List[ConstraintViolation]:
-        return [v for v in self.violations if v.severity == Severity.WARNING]
+    def warnings(self) -> List[CheckResult]:
+        return [c for c in self._checks if c.severity == Severity.WARNING]
 
     def __bool__(self) -> bool:
         """True if there are no errors (warnings are OK to proceed)."""
@@ -200,10 +271,10 @@ def get_all_pipette_ranges(config: dict) -> Dict[str, Tuple[float, float]]:
 # CONSTRAINT CHECKER
 # ============================================================================
 
-class ConstraintChecker:
+class PhysicalConstraintsChecker:
     """Deterministic constraint checker for ProtocolSpec against lab config.
 
-    Run this AFTER extraction, BEFORE schema generation. Surfaces all
+    Run this AFTER resolution of extracted spec and BEFORE schema generation. Surfaces all
     hardware conflicts so the scientist can make informed decisions.
     """
 
@@ -211,28 +282,28 @@ class ConstraintChecker:
         self.config = config
         self.pipette_ranges = get_all_pipette_ranges(config)
 
-    def check_all(self, spec: ProtocolSpec) -> ConstraintCheckResult:
+    def assert_physical_constraints(self, spec: ProtocolSpec) -> PhysicalConstraintsCheckResult:
         """Run every constraint check and collect violations.
 
         Pre:    `spec` is a Pydantic-validated `ProtocolSpec`. `self.config`
                 was supplied at construction.
-        Post:   Returns a `ConstraintCheckResult` containing zero or more
+        Post:   Returns a `PhysicsalConstraintsCheckResult` containing zero or more
                 `ConstraintViolation`s. Empty `violations` list iff every check
                 passes. Each violation has all six structured fields populated
                 (type, severity, step, what, why, suggestion). The same logical
                 problem is not double-reported across check categories.
-        Pure:   Does not mutate `spec` or `self.config`. No I/O, no LLM, no
-                randomness — same inputs always produce the same result.
+        Pure:   Does not mutate `spec` or `self.config`. No I/O, no LLM, no 
+                randomness - same inputs always produce the same result.
         Raises: Never. Malformed inputs are the caller's responsibility.
         """
-        result = ConstraintCheckResult()
+        result = PhysicalConstraintsCheckResult()
 
         for step in spec.steps:
-            self._check_pipette_capacity(step, result)
-            self._check_labware_resolution(step, result)
-            self._check_well_validity(step, result)
+            self._verify_step_volumes_fit_pipette(step, result)
+            self._verify_labwares_exist_in_config(step, result)
+            self._verify_referenced_wells_exist_in_config(step, result)
 
-        self._check_module_availability(spec, result)
+        self._verify_modules_exist_in_config(spec, result)
         self._check_labware_on_module(spec, result)
         self._check_tip_sufficiency(spec, result)
 
@@ -242,7 +313,47 @@ class ConstraintChecker:
     # INDIVIDUAL CHECKS
     # ========================================================================
 
-    def _check_pipette_capacity(self, step: ExtractedStep, result: ConstraintCheckResult):
+    def _pass_phrase_for_volume(self, volume: float) -> Optional[str]:
+        """Build the short positive phrase emitted on a passing pipette-
+        capacity check, used as the inline tag next to a volume value.
+
+        Pre:    `volume` is a real number in microliters that has already
+                been verified by the caller as fitting at least one
+                configured pipette's range. (If no pipette covers it,
+                the caller will have emitted a violation instead and
+                this method should not be called.)
+
+        Post:   Returns a string of the form
+                "within p20 range (1-20 uL)" - uses the smallest pipette
+                spec key (p10/p20/p50/p300/p1000) that covers the volume,
+                with the pipette's accurate range. Returns None when the
+                configured pipette's model isn't recognized by
+                `get_pipette_range` (defensive - caller should treat as
+                "no pass tag to emit").
+
+                CodeRabbit P2 fix: this picks the SMALLEST covering
+                pipette (lowest upper bound), not the first-in-config-
+                order. Without this, a 20 uL transfer in a config with
+                both p20 and p300 mounted could be tagged "within p300
+                range (20-300 uL)" if p300 happened to come first in
+                the dict.
+        """
+        covering = []
+        for mount, (lo, hi) in self.pipette_ranges.items():
+            if lo <= volume <= hi:
+                covering.append((hi, lo, mount))
+        if not covering:
+            return None
+        covering.sort()  # smallest upper bound first
+        hi, lo, mount = covering[0]
+        model_full = self.config["pipettes"][mount]["model"]
+        spec_key = next(
+            (k for k in PIPETTE_SPECS if model_full.lower().startswith(k + "_")),
+            model_full,
+        )
+        return f"within {spec_key} range ({lo:g}-{hi:g} \u00b5L)"
+
+    def _verify_step_volumes_fit_pipette(self, step: ExtractedStep, result: PhysicalConstraintsCheckResult):
         """Check that every volume in this step can be handled by available pipettes."""
 
         # Check step volume
@@ -251,6 +362,24 @@ class ConstraintChecker:
             if step.volume.unit == "mL":
                 vol *= 1000
             self._check_volume_against_pipettes(step, vol, "transfer", result)
+            # Pass branch: if some pipette covers the volume, emit a
+            # PASSED CheckResult so the inline-check renderer can stamp
+            # a green tag next to the volume row. The phrase names the
+            # smallest covering pipette + its range, matching the value
+            # the row displays.
+            can_handle = any(lo <= vol <= hi
+                             for lo, hi in self.pipette_ranges.values())
+            if can_handle:
+                phrase = self._pass_phrase_for_volume(vol)
+                if phrase:
+                    result._checks.append(CheckResult(
+                        violation_type=ViolationType.PIPETTE_CAPACITY,
+                        severity=Severity.PASSED,
+                        step=step.order,
+                        what=phrase,
+                        detail_label="volume",
+                        values={"volume": vol},
+                    ))
 
         # Check post-action volumes (e.g., mix volumes)
         if step.post_actions:
@@ -319,7 +448,7 @@ class ConstraintChecker:
                                     f"Reduce {pa.action} volume to {rng[1]}uL (pipette max), "
                                     f"or add a larger pipette to your config."
                                 )
-                            result.violations.append(ConstraintViolation(
+                            result._checks.append(CheckResult(
                                 violation_type=ViolationType.PIPETTE_CAPACITY,
                                 severity=Severity.ERROR,
                                 step=step.order,
@@ -344,7 +473,7 @@ class ConstraintChecker:
                             ))
 
     def _check_volume_against_pipettes(self, step: ExtractedStep, volume: float,
-                                        context: str, result: ConstraintCheckResult):
+                                        context: str, result: PhysicalConstraintsCheckResult):
         """Check if any configured pipette can handle this volume."""
         can_handle = any(lo <= volume <= hi for lo, hi in self.pipette_ranges.values())
         if not can_handle:
@@ -352,7 +481,7 @@ class ConstraintChecker:
                 f"{self.config['pipettes'][m]['model']} ({lo}-{hi}uL)"
                 for m, (lo, hi) in self.pipette_ranges.items()
             )
-            result.violations.append(ConstraintViolation(
+            result._checks.append(CheckResult(
                 violation_type=ViolationType.PIPETTE_CAPACITY,
                 severity=Severity.ERROR,
                 step=step.order,
@@ -362,7 +491,7 @@ class ConstraintChecker:
                 values={"requested_volume": volume, "available_ranges": dict(self.pipette_ranges)}
             ))
 
-    def _check_labware_resolution(self, step: ExtractedStep, result: ConstraintCheckResult):
+    def _verify_labwares_exist_in_config(self, step: ExtractedStep, result: PhysicalConstraintsCheckResult):
         """Check that source/destination have been resolved to config labware."""
         config_labels = set(self.config.get("labware", {}).keys())
         if not config_labels:
@@ -374,7 +503,7 @@ class ConstraintChecker:
             # Check resolved_label, fall back to description for legacy specs
             label = ref.resolved_label or ref.description
             if label not in config_labels:
-                result.violations.append(ConstraintViolation(
+                result._checks.append(CheckResult(
                     violation_type=ViolationType.LABWARE_NOT_FOUND,
                     severity=Severity.ERROR,
                     step=step.order,
@@ -383,8 +512,26 @@ class ConstraintChecker:
                     suggestion=f"Check your config has labware matching '{ref.description}', or rename it.",
                     values={"description": ref.description, "role": role, "available": sorted(config_labels)}
                 ))
+            else:
+                # Pass branch: the labware resolved to a config entry.
+                # Emit the inline phrase ("loaded at slot N") for the
+                # source/destination row in the spec view. Slot may be
+                # absent on legacy configs — fall back to a generic
+                # phrase so the green tag still appears (the resolution
+                # itself is the verified claim).
+                slot = self.config.get("labware", {}).get(label, {}).get("slot")
+                phrase = (f"loaded at slot {slot}" if slot
+                          else f"resolves to config labware '{label}'")
+                result._checks.append(CheckResult(
+                    violation_type=ViolationType.LABWARE_NOT_FOUND,
+                    severity=Severity.PASSED,
+                    step=step.order,
+                    what=phrase,
+                    detail_label=f"{role}_labware",
+                    values={"role": role, "label": label, "slot": slot},
+                ))
 
-    def _check_well_validity(self, step: ExtractedStep, result: ConstraintCheckResult):
+    def _verify_referenced_wells_exist_in_config(self, step: ExtractedStep, result: PhysicalConstraintsCheckResult):
         """Check that referenced wells exist on the target labware."""
         from nl2protocol.models.labware import get_well_info
 
@@ -415,9 +562,18 @@ class ConstraintChecker:
             if not valid_wells:
                 continue
 
+            rows = well_info.get("rows", "?")
+            cols = well_info.get("cols", "?")
+            # Track whether any well-validity issue was raised on this
+            # (step, role). If none, a single PASSED record covers the
+            # entire wells row in the spec view ("wells: A1, A2, A3, A4
+            # ✓ exist on reagent_rack (4x6)").
+            wells_passed = True
+
             # Check single well
             if ref.well and ref.well not in valid_wells:
-                result.violations.append(ConstraintViolation(
+                wells_passed = False
+                result._checks.append(CheckResult(
                     violation_type=ViolationType.WELL_INVALID,
                     severity=Severity.ERROR,
                     step=step.order,
@@ -431,7 +587,8 @@ class ConstraintChecker:
             if ref.wells:
                 invalid = [w for w in ref.wells if w not in valid_wells]
                 if invalid:
-                    result.violations.append(ConstraintViolation(
+                    wells_passed = False
+                    result._checks.append(CheckResult(
                         violation_type=ViolationType.WELL_INVALID,
                         severity=Severity.ERROR,
                         step=step.order,
@@ -441,7 +598,25 @@ class ConstraintChecker:
                         values={"invalid_wells": invalid, "labware": label}
                     ))
 
-    def _check_module_availability(self, spec: ProtocolSpec, result: ConstraintCheckResult):
+            # Pass branch: every referenced well exists on the labware
+            # AND the ref actually referenced at least one well (an
+            # empty ref doesn't earn a pass tag). The phrase ("exist
+            # on reagent_rack (4x6)" / "exists on ...") matches the
+            # row's plurality.
+            ref_has_well = bool(ref.well or ref.wells)
+            if ref_has_well and wells_passed:
+                verb = "exists on" if (ref.well and not ref.wells) else "exist on"
+                result._checks.append(CheckResult(
+                    violation_type=ViolationType.WELL_INVALID,
+                    severity=Severity.PASSED,
+                    step=step.order,
+                    what=f"{verb} {label} ({rows}\u00d7{cols})",
+                    detail_label=f"{role}_wells",
+                    values={"role": role, "labware": label,
+                             "rows": rows, "cols": cols},
+                ))
+
+    def _verify_modules_exist_in_config(self, spec: ProtocolSpec, result: PhysicalConstraintsCheckResult):
         """Check that module commands reference modules that exist in config."""
         module_actions = {
             "set_temperature": "temperature",
@@ -458,7 +633,7 @@ class ConstraintChecker:
             if step.action in module_actions:
                 required_type = module_actions[step.action]
                 if required_type and required_type not in config_module_types:
-                    result.violations.append(ConstraintViolation(
+                    result._checks.append(CheckResult(
                         violation_type=ViolationType.MODULE_NOT_FOUND,
                         severity=Severity.ERROR,
                         step=step.order,
@@ -468,7 +643,7 @@ class ConstraintChecker:
                         values={"required_type": required_type, "action": step.action}
                     ))
 
-    def _check_labware_on_module(self, spec: ProtocolSpec, result: ConstraintCheckResult):
+    def _check_labware_on_module(self, spec: ProtocolSpec, result: PhysicalConstraintsCheckResult):
         """Warn if protocol uses temperature commands but no labware sits on the module."""
         temp_actions = {"set_temperature", "wait_for_temperature"}
         uses_temp = any(step.action in temp_actions for step in spec.steps)
@@ -489,7 +664,7 @@ class ConstraintChecker:
         )
 
         if not labware_on_temp:
-            result.violations.append(ConstraintViolation(
+            result._checks.append(CheckResult(
                 violation_type=ViolationType.MODULE_LABWARE_MISMATCH,
                 severity=Severity.WARNING,
                 step=0,
@@ -506,7 +681,7 @@ class ConstraintChecker:
                 values={"temp_modules": list(temp_modules)}
             ))
 
-    def _check_tip_sufficiency(self, spec: ProtocolSpec, result: ConstraintCheckResult):
+    def _check_tip_sufficiency(self, spec: ProtocolSpec, result: PhysicalConstraintsCheckResult):
         """Estimate tip usage per pipette and warn if any exceeds available tips."""
         liquid_actions = {"transfer", "distribute", "consolidate", "mix",
                           "serial_dilution", "aspirate", "dispense"}
@@ -543,7 +718,7 @@ class ConstraintChecker:
             available = tips_available.get(mount, 0)
             if used > available > 0:
                 model = self.config["pipettes"][mount].get("model", mount)
-                result.violations.append(ConstraintViolation(
+                result._checks.append(CheckResult(
                     violation_type=ViolationType.TIP_INSUFFICIENT,
                     severity=Severity.ERROR,
                     step=0,
@@ -875,7 +1050,7 @@ class WellStateTracker:
                 Equivalently: True iff the (labware, well) lookup has been
                 seen by the tracker AND its tracked volume strictly exceeds
                 the 0.01uL float-tolerance threshold. False for unseen
-                lookups or for wells tracked at 0.0–0.01uL.
+                lookups or for wells tracked at 0.0-0.01uL.
 
         Side effects: None. Pure read.
 

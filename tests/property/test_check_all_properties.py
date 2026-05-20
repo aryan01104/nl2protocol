@@ -25,7 +25,7 @@ from nl2protocol.models.spec import (
     ProvenancedVolume,
 )
 from nl2protocol.validation.constraints import (
-    ConstraintChecker,
+    PhysicalConstraintsChecker,
     Severity,
     ViolationType,
 )
@@ -246,9 +246,9 @@ class TestCheckAllDeterminism:
     @given(spec=protocol_spec(), config=lab_config())
     @settings(max_examples=50)
     def test_check_all_returns_same_violations_on_repeat(self, spec, config):
-        checker = ConstraintChecker(config)
-        r1 = checker.check_all(spec)
-        r2 = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(config)
+        r1 = checker.assert_physical_constraints(spec)
+        r2 = checker.assert_physical_constraints(spec)
 
         assert len(r1.violations) == len(r2.violations)
         for v1, v2 in zip(r1.violations, r2.violations):
@@ -267,7 +267,7 @@ class TestCheckAllSpecPurity:
     @settings(max_examples=50)
     def test_check_all_does_not_mutate_spec(self, spec, config):
         snapshot = spec.model_dump_json()
-        ConstraintChecker(config).check_all(spec)
+        PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         assert spec.model_dump_json() == snapshot
 
 
@@ -283,7 +283,7 @@ class TestCheckAllConfigPurity:
     def test_check_all_does_not_mutate_config(self, spec, config):
         import json
         snapshot = json.dumps(config, sort_keys=True)
-        ConstraintChecker(config).check_all(spec)
+        PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         assert json.dumps(config, sort_keys=True) == snapshot
 
 
@@ -297,7 +297,7 @@ class TestCheckAllViolationStructure:
     @given(spec=protocol_spec(), config=lab_config())
     @settings(max_examples=50)
     def test_every_violation_is_fully_structured(self, spec, config):
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         for v in result.violations:
             assert v.violation_type is not None
             assert v.severity in {Severity.ERROR, Severity.WARNING, Severity.INFO}
@@ -324,7 +324,7 @@ class TestCheckAllVolumeCompleteness:
     )
     @settings(max_examples=50)
     def test_oversized_volumes_always_produce_capacity_violation(self, spec, config):
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         capacity_violations = [
             v for v in result.violations
             if v.violation_type == ViolationType.PIPETTE_CAPACITY
@@ -356,7 +356,7 @@ class TestCheckAllVolumeSoundness:
             },
             "pipettes": {"left": {"model": "p1000_single_gen2", "tipracks": ["tiprack"]}},
         }
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         capacity_violations = [
             v for v in result.violations
             if v.violation_type == ViolationType.PIPETTE_CAPACITY
@@ -380,7 +380,7 @@ class TestCheckAllWellValidityCompleteness:
     )
     @settings(max_examples=50)
     def test_out_of_grid_well_always_flags_invalid(self, spec, config):
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         well_violations = [
             v for v in result.violations
             if v.violation_type == ViolationType.WELL_INVALID

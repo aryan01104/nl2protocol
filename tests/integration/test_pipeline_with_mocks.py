@@ -30,7 +30,7 @@ import pytest
 from nl2protocol.extraction.extractor import SemanticExtractor
 from nl2protocol.pipeline import generate_python_script
 from nl2protocol.validation.constraints import (
-    ConstraintChecker, Severity, ViolationType,
+    PhysicalConstraintsChecker, Severity, ViolationType,
 )
 
 
@@ -160,7 +160,7 @@ class TestPipelineHappyPath:
         assert spec.steps[0].volume.value == 100.0
 
         # Stage 4 — constraints
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert result.errors == []  # clean
 
         # Stage 5a — spec → schema
@@ -189,7 +189,7 @@ class TestPipelineConstraintFailure:
         spec = extractor.extract("Transfer 500uL from A1 to B1", simple_config)
         assert spec is not None  # extraction itself succeeds — Pydantic doesn't know about pipettes
 
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         capacity_violations = [
             v for v in result.violations
             if v.violation_type == ViolationType.PIPETTE_CAPACITY
@@ -205,7 +205,7 @@ class TestPipelineConstraintFailure:
         spec = extractor.extract("Transfer 100uL from I1 to B1", simple_config)
         assert spec is not None  # Pydantic accepts the well-name; constraints don't
 
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         well_violations = [
             v for v in result.violations
             if v.violation_type == ViolationType.WELL_INVALID
@@ -242,7 +242,7 @@ class TestPipelineMultiStep:
         assert spec is not None
         assert len(spec.steps) == 3
 
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert result.errors == []
 
         schema, _, _ = extractor.spec_to_schema(spec, simple_config)

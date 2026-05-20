@@ -279,22 +279,91 @@ class WellCapacitySuggester:
             return None
         ic = spec.initial_contents[idx]
         config = context.get("config", {})
-        labware = config.get("labware", {}).get(ic.labware) or {}
-        load_name = labware.get("load_name", "")
+
+        # Map the user's labware description to a real config entry so the
+        # load_name (and therefore the capacity lookup) is accurate. Three-
+        # path resolution lets this suggester run in pipeline contexts that
+        # supply the resolver's suggestions AND in test/CLI contexts that
+        # don't.
+        resolved_label, load_name = self._resolve_to_config(
+            ic.labware, config, context.get("labware_suggestions"),
+        )
         capacity = _capacity_for_labware(load_name)
+
+        if resolved_label and load_name:
+            reasoning = (
+                f"'{ic.labware}' resolved to config '{resolved_label}' "
+                f"(load_name '{load_name}'); a well in this container holds "
+                f"~{capacity:.0f} \u00b5L. Using as default \u2014 edit if "
+                f"your actual fill volume is lower."
+            )
+        else:
+            reasoning = (
+                f"Container '{ic.labware}' has no resolved config match; "
+                f"using conservative ~{capacity:.0f} \u00b5L default. Edit "
+                f"if your actual fill volume differs."
+            )
+
         return Suggestion(
             value=capacity,
             provenance_source="deterministic",
-            positive_reasoning=(
-                f"Labware '{ic.labware}' (load_name '{load_name}') has a "
-                f"per-well capacity around {capacity:.0f}uL; using as default."
-            ),
+            positive_reasoning=reasoning,
             why_not_in_instruction=(
                 f"The instruction says well {ic.well} contains "
                 f"'{ic.substance}' but does not state the volume."
             ),
             confidence=0.7,
         )
+
+    @staticmethod
+    def _resolve_to_config(description: str, config: dict,
+                          labware_suggestions: Optional[dict]
+                          ) -> "tuple[Optional[str], str]":
+        """Map a user-language labware description to (config_label, load_name).
+
+        Pre:    `description` is the user's wording (e.g. 'tube rack').
+                `config` is the lab config dict — the source of truth for
+                load_names; `config["labware"]` may be absent or empty.
+                `labware_suggestions`, when supplied, is the dict returned
+                by `LabwareResolver.suggest()` keyed on description; each
+                value exposes a `.suggested_label` attribute (or None).
+
+        Post:   Returns `(label, load_name)` where:
+                  - `label` is the config key chosen for `description`, or
+                    None when no path resolves.
+                  - `load_name` is `config["labware"][label]["load_name"]`,
+                    or '' when no path resolves OR the resolved label has
+                    no load_name entry.
+                Three lookup paths tried in order, first match wins:
+                  1. `labware_suggestions[description].suggested_label`
+                     (the proper path when the labware resolver has run
+                     earlier in the pipeline).
+                  2. `description` is already a literal key in
+                     `config["labware"]` (the legacy/test path).
+                  3. neither matches → returns `(None, '')`.
+
+        Side effects: None.
+        """
+        label: Optional[str] = None
+        labware_map = config.get("labware", {})
+        if labware_suggestions:
+            sug = labware_suggestions.get(description)
+            suggested = (getattr(sug, "suggested_label", None)
+                         if sug is not None else None)
+            # CodeRabbit P1: the suggested_label must actually exist in
+            # the active config. A stale label (resolver suggested a
+            # value not present anymore) would otherwise be propagated
+            # through to load_name lookup → empty load_name →
+            # conservative-fallback capacity, with no chance to try
+            # the legacy direct-config-key path below.
+            if isinstance(suggested, str) and suggested in labware_map:
+                label = suggested
+        if label is None and description in labware_map:
+            label = description
+        if label is None:
+            return None, ""
+        load_name = labware_map.get(label, {}).get("load_name", "")
+        return label, load_name
 
 
 # ============================================================================

@@ -20,7 +20,7 @@ the user had a chance to override, and user overrides only updated
 
 import json
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from nl2protocol.models.spec import LocationRef, ProtocolSpec
 
@@ -106,12 +106,13 @@ class LabwareResolver:
 
         suggestions = {}
         for desc in unique_descs:
-            label = resolved.get(desc)
-            if label is not None:
+            entry = resolved.get(desc)
+            if entry is not None:
+                label, llm_reasoning = entry
                 suggestions[desc] = LabwareSuggestion(
                     description=desc,
                     suggested_label=label,
-                    positive_reasoning=self._positive_reasoning(desc, label),
+                    positive_reasoning=self._positive_reasoning(desc, label, llm_reasoning),
                     why_not_in_instruction=self._why_not_in_instruction(desc, label),
                     confidence=0.85,
                     candidates=list(self.labware_labels),
@@ -152,17 +153,39 @@ class LabwareResolver:
                 ordered.append(pf.labware)
         return ordered
 
-    def _positive_reasoning(self, description: str, label: str) -> str:
+    def _positive_reasoning(self, description: str, label: str,
+                            reasoning: Optional[str] = None) -> str:
         """The 'why is this the right pick?' sentence for a resolver
         suggestion. Stamped into the Provenance iff the user accepts
         the suggestion in the confirmation step.
+
+        Pre:    `description` is the user-language labware reference;
+                `label` is a valid config labware key the resolver
+                picked; `reasoning`, when truthy after strip(), is the
+                LLM's concrete justification (e.g. naming a specific
+                load_name match or single-candidate domain fit).
+
+        Post:   Returns a string of the form
+                "'{description}' → '{label}' (load_name '...'). <body>"
+                where <body> is the LLM's reasoning when supplied, or
+                an honest "reasoning was not surfaced — review and
+                confirm or override" fallback when it isn't. The
+                description→label mapping prefix is preserved in
+                both branches so downstream consumers (modal display
+                + stamped Provenance) keep structural context. The
+                fallback intentionally avoids the previous template's
+                false claim of having reasoned "based on context."
+
+        Side effects: None.
         """
         load_name = self.config.get("labware", {}).get(label, {}).get("load_name", "")
         load_hint = f" (load_name '{load_name}')" if load_name else ""
+        if reasoning and reasoning.strip():
+            return f"'{description}' \u2192 '{label}'{load_hint}. {reasoning.strip()}"
         return (
-            f"User-language description '{description}' resolved to config "
-            f"labware '{label}'{load_hint} based on description text + "
-            f"step usage context (well names, action role)."
+            f"'{description}' \u2192 '{label}'{load_hint}. "
+            f"Reasoning was not surfaced by the resolver \u2014 "
+            f"review the candidates and confirm or override."
         )
 
     def _why_not_in_instruction(self, description: str, label: str) -> str:
@@ -175,18 +198,63 @@ class LabwareResolver:
             f"gap is expected and requires resolution."
         )
 
-    def _llm_resolve(self, descriptions: List[str], spec: ProtocolSpec) -> dict:
+    @staticmethod
+    def _parse_assignment(value) -> Tuple[Optional[str], Optional[str]]:
+        """Normalize one LLM-returned assignment value into a
+        (label, reasoning) pair.
+
+        Pre:    `value` is whatever the LLM emitted inside
+                `assignments[description]`. New shape: a dict
+                {"label": ..., "reasoning": ...}. Legacy shape:
+                a bare string label, or null.
+
+        Post:   Returns (label, reasoning) where:
+                  - new dict shape → (value["label"], value["reasoning"]).
+                    Either field may be None.
+                  - legacy string shape → (value, None). The fallback
+                    reasoning is left for `_positive_reasoning` to
+                    fill so callers can distinguish "LLM gave reasoning"
+                    from "LLM did not."
+                  - null or any other shape → (None, None).
+
+        Side effects: None.
+        """
+        if isinstance(value, str):
+            stripped = value.strip()
+            return (stripped if stripped else None), None
+        if isinstance(value, dict):
+            # Defensive normalization: an LLM may return label / reasoning
+            # as a non-string (list, int, dict). Without these guards the
+            # downstream `label in valid_labels` check (unhashable types)
+            # or `reasoning.strip()` (no .strip on int) crashes the
+            # parse, dropping ALL descriptions to the empty fallback
+            # (CodeRabbit P1).
+            raw_label = value.get("label")
+            label = (raw_label.strip()
+                     if isinstance(raw_label, str) and raw_label.strip()
+                     else None)
+            raw_reasoning = value.get("reasoning")
+            reasoning = (raw_reasoning.strip()
+                         if isinstance(raw_reasoning, str) and raw_reasoning.strip()
+                         else None)
+            return label, reasoning
+        return None, None
+
+    def _llm_resolve(self, descriptions: List[str],
+                     spec: ProtocolSpec) -> dict:
         """Single LLM call to resolve all labware descriptions to config labels.
 
         Pre:    `descriptions` is the list of unique labware descriptions
                 to resolve. `spec` is the extracted spec; only its
                 step-context data is read (action, role, wells, substance).
                 Provenance objects are NOT used by the prompt.
-        Post:   Returns `{description: config_label}` for SUCCESSFUL picks
-                only — entries where the LLM returned null OR returned a
-                label that doesn't exist in `self.config["labware"]` are
-                filtered out. Caller fills in `None` for descriptions
-                absent from this dict.
+        Post:   Returns `{description: (config_label, reasoning_or_None)}`
+                for SUCCESSFUL picks only — entries where the LLM
+                returned null OR returned a label that doesn't exist in
+                `self.config["labware"]` are filtered out. Reasoning is
+                the LLM's concrete justification when present, or None
+                when the LLM returned legacy string-only shape. Caller
+                fills in `None` for descriptions absent from this dict.
         """
         if not self.client:
             return {}
@@ -229,13 +297,32 @@ class LabwareResolver:
 
         prompt += (
             "\nFor each description, respond with JSON only:\n"
-            '{"assignments": {"<description>": "<config_label or null>", ...}}\n\n'
-            "Rules:\n"
+            '{\n'
+            '  "assignments": {\n'
+            '    "<description>": {\n'
+            '      "label": "<config_label or null>",\n'
+            '      "reasoning": "<one or two short sentences naming the SPECIFIC signal that drove the pick>"\n'
+            '    }\n'
+            '  }\n'
+            '}\n\n'
+            "Reasoning rules (these are load-bearing — a vague reason is worse than no reason):\n"
+            "- Name the specific signal that decided the pick. Examples of GOOD reasoning:\n"
+            '    "Only labware in config with load_name containing tuberack; tiprack_20 and tiprack_300 are tip racks per their load_names."\n'
+            '    "Step uses wells A1-D4 (24-well grid) — reagent_rack is the only candidate with that capacity."\n'
+            '    "User wrote \'microplate\'; wellplate_96 is the only 96-well container in config (load_name corning_96_wellplate)."\n'
+            "- Examples of BAD reasoning (do NOT write these — they describe nothing):\n"
+            '    "Based on description text and step context."\n'
+            '    "It matches the description."\n'
+            '    "Inferred from the wells used in the step."\n'
+            "- Reference concrete config keys, load_names, well coordinates, or substance names when relevant.\n"
+            "- For null labels, briefly state why no config label is a reasonable match.\n"
+            "\n"
+            "Matching rules:\n"
             "- Match based on domain knowledge: 'Eppendorf tubes' = tube rack, "
             "'trough' = reservoir, 'microplate' = wellplate, etc.\n"
             "- Use the step context to disambiguate: sources are typically racks/reservoirs, "
             "destinations are typically plates.\n"
-            "- Use null if NO config label is a reasonable match — do not force a match.\n"
+            "- Use null label if NO config label is a reasonable match — do not force a match.\n"
             "- Each config label can be assigned to multiple descriptions if appropriate "
             "(e.g., source and destination on the same plate).\n"
         )
@@ -258,10 +345,12 @@ class LabwareResolver:
             result = json.loads(result_text.strip())
             assignments = result.get("assignments", {})
 
-            return {
-                desc: label
-                for desc, label in assignments.items()
-                if label is not None and label in self.config.get("labware", {})
-            }
+            resolved: dict = {}
+            valid_labels = self.config.get("labware", {})
+            for desc, value in assignments.items():
+                label, reasoning = self._parse_assignment(value)
+                if label is not None and label in valid_labels:
+                    resolved[desc] = (label, reasoning)
+            return resolved
         except Exception:
             return {}

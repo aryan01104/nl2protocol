@@ -34,6 +34,8 @@ from typing import Annotated, List, Optional, Literal, Dict, Tuple
 from anthropic import Anthropic
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
+from nl2protocol.citing import cite_covers_well
+
 
 # Import spec models from their canonical location
 from nl2protocol.models.spec import (
@@ -270,17 +272,41 @@ class SemanticExtractor:
 
     @staticmethod
     def _value_in_quote(value, quote: str) -> bool:
-        """Return True if `value` is contained within the cited quote.
+        """Return True if `value` is grounded by the cited `quote`.
 
         Numeric values: accept both '100' and '100.0' forms (integer-valued
         floats may appear in the cite either way). String values: case-
-        insensitive substring match.
+        insensitive substring match, plus a well-name range relaxation —
+        a well like 'B2' is considered grounded by a cite like '(B1-B4)',
+        'column 2', or 'rows A-D' because the cited range syntax IS
+        verbatim from the instruction and the member well is a
+        deterministic expansion of it. The relaxation only fires for
+        well-name-shaped values ([A-P]\\d+); other strings keep the
+        plain substring semantics.
         """
         if isinstance(value, (int, float)):
             if float(value).is_integer() and str(int(value)) in quote:
                 return True
             return str(value) in quote
-        return str(value).lower() in quote.lower()
+        s = str(value).strip()
+        # Range path: a well like 'B2' is grounded by a cite that names
+        # the range 'B1-B4' (or 'column 1', 'rows A-D'). Cite_covers_well
+        # only fires for cites containing range syntax; literal-well
+        # cites fall through to the boundary/substring path below.
+        if cite_covers_well(quote, s):
+            return True
+        # Well-name literals (`[A-P]\d+`) must match the cite with word
+        # boundaries — otherwise "B2" would match a cite containing
+        # "B20", silently hiding fabricated wells (CodeRabbit P1).
+        if re.fullmatch(r"[A-Pa-p]\d+", s):
+            return re.search(
+                rf"(?<![A-Za-z0-9]){re.escape(s)}(?![A-Za-z0-9])",
+                quote,
+                re.IGNORECASE,
+            ) is not None
+        # Non-well-shaped strings (substance names, etc.): plain
+        # case-insensitive substring match, as before.
+        return s.lower() in quote.lower()
 
     def _verify_claimed_instruction_provenance(self, spec: ProtocolSpec, instruction: str) -> List[dict]:
         """Verify every source='instruction' provenance via cited_text.

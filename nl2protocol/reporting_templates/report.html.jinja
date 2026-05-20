@@ -256,6 +256,82 @@
      the justification + optional domain expansion. */
   .step { cursor: help; }
 
+  /* P1-8: inline constraint-check tag, placed right beside the value
+     it verifies (e.g. "volume: 2.0 uL ✓ within p20 range (1–20 µL)").
+     Green pill matches the WARNING legend's complement — tan = "look
+     at this", green = "this was verified." The column-level toggle
+     (.col.checks-hidden) below hides all of these in one click for
+     users who've built trust and want a cleaner view. */
+  .inline-check {
+    display: inline;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    background: rgba(79, 138, 43, 0.08);
+    color: #2d5d2b;
+    font-size: 11px;
+    font-style: normal;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .inline-check::before {
+    content: "\2713 ";   /* ✓ */
+    color: #4f8a2b;
+    font-weight: 700;
+  }
+  .col.checks-hidden .inline-check { display: none; }
+
+  /* P1-8 toggle button — sits above the step list in the validated-spec
+     column. Clicking it toggles the `.checks-hidden` class on the
+     column (handled by JS at the end of the template). State is
+     persisted in localStorage so a returning visitor gets their last
+     choice automatically. */
+  .checks-toggle-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 11px;
+    color: var(--dim);
+  }
+  .checks-toggle-btn {
+    background: rgba(79, 138, 43, 0.08);
+    border: 1px solid rgba(79, 138, 43, 0.4);
+    color: #2d5d2b;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .checks-toggle-btn:hover { background: rgba(79, 138, 43, 0.15); }
+
+  /* P1-9: per-step constraint warning, rendered inline at the bottom
+     of the step row in the validated-spec column. Tan left-border +
+     subtle background tint matches the WARNING legend color
+     (`#b08846`) added in Task #8. Slightly larger font than the
+     global summary list to address the "very small text" feedback. */
+  .step-warning {
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-left: 3px solid #b08846;
+    background: #fdf3df;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #5a4a1f;
+    border-radius: 2px;
+  }
+  .step-warning-line {
+    /* Preserve the multi-line "Why: / Suggestion:" structure that
+       constraints.py emits — without `pre-wrap` the indentation that
+       carries those sub-claims would collapse. */
+    white-space: pre-wrap;
+  }
+  .step-warning-line + .step-warning-line {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(176, 136, 70, 0.25);
+  }
+
   /* ───────── Code column ───────── */
   pre.code {
     margin: 0;
@@ -764,14 +840,28 @@
 <body>
 
 <header>
-  <h1>nl2protocol report</h1>
+  {# Upper-left header block — only rendered for the static post-run report.
+     In live serve mode, the upper-right `#live-stage-indicator` (below) is
+     the single source of truth for run status; the "Generated <time> ·
+     Status: failed" pre-render here was grandfathered from when this
+     template was a post-run-only artifact and misled live-mode visitors. #}
+  {% if not live_mode %}
+  {# P2-1: header copy after Task #2 deleted the block from live mode.
+     User flagged "generated" / "status" / "report" as useless or unnecessary
+     for the static-artifact use case. Each word is removed where it doesn't
+     carry information the surrounding context already gives:
+       - drop "report" from the title (filename + content already signal it)
+       - drop "Generated" prefix (the timestamp speaks for itself)
+       - drop "Status:" label (the colored success/failed token speaks for itself) #}
+  <h1>nl2protocol</h1>
   <div class="meta">
-    Generated {{ timestamp }} ·
-    Status: {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+    {{ timestamp }} ·
+    {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
     {% if prov_stats and prov_stats.total %}
       · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
     {% endif %}
   </div>
+  {% endif %}
   {% if live_mode %}
   <!-- ADR-0013 Phase 3g (Group B): top-right stage indicator. Floats
        above the page; tracks the pipeline's current stage + plain-
@@ -838,8 +928,8 @@
         Confirm initial contents
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 1 of 3 · accept defaults or edit any row</span>
       </div>
-      <div style="padding: 10px 18px; border-bottom: 1px solid var(--grid); font-size: 12px; color: var(--dim); line-height: 1.5;">
-        Wells that need to be pre-filled <em>before</em> the protocol runs. Each row was inferred from your instruction. The volume is how much you'll physically load into that well — the bot will aspirate from it later. Italic values were defaulted by the system; user-stated values appear in normal weight.
+      <div style="padding: 10px 18px; border-bottom: 1px solid var(--grid); font-size: 13px; color: var(--ink); line-height: 1.55;">
+        Pre-fill these wells before running the protocol. <em>Italic</em> volumes are defaults the system filled in for you; <strong>normal weight</strong> volumes came from your instruction. Click any number to edit before confirming.
       </div>
       <div id="live-ic-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
@@ -890,12 +980,22 @@
     </div>
   </div>
   {% endif %}
+  {# Legend is the decoder ring for the report's visual encoding. Grouped
+     into four logical concepts (instruction-sourced, model-filled, review
+     markers, step-block grounding) so a reader can scan one group at a
+     time. The model-filled row shows ▴ + dotted underline + categorical
+     color side-by-side so readers see they're three cues for one fact
+     (rather than three separate signals to decode). #}
   <div class="legend">
-    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ arrow = step decomposition (instruction phrase → spec step)</span>
-    <span style="color: var(--dim); font-style: italic;">instruction-sourced atoms: per-citation hue (same hue on cite + value)</span>
-    <span><span class="non-instr-marker">▴</span> non-instruction atom (filled in by model — domain default / inferred / config)</span>
-    <span style="color: var(--col-instruction); font-weight: 700;">⚠</span><span style="margin-left: 4px;"> reviewer disagreed (hover for objection)</span>
-    <span style="color: #1f5fa6;">✎</span><span style="margin-left: 4px;"> user-edited during gap resolution</span>
+    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition · instruction-sourced atoms get per-citation hue (cite ↔ value)</span>
+
+    <span><span class="non-instr-marker">▴</span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (marker + dotted underline + categorical color — three cues for one fact):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
+
+    <span><span style="color: var(--col-instruction); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: #1f5fa6;">✎</span> user-edited during gap resolution</span>
+
+    <span>step-block left border signals grounding:<span class="swatch" style="background: var(--col-instruction); margin-left: 8px;"></span>grounded ·<span class="swatch" style="background: var(--col-domain);"></span>mixed ·<span class="swatch" style="background: var(--col-inferred);"></span>orphan</span>
+
+    <span><span style="color: #4f8a2b; font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
   </div>
 </header>
 
@@ -1046,8 +1146,24 @@
        is the spec that becomes CompleteProtocolSpec at the type-system
        level. Visually similar to column 3 today; Phase 2b's arrows will
        show what changed (labware re-mappings + any constraint clips). -->
-  <div class="col col-validated-spec{% if live_mode %} is-pending{% endif %}">
+  <div id="validated-col" class="col col-validated-spec{% if live_mode %} is-pending{% endif %}">
     <h2>Validated Spec</h2>
+    {# P1-8 toggle bar — clicking the button hides every `.inline-check`
+       in this column via the `.checks-hidden` class. JS at the bottom
+       of the template wires the click + persists state to localStorage. #}
+    <div class="checks-toggle-bar">
+      <button id="checks-toggle" type="button" class="checks-toggle-btn">Hide inline checks</button>
+      <span>each verified value carries a green ✓ tag — click to hide</span>
+    </div>
+    {# P1-7: column-local legend so the user can decode the constraint-
+       summary line below without having to infer from color alone. Inline
+       glyph hues match the summary-state colors (red `--col-instruction`,
+       tan `#b08846`) so the user binds definition to visual cue. Always
+       rendered regardless of summary state. #}
+    <div class="validated-summary-legend" style="font-size: 12px; color: var(--dim); margin: 2px 0 8px; line-height: 1.5;">
+      <strong style="color: var(--col-instruction);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
+      <strong style="color: #b08846;">⚠ warning</strong> = concern flagged for your review; pipeline continues.
+    </div>
     <!-- Phase 3i (#72): constraint-check summary. Static path renders
          from constraint_summary; live path's JS replaces #validated-summary's
          content on constraint_check_done. Hidden until populated. -->
@@ -1064,9 +1180,15 @@
             <strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated
           {% endif %}
         </div>
-        {% if constraint_summary.warnings %}
+        {# P1-9: top list shows only protocol-level (Step 0) or unparseable
+           warnings. Step-specific warnings are surfaced inline at their
+           step row below via `step.warnings`. Falls back to the flat
+           `warnings` list when the splitter wasn't run (older state log
+           consumer). #}
+        {% set _global_warns = constraint_summary.warnings_global if constraint_summary.warnings_global is defined else constraint_summary.warnings %}
+        {% if _global_warns %}
           <ul class="validated-summary-warnings">
-            {% for w in constraint_summary.warnings %}
+            {% for w in _global_warns %}
               <li>{{ w|e }}</li>
             {% endfor %}
           </ul>
@@ -1079,6 +1201,7 @@
              data-step-cited="{{ step.step_cited_text|e }}"
              data-step-palette="{{ step.step_palette_class }}"
              data-script-step="s{{ loop.index0 }}"
+             data-step-order="{{ step.order }}"
              {% if step.step_reasoning %}data-step-reasoning="{{ step.step_reasoning|e }}"{% endif %}
              data-params-reasoning="{{ step.parameters_reasoning|e }}"
              data-confidence="{{ step.confidence }}">
@@ -1087,6 +1210,18 @@
             <div class="step-detail">{{ line|safe }}</div>
           {% endfor %}
           {% if step.note_line %}{{ step.note_line|safe }}{% endif %}
+          {# P1-9: per-step constraint warnings surface here so the user
+             sees them in the same visual context as the step they refer
+             to. Tan accent matches the WARNING color used in the
+             validated-summary legend (Task #8). Live-mode JS injects
+             into the same `.step-warning` shape on `constraint_check_done`. #}
+          {% if step.warnings %}
+            <div class="step-warning">
+              {% for w in step.warnings %}
+                <div class="step-warning-line">{{ w|e }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     {% else %}
@@ -1123,14 +1258,23 @@
 <svg id="arrow-overlay" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <clipPath id="arrow-clip"><rect id="arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
+    <!-- Phase 3 fix (P1-10): resolution-arrow clip. Both source + destination
+         columns are always in view horizontally, but a bezier curve with
+         high vertical sweep (e.g., extracted Step 3 → resolved Step 7) used
+         to escape the column box vertically and float over unrelated UI.
+         Rect is sized to the resolved column's bounding box on each
+         render — see updateResolutionArrowClip() below. -->
+    <clipPath id="resolution-arrow-clip"><rect id="resolution-arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
   </defs>
   <!-- Composite-step arrows (instruction → extracted spec). Clipped to the
        extracted-spec column so off-screen segments don't visually escape. -->
   <g clip-path="url(#arrow-clip)" id="arrow-paths"></g>
   <!-- Resolution arrows (extracted → resolved spec, ADR-0011 Phase 2b).
-       NOT clipped — the relevant region spans columns 2 and 3, both
-       always in view at desktop widths. -->
-  <g id="resolution-arrow-paths"></g>
+       Clipped vertically to the resolved-spec column (P1-10 fix); the
+       arrow's bezier shape is preserved, only the off-column overflow
+       is hidden so when the user scrolls source + destination back into
+       view the arrow re-emerges intact. -->
+  <g clip-path="url(#resolution-arrow-clip)" id="resolution-arrow-paths"></g>
 </svg>
 
 <!-- ADR-0011 Phase 2b: resolution-arrow data embedded as JSON.
@@ -1608,6 +1752,23 @@
       // Columns not yet rendered — nothing to anchor against.
       return;
     }
+    // P1-10 fix: keep the clip rect in sync with the resolved column's
+    // vertical bounds. Horizontal extent stays generous (full window
+    // width) so the bezier curve's sweep remains visible even when its
+    // mid-point is far from the column edges; only vertical overflow
+    // gets hidden. Mirrors the composite-arrow clip-update pattern in
+    // renderArrows() above.
+    const clipRect = document.getElementById("resolution-arrow-clip-rect");
+    if (clipRect) {
+      const rRes = resolvedCol.getBoundingClientRect();
+      const rExt = extractedCol.getBoundingClientRect();
+      const yTop = Math.min(rRes.top, rExt.top);
+      const yBot = Math.max(rRes.bottom, rExt.bottom);
+      clipRect.setAttribute("x", "0");
+      clipRect.setAttribute("y", String(yTop));
+      clipRect.setAttribute("width", String(window.innerWidth));
+      clipRect.setAttribute("height", String(yBot - yTop));
+    }
     const seenThisRender = new Set();
     arrows.forEach((arrow) => {
       const pid = arrow.prov_id;
@@ -1746,12 +1907,37 @@
     wireHover();
     wirePanelToggles();
     wireScriptLinkage();
+    wireChecksToggle();
     // Re-render on every layout-affecting event so arrows track their anchors.
     window.addEventListener("resize", scheduleRender);
     window.addEventListener("scroll", scheduleRender, { passive: true });
     document.querySelectorAll(".col").forEach((c) =>
       c.addEventListener("scroll", scheduleRender, { passive: true })
     );
+  }
+
+  // P1-8: column-level toggle that shows/hides all .inline-check tags
+  // in the validated-spec column. Persisted to localStorage so a
+  // returning visitor lands on their prior preference automatically.
+  // The button + state class live on the column itself, so the
+  // injector (`updateValidatedSummary` in live mode) just appends
+  // .inline-check spans — the column's class decides visibility.
+  function wireChecksToggle() {
+    const btn = document.getElementById("checks-toggle");
+    const col = document.getElementById("validated-col");
+    if (!btn || !col) return;
+    const STORAGE_KEY = "nl2protocol.checksHidden";
+    let hidden = false;
+    try { hidden = localStorage.getItem(STORAGE_KEY) === "1"; } catch (e) {}
+    if (hidden) col.classList.add("checks-hidden");
+    btn.textContent = hidden ? "Show inline checks" : "Hide inline checks";
+    btn.addEventListener("click", function () {
+      const nowHidden = col.classList.toggle("checks-hidden");
+      btn.textContent = nowHidden ? "Show inline checks" : "Hide inline checks";
+      try {
+        localStorage.setItem(STORAGE_KEY, nowHidden ? "1" : "0");
+      } catch (e) {}
+    });
   }
 
   if (document.readyState === "loading") {
@@ -1801,9 +1987,9 @@
     // Severity → (label, bg, fg). Keys must match GapSeverity literals
     // ("blocker"/"suggestion"/"quality"); CLI maps these same three.
     const SEVERITY_TAG = {
-      "blocker":    { label: "BLOCKER",     bg: "#f8d7da", fg: "#721c24" },
+      "blocker":    { label: "MUST RESOLVE", bg: "#f8d7da", fg: "#721c24" },
       "suggestion": { label: "needs review", bg: "#fff3cd", fg: "#856404" },
-      "quality":    { label: "optional",    bg: "#f0e6d2", fg: "#6b6b6b" },
+      "quality":    { label: "optional",     bg: "#f0e6d2", fg: "#6b6b6b" },
     };
 
     function showPanel(req) {
@@ -2237,6 +2423,11 @@
         // step id so the hover-pair handler can highlight matching
         // .code-line elements (and vice-versa).
         if (isValidatedCol) div.dataset.scriptStep = "s" + idx;
+        // P1-9: tag every step block (in any column) with its 1-based
+        // step.order so the constraint-warning injector can target
+        // `.col-validated-spec .step[data-step-order="N"]`. Mirrors the
+        // static template's data-step-order attribute.
+        if (step.order != null) div.dataset.stepOrder = String(step.order);
         let html = `<div class="step-action">Step ${step.order}: ${escapeHtml(step.action || "")}</div>`;
         (step.detail_lines || []).forEach((line) => {
           html += `<div class="step-detail">${line}</div>`;
@@ -2635,15 +2826,40 @@
       updatePanelMeta(panel, rows, "mapping", "mappings");
     }
 
+    // P1-9: parse "[WARN] Step N: ..." prefix client-side. Mirrors the
+    // Python `_split_warnings_by_step` helper so live + static paths route
+    // warnings identically.
+    const WARN_STEP_RE = /^\s*\[WARN\]\s+Step\s+(\d+)\s*:/i;
+    function splitWarningsByStep(warnings) {
+      const perStep = new Map();  // step_order(int) -> [warning, ...]
+      const globalWarns = [];
+      warnings.forEach((w) => {
+        const m = WARN_STEP_RE.exec(String(w));
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n >= 1) {
+            if (!perStep.has(n)) perStep.set(n, []);
+            perStep.get(n).push(w);
+            return;
+          }
+        }
+        globalWarns.push(w);
+      });
+      return { perStep, globalWarns };
+    }
+
     function updateValidatedSummary(data) {
       // Phase 3i (#72): mirror the static-path Jinja render exactly so
       // the banner reads the same in live + archived reports. Three
       // states: clean (green), warnings only (tan), errors (red).
+      // P1-9: route per-step warnings inline into the matching step
+      // row; only Step 0 / unparseable warnings remain in the top list.
       const banner = document.getElementById("validated-summary");
       if (!banner || !data) return;
       const vc = data.violation_count || 0;
       const warnings = Array.isArray(data.warnings) ? data.warnings : [];
       const wc = warnings.length;
+      const { perStep, globalWarns } = splitWarningsByStep(warnings);
       banner.classList.remove("is-empty");
       let lineClass, html;
       if (vc > 0) {
@@ -2657,14 +2873,33 @@
         html = '<strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated';
       }
       let body = '<div class="validated-summary-line ' + lineClass + '">' + html + '</div>';
-      if (warnings.length > 0) {
+      if (globalWarns.length > 0) {
         body += '<ul class="validated-summary-warnings">';
-        warnings.forEach((w) => {
+        globalWarns.forEach((w) => {
           body += '<li>' + escapeHtml(String(w)) + '</li>';
         });
         body += '</ul>';
       }
       banner.innerHTML = body;
+
+      // P1-9: inject per-step warnings into their step rows. Clears any
+      // prior .step-warning blocks first so re-runs don't duplicate.
+      const col = document.querySelector(".col-validated-spec");
+      if (!col) return;
+      col.querySelectorAll(".step-warning").forEach((el) => el.remove());
+      perStep.forEach((stepWarnings, stepOrder) => {
+        const stepEl = col.querySelector('.step[data-step-order="' + stepOrder + '"]');
+        if (!stepEl) return;
+        const wrap = document.createElement("div");
+        wrap.className = "step-warning";
+        stepWarnings.forEach((w) => {
+          const line = document.createElement("div");
+          line.className = "step-warning-line";
+          line.textContent = String(w);
+          wrap.appendChild(line);
+        });
+        stepEl.appendChild(wrap);
+      });
     }
 
     function updateBulkPanels(data) {

@@ -215,7 +215,8 @@ def _safe_data(data: Any) -> Any:
 
 
 def _enrich_spec_event_data(event_kind: str, raw_data: Any,
-                             instruction: str) -> dict:
+                             instruction: str,
+                             inline_checks_by_step: Optional[dict] = None) -> dict:
     """For spec events (extracted/resolved/completed), pre-render the
     step blocks server-side using the existing `_step_to_render_dict`
     helper and include them in the payload, plus the cite-marked
@@ -231,6 +232,13 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
     from. Built using the SAME `_render_instruction_with_marks` +
     `_collect_arrow_targets` the static HTMLReporter uses, so the live
     column is byte-equivalent to the static archive.
+
+    P1-8: `inline_checks_by_step` (when supplied — only by the
+    completed_spec branch of the WebSocket sender) is the cached
+    per-step dict of passing constraint checks. It threads through to
+    `_step_to_render_dict` so each step's detail_lines get the green
+    inline tags embedded in the right value cells. None for other spec
+    events (extracted/resolved are pre-validation).
 
     Pre:    `event_kind` is one of "extracted_spec" / "resolved_spec" /
             "completed_spec". `raw_data` is the event's data dict
@@ -259,8 +267,12 @@ def _enrich_spec_event_data(event_kind: str, raw_data: Any,
             _render_instruction_with_marks,
             _step_to_render_dict,
         )
+        inline_by_step = inline_checks_by_step or {}
         step_dicts = [
-            _step_to_render_dict(s, idx, instruction)
+            _step_to_render_dict(
+                s, idx, instruction,
+                inline_checks=inline_by_step.get(s.order),
+            )
             for idx, s in enumerate(spec.steps)
         ]
         out: Dict[str, Any] = {
@@ -364,6 +376,15 @@ class LiveModeApp:
         # whole run; same as the static path's _collect_resolution_arrows
         # walking the captured event list.
         self._gap_resolved_events: list = []
+        # P1-8: cache the constraint checker's passed-check records by
+        # step + detail_label between events. constraint_check_done
+        # arrives BEFORE completed_spec, so by the time the validated-
+        # spec column is being rendered we already know which inline
+        # green tag to embed in each detail row. Populated in the
+        # constraint_check_done branch of `_ws_sender`; consumed when
+        # building the completed_spec payload via
+        # `_enrich_spec_event_data`.
+        self._inline_checks_by_step: dict = {}
         # Phase 3c: shared dict between the worker thread (writes when
         # HTMLConfirmationHandler.present is called) and the WebSocket
         # receiver coroutine (reads + signals when panel_response arrives).
@@ -482,6 +503,7 @@ class LiveModeApp:
                 break
         self._instruction_text = ""
         self._gap_resolved_events = []
+        self._inline_checks_by_step = {}
         self._pending_requests.clear()
         self._pending_assignments.clear()
         self._pending_binary_confirms.clear()
@@ -660,9 +682,26 @@ class LiveModeApp:
                 data = _safe_data(event.data)
             elif event.kind in ("extracted_spec", "resolved_spec",
                                 "completed_spec"):
+                # P1-8: only the validated-spec column surfaces constraint
+                # outcomes, so inline_checks_by_step is plumbed in only
+                # for the completed_spec event. Other spec snapshots
+                # render with no green tags (they're pre-validation).
+                inline = (self._inline_checks_by_step
+                          if event.kind == "completed_spec" else None)
                 data = _enrich_spec_event_data(
                     event.kind, event.data, self._instruction_text,
+                    inline_checks_by_step=inline,
                 )
+            elif event.kind == "constraint_check_done":
+                # P1-8: cache passed_checks for the completed_spec event
+                # processed downstream; pass the event through unchanged
+                # so the browser's updateValidatedSummary handler still
+                # receives the same payload it already consumes.
+                from nl2protocol.reporting import _passes_to_inline_checks
+                passed = (event.data or {}).get("passed_checks") if isinstance(event.data, dict) else None
+                if passed:
+                    self._inline_checks_by_step = _passes_to_inline_checks(passed)
+                data = _safe_data(event.data)
             elif event.kind == "gap_resolved":
                 # Phase 3b-2: track for cumulative arrow set.
                 self._gap_resolved_events.append(event)
