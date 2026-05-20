@@ -1508,15 +1508,22 @@ class TestHTMLReporterArrowsEnd2End:
         assert "success" in out_success.read_text()
 
     def test_html_is_self_contained_no_external_resources(self, tmp_path):
-        """The report should be a single file with no external CSS/JS/images."""
+        """The report should be a single file with no external CSS/JS/images.
+
+        One deliberate exception (refresh-website-parity, 2026-05-20):
+        the Google Fonts CSS link for IBM Plex Sans + JetBrains Mono
+        matches the website's font stack. When opened offline the
+        fonts fall back through the system stack (-apple-system, etc.)
+        so the report still renders — just without the website fonts.
+        """
+        import re
         out = tmp_path / "report.html"
         HTMLReporter(str(out)).finalize()
         content = out.read_text()
-        # Inline CSS only — no <link rel="stylesheet">
-        assert "<link rel=\"stylesheet\"" not in content.lower()
-        # No external scripts (Phase 2 has no JS at all)
+        links = re.findall(r'<link[^>]*rel="stylesheet"[^>]*>', content, re.IGNORECASE)
+        unexpected = [link for link in links if "fonts.googleapis.com" not in link]
+        assert unexpected == [], f"unexpected external stylesheets: {unexpected}"
         assert "<script src=" not in content.lower()
-        # No external images either
         assert "<img " not in content.lower()
 
 

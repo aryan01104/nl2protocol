@@ -4,102 +4,109 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>nl2protocol report — {{ timestamp }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
   /* ───────── Layout ───────── */
   :root {
     /* ───────── Semantic provenance hues ─────────
-       Each provenance source category gets one hue. The pre-refresh
-       palette had red=instruction, purple=config, gold=domain,
-       orange=inferred — kept here for parity until commit 2 (palette
-       swap to website tokens). */
-    --col-instruction: #e63946;   /* arrow color + step-grounded border */
-    --col-config:      #9d4edd;   /* labware-resolver viz */
-    --col-domain:      #ffb703;
-    --col-inferred:    #fb8500;
+       Aligned with website palette (cool slate + Tailwind 600s).
+       Mapping:
+         instruction → blue-600   (was red — semantic moved to disagree)
+         config      → indigo-600 (kept distinct from domain)
+         domain      → amber-600
+         inferred    → orange-600
+       Red now carries one meaning project-wide: reviewer-disagree. */
+    --col-instruction: #2563eb;
+    --col-config:      #4f46e5;
+    --col-domain:      #d97706;
+    --col-inferred:    #ea580c;
 
-    /* ───────── Surfaces ───────── */
-    --bg:              #fdf6e3;   /* warm off-white background       */
-    --panel:           #ffffff;   /* cards / modals                  */
-    --ink:             #1a1a1a;   /* primary text                    */
-    --dim:             #6b6b6b;   /* secondary text                  */
-    --grid:            #e5e0d4;   /* borders + rules                 */
+    /* ───────── Surfaces (Notion off-white + slate ink, per website) ───────── */
+    --bg:              #f7f6f3;
+    --panel:           #ffffff;
+    --ink:             #0f172a;   /* slate-900                       */
+    --dim:             #475569;   /* slate-600                       */
+    --grid:            #e2e8f0;   /* slate-200                       */
 
-    /* ───────── Action buttons (primary teal / secondary outline) ───────── */
-    --btn-primary:           #2a9d8f;
+    /* ───────── Typography (IBM Plex Sans body, JetBrains Mono code) ───────── */
+    --font-body:  "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+                  "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo,
+                  Consolas, monospace;
+
+    /* ───────── Action buttons (slate-ink primary, slate-300 outline) ───────── */
+    --btn-primary:           #0f172a;   /* matches --ink              */
     --btn-primary-fg:        #ffffff;
-    --btn-secondary-border:  #c0c0c0;
+    --btn-secondary-border:  #cbd5e1;   /* slate-300                  */
 
-    /* ───────── Status pills (idle / error / running / done) ─────────
-       Used by the live-mode top-right indicator AND the JS setStatus
-       helper. JS reads these as literals for now; commit 2 will lift
-       them into a single JS constant block. */
-    --status-success-bg:  #d4edda;
-    --status-success-fg:  #155724;
-    --status-error-bg:    #f8d7da;
-    --status-error-fg:    #721c24;
-    --status-warn-bg:     #fff3cd;
-    --status-warn-fg:     #856404;
-    --status-neutral-bg:  #f0e6d2;
-    --status-neutral-fg:  #6b6b6b;
+    /* ───────── Status pills (Tailwind 100 bg / 800 fg pairs) ───────── */
+    --status-success-bg:  #dcfce7;
+    --status-success-fg:  #166534;
+    --status-error-bg:    #fee2e2;
+    --status-error-fg:    #991b1b;
+    --status-warn-bg:     #fef3c7;
+    --status-warn-fg:     #92400e;
+    --status-neutral-bg:  #f1f5f9;
+    --status-neutral-fg:  #475569;
 
-    /* ───────── Modal / panel chrome ───────── */
-    --modal-header-bg:        #faf6e8;
-    --panel-header-hover-bg:  #f3edd6;
-    --panel-empty-text:       #b9b3a4;
+    /* ───────── Modal / panel chrome (slate-100 header, slate-200 hover) ───────── */
+    --modal-header-bg:        #f1f5f9;
+    --panel-header-hover-bg:  #e2e8f0;
+    --panel-empty-text:       #94a3b8;   /* slate-400                 */
 
-    /* ───────── Warning chrome (anchored step warnings, validated-summary) ───────── */
-    --warning-bg:        #fdf3df;
-    --warning-text:      #5a4a1f;
-    --warning-accent:    #b08846;   /* tan border + ⚠ glyph color   */
+    /* ───────── Warning chrome (amber family) ───────── */
+    --warning-bg:        #fef3c7;   /* amber-100                     */
+    --warning-text:      #78350f;   /* amber-900                     */
+    --warning-accent:    #d97706;   /* amber-600 (= --col-domain)    */
 
-    /* ───────── Live-mode stage indicator (top-right progress badge) ─────────
-       Conceptually distinct from --warning-accent even when the hue
-       happens to match: the indicator switches to a "done" green when
-       the pipeline finishes; the warning hue is fixed. */
-    --indicator-tan:     #b08846;
-    --indicator-done:    #4f8a2b;
+    /* ───────── Live-mode stage indicator (amber working, green done) ───────── */
+    --indicator-tan:     #d97706;
+    --indicator-done:    #16a34a;
 
-    /* ───────── Reviewer-disagree wash (panel objection block) ───────── */
-    --disagree-bg:       #fff4e6;
+    /* ───────── Reviewer-disagree wash (red-100) ───────── */
+    --disagree-bg:       #fee2e2;
 
-    /* ───────── Resolution-arrow colors (extracted ↔ resolved links) ───────── */
-    --res-auto-accepted:        #4f8a2b;   /* leaf green   */
-    --res-user-accepted:        #6b8e3d;   /* gray-green   */
-    --res-user-edited:          #1f5fa6;   /* deep blue    */
-    --res-user-confirmed:       #6b6b6b;   /* dim gray     */
+    /* ───────── Resolution-arrow colors ───────── */
+    --res-auto-accepted:        #16a34a;   /* green-600  */
+    --res-user-accepted:        #15803d;   /* green-700  */
+    --res-user-edited:          #2563eb;   /* blue-600   */
+    --res-user-confirmed:       #94a3b8;   /* slate-400  */
 
-    /* ───────── Inline-check pill (P1-8 verified-value ✓ tag) ───────── */
-    --check-pill-fg:     #2d5d2b;
-    --check-pill-glyph:  #4f8a2b;
+    /* ───────── Inline-check pill (green family) ───────── */
+    --check-pill-fg:     #166534;   /* green-800                      */
+    --check-pill-glyph:  #16a34a;   /* green-600                      */
 
-    /* ───────── Hover tooltip (#hover-tip) ───────── */
-    --tip-bg:            #2a2a2a;
-    --tip-fg:            #f5f5f5;
-    --tip-dim:           #b8b8b8;
-    --tip-cite-quote:    #ffd9c2;
-    --tip-reasoning:     #f0f0f0;
+    /* ───────── Hover tooltip (slate-950 surface) ───────── */
+    --tip-bg:            #020617;   /* slate-950                     */
+    --tip-fg:            #f8fafc;   /* slate-50                      */
+    --tip-dim:           #cbd5e1;   /* slate-300                     */
+    --tip-cite-quote:    #fbbf24;   /* amber-400 (warm on dark)      */
+    --tip-reasoning:     #e2e8f0;   /* slate-200                     */
 
-    /* ───────── Per-citation palette (8 distinguishable hues) ─────────
+    /* ───────── Per-citation palette (8 hues, Tailwind 600 family) ─────────
        Each unique cited_text in the instruction hashes to one slot;
        both the cite span (instruction column) and the atomic value
-       span (spec column) share the hue. Saturated for legibility
-       against the off-white background — designed to be picked out
-       at a glance. */
-    --palette-0: #c1272d;   /* deep red     */
-    --palette-1: #e76f1c;   /* burnt orange */
-    --palette-2: #c79100;   /* mustard      */
-    --palette-3: #4f8a2b;   /* leaf green   */
-    --palette-4: #168a8a;   /* teal         */
-    --palette-5: #1f5fa6;   /* deep blue    */
-    --palette-6: #5d3fa8;   /* indigo       */
-    --palette-7: #b62f7a;   /* magenta      */
+       span (spec column) share the hue. Uniform saturation level
+       across the family for visual coherence. */
+    --palette-0: #dc2626;   /* red-600     */
+    --palette-1: #ea580c;   /* orange-600  */
+    --palette-2: #d97706;   /* amber-600   */
+    --palette-3: #16a34a;   /* green-600   */
+    --palette-4: #0d9488;   /* teal-600    */
+    --palette-5: #2563eb;   /* blue-600    */
+    --palette-6: #7c3aed;   /* violet-600  */
+    --palette-7: #db2777;   /* pink-600    */
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    font: 14px/1.55 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   header {
     padding: 24px 32px 16px;
@@ -269,7 +276,7 @@
   /* ───────── Instruction column ───────── */
   .instruction-text {
     white-space: pre-wrap;
-    font-family: ui-serif, Georgia, "Times New Roman", serif;
+    font-family: var(--font-body);
     font-size: 14px;
     line-height: 1.6;
   }
@@ -397,7 +404,7 @@
   /* ───────── Code column ───────── */
   pre.code {
     margin: 0;
-    font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Courier New", monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.45;
     white-space: pre;
@@ -810,7 +817,7 @@
     letter-spacing: 0.04em;
   }
   .panel td.col-volume {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-family: var(--font-mono);
     text-align: right;
     color: var(--ink);
   }
@@ -849,7 +856,7 @@
     top: 18px;
     right: 22px;
     z-index: 1100;
-    font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+    font: 13px/1.35 var(--font-body);
     color: var(--indicator-tan);
     text-align: right;
     user-select: none;
@@ -918,7 +925,7 @@
   <h1>nl2protocol</h1>
   <div class="meta">
     {{ timestamp }} ·
-    {% if success %}<strong style="color:#2a9d8f">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+    {% if success %}<strong style="color:var(--status-success-fg)">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
     {% if prov_stats and prov_stats.total %}
       · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
     {% endif %}
@@ -944,21 +951,21 @@
   <div class="live-controls" style="margin-top: 10px; padding: 12px 14px; border: 1px solid var(--grid); border-radius: 6px; background: var(--panel); display: flex; flex-direction: column; gap: 10px;">
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <label for="live-example-select" style="font-size: 13px; color: var(--ink);">Protocol:</label>
-      <select id="live-example-select" style="font: 13px -apple-system, sans-serif; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 220px;">
+      <select id="live-example-select" style="font: 13px var(--font-body); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 220px;">
         <option value="">— choose —</option>
       </select>
       <span style="color: var(--dim); font-size: 12px;">or</span>
-      <button type="button" id="live-upload-toggle" style="font: 13px -apple-system, sans-serif; padding: 5px 10px; border: 1px solid #c0c0c0; background: white; cursor: pointer; border-radius: 4px;">Upload your own…</button>
+      <button type="button" id="live-upload-toggle" style="font: 13px var(--font-body); padding: 5px 10px; border: 1px solid var(--btn-secondary-border); background: var(--panel); cursor: pointer; border-radius: 4px;">Upload your own…</button>
     </div>
-    <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: #faf6e8; border-radius: 4px;">
+    <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: var(--modal-header-bg); border-radius: 4px;">
       <label style="font-size: 12px; color: var(--ink);">Instruction (.txt): <input type="file" id="live-instruction-file" accept=".txt,.md,text/plain" style="font-size: 12px;"></label>
       <label style="font-size: 12px; color: var(--ink);">Config (.json): <input type="file" id="live-config-file" accept=".json,application/json" style="font-size: 12px;"></label>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <label for="live-api-key" style="font-size: 13px; color: var(--ink);">Anthropic key:</label>
-      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px ui-monospace, 'SF Mono', Menlo, monospace; padding: 5px 8px; border: 1px solid #c0c0c0; border-radius: 4px; min-width: 280px;">
-      <button id="live-start-btn" style="font: 14px -apple-system, sans-serif; padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
-      <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #d4edda; color: #155724;">idle</span>
+      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px var(--font-mono); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 280px;">
+      <button id="live-start-btn" style="font: 14px var(--font-body); padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
+      <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: var(--status-success-bg); color: var(--status-success-fg);">idle</span>
     </div>
     <div style="color: var(--dim); font-size: 11px; line-height: 1.5;">
       Your key is used only for this request and never stored. Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.
@@ -970,11 +977,11 @@
        assignments modal — typically just a list + 2 buttons. -->
   <div id="live-binary-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.30); z-index: 1050; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 10px 32px rgba(0,0,0,0.22); width: min(520px, 92vw); max-height: 80vh; overflow-y: auto; font-size: 13px;">
-      <div id="live-binary-title" style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;"></div>
+      <div id="live-binary-title" style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;"></div>
       <div id="live-binary-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-binary-no" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">No</button>
-        <button id="live-binary-yes" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Yes</button>
+        <button id="live-binary-no" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">No</button>
+        <button id="live-binary-yes" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Yes</button>
       </div>
     </div>
   </div>
@@ -986,7 +993,7 @@
        1 of 3 in the post-extraction confirmation sequence. -->
   <div id="live-ic-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
-      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
         Confirm initial contents
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 1 of 3 · accept defaults or edit any row</span>
       </div>
@@ -995,8 +1002,8 @@
       </div>
       <div id="live-ic-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-ic-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
-        <button id="live-ic-confirm" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+        <button id="live-ic-abort" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-ic-confirm" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
       </div>
     </div>
   </div>
@@ -1008,23 +1015,23 @@
        JS in initLiveMode wires up populate + submit. -->
   <div id="live-assignments-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
     <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
-      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
         Confirm labware assignments
         <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">step 3 of 3 · change any row, or confirm to accept all</span>
       </div>
       <div id="live-assignments-body" style="padding: 14px 18px;"></div>
       <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
-        <button id="live-assignments-abort" style="padding: 6px 14px; border: 1px solid #c0c0c0; background: white; color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
-        <button id="live-assignments-confirm" style="padding: 6px 14px; border: 1px solid #2a9d8f; background: #2a9d8f; color: white; border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+        <button id="live-assignments-abort" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-assignments-confirm" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
       </div>
     </div>
   </div>
   <!-- ADR-0013 Phase 3c: gap-prompt modal. Hidden until a panel_request
        arrives over the WebSocket. Anchored bottom-right per ADR-0013. -->
   <div id="live-panel" style="display: none; position: fixed; right: 24px; bottom: 24px; width: 380px; max-height: 70vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 1000; font-size: 13px;">
-    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: #faf6e8; font-weight: 600;">
+    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
       <span id="live-panel-title">Confirm gap</span>
-      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: #f0e6d2; color: var(--dim); font-weight: 500;"></span>
+      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: var(--status-neutral-bg); color: var(--dim); font-weight: 500;"></span>
     </div>
     <div style="padding: 12px 14px;">
       <div id="live-panel-description" style="margin-bottom: 8px;"></div>
@@ -1035,7 +1042,7 @@
            gap.metadata.reviewer_objection field is non-empty. Orange-tinted
            to match the legend's "⚠ reviewer disagreed" marker. Hidden by
            default; showPanel toggles display. -->
-      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--col-instruction); background: #fff4e6; font-size: 12px;"></div>
+      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--col-instruction); background: var(--disagree-bg); font-size: 12px;"></div>
     </div>
     <div id="live-panel-buttons" style="padding: 10px 14px; border-top: 1px solid var(--grid); display: flex; gap: 8px; flex-wrap: wrap;">
       <!-- buttons injected per-gap by JS (accept / skip / override / abort) -->
@@ -1053,11 +1060,11 @@
 
     <span><span class="non-instr-marker">▴</span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (marker + dotted underline + categorical color — three cues for one fact):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
 
-    <span><span style="color: var(--col-instruction); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: #1f5fa6;">✎</span> user-edited during gap resolution</span>
+    <span><span style="color: var(--col-instruction); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
     <span>step-block left border signals grounding:<span class="swatch" style="background: var(--col-instruction); margin-left: 8px;"></span>grounded ·<span class="swatch" style="background: var(--col-domain);"></span>mixed ·<span class="swatch" style="background: var(--col-inferred);"></span>orphan</span>
 
-    <span><span style="color: #4f8a2b; font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
+    <span><span style="color: var(--res-auto-accepted); font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
   </div>
 </header>
 
@@ -1219,12 +1226,13 @@
     </div>
     {# P1-7: column-local legend so the user can decode the constraint-
        summary line below without having to infer from color alone. Inline
-       glyph hues match the summary-state colors (red `--col-instruction`,
-       tan `#b08846`) so the user binds definition to visual cue. Always
-       rendered regardless of summary state. #}
+       glyph hues track the summary-state colors (var(--col-instruction)
+       for violations, var(--warning-accent) for warnings) so the user
+       binds definition to visual cue. Always rendered regardless of
+       summary state. #}
     <div class="validated-summary-legend" style="font-size: 12px; color: var(--dim); margin: 2px 0 8px; line-height: 1.5;">
       <strong style="color: var(--col-instruction);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
-      <strong style="color: #b08846;">⚠ warning</strong> = concern flagged for your review; pipeline continues.
+      <strong style="color: var(--warning-accent);">⚠ warning</strong> = concern flagged for your review; pipeline continues.
     </div>
     <!-- Phase 3i (#72): constraint-check summary. Static path renders
          from constraint_summary; live path's JS replaces #validated-summary's
@@ -1237,9 +1245,9 @@
           {% if vc > 0 %}
             <strong style="color: var(--col-instruction);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
           {% elif wc > 0 %}
-            <strong style="color: #b08846;">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
+            <strong style="color: var(--warning-accent);">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
           {% else %}
-            <strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated
+            <strong style="color: var(--check-pill-glyph);">✓ 0 violations</strong> — protocol validated
           {% endif %}
         </div>
         {# P1-9: top list shows only protocol-level (Step 0) or unparseable
@@ -2021,22 +2029,32 @@
 
     let activeWS = null;   // populated by connectWS so panel button clicks can reach it
 
+    // Read a CSS custom property off :root. Used to keep JS color
+    // literals in sync with the design-token palette in <style>:root.
+    const cssVar = (name) =>
+      getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
     // Status changes are sticky in the failure direction: once we've set
     // "error", `pipeline_done` (which fires unconditionally in the server's
     // finally block) must NOT downgrade the status back to a success-looking
     // "done". Without this, an uncaught exception sequence — error event
     // first, then pipeline_done sentinel — paints the indicator green and
     // makes a real crash look like a clean run.
+    //
+    // Signature: setStatus(text, tier) where tier ∈
+    // {"success", "error", "warn", "neutral"}. The tier resolves to a
+    // (--status-{tier}-bg, --status-{tier}-fg) pair on :root so every
+    // pill color tracks the central palette tokens.
     let statusIsTerminalError = false;
-    function setStatus(text, bg, fg) {
+    function setStatus(text, tier) {
       if (text === "error") {
         statusIsTerminalError = true;
       } else if (statusIsTerminalError && text === "done") {
         return;
       }
       status.textContent = text;
-      status.style.background = bg;
-      status.style.color = fg;
+      status.style.background = cssVar(`--status-${tier}-bg`);
+      status.style.color = cssVar(`--status-${tier}-fg`);
     }
 
     // ADR-0013 Phase 3c: gap-prompt modal helpers.
@@ -2048,10 +2066,12 @@
 
     // Severity → (label, bg, fg). Keys must match GapSeverity literals
     // ("blocker"/"suggestion"/"quality"); CLI maps these same three.
+    // Colors come from the central palette tokens via cssVar() so the
+    // badges shift automatically when the palette swaps.
     const SEVERITY_TAG = {
-      "blocker":    { label: "MUST RESOLVE", bg: "#f8d7da", fg: "#721c24" },
-      "suggestion": { label: "needs review", bg: "#fff3cd", fg: "#856404" },
-      "quality":    { label: "optional",     bg: "#f0e6d2", fg: "#6b6b6b" },
+      "blocker":    { label: "MUST RESOLVE", bg: cssVar("--status-error-bg"),   fg: cssVar("--status-error-fg") },
+      "suggestion": { label: "needs review", bg: cssVar("--status-warn-bg"),    fg: cssVar("--status-warn-fg") },
+      "quality":    { label: "optional",     bg: cssVar("--status-neutral-bg"), fg: cssVar("--status-neutral-fg") },
     };
 
     function showPanel(req) {
@@ -2063,7 +2083,9 @@
         gap.kind ? "Gap: " + gap.kind : "Confirm gap";
       const sev = document.getElementById("live-panel-severity");
       const sevTag = SEVERITY_TAG[gap.severity]
-                     || { label: gap.severity || "", bg: "#f0e6d2", fg: "#6b6b6b" };
+                     || { label: gap.severity || "",
+                          bg: cssVar("--status-neutral-bg"),
+                          fg: cssVar("--status-neutral-fg") };
       sev.textContent = sevTag.label;
       sev.style.background = sevTag.bg;
       sev.style.color = sevTag.fg;
@@ -2158,8 +2180,8 @@
         const el = document.createElement("button");
         el.textContent = b.label;
         el.style.cssText = b.primary
-          ? "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;"
-          : "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+          ? "padding:6px 14px;border:1px solid var(--btn-primary);background:var(--btn-primary);color:var(--btn-primary-fg);border-radius:4px;cursor:pointer;font-size:13px;"
+          : "padding:6px 14px;border:1px solid var(--btn-secondary-border);background:var(--panel);color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
         el.addEventListener("click", () => triggerAction(b.action));
         btnRow.appendChild(el);
       });
@@ -2226,13 +2248,13 @@
       const input = document.createElement("input");
       input.type = "text";
       input.value = String(initial);
-      input.style.cssText = "flex:1;min-width:0;padding:6px 8px;border:1px solid #c0c0c0;border-radius:4px;font-size:13px;";
+      input.style.cssText = "flex:1;min-width:0;padding:6px 8px;border:1px solid var(--btn-secondary-border);border-radius:4px;font-size:13px;";
       const save = document.createElement("button");
       save.textContent = "Save";
-      save.style.cssText = "padding:6px 14px;border:1px solid #2a9d8f;background:#2a9d8f;color:white;border-radius:4px;cursor:pointer;font-size:13px;";
+      save.style.cssText = "padding:6px 14px;border:1px solid var(--btn-primary);background:var(--btn-primary);color:var(--btn-primary-fg);border-radius:4px;cursor:pointer;font-size:13px;";
       const cancel = document.createElement("button");
       cancel.textContent = "Cancel";
-      cancel.style.cssText = "padding:6px 14px;border:1px solid #c0c0c0;background:white;color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
+      cancel.style.cssText = "padding:6px 14px;border:1px solid var(--btn-secondary-border);background:var(--panel);color:var(--ink);border-radius:4px;cursor:pointer;font-size:13px;";
       function submit() {
         if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
         activeWS.send(JSON.stringify({
@@ -2525,7 +2547,7 @@
         input.type = "number";
         input.step = "any";
         input.min = "0";
-        input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid #c0c0c0; border-radius: 4px; font-family: ui-monospace, 'SF Mono', Menlo, monospace;";
+        input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; font-family: var(--font-mono);";
         // Pre-fill: extracted current value wins; else suggester output;
         // else empty for the user to type.
         const initial = (row.current_volume_ul !== null && row.current_volume_ul !== undefined)
@@ -2694,7 +2716,7 @@
         const labelCell = document.createElement("td");
         labelCell.style.cssText = "padding: 6px 8px; vertical-align: top;";
         const select = document.createElement("select");
-        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid #c0c0c0; border-radius: 4px;";
+        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px;";
         // Empty option for unresolved; only used when no candidates match.
         if (!row.suggested_label) {
           const opt = document.createElement("option");
@@ -2912,10 +2934,10 @@
         html = '<strong style="color: var(--col-instruction);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
       } else if (wc > 0) {
         lineClass = "has-warnings";
-        html = '<strong style="color: #b08846;">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
+        html = '<strong style="color: var(--warning-accent);">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
       } else {
         lineClass = "all-clear";
-        html = '<strong style="color: #4f8a2b;">✓ 0 violations</strong> — protocol validated';
+        html = '<strong style="color: var(--check-pill-glyph);">✓ 0 violations</strong> — protocol validated';
       }
       let body = '<div class="validated-summary-line ' + lineClass + '">' + html + '</div>';
       if (globalWarns.length > 0) {
@@ -3219,13 +3241,13 @@
           if (e.data) gateModal(() => showIcModal(e.data));
           break;
         case "pipeline_done":
-          setStatus("done", "#d4edda", "#155724");
+          setStatus("done", "success");
           startBtn.disabled = false;
           hidePanel();
           markIndicatorDone();
           break;
         case "error":
-          setStatus("error", "#f8d7da", "#721c24");
+          setStatus("error", "error");
           break;
       }
       // After any DOM mutation, re-render arrows so existing red
@@ -3247,7 +3269,7 @@
           handleEvent(JSON.parse(msg.data));
         } catch (err) { /* parse error — skip */ }
       };
-      ws.onerror = () => { setStatus("ws error", "#f8d7da", "#721c24"); };
+      ws.onerror = () => { setStatus("ws error", "error"); };
       ws.onclose = () => { activeWS = null; };
     }
 
@@ -3311,7 +3333,7 @@
     startBtn.addEventListener("click", async () => {
       const apiKey = (document.getElementById("live-api-key").value || "").trim();
       if (!apiKey && !LOCAL_DEV_MODE) {
-        setStatus("API key required", "#f8d7da", "#721c24");
+        setStatus("API key required", "error");
         return;
       }
 
@@ -3320,33 +3342,33 @@
         if (uploadMode) {
           const instText = await readFileText(document.getElementById("live-instruction-file"));
           const configText = await readFileText(document.getElementById("live-config-file"));
-          if (!instText) { setStatus("instruction file required", "#f8d7da", "#721c24"); return; }
-          if (!configText) { setStatus("config file required", "#f8d7da", "#721c24"); return; }
+          if (!instText) { setStatus("instruction file required", "error"); return; }
+          if (!configText) { setStatus("config file required", "error"); return; }
           instruction = instText;
           try { config = JSON.parse(configText); }
-          catch (e) { setStatus("invalid config JSON", "#f8d7da", "#721c24"); return; }
+          catch (e) { setStatus("invalid config JSON", "error"); return; }
         } else if (exampleSelect.value) {
           const [instResp, configResp] = await Promise.all([
             fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/instruction"),
             fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/config"),
           ]);
           if (!instResp.ok || !configResp.ok) {
-            setStatus("failed to load example", "#f8d7da", "#721c24");
+            setStatus("failed to load example", "error");
             return;
           }
           instruction = await instResp.text();
           config = await configResp.json();
         } else {
-          setStatus("pick an example or upload files", "#f8d7da", "#721c24");
+          setStatus("pick an example or upload files", "error");
           return;
         }
       } catch (err) {
-        setStatus("input read error", "#f8d7da", "#721c24");
+        setStatus("input read error", "error");
         return;
       }
 
       startBtn.disabled = true;
-      setStatus("starting...", "#fff3cd", "#856404");
+      setStatus("starting...", "warn");
       try {
         const r = await fetch("/start", {
           method: "POST",
@@ -3355,16 +3377,16 @@
         });
         const j = await r.json();
         if (j.status === "started") {
-          setStatus("running", "#fff3cd", "#856404");
+          setStatus("running", "warn");
         } else if (j.status === "already_running") {
-          setStatus("demo busy — try again in a few minutes", "#fff3cd", "#856404");
+          setStatus("demo busy — try again in a few minutes", "warn");
           startBtn.disabled = false;
         } else {
-          setStatus("error: " + (j.message || "start failed"), "#f8d7da", "#721c24");
+          setStatus("error: " + (j.message || "start failed"), "error");
           startBtn.disabled = false;
         }
       } catch (err) {
-        setStatus("network error", "#f8d7da", "#721c24");
+        setStatus("network error", "error");
         startBtn.disabled = false;
       }
     });
