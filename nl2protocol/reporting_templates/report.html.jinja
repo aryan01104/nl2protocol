@@ -7,30 +7,92 @@
 <style>
   /* ───────── Layout ───────── */
   :root {
-    --col-instruction: #e63946;   /* vivid red, arrow color */
-    --col-config:      #9d4edd;   /* purple, reserved for labware-resolver viz */
-    --col-domain:      #ffb703;   /* gold */
-    --col-inferred:    #fb8500;   /* orange */
-    --bg:              #fdf6e3;   /* warm off-white */
-    --indicator-tan:   #b08846;   /* live-mode progress indicator */
-    --panel:           #ffffff;
-    --ink:             #1a1a1a;
-    --dim:             #6b6b6b;
-    --grid:            #e5e0d4;
+    /* ───────── Semantic provenance hues ─────────
+       Each provenance source category gets one hue. The pre-refresh
+       palette had red=instruction, purple=config, gold=domain,
+       orange=inferred — kept here for parity until commit 2 (palette
+       swap to website tokens). */
+    --col-instruction: #e63946;   /* arrow color + step-grounded border */
+    --col-config:      #9d4edd;   /* labware-resolver viz */
+    --col-domain:      #ffb703;
+    --col-inferred:    #fb8500;
 
-    /* Per-citation palette (8 vivid, distinguishable hues). Each unique
-       cited_text in the instruction hashes to one slot; both the cite
-       span (instruction column) and the atomic value span (spec column)
-       share the hue. Saturated for legibility against the off-white
-       background — designed to be picked out at a glance. */
-    --palette-0: #c1272d;   /* deep red */
+    /* ───────── Surfaces ───────── */
+    --bg:              #fdf6e3;   /* warm off-white background       */
+    --panel:           #ffffff;   /* cards / modals                  */
+    --ink:             #1a1a1a;   /* primary text                    */
+    --dim:             #6b6b6b;   /* secondary text                  */
+    --grid:            #e5e0d4;   /* borders + rules                 */
+
+    /* ───────── Action buttons (primary teal / secondary outline) ───────── */
+    --btn-primary:           #2a9d8f;
+    --btn-primary-fg:        #ffffff;
+    --btn-secondary-border:  #c0c0c0;
+
+    /* ───────── Status pills (idle / error / running / done) ─────────
+       Used by the live-mode top-right indicator AND the JS setStatus
+       helper. JS reads these as literals for now; commit 2 will lift
+       them into a single JS constant block. */
+    --status-success-bg:  #d4edda;
+    --status-success-fg:  #155724;
+    --status-error-bg:    #f8d7da;
+    --status-error-fg:    #721c24;
+    --status-warn-bg:     #fff3cd;
+    --status-warn-fg:     #856404;
+    --status-neutral-bg:  #f0e6d2;
+    --status-neutral-fg:  #6b6b6b;
+
+    /* ───────── Modal / panel chrome ───────── */
+    --modal-header-bg:        #faf6e8;
+    --panel-header-hover-bg:  #f3edd6;
+    --panel-empty-text:       #b9b3a4;
+
+    /* ───────── Warning chrome (anchored step warnings, validated-summary) ───────── */
+    --warning-bg:        #fdf3df;
+    --warning-text:      #5a4a1f;
+    --warning-accent:    #b08846;   /* tan border + ⚠ glyph color   */
+
+    /* ───────── Live-mode stage indicator (top-right progress badge) ─────────
+       Conceptually distinct from --warning-accent even when the hue
+       happens to match: the indicator switches to a "done" green when
+       the pipeline finishes; the warning hue is fixed. */
+    --indicator-tan:     #b08846;
+    --indicator-done:    #4f8a2b;
+
+    /* ───────── Reviewer-disagree wash (panel objection block) ───────── */
+    --disagree-bg:       #fff4e6;
+
+    /* ───────── Resolution-arrow colors (extracted ↔ resolved links) ───────── */
+    --res-auto-accepted:        #4f8a2b;   /* leaf green   */
+    --res-user-accepted:        #6b8e3d;   /* gray-green   */
+    --res-user-edited:          #1f5fa6;   /* deep blue    */
+    --res-user-confirmed:       #6b6b6b;   /* dim gray     */
+
+    /* ───────── Inline-check pill (P1-8 verified-value ✓ tag) ───────── */
+    --check-pill-fg:     #2d5d2b;
+    --check-pill-glyph:  #4f8a2b;
+
+    /* ───────── Hover tooltip (#hover-tip) ───────── */
+    --tip-bg:            #2a2a2a;
+    --tip-fg:            #f5f5f5;
+    --tip-dim:           #b8b8b8;
+    --tip-cite-quote:    #ffd9c2;
+    --tip-reasoning:     #f0f0f0;
+
+    /* ───────── Per-citation palette (8 distinguishable hues) ─────────
+       Each unique cited_text in the instruction hashes to one slot;
+       both the cite span (instruction column) and the atomic value
+       span (spec column) share the hue. Saturated for legibility
+       against the off-white background — designed to be picked out
+       at a glance. */
+    --palette-0: #c1272d;   /* deep red     */
     --palette-1: #e76f1c;   /* burnt orange */
-    --palette-2: #c79100;   /* mustard */
-    --palette-3: #4f8a2b;   /* leaf green */
-    --palette-4: #168a8a;   /* teal */
-    --palette-5: #1f5fa6;   /* deep blue */
-    --palette-6: #5d3fa8;   /* indigo */
-    --palette-7: #b62f7a;   /* magenta */
+    --palette-2: #c79100;   /* mustard      */
+    --palette-3: #4f8a2b;   /* leaf green   */
+    --palette-4: #168a8a;   /* teal         */
+    --palette-5: #1f5fa6;   /* deep blue    */
+    --palette-6: #5d3fa8;   /* indigo       */
+    --palette-7: #b62f7a;   /* magenta      */
   }
   * { box-sizing: border-box; }
   body {
@@ -170,7 +232,7 @@
     content: "✎";
     margin-left: 3px;
     font-size: 11px;
-    color: #1f5fa6;
+    color: var(--res-user-edited);
     vertical-align: baseline;
   }
 
@@ -195,14 +257,14 @@
      The flip is done by overriding text color and adding a strong bg
      of the same palette hue. Per-palette contrast is hardcoded — chosen
      once for legibility, not computed. */
-  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: #1a1a1a; }
-  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: #fff; }
-  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: #fff; }
+  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: var(--ink); }
+  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: var(--panel); }
+  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: var(--panel); }
 
   /* ───────── Instruction column ───────── */
   .instruction-text {
@@ -238,7 +300,7 @@
   .step-detail {
     margin-left: 12px;
     font-size: 13px;
-    color: #333;
+    color: var(--ink);
   }
   .step-detail .label { color: var(--dim); margin-right: 4px; }
   /* Footnote inside a step block — used for the `note` field on
@@ -267,8 +329,8 @@
     margin-left: 8px;
     padding: 1px 6px;
     border-radius: 2px;
-    background: rgba(79, 138, 43, 0.08);
-    color: #2d5d2b;
+    background: color-mix(in srgb, var(--check-pill-glyph) 8%, transparent);
+    color: var(--check-pill-fg);
     font-size: 11px;
     font-style: normal;
     white-space: nowrap;
@@ -276,7 +338,7 @@
   }
   .inline-check::before {
     content: "\2713 ";   /* ✓ */
-    color: #4f8a2b;
+    color: var(--check-pill-glyph);
     font-weight: 700;
   }
   .col.checks-hidden .inline-check { display: none; }
@@ -295,29 +357,29 @@
     color: var(--dim);
   }
   .checks-toggle-btn {
-    background: rgba(79, 138, 43, 0.08);
-    border: 1px solid rgba(79, 138, 43, 0.4);
-    color: #2d5d2b;
+    background: color-mix(in srgb, var(--check-pill-glyph) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--check-pill-glyph) 40%, transparent);
+    color: var(--check-pill-fg);
     padding: 3px 9px;
     border-radius: 3px;
     font: inherit;
     cursor: pointer;
   }
-  .checks-toggle-btn:hover { background: rgba(79, 138, 43, 0.15); }
+  .checks-toggle-btn:hover { background: color-mix(in srgb, var(--check-pill-glyph) 15%, transparent); }
 
   /* P1-9: per-step constraint warning, rendered inline at the bottom
      of the step row in the validated-spec column. Tan left-border +
-     subtle background tint matches the WARNING legend color
-     (`#b08846`) added in Task #8. Slightly larger font than the
-     global summary list to address the "very small text" feedback. */
+     subtle background tint matches the WARNING legend color added
+     in Task #8. Slightly larger font than the global summary list
+     to address the "very small text" feedback. */
   .step-warning {
     margin-top: 8px;
     padding: 6px 10px;
-    border-left: 3px solid #b08846;
-    background: #fdf3df;
+    border-left: 3px solid var(--warning-accent);
+    background: var(--warning-bg);
     font-size: 13px;
     line-height: 1.45;
-    color: #5a4a1f;
+    color: var(--warning-text);
     border-radius: 2px;
   }
   .step-warning-line {
@@ -329,7 +391,7 @@
   .step-warning-line + .step-warning-line {
     margin-top: 4px;
     padding-top: 4px;
-    border-top: 1px solid rgba(176, 136, 70, 0.25);
+    border-top: 1px solid color-mix(in srgb, var(--warning-accent) 25%, transparent);
   }
 
   /* ───────── Code column ───────── */
@@ -340,7 +402,7 @@
     line-height: 1.45;
     white-space: pre;
     overflow-x: auto;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   /* Phase 3i (#72): per-line spans inside <pre.code>. Each <span> ends
      in a literal newline so the <pre> still wraps line-by-line. The
@@ -447,8 +509,8 @@
   }
   .validated-summary.is-empty { display: none; }
   .validated-summary-line { color: var(--ink); }
-  .validated-summary-line.all-clear { border-left: 3px solid #4f8a2b; padding-left: 6px; }
-  .validated-summary-line.has-warnings { border-left: 3px solid #b08846; padding-left: 6px; }
+  .validated-summary-line.all-clear { border-left: 3px solid var(--check-pill-glyph); padding-left: 6px; }
+  .validated-summary-line.has-warnings { border-left: 3px solid var(--warning-accent); padding-left: 6px; }
   .validated-summary-line.has-errors { border-left: 3px solid var(--col-instruction); padding-left: 6px; }
   .validated-summary-warnings {
     margin: 6px 0 0;
@@ -501,25 +563,25 @@
      marks it .prov-active), the cell fills with its color and the text
      flips to white/black for contrast. Same visual language on both
      sides of the cite ↔ value pair. */
-  span.palette-0.prov-active, span.palette-0.prov-spotlight, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-1.prov-active, span.palette-1.prov-spotlight, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-2.prov-active, span.palette-2.prov-spotlight, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: #1a1a1a;  outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-3.prov-active, span.palette-3.prov-spotlight, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-4.prov-active, span.palette-4.prov-spotlight, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-5.prov-active, span.palette-5.prov-spotlight, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-6.prov-active, span.palette-6.prov-spotlight, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-7.prov-active, span.palette-7.prov-spotlight, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: #fff;     outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-0.prov-active, span.palette-0.prov-spotlight, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-1.prov-active, span.palette-1.prov-spotlight, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-2.prov-active, span.palette-2.prov-spotlight, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-3.prov-active, span.palette-3.prov-spotlight, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-4.prov-active, span.palette-4.prov-spotlight, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-5.prov-active, span.palette-5.prov-spotlight, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-6.prov-active, span.palette-6.prov-spotlight, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.palette-7.prov-active, span.palette-7.prov-spotlight, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* Non-instruction sources without palette: use their categorical hue. */
-  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: #1a1a1a; outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* Instruction-sourced spans WITHOUT a palette (cite not recoverable):
      fall back to instruction-red. Spans WITH a palette take the palette
      rules above (later in the cascade with the same specificity, so
      palette wins by source order). */
-  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: #fff;    outline: none; text-decoration: none; border-radius: 2px; }
+  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
 
   /* ───────── ADR-0011 Phase 2b/4 polish: ✗ placeholder cells ─────────
      For action-expected fields that are null on the step, the renderer
@@ -540,9 +602,9 @@
   .cell-empty.prov-active,
   .cell-empty.prov-spotlight,
   .cell-empty[data-prov-id]:hover {
-    background: rgba(184, 68, 79, 0.08);
+    background: color-mix(in srgb, var(--col-instruction) 8%, transparent);
     border-radius: 2px;
-    outline: 1px solid rgba(184, 68, 79, 0.35);
+    outline: 1px solid color-mix(in srgb, var(--col-instruction) 35%, transparent);
     outline-offset: 1px;
   }
 
@@ -552,8 +614,8 @@
     z-index: 100;
     max-width: 360px;
     padding: 10px 12px;
-    background: #2a2a2a;
-    color: #f5f5f5;
+    background: var(--tip-bg);
+    color: var(--tip-fg);
     font-size: 12px;
     line-height: 1.45;
     border-radius: 4px;
@@ -565,7 +627,7 @@
   }
   #hover-tip.visible { opacity: 1; }
   #hover-tip .tip-meta {
-    color: #b8b8b8;
+    color: var(--tip-dim);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -573,10 +635,10 @@
   }
   #hover-tip .tip-cite {
     font-style: italic;
-    color: #ffd9c2;
+    color: var(--tip-cite-quote);
     margin-bottom: 6px;
   }
-  #hover-tip .tip-reasoning { color: #f0f0f0; }
+  #hover-tip .tip-reasoning { color: var(--tip-reasoning); }
   #hover-tip .tip-section { margin-top: 8px; }
   /* Indented blockquote of the step's cited text. The left bar uses the
      step-trigger color (vivid red for instruction grounding) so readers
@@ -586,7 +648,7 @@
     margin: 8px 0 0;
     padding: 4px 0 4px 10px;
     border-left: 3px solid var(--col-instruction);
-    color: #ffd9c2;
+    color: var(--tip-cite-quote);
     font-style: italic;
     line-height: 1.4;
   }
@@ -605,7 +667,7 @@
     margin: 8px 0 0;
     padding: 4px 0 4px 10px;
     border-left: 3px solid var(--col-instruction);
-    color: #ffd9c2;
+    color: var(--tip-cite-quote);
     font-style: italic;
     line-height: 1.4;
   }
@@ -654,10 +716,10 @@
     stroke-opacity: 0.9;
     stroke-width: 3;
   }
-  #arrow-overlay path.res-auto_accepted            { stroke: #4f8a2b; }  /* leaf green */
-  #arrow-overlay path.res-user_accepted_suggestion { stroke: #6b8e3d; }  /* gray-green */
-  #arrow-overlay path.res-user_edited              { stroke: #1f5fa6; }  /* deep blue */
-  #arrow-overlay path.res-user_confirmed           { stroke: #6b6b6b; }  /* dim gray */
+  #arrow-overlay path.res-auto_accepted            { stroke: var(--res-auto-accepted); }
+  #arrow-overlay path.res-user_accepted_suggestion { stroke: var(--res-user-accepted); }
+  #arrow-overlay path.res-user_edited              { stroke: var(--res-user-edited); }
+  #arrow-overlay path.res-user_confirmed           { stroke: var(--res-user-confirmed); }
 
   /* ───────── ADR-0011 Phase 2c: confirmation summary panels ─────────
      Two read-only audit tables rendered below the 5-col grid:
@@ -685,11 +747,11 @@
     cursor: pointer;
     padding: 10px 14px;
     user-select: none;
-    background: #faf6e8;
+    background: var(--modal-header-bg);
     border-bottom: 1px solid var(--grid);
     transition: background 0.15s;
   }
-  .panel-header:hover { background: #f3edd6; }
+  .panel-header:hover { background: var(--panel-header-hover-bg); }
   .panel-chevron {
     font-size: 11px;
     color: var(--dim);
@@ -706,7 +768,7 @@
     color: var(--dim);
     font-weight: 500;
   }
-  .panel.is-empty .panel-count { color: #b9b3a4; }
+  .panel.is-empty .panel-count { color: var(--panel-empty-text); }
   .panel-body {
     padding: 12px 16px 14px;
     max-height: 400px;
@@ -750,16 +812,16 @@
   .panel td.col-volume {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     text-align: right;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel td.col-substance,
   .panel td.col-description {
     font-style: italic;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel td.col-label {
     font-weight: 500;
-    color: #1a1a1a;
+    color: var(--ink);
   }
   .panel .empty {
     color: var(--dim);
@@ -771,7 +833,7 @@
      via the existing data-prov-id system. */
   .panel tbody tr[data-target-cells]:hover,
   .panel tbody tr.row-active {
-    background: rgba(184, 68, 79, 0.06);
+    background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     cursor: help;
   }
 
@@ -810,7 +872,7 @@
   }
   #live-stage-indicator.is-done .indicator-dot {
     animation: none;
-    background: #4f8a2b;
+    background: var(--indicator-done);
   }
   #live-stage-indicator .indicator-line-sub {
     font-size: 12px;
