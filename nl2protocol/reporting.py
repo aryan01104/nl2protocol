@@ -548,6 +548,13 @@ def _render_instruction_with_marks(instruction: str, targets: list) -> str:
             "prov_id": t["prov_id"],
             "kind": t["kind"],
             "step_id": t.get("step_id"),
+            # Carry palette_class through to the sweep-line layer so
+            # _wrap_overlapping_segment can emit `.palette-N` on the cite
+            # <span>. Without this, the cite-side hover-flip CSS rule
+            # (.cite-marker.cite-atomic-color.palette-N.cite-active) never
+            # matches, leaving only the faint .cite-active fallback —
+            # the visual-attribution-invisible bug from PDF p.3.
+            "palette_class": t.get("palette_class"),
         })
 
     if not spans:
@@ -655,21 +662,23 @@ def _format_location(loc) -> str:
 
 def _format_labware_label(loc) -> str:
     """Just the labware portion of a LocationRef: '"tube rack"' or
-    '"tube rack"  [reagent_rack]' when resolved.
+    '"tube rack" → labware: [reagent_rack]' when resolved.
 
     Pre:    `loc` is a LocationRef with `description` (required) and
             an optional `resolved_label`.
     Post:   Returns '"description"' alone if resolved_label is null;
-            '"description"  [resolved_label]' otherwise. The double
-            quotes are P2-2: they make the user's verbatim wording
-            visually distinguishable from neighboring plain text on
-            the row (substance, action name). The resolved_label
-            stays in its existing bracketed form. No well info in
-            this string — that's `_format_wells_only`'s job.
+            '"description" → labware: [resolved_label]' otherwise.
+            The double quotes are P2-2: they make the user's verbatim
+            wording visually distinguishable from neighboring plain
+            text on the row (substance, action name). The arrow +
+            "labware:" prefix is CARRY-D1: makes the description →
+            config-key mapping direction visible at a glance, per
+            the user's PDF p.2 literal `tube_rack → labware: [reagent_rack]`.
+            No well info in this string — that's `_format_wells_only`'s job.
     """
     text = f'"{loc.description}"'
     if getattr(loc, "resolved_label", None):
-        text += f"  [{loc.resolved_label}]"
+        text += f" \u2192 labware: [{loc.resolved_label}]"
     return text
 
 

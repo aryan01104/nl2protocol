@@ -221,8 +221,8 @@ class TestParseAssignment_TypeGuards:
 
 class TestPositiveReasoning_WithLLMReasoning:
     """When the LLM supplied reasoning, the output should preface it
-    with the description→label mapping (including load_name) so the
-    user sees both the structural context and the concrete signal."""
+    with the description→label mapping so the user sees both the
+    structural context and the concrete signal."""
 
     def test_includes_mapping_prefix(self):
         r = LabwareResolver(config=_DEFAULT_CONFIG)
@@ -233,19 +233,22 @@ class TestPositiveReasoning_WithLLMReasoning:
         )
         assert "'tube rack'" in out
         assert "'reagent_rack'" in out
-        assert "opentrons_24_tuberack" in out
         assert "Only tuberack in config" in out
 
-    def test_load_name_omitted_when_missing(self):
-        r = LabwareResolver(config={"labware": {"foo": {}}})
+    def test_load_name_never_in_output(self):
+        # CARRY-C1: load_name is always omitted from the modal text,
+        # regardless of whether the config carries one. The full
+        # Opentrons identifier (50+ chars) was noise for reviewers;
+        # it lives on in config["labware"][label] for audit purposes.
+        r = LabwareResolver(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
-            description="thing",
-            label="foo",
+            description="tube rack",
+            label="reagent_rack",
             reasoning="Single candidate.",
         )
         assert "load_name" not in out
-        assert "'thing'" in out and "'foo'" in out
-        assert "Single candidate." in out
+        assert "opentrons_24_tuberack" not in out
+        assert "'tube rack'" in out and "'reagent_rack'" in out
 
     def test_strips_surrounding_whitespace_in_reasoning(self):
         r = LabwareResolver(config=_DEFAULT_CONFIG)
@@ -428,7 +431,9 @@ class TestSuggestIntegration:
         assert "Only tuberack-typed labware in config." in sug.positive_reasoning
         # Mapping prefix retained.
         assert "'tube rack'" in sug.positive_reasoning
-        assert "opentrons_24_tuberack" in sug.positive_reasoning
+        # CARRY-C1: load_name no longer surfaced in modal text.
+        assert "opentrons_24_tuberack" not in sug.positive_reasoning
+        assert "load_name" not in sug.positive_reasoning
 
     def test_legacy_shape_yields_fallback_reasoning(self):
         response = json.dumps({

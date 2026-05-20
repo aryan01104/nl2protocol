@@ -174,3 +174,40 @@ class TestProvenancedVolumeBoundaries:
         smallest = math.nextafter(0.0, 1.0)
         v = ProvenancedVolume(value=smallest, unit="uL", exact=True, provenance=_prov())
         assert v.value == smallest
+
+
+class TestWellContentsVolumeProvenance:
+    """CARRY-B1: WellContents carries an optional volume_ul_provenance so
+    the IC modal can render a per-row audit trail like 'from your
+    instruction: 50uL DNA' for user-stated volumes. Default is None —
+    legacy specs without the field still validate."""
+
+    def test_volume_ul_provenance_defaults_to_none(self):
+        from nl2protocol.models.spec import WellContents
+        wc = WellContents(labware="tube rack", well="A1",
+                          substance="DNA", volume_ul=50.0)
+        assert wc.volume_ul_provenance is None
+
+    def test_volume_ul_provenance_accepts_instruction_provenance(self):
+        from nl2protocol.models.spec import Provenance, WellContents
+        prov = Provenance(source="instruction",
+                          cited_text=["50uL DNA"], confidence=1.0)
+        wc = WellContents(labware="tube rack", well="A1",
+                          substance="DNA", volume_ul=50.0,
+                          volume_ul_provenance=prov)
+        assert wc.volume_ul_provenance is not None
+        assert wc.volume_ul_provenance.source == "instruction"
+        assert wc.volume_ul_provenance.cited_text == ["50uL DNA"]
+
+    def test_volume_ul_provenance_works_when_volume_ul_is_null(self):
+        # Edge case: model permits volume_ul_provenance even when volume_ul
+        # is null — the prompt says don't do this, but the schema doesn't
+        # enforce, so model construction must not raise. Cross-field
+        # validation lives in the prompt, not the model.
+        from nl2protocol.models.spec import Provenance, WellContents
+        prov = Provenance(source="instruction",
+                          cited_text=["unused"], confidence=0.5)
+        wc = WellContents(labware="x", well="A1", substance="y",
+                          volume_ul=None, volume_ul_provenance=prov)
+        assert wc.volume_ul is None
+        assert wc.volume_ul_provenance is not None

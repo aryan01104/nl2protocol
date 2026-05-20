@@ -291,6 +291,13 @@ INITIAL CONTENTS (two fields — use the right one):
 - Include every well the instruction says has something in it, even if no volume is given.
   Set volume_ul to null when the volume isn't stated.
 - Only include what the instruction explicitly states. Don't infer contents for wells not mentioned.
+- When you set volume_ul to a number that came from the instruction, ALSO set
+  volume_ul_provenance with source="instruction" and cited_text to the verbatim
+  substring(s) the volume came from. Example: "Tube rack A1 contains 50uL DNA" →
+  {{"labware": "tube rack", "well": "A1", "substance": "DNA", "volume_ul": 50.0,
+    "volume_ul_provenance": {{"source": "instruction",
+                              "cited_text": ["50uL DNA"], "confidence": 1.0}}}}.
+  Leave volume_ul_provenance null when volume_ul is null.
 
 "prefilled_labware" — for ENTIRE plates/labware pre-filled uniformly:
 - Use when the instruction says ALL wells have the same contents: "cell plate has 100uL media per well"

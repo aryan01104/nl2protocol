@@ -674,6 +674,20 @@ class ProtocolAgent:
                         except (TypeError, ValueError):
                             suggested = None
                         break
+            # CARRY-B1: for user-stated rows (current is non-null), pull
+            # the verbatim cite from volume_ul_provenance so the modal can
+            # render a per-row audit trail like "from your instruction:
+            # '50uL DNA'". Stays None when the LLM didn't populate the
+            # provenance (legacy specs, or when the volume itself was null).
+            user_cited_text = None
+            if current is not None:
+                vol_prov = getattr(ic, "volume_ul_provenance", None)
+                if vol_prov is not None and getattr(vol_prov, "source", None) == "instruction":
+                    cited = getattr(vol_prov, "cited_text", None)
+                    if cited:
+                        user_cited_text = (
+                            " | ".join(cited) if isinstance(cited, list) else str(cited)
+                        )
             table.append({
                 "labware": getattr(ic, "labware", ""),
                 "well": getattr(ic, "well", ""),
@@ -692,6 +706,11 @@ class ProtocolAgent:
                     winning_sug.positive_reasoning
                     if winning_sug is not None else None
                 ),
+                # CARRY-B1: verbatim instruction substring for user-stated
+                # volumes. Null for defaults (the provenance_reasoning above
+                # covers those) and for legacy specs where the LLM didn't
+                # populate volume_ul_provenance.
+                "user_cited_text": user_cited_text,
             })
         confirmed = self.initial_contents_handler.confirm(table)
         if confirmed is None:

@@ -296,9 +296,33 @@ class TestHTMLReporterRendering:
 from nl2protocol.reporting import (
     _collect_arrow_targets,
     _find_cite_position,
+    _format_labware_label,
     _palette_class,
     _render_instruction_with_marks,
 )
+
+
+class TestFormatLabwareLabel:
+    """The labware-portion render of a LocationRef. P2-2 added the
+    surrounding double quotes around `description`; CARRY-D1 adds the
+    arrow + 'labware:' prefix between the description and the bracketed
+    resolved_label so the mapping direction reads at a glance."""
+
+    class _FakeLoc:
+        def __init__(self, description, resolved_label=None):
+            self.description = description
+            self.resolved_label = resolved_label
+
+    def test_unresolved_returns_quoted_description_only(self):
+        out = _format_labware_label(self._FakeLoc("tube rack"))
+        assert out == '"tube rack"'
+
+    def test_resolved_renders_arrow_labware_bracketed_label(self):
+        out = _format_labware_label(
+            self._FakeLoc("tube rack", resolved_label="reagent_rack")
+        )
+        # CARRY-D1: PDF p.2 literal `tube_rack → labware: [reagent_rack]`.
+        assert out == '"tube rack" \u2192 labware: [reagent_rack]'
 
 
 class TestPaletteClass:
@@ -1243,6 +1267,39 @@ class TestRenderInstructionWithMarks:
         assert "short" in out
         # The shared segment carries both ids in one data-cite-id attribute.
         assert 'data-cite-id="long short"' in out or 'data-cite-id="short long"' in out
+
+    def test_atomic_color_target_emits_palette_class_on_cite_span(self):
+        # Regression: PDF p.3 hover-flip-invisible bug. atomic-color targets
+        # carry palette_class; the sweep-line layer must preserve it so the
+        # emitted <span> gets `palette-N`. Without that class, the strong-flip
+        # CSS (.cite-marker.cite-atomic-color.palette-N.cite-active) never
+        # matches and only the faint .cite-active fallback shows.
+        targets = [
+            {
+                "prov_id": "s0-volume",
+                "cited_text": "100uL",
+                "kind": "atomic-color",
+                "palette_class": "palette-3",
+            }
+        ]
+        out = _render_instruction_with_marks("Transfer 100uL from A1.", targets)
+        assert 'data-cite-id="s0-volume"' in out
+        assert "palette-3" in out
+
+    def test_non_atomic_color_target_does_not_emit_palette_class(self):
+        # composite-step kind never carries a palette (composite uses its
+        # own cite-composite-step styling). palette_class either absent or
+        # set to None → no palette-N class on the span.
+        targets = [
+            {
+                "prov_id": "s0-step-trigger",
+                "cited_text": "Transfer 100uL",
+                "kind": "composite-step",
+            }
+        ]
+        out = _render_instruction_with_marks("Transfer 100uL from A1.", targets)
+        assert 'data-cite-id="s0-step-trigger"' in out
+        assert "palette-" not in out
 
 
 class TestCollectArrowTargets:

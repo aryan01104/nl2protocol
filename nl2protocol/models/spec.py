@@ -611,6 +611,14 @@ class WellContents(BaseModel):
     volume_ul: Optional[float] = Field(None, description=(
         "Volume in uL if the user stated it. Do not infer — leave null if not stated."
     ))
+    volume_ul_provenance: Optional[Provenance] = Field(None, description=(
+        "Required when volume_ul is non-null AND came from the instruction: "
+        "set source='instruction' and cited_text to the verbatim substring(s) "
+        "the volume came from (e.g., '50uL aliquots'). Leave null when "
+        "volume_ul is null OR was filled in by a suggester. The IC confirmation "
+        "modal surfaces cited_text as a per-row audit trail so users can "
+        "cross-check the system's reading of their volume against their wording."
+    ))
 
 
 class LabwarePrefill(BaseModel):

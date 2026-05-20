@@ -2207,11 +2207,16 @@
     function hidePanel() {
       if (panel) {
         panel.style.display = "none";
-        // Reset any inline anchoring so the next call starts clean.
+        // Clear left/top (defensive — in case any future code path
+        // sets them) and re-establish the bottom-right corner anchor.
+        // The right/bottom literals match the modal's initial inline
+        // style at the markup site; setting them back here makes the
+        // anchor self-healing across hide/show cycles even if some
+        // earlier code wiped or overrode them.
         panel.style.left = "";
         panel.style.top = "";
-        panel.style.right = "";
-        panel.style.bottom = "";
+        panel.style.right = "24px";
+        panel.style.bottom = "24px";
       }
       activeReq = null;
       removeKeyboardHandler();
@@ -2240,42 +2245,11 @@
         });
       });
       if (activeAnchorTargets.length === 0) return false;
-      positionPanelNearTarget(activeAnchorTargets[0]);
+      // Modal stays pinned at the CSS-default bottom-right corner so it
+      // never covers spec content. The cell-side spotlight pulse +
+      // bezier attach arrows below preserve the modal ↔ target link.
       drawAttachArrows();
       return true;
-    }
-
-    function positionPanelNearTarget(targetEl) {
-      if (!panel || !targetEl) return;
-      const rect = targetEl.getBoundingClientRect();
-      const panelW = 380;   // matches modal CSS width
-      const panelH = panel.offsetHeight || 280;
-      // Pick the side with the most room; prefer right then below.
-      const rightRoom = window.innerWidth - rect.right;
-      const leftRoom = rect.left;
-      const belowRoom = window.innerHeight - rect.bottom;
-      let left, top;
-      const margin = 16;
-      if (rightRoom >= panelW + margin) {
-        left = rect.right + margin;
-        top = Math.max(margin, rect.top - 8);
-      } else if (leftRoom >= panelW + margin) {
-        left = rect.left - panelW - margin;
-        top = Math.max(margin, rect.top - 8);
-      } else if (belowRoom >= panelH + margin) {
-        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
-        top = rect.bottom + margin;
-      } else {
-        // Fall back to above
-        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
-        top = Math.max(margin, rect.top - panelH - margin);
-      }
-      // Clamp top to viewport
-      top = Math.max(margin, Math.min(window.innerHeight - panelH - margin, top));
-      panel.style.left = left + "px";
-      panel.style.top = top + "px";
-      panel.style.right = "auto";
-      panel.style.bottom = "auto";
     }
 
     function clearAttachArrows() {
@@ -2334,7 +2308,6 @@
       removeAnchorListeners();
       anchorScrollHandler = () => {
         if (activeAnchorTargets.length > 0) {
-          positionPanelNearTarget(activeAnchorTargets[0]);
           drawAttachArrows();
         }
       };
@@ -2515,16 +2488,26 @@
           }, { once: true });
         }
         tdVol.appendChild(input);
-        // Per-row reasoning caption — ONLY on suggester-defaulted rows
-        // (user-stated rows don't get one; the value IS the user's
-        // word, no system reasoning to surface). Caption text is the
-        // suggester's own positive_reasoning, so different rows can
-        // carry different explanations (capacity default vs carryover
-        // vs config lookup) instead of identical boilerplate.
+        // Per-row caption. Two mutually-exclusive branches:
+        //   (a) Suggester-defaulted rows: surface the suggester's own
+        //       positive_reasoning so different rows can carry different
+        //       explanations (capacity default vs carryover vs config
+        //       lookup) instead of identical boilerplate.
+        //   (b) User-stated rows: surface the verbatim instruction
+        //       substring the LLM cited when extracting volume_ul, so
+        //       the user can cross-check the system's reading against
+        //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
+        //       for user to cross-check"). Falls back to no caption if
+        //       the LLM didn't populate volume_ul_provenance.
         if (isDefault && row.provenance_reasoning) {
           const hint = document.createElement("div");
           hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
           hint.textContent = row.provenance_reasoning;
+          tdVol.appendChild(hint);
+        } else if (!isDefault && row.user_cited_text) {
+          const hint = document.createElement("div");
+          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+          hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
           tdVol.appendChild(hint);
         }
         tr.appendChild(tdLabware);

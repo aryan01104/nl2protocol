@@ -166,7 +166,7 @@ class LabwareResolver:
                 load_name match or single-candidate domain fit).
 
         Post:   Returns a string of the form
-                "'{description}' → '{label}' (load_name '...'). <body>"
+                "'{description}' → '{label}'. <body>"
                 where <body> is the LLM's reasoning when supplied, or
                 an honest "reasoning was not surfaced — review and
                 confirm or override" fallback when it isn't. The
@@ -176,14 +176,17 @@ class LabwareResolver:
                 fallback intentionally avoids the previous template's
                 false claim of having reasoned "based on context."
 
+                The full Opentrons load_name remains in
+                self.config["labware"][label] for audit purposes but
+                is no longer surfaced in the modal text — at 50+ chars
+                it read as noise to reviewers.
+
         Side effects: None.
         """
-        load_name = self.config.get("labware", {}).get(label, {}).get("load_name", "")
-        load_hint = f" (load_name '{load_name}')" if load_name else ""
         if reasoning and reasoning.strip():
-            return f"'{description}' \u2192 '{label}'{load_hint}. {reasoning.strip()}"
+            return f"'{description}' \u2192 '{label}'. {reasoning.strip()}"
         return (
-            f"'{description}' \u2192 '{label}'{load_hint}. "
+            f"'{description}' \u2192 '{label}'. "
             f"Reasoning was not surfaced by the resolver \u2014 "
             f"review the candidates and confirm or override."
         )
