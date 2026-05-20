@@ -296,9 +296,33 @@ class TestHTMLReporterRendering:
 from nl2protocol.reporting import (
     _collect_arrow_targets,
     _find_cite_position,
+    _format_labware_label,
     _palette_class,
     _render_instruction_with_marks,
 )
+
+
+class TestFormatLabwareLabel:
+    """The labware-portion render of a LocationRef. P2-2 added the
+    surrounding double quotes around `description`; CARRY-D1 adds the
+    arrow + 'labware:' prefix between the description and the bracketed
+    resolved_label so the mapping direction reads at a glance."""
+
+    class _FakeLoc:
+        def __init__(self, description, resolved_label=None):
+            self.description = description
+            self.resolved_label = resolved_label
+
+    def test_unresolved_returns_quoted_description_only(self):
+        out = _format_labware_label(self._FakeLoc("tube rack"))
+        assert out == '"tube rack"'
+
+    def test_resolved_renders_arrow_labware_bracketed_label(self):
+        out = _format_labware_label(
+            self._FakeLoc("tube rack", resolved_label="reagent_rack")
+        )
+        # CARRY-D1: PDF p.2 literal `tube_rack → labware: [reagent_rack]`.
+        assert out == '"tube rack" \u2192 labware: [reagent_rack]'
 
 
 class TestPaletteClass:
