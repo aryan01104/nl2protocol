@@ -2483,16 +2483,26 @@
           }, { once: true });
         }
         tdVol.appendChild(input);
-        // Per-row reasoning caption — ONLY on suggester-defaulted rows
-        // (user-stated rows don't get one; the value IS the user's
-        // word, no system reasoning to surface). Caption text is the
-        // suggester's own positive_reasoning, so different rows can
-        // carry different explanations (capacity default vs carryover
-        // vs config lookup) instead of identical boilerplate.
+        // Per-row caption. Two mutually-exclusive branches:
+        //   (a) Suggester-defaulted rows: surface the suggester's own
+        //       positive_reasoning so different rows can carry different
+        //       explanations (capacity default vs carryover vs config
+        //       lookup) instead of identical boilerplate.
+        //   (b) User-stated rows: surface the verbatim instruction
+        //       substring the LLM cited when extracting volume_ul, so
+        //       the user can cross-check the system's reading against
+        //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
+        //       for user to cross-check"). Falls back to no caption if
+        //       the LLM didn't populate volume_ul_provenance.
         if (isDefault && row.provenance_reasoning) {
           const hint = document.createElement("div");
           hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
           hint.textContent = row.provenance_reasoning;
+          tdVol.appendChild(hint);
+        } else if (!isDefault && row.user_cited_text) {
+          const hint = document.createElement("div");
+          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+          hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
           tdVol.appendChild(hint);
         }
         tr.appendChild(tdLabware);
