@@ -2240,42 +2240,11 @@
         });
       });
       if (activeAnchorTargets.length === 0) return false;
-      positionPanelNearTarget(activeAnchorTargets[0]);
+      // Modal stays pinned at the CSS-default bottom-right corner so it
+      // never covers spec content. The cell-side spotlight pulse +
+      // bezier attach arrows below preserve the modal ↔ target link.
       drawAttachArrows();
       return true;
-    }
-
-    function positionPanelNearTarget(targetEl) {
-      if (!panel || !targetEl) return;
-      const rect = targetEl.getBoundingClientRect();
-      const panelW = 380;   // matches modal CSS width
-      const panelH = panel.offsetHeight || 280;
-      // Pick the side with the most room; prefer right then below.
-      const rightRoom = window.innerWidth - rect.right;
-      const leftRoom = rect.left;
-      const belowRoom = window.innerHeight - rect.bottom;
-      let left, top;
-      const margin = 16;
-      if (rightRoom >= panelW + margin) {
-        left = rect.right + margin;
-        top = Math.max(margin, rect.top - 8);
-      } else if (leftRoom >= panelW + margin) {
-        left = rect.left - panelW - margin;
-        top = Math.max(margin, rect.top - 8);
-      } else if (belowRoom >= panelH + margin) {
-        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
-        top = rect.bottom + margin;
-      } else {
-        // Fall back to above
-        left = Math.max(margin, Math.min(window.innerWidth - panelW - margin, rect.left));
-        top = Math.max(margin, rect.top - panelH - margin);
-      }
-      // Clamp top to viewport
-      top = Math.max(margin, Math.min(window.innerHeight - panelH - margin, top));
-      panel.style.left = left + "px";
-      panel.style.top = top + "px";
-      panel.style.right = "auto";
-      panel.style.bottom = "auto";
     }
 
     function clearAttachArrows() {
@@ -2334,7 +2303,6 @@
       removeAnchorListeners();
       anchorScrollHandler = () => {
         if (activeAnchorTargets.length > 0) {
-          positionPanelNearTarget(activeAnchorTargets[0]);
           drawAttachArrows();
         }
       };
