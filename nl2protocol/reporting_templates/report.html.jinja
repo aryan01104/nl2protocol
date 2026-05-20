@@ -2207,11 +2207,16 @@
     function hidePanel() {
       if (panel) {
         panel.style.display = "none";
-        // Reset any inline anchoring so the next call starts clean.
+        // Clear left/top (defensive — in case any future code path
+        // sets them) and re-establish the bottom-right corner anchor.
+        // The right/bottom literals match the modal's initial inline
+        // style at the markup site; setting them back here makes the
+        // anchor self-healing across hide/show cycles even if some
+        // earlier code wiped or overrode them.
         panel.style.left = "";
         panel.style.top = "";
-        panel.style.right = "";
-        panel.style.bottom = "";
+        panel.style.right = "24px";
+        panel.style.bottom = "24px";
       }
       activeReq = null;
       removeKeyboardHandler();
