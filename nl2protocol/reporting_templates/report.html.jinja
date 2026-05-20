@@ -239,7 +239,7 @@
     content: "⚠";
     margin-left: 3px;
     font-size: 10px;
-    color: var(--col-instruction);
+    color: var(--status-error-fg);
     vertical-align: super;
     font-weight: 700;
   }
@@ -484,7 +484,7 @@
     border-radius: 2px;
   }
   .step.step-active {
-    background: rgba(184, 68, 79, 0.06);
+    background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     border-left-color: var(--col-instruction);
   }
 
@@ -526,7 +526,7 @@
   .validated-summary-line { color: var(--ink); }
   .validated-summary-line.all-clear { border-left: 3px solid var(--check-pill-glyph); padding-left: 6px; }
   .validated-summary-line.has-warnings { border-left: 3px solid var(--warning-accent); padding-left: 6px; }
-  .validated-summary-line.has-errors { border-left: 3px solid var(--col-instruction); padding-left: 6px; }
+  .validated-summary-line.has-errors { border-left: 3px solid var(--status-error-fg); padding-left: 6px; }
   .validated-summary-warnings {
     margin: 6px 0 0;
     padding-left: 18px;
@@ -617,9 +617,9 @@
   .cell-empty.prov-active,
   .cell-empty.prov-spotlight,
   .cell-empty[data-prov-id]:hover {
-    background: color-mix(in srgb, var(--col-instruction) 8%, transparent);
+    background: color-mix(in srgb, var(--status-error-fg) 8%, transparent);
     border-radius: 2px;
-    outline: 1px solid color-mix(in srgb, var(--col-instruction) 35%, transparent);
+    outline: 1px solid color-mix(in srgb, var(--status-error-fg) 35%, transparent);
     outline-offset: 1px;
   }
 
@@ -681,7 +681,7 @@
   #hover-tip .tip-objection {
     margin: 8px 0 0;
     padding: 4px 0 4px 10px;
-    border-left: 3px solid var(--col-instruction);
+    border-left: 3px solid var(--status-error-fg);
     color: var(--tip-cite-quote);
     font-style: italic;
     line-height: 1.4;
@@ -691,7 +691,8 @@
      The overlay hosts TWO arrow categories:
        - Composite-step arrows (instruction → extracted spec block).
          Reserved for step-existence grounding; existing pre-Phase-2b
-         language. Default red (--col-instruction).
+         language. Stroke is var(--col-instruction) so the arrow hue
+         tracks the instruction-source provenance token.
        - Resolution arrows (extracted spec atomic value → resolved
          spec atomic value). One per gap_resolved event with a
          drawable resolution_kind. Per ADR-0011 Phase 2b. Color-coded
@@ -933,7 +934,7 @@
   <h1>nl2protocol</h1>
   <div class="meta">
     {{ timestamp }} ·
-    {% if success %}<strong style="color:var(--status-success-fg)">success</strong>{% else %}<strong style="color:var(--col-instruction)">failed</strong>{% endif %}
+    {% if success %}<strong style="color:var(--status-success-fg)">success</strong>{% else %}<strong style="color:var(--status-error-fg)">failed</strong>{% endif %}
     {% if prov_stats and prov_stats.total %}
       · <span title="Atomic values whose provenance is NOT a literal lift from the instruction (i.e. domain default / inferred / config). Higher = more was filled in by the model.">{{ prov_stats.total }} atomic values · <strong>{{ "%.0f"|format(prov_stats.non_instr_pct) }}%</strong> non-instruction (model-filled)</span>
     {% endif %}
@@ -1050,7 +1051,7 @@
            gap.metadata.reviewer_objection field is non-empty. Orange-tinted
            to match the legend's "⚠ reviewer disagreed" marker. Hidden by
            default; showPanel toggles display. -->
-      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--col-instruction); background: var(--disagree-bg); font-size: 12px;"></div>
+      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--status-error-fg); background: var(--disagree-bg); font-size: 12px;"></div>
     </div>
     <div id="live-panel-buttons" style="padding: 10px 14px; border-top: 1px solid var(--grid); display: flex; gap: 8px; flex-wrap: wrap;">
       <!-- buttons injected per-gap by JS (accept / skip / override / abort) -->
@@ -1068,7 +1069,7 @@
 
     <span><span class="non-instr-marker">▴</span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (marker + dotted underline + categorical color — three cues for one fact):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
 
-    <span><span style="color: var(--col-instruction); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
+    <span><span style="color: var(--status-error-fg); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
     <span>step-block left border signals grounding:<span class="swatch" style="background: var(--col-instruction); margin-left: 8px;"></span>grounded ·<span class="swatch" style="background: var(--col-domain);"></span>mixed ·<span class="swatch" style="background: var(--col-inferred);"></span>orphan</span>
 
@@ -1234,12 +1235,12 @@
     </div>
     {# P1-7: column-local legend so the user can decode the constraint-
        summary line below without having to infer from color alone. Inline
-       glyph hues track the summary-state colors (var(--col-instruction)
+       glyph hues track the summary-state colors (var(--status-error-fg)
        for violations, var(--warning-accent) for warnings) so the user
        binds definition to visual cue. Always rendered regardless of
        summary state. #}
     <div class="validated-summary-legend" style="font-size: 12px; color: var(--dim); margin: 2px 0 8px; line-height: 1.5;">
-      <strong style="color: var(--col-instruction);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
+      <strong style="color: var(--status-error-fg);">✗ violation</strong> = rule the protocol must satisfy — pipeline halts here ·
       <strong style="color: var(--warning-accent);">⚠ warning</strong> = concern flagged for your review; pipeline continues.
     </div>
     <!-- Phase 3i (#72): constraint-check summary. Static path renders
@@ -1251,7 +1252,7 @@
         {% set wc = constraint_summary.warnings|length %}
         <div class="validated-summary-line {% if vc > 0 %}has-errors{% elif wc > 0 %}has-warnings{% else %}all-clear{% endif %}">
           {% if vc > 0 %}
-            <strong style="color: var(--col-instruction);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
+            <strong style="color: var(--status-error-fg);">✗ {{ vc }} violation{{ '' if vc == 1 else 's' }}</strong> — protocol does not validate
           {% elif wc > 0 %}
             <strong style="color: var(--warning-accent);">✓ 0 violations, {{ wc }} warning{{ '' if wc == 1 else 's' }}</strong> — protocol validated
           {% else %}
@@ -2139,7 +2140,7 @@
       const objDiv = document.getElementById("live-panel-objection");
       const objection = gap.metadata && gap.metadata.reviewer_objection;
       if (objection) {
-        objDiv.innerHTML = '<strong style="color:var(--col-instruction)">⚠ reviewer pushed back:</strong> '
+        objDiv.innerHTML = '<strong style="color:var(--status-error-fg)">⚠ reviewer pushed back:</strong> '
           + escapeHtml(String(objection));
         objDiv.style.display = "block";
       } else {
@@ -2969,7 +2970,7 @@
       let lineClass, html;
       if (vc > 0) {
         lineClass = "has-errors";
-        html = '<strong style="color: var(--col-instruction);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
+        html = '<strong style="color: var(--status-error-fg);">✗ ' + vc + ' violation' + (vc === 1 ? '' : 's') + '</strong> — protocol does not validate';
       } else if (wc > 0) {
         lineClass = "has-warnings";
         html = '<strong style="color: var(--warning-accent);">✓ 0 violations, ' + wc + ' warning' + (wc === 1 ? '' : 's') + '</strong> — protocol validated';
@@ -3279,10 +3280,19 @@
           if (e.data) gateModal(() => showIcModal(e.data));
           break;
         case "pipeline_done":
-          setStatus("done", "success");
+          // pipeline_done fires from the server's finally block too,
+          // so reaching this case does NOT mean success. Honor the
+          // sticky failure flag: setStatus already short-circuits the
+          // "done" pill text when we're in terminal-error mode (and
+          // the user-visible pill stays "error"); markIndicatorDone()
+          // needs the same guard or the top-right indicator flips to
+          // its green ✓ even after a crash.
           startBtn.disabled = false;
           hidePanel();
-          markIndicatorDone();
+          if (!statusIsTerminalError) {
+            setStatus("done", "success");
+            markIndicatorDone();
+          }
           break;
         case "error":
           setStatus("error", "error");

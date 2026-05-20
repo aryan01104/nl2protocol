@@ -1515,18 +1515,26 @@ class TestHTMLReporterArrowsEnd2End:
         """The report should be a single file with no external CSS/JS/images.
 
         One deliberate exception (refresh-website-parity, 2026-05-20):
-        the Google Fonts CSS link for IBM Plex Sans + JetBrains Mono
-        matches the website's font stack. When opened offline the
-        fonts fall back through the system stack (-apple-system, etc.)
-        so the report still renders — just without the website fonts.
+        exactly one Google Fonts CSS link, pulling IBM Plex Sans +
+        JetBrains Mono to match the website's font stack. When opened
+        offline the fonts fall back through the system stack
+        (-apple-system, etc.) so the report still renders — just
+        without the website fonts.
+
+        Strictness: assert the EXACT shape of the allowed link so a
+        future change that adds another external stylesheet (or quietly
+        drops the IBM Plex/JetBrains Mono families) fails this test.
         """
         import re
         out = tmp_path / "report.html"
         HTMLReporter(str(out)).finalize()
         content = out.read_text()
         links = re.findall(r'<link[^>]*rel="stylesheet"[^>]*>', content, re.IGNORECASE)
-        unexpected = [link for link in links if "fonts.googleapis.com" not in link]
-        assert unexpected == [], f"unexpected external stylesheets: {unexpected}"
+        assert len(links) == 1, f"expected exactly one stylesheet link; got {len(links)}: {links}"
+        link = links[0]
+        assert "fonts.googleapis.com/css2?" in link
+        assert "family=IBM+Plex+Sans" in link
+        assert "family=JetBrains+Mono" in link
         assert "<script src=" not in content.lower()
         assert "<img " not in content.lower()
 
