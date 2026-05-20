@@ -28,7 +28,8 @@
     --panel:           #ffffff;
     --ink:             #0f172a;   /* slate-900                       */
     --dim:             #475569;   /* slate-600                       */
-    --grid:            #e2e8f0;   /* slate-200                       */
+    --grid:            #e2e8f0;   /* slate-200 — borders             */
+    --rule:            #cbd5e1;   /* slate-300 — stronger separators */
 
     /* ───────── Typography (IBM Plex Sans body, JetBrains Mono code) ───────── */
     --font-body:  "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
@@ -143,11 +144,18 @@
      adds cross-column arrows showing each value's resolution journey. */
   .grid {
     display: grid;
-    /* Instruction column capped at a prose-readable width (≤640px,
-       ~66 chars/line per Bringhurst). Other columns absorb the remaining
-       width via their fr shares. Min 420px so it doesn't collapse on
-       narrow viewports. */
-    grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr;
+    /* Each column is capped so the report stays scannable at wide
+       viewports — column lines are unread above ~640px (prose) /
+       ~600px (spec) / ~720px (code). Without the caps, on a 2K
+       monitor the extracted spec would span the entire width of
+       what should be a 5-column comparison view (CARRY-F2, PDF
+       p.1). Mins keep each column readable when the viewport
+       is narrow; defaults below get applied for each cols-N
+       variant the live-mode gating reveals incrementally. */
+    grid-template-columns:
+      minmax(420px, 640px)
+      minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px)
+      minmax(380px, 720px);
     gap: 14px;
     padding: 24px 32px;
     min-height: calc(100vh - 200px);
@@ -159,10 +167,10 @@
      so hidden columns don't leave empty tracks. The instruction-column
      cap is preserved in every reveal state. */
   .grid.cols-1 { grid-template-columns: minmax(420px, 640px); }
-  .grid.cols-2 { grid-template-columns: minmax(420px, 640px) 1.15fr; }
-  .grid.cols-3 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr; }
-  .grid.cols-4 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr; }
-  .grid.cols-5 { grid-template-columns: minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr; }
+  .grid.cols-2 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px); }
+  .grid.cols-3 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px); }
+  .grid.cols-4 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px); }
+  .grid.cols-5 { grid-template-columns: minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) minmax(340px, 600px) minmax(380px, 720px); }
   .col.is-pending { display: none; }
   .col {
     background: var(--panel);
@@ -2529,80 +2537,110 @@
         + '</tr>';
       table.appendChild(thead);
       const tbody = document.createElement("tbody");
+      // Group rows by labware, preserving order-of-first-appearance.
+      // PDF p.1 Diagram 1: rows belonging to the same container should
+      // visually cluster under one labware label, with a clear border
+      // separating one group from the next, so the user can scan
+      // "everything in tube rack" without re-reading the labware name
+      // on every line.
+      const groupOrder = [];
+      const groups = new Map();
       (req.rows || []).forEach((row) => {
-        const tr = document.createElement("tr");
-        tr.style.cssText = "border-bottom: 1px solid var(--grid);";
-        const tdLabware = document.createElement("td");
-        tdLabware.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        tdLabware.textContent = row.labware || "";
-        const tdWell = document.createElement("td");
-        tdWell.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        tdWell.textContent = row.well || "(all wells)";
-        const tdSubstance = document.createElement("td");
-        tdSubstance.style.cssText = "padding: 6px 8px; vertical-align: top; font-style: italic; color: var(--dim);";
-        tdSubstance.textContent = row.substance || "";
-        const tdVol = document.createElement("td");
-        tdVol.style.cssText = "padding: 6px 8px; vertical-align: top;";
-        const input = document.createElement("input");
-        input.type = "number";
-        input.step = "any";
-        input.min = "0";
-        input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; font-family: var(--font-mono);";
-        // Pre-fill: extracted current value wins; else suggester output;
-        // else empty for the user to type.
-        const initial = (row.current_volume_ul !== null && row.current_volume_ul !== undefined)
-          ? row.current_volume_ul
-          : (row.suggested_volume_ul !== null && row.suggested_volume_ul !== undefined)
-              ? row.suggested_volume_ul
-              : "";
-        input.value = initial === "" ? "" : String(initial);
-        // Visual hint: italic + dim for suggester defaults so user sees
-        // they were filled by the system, not the instruction.
-        const isDefault = (
-          (row.current_volume_ul === null || row.current_volume_ul === undefined)
-          && row.suggested_volume_ul !== null
-          && row.suggested_volume_ul !== undefined
-        );
-        if (isDefault) {
-          input.style.color = "var(--col-inferred)";
-          input.style.fontStyle = "italic";
-          input.addEventListener("input", () => {
-            input.style.color = "var(--ink)";
-            input.style.fontStyle = "normal";
-          }, { once: true });
+        const key = row.labware || "";
+        if (!groups.has(key)) {
+          groupOrder.push(key);
+          groups.set(key, []);
         }
-        tdVol.appendChild(input);
-        // Per-row caption. Two mutually-exclusive branches:
-        //   (a) Suggester-defaulted rows: surface the suggester's own
-        //       positive_reasoning so different rows can carry different
-        //       explanations (capacity default vs carryover vs config
-        //       lookup) instead of identical boilerplate.
-        //   (b) User-stated rows: surface the verbatim instruction
-        //       substring the LLM cited when extracting volume_ul, so
-        //       the user can cross-check the system's reading against
-        //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
-        //       for user to cross-check"). Falls back to no caption if
-        //       the LLM didn't populate volume_ul_provenance.
-        if (isDefault && row.provenance_reasoning) {
-          const hint = document.createElement("div");
-          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
-          hint.textContent = row.provenance_reasoning;
-          tdVol.appendChild(hint);
-        } else if (!isDefault && row.user_cited_text) {
-          const hint = document.createElement("div");
-          hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
-          hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
-          tdVol.appendChild(hint);
-        }
-        tr.appendChild(tdLabware);
-        tr.appendChild(tdWell);
-        tr.appendChild(tdSubstance);
-        tr.appendChild(tdVol);
-        tbody.appendChild(tr);
-        activeIcInputs.push({
-          labware: row.labware,
-          well: row.well,
-          inputEl: input,
+        groups.get(key).push(row);
+      });
+      groupOrder.forEach((labware, groupIdx) => {
+        const members = groups.get(labware);
+        members.forEach((row, memberIdx) => {
+          const tr = document.createElement("tr");
+          tr.style.cssText = "border-bottom: 1px solid var(--grid);";
+          // First row of each group after the first carries a thicker
+          // top border so the eye registers the group boundary.
+          if (memberIdx === 0 && groupIdx > 0) {
+            tr.style.borderTop = "2px solid var(--rule, var(--grid))";
+          }
+          // Labware cell is rendered once per group, spanning every
+          // member row via rowspan. Subsequent rows skip the cell
+          // entirely so the rowspan visually fills the column.
+          if (memberIdx === 0) {
+            const tdLabware = document.createElement("td");
+            tdLabware.rowSpan = members.length;
+            tdLabware.style.cssText = "padding: 6px 8px; vertical-align: top; font-weight: 500;";
+            tdLabware.textContent = labware;
+            tr.appendChild(tdLabware);
+          }
+          const tdWell = document.createElement("td");
+          tdWell.style.cssText = "padding: 6px 8px; vertical-align: top;";
+          tdWell.textContent = row.well || "(all wells)";
+          const tdSubstance = document.createElement("td");
+          tdSubstance.style.cssText = "padding: 6px 8px; vertical-align: top; font-style: italic; color: var(--dim);";
+          tdSubstance.textContent = row.substance || "";
+          const tdVol = document.createElement("td");
+          tdVol.style.cssText = "padding: 6px 8px; vertical-align: top;";
+          const input = document.createElement("input");
+          input.type = "number";
+          input.step = "any";
+          input.min = "0";
+          input.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; font-family: var(--font-mono);";
+          // Pre-fill: extracted current value wins; else suggester output;
+          // else empty for the user to type.
+          const initial = (row.current_volume_ul !== null && row.current_volume_ul !== undefined)
+            ? row.current_volume_ul
+            : (row.suggested_volume_ul !== null && row.suggested_volume_ul !== undefined)
+                ? row.suggested_volume_ul
+                : "";
+          input.value = initial === "" ? "" : String(initial);
+          // Visual hint: italic + dim for suggester defaults so user sees
+          // they were filled by the system, not the instruction.
+          const isDefault = (
+            (row.current_volume_ul === null || row.current_volume_ul === undefined)
+            && row.suggested_volume_ul !== null
+            && row.suggested_volume_ul !== undefined
+          );
+          if (isDefault) {
+            input.style.color = "var(--col-inferred)";
+            input.style.fontStyle = "italic";
+            input.addEventListener("input", () => {
+              input.style.color = "var(--ink)";
+              input.style.fontStyle = "normal";
+            }, { once: true });
+          }
+          tdVol.appendChild(input);
+          // Per-row caption. Two mutually-exclusive branches:
+          //   (a) Suggester-defaulted rows: surface the suggester's own
+          //       positive_reasoning so different rows can carry different
+          //       explanations (capacity default vs carryover vs config
+          //       lookup) instead of identical boilerplate.
+          //   (b) User-stated rows: surface the verbatim instruction
+          //       substring the LLM cited when extracting volume_ul, so
+          //       the user can cross-check the system's reading against
+          //       their own wording (CARRY-B1, PDF p.1 "1C of 50 — nothing
+          //       for user to cross-check"). Falls back to no caption if
+          //       the LLM didn't populate volume_ul_provenance.
+          if (isDefault && row.provenance_reasoning) {
+            const hint = document.createElement("div");
+            hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+            hint.textContent = row.provenance_reasoning;
+            tdVol.appendChild(hint);
+          } else if (!isDefault && row.user_cited_text) {
+            const hint = document.createElement("div");
+            hint.style.cssText = "margin-top: 4px; font-size: 11px; font-style: italic; color: var(--dim); line-height: 1.4;";
+            hint.textContent = "from your instruction: \u201C" + row.user_cited_text + "\u201D";
+            tdVol.appendChild(hint);
+          }
+          tr.appendChild(tdWell);
+          tr.appendChild(tdSubstance);
+          tr.appendChild(tdVol);
+          tbody.appendChild(tr);
+          activeIcInputs.push({
+            labware: row.labware,
+            well: row.well,
+            inputEl: input,
+          });
         });
       });
       table.appendChild(tbody);

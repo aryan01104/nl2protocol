@@ -651,12 +651,16 @@ class TestADR0011FiveColumnLayout:
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # The CSS rule for the grid declares five columns. We assert on a
-        # substring pattern that's unique to our 5-col grid declaration to
-        # avoid coupling the test to specific fr ratios. The instruction
-        # column is capped to a prose-readable width via minmax(); the
-        # remaining four use fr units.
-        assert "minmax(420px, 640px) 1.15fr 1.15fr 1.15fr 1.4fr" in rendered
+        # The CSS rule for the grid declares five columns. Refresh
+        # 2026-05-20 caps each column at a max-width via minmax() so
+        # the report stays scannable at wide viewports (CARRY-F2). The
+        # .grid.cols-5 declaration is what we assert against — instruction
+        # column has a tighter range, spec columns share one range, code
+        # column has the widest range.
+        assert (
+            "minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) "
+            "minmax(340px, 600px) minmax(380px, 720px)"
+        ) in rendered
 
 
 class TestADR0011Phase2bResolutionArrows:
