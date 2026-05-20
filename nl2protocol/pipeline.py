@@ -1222,7 +1222,15 @@ class ProtocolAgent:
                                      stage_name="stage_4_initial_contents")
                 ic_ok = self._confirm_initial_contents_via_handler(
                     spec, ic_suggesters,
-                    {"instruction": prompt, "config": self.config_loader.config},
+                    {
+                        "instruction": prompt,
+                        "config": self.config_loader.config,
+                        # Threaded so WellCapacitySuggester can resolve the
+                        # user's labware description to its real config
+                        # load_name (instead of falling through to a
+                        # generic tube-rack default with empty load_name).
+                        "labware_suggestions": labware_suggestions,
+                    },
                 )
                 if not ic_ok:
                     _log("  Initial-contents confirmation aborted.")
@@ -1403,9 +1411,9 @@ class ProtocolAgent:
             # No per-check progress events — the indicator's catalog cycles
             # client-side through the constraint-checker categories while
             # this stage is active.
-            from .validation.constraints import ConstraintChecker
-            checker = ConstraintChecker(self.config_loader.config)
-            constraint_result = checker.check_all(spec)
+            from .validation.constraints import PhysicalConstraintsChecker
+            checker = PhysicalConstraintsChecker(self.config_loader.config)
+            constraint_result = checker.assert_physical_constraints(spec)
 
             state_log["stage_4_constraints"] = {
                 "errors": [str(v) for v in constraint_result.errors],
@@ -1417,11 +1425,23 @@ class ProtocolAgent:
             # checks cleanly. Most ERROR violations should already be 0
             # (orchestrator's ConstraintViolationDetector resolved them);
             # this event captures the residual + any WARNING-severity items.
+            # P1-8: `passed_checks` carries one record per (step, check_type,
+            # role) cell that the checker verified — same data the renderer
+            # uses to anchor inline green tags next to each value row.
             self.reporter.emit(StageEvent(
                 kind="constraint_check_done",
                 data={
                     "violation_count": len(constraint_result.errors),
                     "warnings": [str(w) for w in constraint_result.warnings],
+                    "passed_checks": [
+                        {
+                            "step": p.step,
+                            "check_type": p.violation_type.value,
+                            "detail_label": p.detail_label,
+                            "what": p.what,
+                        }
+                        for p in constraint_result.passes
+                    ],
                 },
                 stage_name="stage_4_constraints",
             ))

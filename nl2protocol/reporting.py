@@ -19,9 +19,10 @@ they have to parse. Structured events make the same data renderable in
 multiple formats from one source.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, List, Literal, Optional, Protocol
+from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple
 
 
 # ============================================================================
@@ -173,6 +174,92 @@ _PROV_CLASS = {
 # atomic value span in the spec column carry the same .palette-N class so
 # readers can connect them by hue without any arrow.
 _PALETTE_SIZE = 8
+
+
+# ============================================================================
+# Constraint warning routing — partition by step number for inline anchoring
+# ============================================================================
+
+_WARN_STEP_RE = re.compile(r"^\s*\[WARN\]\s+Step\s+(\d+)\s*:", re.IGNORECASE)
+
+
+def _split_warnings_by_step(
+    warnings: List[str],
+) -> Tuple[Dict[int, List[str]], List[str]]:
+    """Partition constraint warnings into per-step buckets + a global bucket.
+
+    Pre:    `warnings` is a list of constraint-checker warning strings,
+            each typically formatted as "[WARN] Step N: ...". N is the
+            1-based step.order for step-specific concerns, or 0 for
+            protocol-level concerns (e.g. "Protocol uses temperature
+            control but no labware is on the temperature module").
+
+    Post:   Returns (per_step, global_warnings) where:
+              - per_step[step_order] is the list of warnings whose
+                leading "[WARN] Step N:" parses to step_order >= 1.
+                Dict iteration order matches first-seen step_order.
+              - global_warnings is the list of warnings whose leading
+                step number is 0 OR whose prefix doesn't match the
+                regex (defensive — unrecognized formats land in the
+                global bucket rather than getting dropped).
+            Each input warning lands in exactly one bucket; total
+            count is preserved. Order within each bucket is preserved.
+
+    Side effects: None.
+
+    Why this lives in reporting.py and not constraints.py: the source
+    of constraint warnings (constraints.py) emits formatted strings.
+    The decision about WHERE to surface them in the UI is presentation,
+    so the parser lives next to the renderer that consumes it.
+    """
+    per_step: Dict[int, List[str]] = {}
+    global_warnings: List[str] = []
+    for w in warnings:
+        m = _WARN_STEP_RE.match(w)
+        if m:
+            step_n = int(m.group(1))
+            if step_n >= 1:
+                per_step.setdefault(step_n, []).append(w)
+                continue
+        global_warnings.append(w)
+    return per_step, global_warnings
+
+
+def _passes_to_inline_checks(
+    passed_checks: List[dict],
+) -> Dict[int, Dict[str, str]]:
+    """Group serialized passed-check records into the per-step dict the
+    template consumes for inline-tag rendering.
+
+    Pre:    `passed_checks` is the list serialized by `pipeline.py` from
+            `PhysicalConstraintsCheckResult.passes`. Each entry is a dict
+            with keys `step` (int, 0 for protocol-level), `check_type`
+            (str enum value), `detail_label` (str | None — names the
+            spec-view row to anchor on), and `what` (str — the inline
+            phrase).
+
+    Post:   Returns a dict mapping `step_order` (>=1) to a dict
+            `{detail_label: phrase}`. Entries with `step == 0` or
+            `detail_label is None` are skipped — they don't anchor to
+            a spec row, so the inline-tag renderer has nothing to do
+            with them. Order within each step is the input order;
+            later entries for the same (step, label) cell overwrite
+            earlier ones (the invariant in `constraints.py` is "one
+            CheckResult per cell" so collisions shouldn't occur, but
+            the dict assignment makes the behavior deterministic if
+            they ever do).
+
+    Side effects: None.
+    """
+    by_step: Dict[int, Dict[str, str]] = {}
+    for entry in passed_checks:
+        step = entry.get("step")
+        label = entry.get("detail_label")
+        phrase = entry.get("what")
+        if not step or step < 1 or not label or not phrase:
+            continue
+        by_step.setdefault(step, {})[label] = phrase
+    return by_step
 
 
 def _palette_class(cited_text) -> str:
@@ -567,16 +654,20 @@ def _format_location(loc) -> str:
 
 
 def _format_labware_label(loc) -> str:
-    """Just the labware portion of a LocationRef: 'tube rack' or
-    'tube rack  [reagent_rack]' when resolved.
+    """Just the labware portion of a LocationRef: '"tube rack"' or
+    '"tube rack"  [reagent_rack]' when resolved.
 
     Pre:    `loc` is a LocationRef with `description` (required) and
             an optional `resolved_label`.
-    Post:   Returns 'description' alone if resolved_label is null;
-            'description  [resolved_label]' otherwise. No well info
-            in this string — that's `_format_wells_only`'s job.
+    Post:   Returns '"description"' alone if resolved_label is null;
+            '"description"  [resolved_label]' otherwise. The double
+            quotes are P2-2: they make the user's verbatim wording
+            visually distinguishable from neighboring plain text on
+            the row (substance, action name). The resolved_label
+            stays in its existing bracketed form. No well info in
+            this string — that's `_format_wells_only`'s job.
     """
-    text = loc.description
+    text = f'"{loc.description}"'
     if getattr(loc, "resolved_label", None):
         text += f"  [{loc.resolved_label}]"
     return text
@@ -1032,13 +1123,22 @@ def _empty_field_cell(prov_id: str, label: str) -> str:
     )
 
 
-def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = None) -> dict:
+def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = None,
+                         inline_checks: Optional[Dict[str, str]] = None) -> dict:
     """Convert an ExtractedStep into the dict shape the template expects.
 
     `instruction` (when provided) lets `_render_provenanced_value` decide
     whether each cited_text is actually recoverable. If a cite isn't
     present in the instruction we degrade gracefully — color the value
     but omit `data-prov-id` so we don't promise a broken hover link.
+
+    `inline_checks` (P1-8) is the {detail_label: phrase} dict for THIS
+    step's passing constraint checks. When provided, each detail line
+    whose logical label matches a key gets a `<span class="inline-check">`
+    appended (the green ✓ tag next to the value). Pass None for
+    columns that don't surface constraint outcomes (extracted, resolved).
+    Recognized labels: "volume" / "source_labware" / "source_wells" /
+    "destination_labware" / "destination_wells".
 
     Per ADR-0011 Phase 2b/4 polish (2026-05-05): for each action,
     `_ACTION_EXPECTED_FIELDS` enumerates which tracked fields a step
@@ -1054,6 +1154,19 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     grounding = list(getattr(comp, "grounding", []))
     sid = f"s{step_idx}"
 
+    def _maybe_tag(label: str) -> str:
+        """Return the inline-check `<span>` for `label`, or '' when no
+        passing check is available for it. Empty string keeps the
+        detail line unchanged for callers that pass `inline_checks=None`
+        or for labels with no passing check."""
+        if not inline_checks:
+            return ""
+        phrase = inline_checks.get(label)
+        if not phrase:
+            return ""
+        import html as _html
+        return f' <span class="inline-check">{_html.escape(phrase)}</span>'
+
     detail_lines = []
     expected = _ACTION_EXPECTED_FIELDS.get(step.action, set())
 
@@ -1064,7 +1177,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             prov_id=f"{sid}-volume",
             instruction=instruction,
         )
-        detail_lines.append(f'<span class="label">volume:</span> {v}')
+        detail_lines.append(
+            f'<span class="label">volume:</span> {v}{_maybe_tag("volume")}'
+        )
     elif "volume" in expected:
         detail_lines.append(_empty_field_cell(f"{sid}-volume", "volume"))
 
@@ -1089,7 +1204,10 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             else:
                 import html as _html
                 v_lab = _html.escape(labware_text)
-            detail_lines.append(f'<span class="label">{role}:</span> {v_lab}')
+            detail_lines.append(
+                f'<span class="label">{role}:</span> {v_lab}'
+                f'{_maybe_tag(f"{role}_labware")}'
+            )
 
             wells_text = _format_wells_only(role_ref)
             if wells_text:
@@ -1107,7 +1225,7 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
                 # of the source/destination row above.
                 detail_lines.append(
                     f'<span class="label" style="padding-left: 1.4em;">'
-                    f'↳ wells:</span> {v_wells}'
+                    f'↳ wells:</span> {v_wells}{_maybe_tag(f"{role}_wells")}'
                 )
         elif role in expected:
             detail_lines.append(_empty_field_cell(f"{sid}-{role}", role))
@@ -1260,9 +1378,26 @@ class HTMLReporter(CapturingReporter):
         constraint_summary = None
         if constraint_event is not None:
             cdata = constraint_event.data or {}
+            raw_warnings = list(cdata.get("warnings", []))
+            # P1-9: route warnings by step. Per-step warnings are
+            # surfaced inline at their step row; global / protocol-level
+            # warnings stay in the top banner's <ul>. The original
+            # `warnings` field is preserved for any downstream consumer
+            # that depends on the flat list.
+            per_step_warnings, global_warnings = _split_warnings_by_step(raw_warnings)
+            # P1-8: route passed-check records by step + detail_label so
+            # the template can stamp inline green tags next to value
+            # rows. Each (step, label) cell from the checker becomes one
+            # entry in the per-step dict.
+            raw_passes = list(cdata.get("passed_checks", []))
+            inline_checks_by_step = _passes_to_inline_checks(raw_passes)
             constraint_summary = {
                 "violation_count": cdata.get("violation_count", 0),
-                "warnings": list(cdata.get("warnings", [])),
+                "warnings": raw_warnings,
+                "warnings_by_step": per_step_warnings,
+                "warnings_global": global_warnings,
+                "passed_checks": raw_passes,
+                "inline_checks_by_step": inline_checks_by_step,
             }
 
         instruction = (instruction_event.data.get("instruction", "")
@@ -1280,7 +1415,37 @@ class HTMLReporter(CapturingReporter):
         validated_steps = []
         cspec = completed_spec_event.data.get("spec") if completed_spec_event else None
         if cspec:
-            validated_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(cspec.steps)]
+            # P1-8: pass per-step inline-checks at construction so the
+            # green ✓ tags get embedded into the right detail_lines.
+            inline_by_step = (
+                constraint_summary.get("inline_checks_by_step")
+                if constraint_summary else None
+            ) or {}
+            validated_steps = [
+                _step_to_render_dict(
+                    s, idx, instruction,
+                    inline_checks=inline_by_step.get(s.order),
+                )
+                for idx, s in enumerate(cspec.steps)
+            ]
+
+        # P1-9: attach per-step warnings to each validated_step dict so the
+        # template can render them inline below the step body. Done after
+        # validated_steps is built so the warning-routing key (step.order)
+        # is available on each render dict.
+        # P1-8: attach per-step inline checks (the green tags) on the
+        # same pass through the list.
+        if constraint_summary and validated_steps:
+            per_step_warnings = constraint_summary.get("warnings_by_step") or {}
+            per_step_inline = constraint_summary.get("inline_checks_by_step") or {}
+            for step_dict in validated_steps:
+                order = step_dict.get("order")
+                if order is None:
+                    continue
+                if order in per_step_warnings:
+                    step_dict["warnings"] = per_step_warnings[order]
+                if order in per_step_inline:
+                    step_dict["inline_checks"] = per_step_inline[order]
 
         # Build the marked-up instruction HTML with <span data-cite-id="...">
         # wrappers for arrow rendering. Use the most-resolved spec available

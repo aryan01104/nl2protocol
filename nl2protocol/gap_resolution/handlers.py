@@ -59,7 +59,7 @@ class CLIConfirmationHandler:
         return self._interpret_response(response, gap, suggestion)
 
     def _render_gap(self, gap: Gap, suggestion: Optional[Suggestion]) -> None:
-        sev_tag = {"blocker": "BLOCKER", "suggestion": "needs review",
+        sev_tag = {"blocker": "MUST RESOLVE", "suggestion": "needs review",
                     "quality": "optional"}.get(gap.severity, gap.severity)
         self._log(f"\n  [{sev_tag}] {gap.description}")
         if gap.current_value is not None:

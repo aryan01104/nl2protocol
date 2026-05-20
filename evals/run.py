@@ -40,7 +40,7 @@ except ImportError:
 from nl2protocol.config import ConfigLoader
 from nl2protocol.extraction import LabwareResolver
 from nl2protocol.extraction.extractor import SemanticExtractor
-from nl2protocol.validation.constraints import ConstraintChecker, ViolationType
+from nl2protocol.validation.constraints import PhysicalConstraintsChecker, ViolationType
 
 
 # ============================================================================
@@ -211,8 +211,8 @@ def run_one_eval(eval_dir: Path) -> EvalResult:
     # Check constraint invariants (only meaningful if extract succeeded)
     if "constraints" in expected and spec is not None:
         try:
-            checker = ConstraintChecker(loader.config)
-            constraint_result = checker.check_all(spec)
+            checker = PhysicalConstraintsChecker(loader.config)
+            constraint_result = checker.assert_physical_constraints(spec)
             failures += _check_constraints(expected["constraints"], constraint_result)
         except Exception as e:
             failures.append(f"constraint check crashed: {type(e).__name__}: {e}")

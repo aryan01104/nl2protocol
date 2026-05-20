@@ -11,7 +11,7 @@ import pytest
 from pathlib import Path
 
 from nl2protocol.validation.constraints import (
-    ConstraintChecker, ConstraintCheckResult, WellStateTracker, WellState,
+    PhysicalConstraintsChecker, PhysicalConstraintsCheckResult, WellStateTracker, WellState,
     Severity, ViolationType,
     get_pipette_range, get_pipette_for_volume, get_all_pipette_ranges,
     PIPETTE_SPECS,
@@ -412,13 +412,13 @@ class TestCheckAllOrchestration:
     # Post: empty violations list iff every check passes
     def test_clean_spec_returns_empty_violations(self, simple_config):
         spec = make_spec([self._clean_step(simple_config)])
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert result.violations == []
 
     # Post: result.bool() / has_errors / errors / warnings are coherent
     def test_clean_spec_result_is_truthy_and_no_errors(self, simple_config):
         spec = make_spec([self._clean_step(simple_config)])
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert bool(result) is True
         assert result.has_errors is False
         assert result.errors == []
@@ -439,7 +439,7 @@ class TestCheckAllOrchestration:
             composition_provenance=_comp(),
         )
         spec = make_spec([bad_step_1, bad_step_2])
-        result = ConstraintChecker(simple_config).check_all(spec)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
 
         steps_with_violations = {v.step for v in result.violations}
         assert 1 in steps_with_violations
@@ -453,7 +453,7 @@ class TestCheckAllOrchestration:
             destination=_loc(description="dest_plate", well="A1"),
             composition_provenance=_comp(),
         )
-        result = ConstraintChecker(simple_config).check_all(make_spec([bad_step]))
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(make_spec([bad_step]))
         assert len(result.violations) >= 1
 
         for v in result.violations:
@@ -467,9 +467,9 @@ class TestCheckAllOrchestration:
     # Post: same spec → same result (deterministic / pure)
     def test_check_all_is_deterministic(self, simple_config):
         spec = make_spec([self._clean_step(simple_config)])
-        checker = ConstraintChecker(simple_config)
-        r1 = checker.check_all(spec)
-        r2 = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(simple_config)
+        r1 = checker.assert_physical_constraints(spec)
+        r2 = checker.assert_physical_constraints(spec)
         # Compare violation lists field-by-field
         assert len(r1.violations) == len(r2.violations)
         for v1, v2 in zip(r1.violations, r2.violations):
@@ -480,14 +480,14 @@ class TestCheckAllOrchestration:
     def test_does_not_mutate_spec(self, simple_config):
         spec = make_spec([self._clean_step(simple_config)])
         snapshot = spec.model_dump_json()
-        ConstraintChecker(simple_config).check_all(spec)
+        PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert spec.model_dump_json() == snapshot
 
     # Side effects: does not mutate self.config
     def test_does_not_mutate_config(self, simple_config):
         spec = make_spec([self._clean_step(simple_config)])
         snapshot = json.dumps(simple_config, sort_keys=True)
-        ConstraintChecker(simple_config).check_all(spec)
+        PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert json.dumps(simple_config, sort_keys=True) == snapshot
 
 
@@ -512,8 +512,8 @@ class TestPipetteCapacity:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(qpcr_config)
+        result = checker.assert_physical_constraints(spec)
 
         assert result.has_errors
         assert len(result.errors) == 1
@@ -533,8 +533,8 @@ class TestPipetteCapacity:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(simple_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(simple_config)
+        result = checker.assert_physical_constraints(spec)
 
         assert not result.has_errors
 
@@ -549,8 +549,8 @@ class TestPipetteCapacity:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(qpcr_config)
+        result = checker.assert_physical_constraints(spec)
 
         assert result.has_errors
         assert any("1500" in v.what for v in result.errors)
@@ -566,8 +566,8 @@ class TestPipetteCapacity:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(qpcr_config)
+        result = checker.assert_physical_constraints(spec)
 
         # Physical constraints apply regardless of provenance
         assert result.has_errors
@@ -591,8 +591,8 @@ class TestLabwareResolution:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(qpcr_config)
+        result = checker.assert_physical_constraints(spec)
 
         labware_errors = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
         assert len(labware_errors) >= 1
@@ -609,8 +609,8 @@ class TestLabwareResolution:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(simple_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(simple_config)
+        result = checker.assert_physical_constraints(spec)
 
         labware_errors = [v for v in result.errors if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
         assert len(labware_errors) == 0
@@ -628,8 +628,8 @@ class TestModuleAvailability:
         spec = make_spec([
             ExtractedStep(order=1, action="set_temperature", note="37°C", composition_provenance=_comp())
         ])
-        checker = ConstraintChecker(simple_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(simple_config)
+        result = checker.assert_physical_constraints(spec)
 
         module_errors = [v for v in result.errors if v.violation_type == ViolationType.MODULE_NOT_FOUND]
         assert len(module_errors) == 1
@@ -640,8 +640,8 @@ class TestModuleAvailability:
         spec = make_spec([
             ExtractedStep(order=1, action="set_temperature", note="4°C", composition_provenance=_comp())
         ])
-        checker = ConstraintChecker(qpcr_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(qpcr_config)
+        result = checker.assert_physical_constraints(spec)
 
         module_errors = [v for v in result.errors if v.violation_type == ViolationType.MODULE_NOT_FOUND]
         assert len(module_errors) == 0
@@ -668,8 +668,8 @@ class TestTipSufficiency:
                 composition_provenance=_comp(),
             )
         ])
-        checker = ConstraintChecker(simple_config)
-        result = checker.check_all(spec)
+        checker = PhysicalConstraintsChecker(simple_config)
+        result = checker.assert_physical_constraints(spec)
 
         tip_errors = [v for v in result.errors if v.violation_type == ViolationType.TIP_INSUFFICIENT]
         assert len(tip_errors) == 1
@@ -1097,3 +1097,176 @@ class TestSerialDilution:
 # now lives in CLIConfirmationHandler (per-Gap CLI prompts) and the HTML
 # report (ADR-0009 step 5). Render-tests for the new surfaces are in
 # tests/test_reporting.py and the orchestrator/handler test files.
+
+
+# ============================================================================
+# P1-8 — passed-check emission (the inline-tag data source)
+# ============================================================================
+
+from nl2protocol.validation.constraints import CheckResult
+
+
+def _make_step_with_volume(volume_ul: float, action: str = "transfer",
+                            **loc_kwargs):
+    """Helper for the pass-emission tests: build a one-step spec whose
+    volume + (optional) source/destination refs are inline-checkable."""
+    step_kwargs = dict(
+        order=1, action=action,
+        composition_provenance=CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        ),
+        volume=ProvenancedVolume(
+            value=volume_ul, unit="uL", exact=True, provenance=_prov(),
+        ),
+    )
+    step_kwargs.update(loc_kwargs)
+    return ProtocolSpec(summary="t", steps=[ExtractedStep(**step_kwargs)])
+
+
+class TestPassedCheckEmission:
+    """Each `_check_*` method that emits ConstraintViolations on failure
+    must also emit a PASSED CheckResult on success, populated with a
+    `detail_label` + short `what` phrase. This is the data the inline-
+    tag renderer reads."""
+
+    def test_volume_check_emits_pass(self, simple_config):
+        spec = _make_step_with_volume(50.0)  # in range of either pipette
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        assert not result.has_errors, f"Setup error: {result.errors}"
+        volume_passes = [p for p in result.passes
+                         if p.detail_label == "volume" and p.step == 1]
+        assert len(volume_passes) == 1
+        assert volume_passes[0].severity == Severity.PASSED
+        assert volume_passes[0].violation_type == ViolationType.PIPETTE_CAPACITY
+        # The phrase names the smallest covering pipette (config-dependent).
+        assert "range" in volume_passes[0].what
+
+    def test_labware_check_emits_pass_for_resolved_source(self, simple_config):
+        # Resolved label that exists in simple_config's labware
+        # (`source_plate` is one of the entries — fixture-specific).
+        loc = _loc(
+            description="source_plate", resolved_label="source_plate",
+            well="A1",
+        )
+        spec = _make_step_with_volume(50.0, source=loc)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        source_passes = [p for p in result.passes
+                         if p.detail_label == "source_labware"]
+        assert len(source_passes) == 1
+        assert source_passes[0].violation_type == ViolationType.LABWARE_NOT_FOUND
+        # Phrase mentions either "slot" (when config carries one) or the
+        # resolved-to-config text (fallback).
+        assert ("slot" in source_passes[0].what
+                or "resolves" in source_passes[0].what)
+
+    def test_wells_check_emits_pass_for_valid_destination_wells(self, simple_config):
+        dst = _loc(
+            description="dest_plate", resolved_label="dest_plate",
+            wells=["A1", "A2"],
+        )
+        spec = _make_step_with_volume(50.0, destination=dst)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        dest_wells_passes = [p for p in result.passes
+                             if p.detail_label == "destination_wells"]
+        assert len(dest_wells_passes) == 1
+        assert dest_wells_passes[0].violation_type == ViolationType.WELL_INVALID
+        # Plural phrase since we passed a wells list.
+        assert "exist on" in dest_wells_passes[0].what
+
+    def test_singular_well_pass_uses_exists_on(self, simple_config):
+        loc = _loc(
+            description="source_plate", resolved_label="source_plate",
+            well="B2",
+        )
+        spec = _make_step_with_volume(50.0, source=loc)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        source_wells_passes = [p for p in result.passes
+                               if p.detail_label == "source_wells"]
+        assert len(source_wells_passes) == 1
+        # Singular phrasing for the single-well case.
+        assert "exists on" in source_wells_passes[0].what
+
+    def test_no_pass_emitted_when_check_fails(self, simple_config):
+        # Volume way outside any configured pipette's range → violation,
+        # not a pass. The passes list should be empty for the failed cell.
+        spec = _make_step_with_volume(100000.0)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        assert result.has_errors
+        volume_passes = [p for p in result.passes if p.detail_label == "volume"]
+        assert len(volume_passes) == 0
+
+    def test_exactly_one_outcome_per_cell(self, simple_config):
+        """Drift invariant: for every (step, check_type, role) cell the
+        checker visits, exactly one CheckResult is emitted — never two
+        (both pass + fail), never zero (silently dropped)."""
+        # Source + destination wired to real config labware. Two
+        # different labware keys keep the source/destination passes
+        # structurally distinct.
+        src = _loc(description="source_plate", resolved_label="source_plate", wells=["A1"])
+        dst = _loc(description="dest_plate",   resolved_label="dest_plate",   wells=["A1"])
+        spec = _make_step_with_volume(50.0, source=src, destination=dst)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        # Cells the checker visits for this spec, each as a (check_type
+        # enum value, label) pair (using `.value` so sorting works —
+        # enums aren't ordered, strings are).
+        seen_cells = []
+        for c in result.checks:
+            if c.step == 1 and c.detail_label:
+                seen_cells.append((c.violation_type.value, c.detail_label))
+        assert sorted(seen_cells) == sorted([
+            ("pipette_capacity", "volume"),
+            ("labware_not_found", "source_labware"),
+            ("labware_not_found", "destination_labware"),
+            ("well_invalid", "source_wells"),
+            ("well_invalid", "destination_wells"),
+        ])
+        # No duplicates: a cell appearing twice would be a drift bug.
+        assert len(seen_cells) == len(set(seen_cells))
+
+
+class TestCheckResultUnification:
+    """The unified `CheckResult` class (formerly `ConstraintViolation`)
+    is a tagged union of pass + failure variants. These tests pin its
+    shape so future refactors don't accidentally diverge."""
+
+    def test_backwards_compat_alias(self):
+        # Old name still works for callers that imported it.
+        from nl2protocol.validation.constraints import ConstraintViolation
+        assert ConstraintViolation is CheckResult
+
+    def test_failure_record_carries_what_why_suggestion(self, simple_config):
+        # A failure-side record fills the existing what/why/suggestion.
+        spec = _make_step_with_volume(100000.0)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        assert result.errors, "expected a violation"
+        v = result.errors[0]
+        assert v.severity == Severity.ERROR
+        assert v.what
+        assert v.why
+        assert v.suggestion
+
+    def test_pass_record_carries_detail_label_and_what(self, simple_config):
+        # A pass-side record fills detail_label + the inline phrase via `what`.
+        spec = _make_step_with_volume(50.0)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        passes = result.passes
+        assert passes, "expected at least one passing check"
+        for p in passes:
+            assert p.severity == Severity.PASSED
+            assert p.detail_label is not None
+            assert p.what
+            # Pass-side records don't carry failure-only fields; defaults stay empty.
+            assert p.why == ""
+            assert p.suggestion == ""
+
+    def test_violations_property_excludes_passes(self, simple_config):
+        # The historical `violations` property still means "failures";
+        # passes don't leak into it even though both live in `_checks`.
+        spec = _make_step_with_volume(50.0)
+        result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
+        # All checks include both passes and failures (here, only passes).
+        assert len(result.checks) > 0
+        assert len(result.passes) > 0
+        # `violations` filters to non-PASSED outcomes.
+        assert all(v.severity != Severity.PASSED for v in result.violations)

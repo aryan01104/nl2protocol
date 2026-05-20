@@ -147,7 +147,11 @@ class TestHTMLReporterEmptyEvents:
         content = out.read_text()
         assert content.startswith("<!DOCTYPE html>")
         assert "</html>" in content
-        assert "Status:" in content  # header rendered
+        # Header block rendered — the static-mode title (post-P2-1 wording).
+        # P2-1 dropped the literal "Status:" label; the colored success/failed
+        # token now stands on its own, so we anchor the assertion on the H1
+        # text instead, which is more durable.
+        assert "<h1>nl2protocol</h1>" in content
 
     def test_finalize_creates_parent_directories(self, tmp_path):
         # Reporter must not fail if the output directory doesn't yet exist.
@@ -1457,3 +1461,153 @@ class TestHTMLReporterArrowsEnd2End:
         assert "<script src=" not in content.lower()
         # No external images either
         assert "<img " not in content.lower()
+
+
+# ============================================================================
+# _split_warnings_by_step — P1-9 routing helper
+# ============================================================================
+
+from nl2protocol.reporting import _split_warnings_by_step
+
+
+class TestSplitWarningsByStep:
+    """Constraint warnings get partitioned by their leading "[WARN] Step N:"
+    prefix so the template can anchor per-step warnings inline at their
+    step rows; Step 0 / unparseable warnings remain in the global list."""
+
+    def test_step_specific_warning_lands_in_per_step_bucket(self):
+        warnings = ["[WARN] Step 3: volume exceeds pipette capacity"]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {3: ["[WARN] Step 3: volume exceeds pipette capacity"]}
+        assert global_ == []
+
+    def test_step_zero_lands_in_global_bucket(self):
+        warnings = ["[WARN] Step 0: Protocol uses temperature control but ..."]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        # Step 0 is protocol-level — has no step row to anchor to.
+        assert per_step == {}
+        assert global_ == ["[WARN] Step 0: Protocol uses temperature control but ..."]
+
+    def test_unparseable_warning_falls_to_global(self):
+        # Defensive: an unrecognized prefix doesn't get silently dropped.
+        warnings = ["something the constraint checker emitted without [WARN] prefix"]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {}
+        assert global_ == warnings
+
+    def test_multiple_warnings_same_step_grouped(self):
+        warnings = [
+            "[WARN] Step 5: a",
+            "[WARN] Step 5: b",
+            "[WARN] Step 5: c",
+        ]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {5: warnings}
+        assert global_ == []
+
+    def test_multiple_steps_separate_buckets(self):
+        warnings = [
+            "[WARN] Step 1: x",
+            "[WARN] Step 3: y",
+            "[WARN] Step 1: z",
+        ]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {
+            1: ["[WARN] Step 1: x", "[WARN] Step 1: z"],
+            3: ["[WARN] Step 3: y"],
+        }
+        assert global_ == []
+
+    def test_mixed_step_zero_and_step_specific(self):
+        warnings = [
+            "[WARN] Step 0: protocol-level concern",
+            "[WARN] Step 2: step-specific concern",
+        ]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {2: ["[WARN] Step 2: step-specific concern"]}
+        assert global_ == ["[WARN] Step 0: protocol-level concern"]
+
+    def test_empty_input(self):
+        per_step, global_ = _split_warnings_by_step([])
+        assert per_step == {}
+        assert global_ == []
+
+    def test_case_insensitive_prefix(self):
+        # Defensive: minor casing variants on the prefix still get parsed.
+        warnings = ["[warn] step 4: lowercased prefix"]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        assert per_step == {4: warnings}
+        assert global_ == []
+
+    def test_no_warning_is_dropped(self):
+        # Every input warning must land in exactly one bucket.
+        warnings = [
+            "[WARN] Step 1: a",
+            "[WARN] Step 0: b",
+            "garbage prefix",
+            "[WARN] Step 1: c",
+        ]
+        per_step, global_ = _split_warnings_by_step(warnings)
+        total = sum(len(v) for v in per_step.values()) + len(global_)
+        assert total == len(warnings)
+
+
+# ============================================================================
+# _passes_to_inline_checks — P1-8 routing helper
+# ============================================================================
+
+from nl2protocol.reporting import _passes_to_inline_checks
+
+
+class TestPassesToInlineChecks:
+    """Routes the constraint-check `passed_checks` payload into the
+    per-step dict the template uses for inline-tag rendering. Mirrors
+    the warning-routing helper's shape but for passing checks instead
+    of failures."""
+
+    def test_basic_routing(self):
+        passes = [
+            {"step": 3, "check_type": "pipette_capacity",
+             "detail_label": "volume", "what": "within p20 range (1–20 µL)"},
+            {"step": 3, "check_type": "labware_not_found",
+             "detail_label": "source_labware", "what": "loaded at slot 2"},
+        ]
+        out = _passes_to_inline_checks(passes)
+        assert out == {
+            3: {
+                "volume": "within p20 range (1–20 µL)",
+                "source_labware": "loaded at slot 2",
+            },
+        }
+
+    def test_protocol_level_passes_skipped(self):
+        # Step 0 has no spec row to anchor to — those passes get
+        # filtered out by the routing helper.
+        passes = [
+            {"step": 0, "check_type": "tip_insufficient",
+             "detail_label": "tips", "what": "100 tips available"},
+        ]
+        assert _passes_to_inline_checks(passes) == {}
+
+    def test_missing_label_skipped(self):
+        passes = [
+            {"step": 1, "check_type": "x", "detail_label": None, "what": "phrase"},
+        ]
+        assert _passes_to_inline_checks(passes) == {}
+
+    def test_missing_phrase_skipped(self):
+        passes = [
+            {"step": 1, "check_type": "x", "detail_label": "volume", "what": ""},
+        ]
+        assert _passes_to_inline_checks(passes) == {}
+
+    def test_multiple_steps_grouped(self):
+        passes = [
+            {"step": 1, "check_type": "x", "detail_label": "volume", "what": "a"},
+            {"step": 2, "check_type": "y", "detail_label": "volume", "what": "b"},
+        ]
+        out = _passes_to_inline_checks(passes)
+        assert out == {1: {"volume": "a"}, 2: {"volume": "b"}}
+
+    def test_empty_input(self):
+        assert _passes_to_inline_checks([]) == {}

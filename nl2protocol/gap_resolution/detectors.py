@@ -343,11 +343,11 @@ class ConstraintViolationDetector:
     """
 
     def detect(self, spec, context: dict) -> List[Gap]:
-        from nl2protocol.validation.constraints import ConstraintChecker, Severity
+        from nl2protocol.validation.constraints import PhysicalConstraintsChecker, Severity
         config = context.get("config", {})
         if not config:
             return []
-        result = ConstraintChecker(config).check_all(spec)
+        result = PhysicalConstraintsChecker(config).assert_physical_constraints(spec)
         # Group ERROR-severity violations by (violation_type, dedupe key).
         # Insertion order preserved (dict in Python 3.7+) so the first
         # violation in each group is the representative — its step order

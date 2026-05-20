@@ -22,7 +22,7 @@ from nl2protocol.validation.validate_config import validate_config, validate_con
 from nl2protocol.robot import RobotClient
 from nl2protocol.validation.input_validator import InputValidator, validate_input
 from nl2protocol.extraction import SemanticExtractor, ProtocolSpec, CompleteProtocolSpec
-from nl2protocol.validation import ConstraintChecker, ConstraintViolation, ConstraintCheckResult
+from nl2protocol.validation import PhysicalConstraintsChecker, ConstraintViolation, PhysicalConstraintsCheckResult
 
 __all__ = [
     # Version
@@ -32,7 +32,7 @@ __all__ = [
     "ConfigLoader",
     "ProtocolSchema",
     "ConfigValidator",
-    "ConstraintChecker",
+    "PhysicalConstraintsChecker",
     "RobotClient",
     "InputValidator",
     "SemanticExtractor",
@@ -51,5 +51,5 @@ __all__ = [
     "Delay",
     "Comment",
     "ConstraintViolation",
-    "ConstraintCheckResult",
+    "PhysicalConstraintsCheckResult",
 ]
