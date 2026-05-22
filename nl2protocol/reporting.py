@@ -408,6 +408,66 @@ def _render_provenanced_value(
     return f'{marker}<span class="{" ".join(classes)}"{extra_attrs}>{rendered_value}</span>'
 
 
+def _render_revisioned_value(field, value_formatter, prov_getter, *,
+                              prov_id: Optional[str], instruction: Optional[str]):
+    """Render the evolution chain of a tracked field as inline value spans
+    separated by → arrows. Falls back to the single-span renderer when the
+    field has no `prior_revisions`.
+
+    Pre:    `field` is a tracked head (ProvenancedVolume / Duration /
+            Temperature / String, LocationRef). `value_formatter` is a
+            callable taking a field-like instance and returning the
+            display string for that revision. `prov_getter` extracts the
+            Provenance for the relevant sub-slot from a revision (e.g.
+            `lambda lr: lr.wells_provenance` for the wells row on a
+            LocationRef). `prov_id` is the cell anchor used for cite ↔
+            value pair-highlight + lab-state row hover; priors do NOT
+            get a prov_id (only the head). `instruction` is the raw
+            instruction text used to verify cite-recoverability for
+            palette assignment, same as `_render_provenanced_value`.
+
+    Post:   Returns one HTML string. When the field has no priors
+            (or all priors project to a None provenance via
+            `prov_getter`), the output is identical to calling
+            `_render_provenanced_value(value_formatter(field),
+            prov_getter(field), ...)` — backwards-compatible.
+            When at least one prior projects cleanly, the output is
+            `<prior-span> → <prior-span> → ... → <head-span>` with each
+            prior wrapped in `.prior-rev` for the strikethrough/dim
+            styling and the arrows wrapped in `.rev-arrow` for spacing.
+            Priors carry `data-rev-idx` so JS can identify them by
+            chain position.
+
+    Side effects: None. Pure formatting.
+    """
+    priors_raw = list(getattr(field, "prior_revisions", []) or [])
+    # Skip priors whose projected sub-provenance is None — they represent
+    # states where the sub-field wasn't populated, and rendering a bare
+    # value span without provenance would mislead the reader.
+    priors = [r for r in priors_raw if prov_getter(r) is not None]
+    head_prov = prov_getter(field)
+    if not priors:
+        return _render_provenanced_value(
+            value_formatter(field), head_prov,
+            prov_id=prov_id, instruction=instruction,
+        )
+
+    segments = []
+    for i, rev in enumerate(priors):
+        inner = _render_provenanced_value(
+            value_formatter(rev), prov_getter(rev),
+            prov_id=None, instruction=instruction,
+        )
+        segments.append(
+            f'<span class="prior-rev" data-rev-idx="{i}">{inner}</span>'
+        )
+    segments.append(_render_provenanced_value(
+        value_formatter(field), head_prov,
+        prov_id=prov_id, instruction=instruction,
+    ))
+    return '<span class="rev-arrow" aria-hidden="true">→</span>'.join(segments)
+
+
 # ============================================================================
 # Phase 3: Span recovery — find cited_text positions in the instruction.
 # The predicate lives in nl2protocol.citing so the verifier (extractor) and
@@ -1180,9 +1240,10 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     expected = _ACTION_EXPECTED_FIELDS.get(step.action, set())
 
     if step.volume is not None:
-        v = _render_provenanced_value(
-            f"{step.volume.value} {step.volume.unit}",
-            step.volume.provenance,
+        v = _render_revisioned_value(
+            step.volume,
+            lambda f: f"{f.value} {f.unit}",
+            lambda f: f.provenance,
             prov_id=f"{sid}-volume",
             instruction=instruction,
         )
@@ -1202,17 +1263,18 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     # wells_provenance can land cleanly on that specific row.
     for role, role_ref in (("source", step.source), ("destination", step.destination)):
         if role_ref is not None:
-            labware_text = _format_labware_label(role_ref)
             desc_prov = role_ref.description_provenance
             if desc_prov:
-                v_lab = _render_provenanced_value(
-                    labware_text, desc_prov,
+                v_lab = _render_revisioned_value(
+                    role_ref,
+                    _format_labware_label,
+                    lambda lr: lr.description_provenance,
                     prov_id=f"{sid}-{role}",
                     instruction=instruction,
                 )
             else:
                 import html as _html
-                v_lab = _html.escape(labware_text)
+                v_lab = _html.escape(_format_labware_label(role_ref))
             detail_lines.append(
                 f'<span class="label">{role}:</span> {v_lab}'
                 f'{_maybe_tag(f"{role}_labware")}'
@@ -1222,8 +1284,10 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             if wells_text:
                 wells_prov = getattr(role_ref, "wells_provenance", None)
                 if wells_prov:
-                    v_wells = _render_provenanced_value(
-                        wells_text, wells_prov,
+                    v_wells = _render_revisioned_value(
+                        role_ref,
+                        _format_wells_only,
+                        lambda lr: lr.wells_provenance,
                         prov_id=f"{sid}-{role}-wells",
                         instruction=instruction,
                     )
@@ -1240,15 +1304,22 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             detail_lines.append(_empty_field_cell(f"{sid}-{role}", role))
 
     if step.substance is not None:
-        v = _render_provenanced_value(step.substance.value, step.substance.provenance, prov_id=f"{sid}-substance", instruction=instruction)
+        v = _render_revisioned_value(
+            step.substance,
+            lambda f: f.value,
+            lambda f: f.provenance,
+            prov_id=f"{sid}-substance",
+            instruction=instruction,
+        )
         detail_lines.append(f'<span class="label">substance:</span> {v}')
     elif "substance" in expected:
         detail_lines.append(_empty_field_cell(f"{sid}-substance", "substance"))
 
     if step.duration is not None:
-        v = _render_provenanced_value(
-            f"{step.duration.value} {step.duration.unit}",
-            step.duration.provenance,
+        v = _render_revisioned_value(
+            step.duration,
+            lambda f: f"{f.value} {f.unit}",
+            lambda f: f.provenance,
             prov_id=f"{sid}-duration",
             instruction=instruction,
         )
@@ -1257,9 +1328,10 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
         detail_lines.append(_empty_field_cell(f"{sid}-duration", "duration"))
 
     if step.temperature is not None:
-        v = _render_provenanced_value(
-            f"{step.temperature.value}°C",
-            step.temperature.provenance,
+        v = _render_revisioned_value(
+            step.temperature,
+            lambda f: f"{f.value}°C",
+            lambda f: f.provenance,
             prov_id=f"{sid}-temperature",
             instruction=instruction,
         )
@@ -1285,9 +1357,10 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
         if pa.repetitions is not None:
             bits.append(f"×{pa.repetitions}")
         if pa.volume is not None:
-            v = _render_provenanced_value(
-                f"{pa.volume.value} {pa.volume.unit}",
-                pa.volume.provenance,
+            v = _render_revisioned_value(
+                pa.volume,
+                lambda f: f"{f.value} {f.unit}",
+                lambda f: f.provenance,
                 prov_id=f"{sid}-{pa.action}-{pa_idx}-volume",
                 instruction=instruction,
             )

@@ -221,6 +221,29 @@
     transform: translateY(1px);
   }
 
+  /* ───────── Revision chain (ADR history) ─────────
+     When a tracked field has been mutated through the gap loop or stage
+     2.5, each prior value renders as a strike-through dimmed span and
+     the chain segments are joined with → arrows. Hovering any segment
+     surfaces that revision's provenance via the existing tooltip JS
+     (data-prov-* attrs are emitted per segment). The head segment
+     keeps its normal styling so the live value stays scannable. */
+  .prior-rev {
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    opacity: 0.55;
+  }
+  .prior-rev:hover { opacity: 0.85; }
+  /* The arrow between chain segments. Dimmed so the values themselves
+     stay the visual focus; aria-hidden in the markup since the
+     strike-through + bold-head pair already communicates direction. */
+  .rev-arrow {
+    color: var(--dim);
+    margin: 0 0.35em;
+    font-weight: 400;
+    user-select: none;
+  }
+
   /* ───────── Review-lifecycle badges (ADR-0009) ─────────
      The Provenance carries `review_status` (original / reviewed_agree /
      reviewed_disagree / user_confirmed / user_edited /

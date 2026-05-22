@@ -318,3 +318,117 @@ class TestApplyPathPushesRevisions:
         snap = vol.prior_revisions[0]
         assert snap.provenance.source == "instruction"
         assert snap.provenance.cited_text == ["10uL"]
+
+
+# ============================================================================
+# Renderer: chains appear in HTML when prior_revisions is populated
+# ============================================================================
+
+class TestRendererChain:
+    """The HTML renderer emits a value chain (prior segments joined by →
+    arrows + head segment) when a tracked field has prior_revisions; falls
+    back to a single span when the field has none."""
+
+    def test_no_history_renders_single_span(self):
+        # Field with empty prior_revisions: chain renderer must produce
+        # output identical to the legacy single-span renderer.
+        from nl2protocol.reporting import _render_revisioned_value
+        v = ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                               provenance=_instr("10uL"))
+        html = _render_revisioned_value(
+            v,
+            lambda f: f"{f.value} {f.unit}",
+            lambda f: f.provenance,
+            prov_id="vol-1", instruction="10uL",
+        )
+        assert "prior-rev" not in html
+        assert "rev-arrow" not in html
+        assert ">10.0 uL<" in html
+
+    def test_one_prior_renders_two_segments_and_arrow(self):
+        from nl2protocol.reporting import _render_revisioned_value
+        v = ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                               provenance=_instr("10uL"))
+        push_revision(v, value=15.0, provenance=_inferred("user edited", "user_edited"))
+        html = _render_revisioned_value(
+            v,
+            lambda f: f"{f.value} {f.unit}",
+            lambda f: f.provenance,
+            prov_id="vol-1", instruction="10uL",
+        )
+        # Prior segment wrapped in .prior-rev with data-rev-idx=0
+        assert 'class="prior-rev" data-rev-idx="0"' in html
+        # Old value present in chain
+        assert ">10.0 uL<" in html
+        # New value present
+        assert ">15.0 uL<" in html
+        # Arrow separator
+        assert 'class="rev-arrow"' in html
+
+    def test_head_carries_prov_id_priors_do_not(self):
+        # prov_id is the cite ↔ value pair-highlight anchor. Only the
+        # head should participate; priors are frozen snapshots.
+        from nl2protocol.reporting import _render_revisioned_value
+        v = ProvenancedVolume(value=10.0, unit="uL", exact=True,
+                               provenance=_instr("10uL"))
+        push_revision(v, value=15.0, provenance=_inferred("changed", "user_edited"))
+        html = _render_revisioned_value(
+            v,
+            lambda f: f"{f.value} {f.unit}",
+            lambda f: f.provenance,
+            prov_id="vol-1", instruction="10uL",
+        )
+        # Exactly one occurrence of data-prov-id (the head's)
+        assert html.count('data-prov-id="vol-1"') == 1
+
+    def test_locationref_wells_subfield_chain(self):
+        # LocationRef.wells_provenance projection works through the chain.
+        # Old: well='C7'. New: wells=['D1'].
+        from nl2protocol.reporting import _render_revisioned_value, _format_wells_only
+        lr = LocationRef(
+            description="tube rack", well="C7",
+            description_provenance=_instr("tube C7"),
+            wells_provenance=_instr("C7"),
+        )
+        push_revision(
+            lr, well=None, wells=["D1"],
+            wells_provenance=_inferred("clipped", "user_accepted_suggestion"),
+        )
+        html = _render_revisioned_value(
+            lr,
+            _format_wells_only,
+            lambda l: l.wells_provenance,
+            prov_id="dst-wells", instruction="tube C7",
+        )
+        assert ">well C7<" in html
+        assert ">wells D1<" in html
+        assert "prior-rev" in html
+        assert "rev-arrow" in html
+
+    def test_prior_with_none_subprov_is_skipped(self):
+        # A prior revision whose projected sub-provenance is None is
+        # skipped — the chain renders as if it weren't there. (Test:
+        # synthesize a LocationRef whose prior revision has wells_provenance
+        # None, with current head having wells_provenance set.)
+        from nl2protocol.reporting import _render_revisioned_value, _format_wells_only
+        # Construct a snapshot with wells_provenance=None manually.
+        snap_no_wells = LocationRef(
+            description="tube rack",
+            description_provenance=_instr("tube rack"),
+        )
+        head = LocationRef(
+            description="tube rack", well="A1",
+            description_provenance=_instr("tube rack"),
+            wells_provenance=_instr("A1"),
+            prior_revisions=[snap_no_wells],
+        )
+        html = _render_revisioned_value(
+            head,
+            _format_wells_only,
+            lambda l: l.wells_provenance,
+            prov_id="src-wells", instruction="A1",
+        )
+        # No chain (skipped the only prior). Single span output.
+        assert "prior-rev" not in html
+        assert "rev-arrow" not in html
+        assert ">well A1<" in html
