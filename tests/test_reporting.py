@@ -524,32 +524,11 @@ class TestADR0009Rendering:
         assert "prov-review-user-accepted-suggestion" in out
 
 
-class TestResolvedSpecColumnRename:
-    """ADR-0009 renames the third column from 'Complete Spec' to 'Resolved
-    Spec' to match the post-orchestrator semantic, and to forward-compat
-    the planned five-column layout (ADR-0010)."""
-
-    def test_template_uses_resolved_spec_header(self, tmp_path):
-        from nl2protocol.reporting import HTMLReporter
-        # Empty run is enough — we only care that the column header shipped
-        # in the rendered HTML is the new name.
-        out_path = tmp_path / "report.html"
-        rep = HTMLReporter(str(out_path))
-        rep.finalize()
-        rendered = out_path.read_text()
-        # The column's <h2> must use the new name. We check for the actual
-        # rendered tag rather than the bare string so the test isn't fooled
-        # by the template comment that explains the rename (which contains
-        # the literal "Complete Spec" prose).
-        assert "<h2>Resolved Spec</h2>" in rendered
-        assert "<h2>Complete Spec</h2>" not in rendered
-
-
-class TestADR0011FiveColumnLayout:
-    """ADR-0011 Phase 2a expands the report from 4 columns to 5: instruction,
-    extracted spec, resolved spec (post-orchestrator), validated spec
-    (post-stage-5 promotion), generated python. The new resolved_spec event
-    feeds column 3; the existing completed_spec event feeds column 4."""
+class TestUnifiedProtocolStepsColumn:
+    """Phase 3b collapses the previously-separate Extracted/Resolved/
+    Validated spec columns into one 'Protocol Steps' column. Per-field
+    revision chains carry the temporal evolution inline instead of
+    spreading it across three columns."""
 
     def _make_minimal_spec(self):
         from nl2protocol.models.spec import (
@@ -575,28 +554,30 @@ class TestADR0011FiveColumnLayout:
             ),
         ])
 
-    def test_renders_validated_spec_column_header(self, tmp_path):
+    def test_renders_protocol_steps_column_header(self, tmp_path):
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        assert "<h2>Validated Spec</h2>" in rendered
+        assert "<h2>Protocol Steps</h2>" in rendered
+        # Old headers must no longer appear.
+        assert "<h2>Extracted Spec</h2>" not in rendered
+        assert "<h2>Resolved Spec</h2>" not in rendered
+        assert "<h2>Validated Spec</h2>" not in rendered
 
-    def test_renders_all_five_column_headers(self, tmp_path):
+    def test_renders_all_three_column_headers(self, tmp_path):
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
         for header in ("<h2>Instruction</h2>",
-                        "<h2>Extracted Spec</h2>",
-                        "<h2>Resolved Spec</h2>",
-                        "<h2>Validated Spec</h2>",
+                        "<h2>Protocol Steps</h2>",
                         "<h2>Generated Python</h2>"):
             assert header in rendered, f"missing column header: {header}"
 
-    def test_resolved_spec_event_populates_resolved_column(self, tmp_path):
+    def test_resolved_spec_event_populates_unified_column(self, tmp_path):
         from nl2protocol.reporting import HTMLReporter, StageEvent
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
@@ -606,13 +587,10 @@ class TestADR0011FiveColumnLayout:
                              data={"spec": self._make_minimal_spec()}))
         rep.finalize()
         rendered = out_path.read_text()
-        # Resolved spec column shows the step.
-        assert "Step 1: transfer" in rendered
-        # Without a completed_spec event, validated column shows the
-        # not-reached placeholder.
-        assert "(validation stage not reached)" in rendered
+        # The step renders once in the unified column.
+        assert rendered.count("Step 1: transfer") == 1
 
-    def test_completed_spec_event_populates_validated_column(self, tmp_path):
+    def test_completed_spec_event_populates_unified_column(self, tmp_path):
         from nl2protocol.reporting import HTMLReporter, StageEvent
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
@@ -622,44 +600,36 @@ class TestADR0011FiveColumnLayout:
                              data={"spec": self._make_minimal_spec()}))
         rep.finalize()
         rendered = out_path.read_text()
-        # Validated column shows the step.
-        assert "Step 1: transfer" in rendered
-        # Resolved column without an event shows the not-reached placeholder.
-        assert "(orchestrator stage not reached)" in rendered
+        assert rendered.count("Step 1: transfer") == 1
 
-    def test_both_events_populate_their_columns_independently(self, tmp_path):
+    def test_multiple_spec_events_render_step_once(self, tmp_path):
+        # extracted + resolved + completed events all reference the SAME
+        # mutated spec object. The static renderer picks the most-resolved
+        # available and renders ONCE into the unified column. No
+        # duplication across former column boundaries.
         from nl2protocol.reporting import HTMLReporter, StageEvent
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.emit(StageEvent(kind="raw_instruction",
                              data={"instruction": "Transfer 100uL from A1 to B1."}))
-        rep.emit(StageEvent(kind="resolved_spec",
-                             data={"spec": self._make_minimal_spec()}))
-        rep.emit(StageEvent(kind="completed_spec",
-                             data={"spec": self._make_minimal_spec()}))
+        spec = self._make_minimal_spec()
+        rep.emit(StageEvent(kind="extracted_spec", data={"spec": spec}))
+        rep.emit(StageEvent(kind="resolved_spec", data={"spec": spec}))
+        rep.emit(StageEvent(kind="completed_spec", data={"spec": spec}))
         rep.finalize()
         rendered = out_path.read_text()
-        # Both columns populated; neither shows the placeholder.
-        assert "(orchestrator stage not reached)" not in rendered
-        assert "(validation stage not reached)" not in rendered
-        # The step rendering appears at least twice (once per column).
-        assert rendered.count("Step 1: transfer") >= 2
+        assert rendered.count("Step 1: transfer") == 1
 
-    def test_grid_template_columns_is_five(self, tmp_path):
+    def test_grid_template_columns_is_three(self, tmp_path):
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # The CSS rule for the grid declares five columns. Refresh
-        # 2026-05-20 caps each column at a max-width via minmax() so
-        # the report stays scannable at wide viewports (CARRY-F2). The
-        # .grid.cols-5 declaration is what we assert against — instruction
-        # column has a tighter range, spec columns share one range, code
-        # column has the widest range.
+        # Three columns: instruction (narrow cap), protocol steps (mid),
+        # generated python (widest cap).
         assert (
-            "minmax(420px, 640px) minmax(340px, 600px) minmax(340px, 600px) "
-            "minmax(340px, 600px) minmax(380px, 720px)"
+            "minmax(420px, 640px)\n      minmax(340px, 600px)\n      minmax(380px, 720px)"
         ) in rendered
 
 
@@ -1105,10 +1075,12 @@ class TestADR0011NullFieldPlaceholders:
         assert "✗" in joined
         assert "(not extracted)" in joined
 
-    def test_extracted_and_resolved_columns_both_carry_source_prov_id(self, tmp_path):
-        # End-to-end: a transfer step with source=None in extracted spec
-        # and source=filled in resolved spec produces a `data-prov-id="s0-source"`
-        # span in BOTH columns. The arrow JS finds matching anchors.
+    def test_unified_column_carries_source_prov_id(self, tmp_path):
+        # End-to-end: Phase 3b collapse — the previously-separate Extracted
+        # and Resolved columns are gone. The unified Protocol Steps column
+        # renders the most-resolved spec (the resolved event here) so the
+        # data-prov-id="s0-source" anchor lands on that column. (Prior to
+        # 3b this assertion required >=2 occurrences across two columns.)
         from nl2protocol.reporting import HTMLReporter, StageEvent
         from nl2protocol.models.spec import (
             CompositionProvenance, ExtractedStep, LocationRef,
@@ -1172,10 +1144,11 @@ class TestADR0011NullFieldPlaceholders:
         rep.emit(StageEvent(kind="resolved_spec", data={"spec": resolved}))
         rep.finalize()
         rendered = out_path.read_text()
-        # Two occurrences of data-prov-id="s0-source": once per column.
-        # Without Phase 2b/4 polish, the extracted column would skip
-        # source entirely (only one occurrence in the resolved column).
-        assert rendered.count('data-prov-id="s0-source"') >= 2
+        # Exactly one occurrence after Phase 3b's column collapse — the
+        # unified column carries one set of step blocks. The renderer
+        # picks the most-resolved spec (resolved over extracted) so the
+        # filled source LocationRef's anchor lands here.
+        assert rendered.count('data-prov-id="s0-source"') == 1
 
     def test_pause_step_does_not_emit_placeholder_clutter(self):
         # Pause steps don't expect volume/source/destination/etc. — the

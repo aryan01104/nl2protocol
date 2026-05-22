@@ -36,9 +36,12 @@ EventKind = Literal[
     "stage_complete",       # data = {"stage": "Stage 2/7", "summary": "..."}
     "stage_failed",         # data = {"stage": "Stage 2/7", "reason": "..."}
     "raw_instruction",      # data = {"instruction": "..."}
-    "extracted_spec",       # data = {"spec": ProtocolSpec}        — column 2 (post-extraction, immutable LLM output)
-    "resolved_spec",        # data = {"spec": ProtocolSpec}        — column 3 (post-orchestrator gap resolution; ADR-0011 Phase 2a)
-    "completed_spec",       # data = {"spec": CompleteProtocolSpec} — column 4 (post-validation: labware confirm + constraint check)
+    # Phase 3b collapse: extracted/resolved/completed events all populate
+    # the SAME "Protocol Steps" column. The temporal progression is
+    # encoded per-cell via `prior_revisions` rather than per-column.
+    "extracted_spec",       # data = {"spec": ProtocolSpec}        — initial column population
+    "resolved_spec",        # data = {"spec": ProtocolSpec}        — re-render with revision chains
+    "completed_spec",       # data = {"spec": CompleteProtocolSpec} — re-render with inline ✓ + warnings
     "generated_script",     # data = {"script": "..."}
     "warning",              # data = {"message": "...", "context": "..."}
     "error",                # data = {"message": "...", "stage": "..."}
@@ -1441,12 +1444,13 @@ class HTMLReporter(CapturingReporter):
         template = env.get_template("report.html.jinja")
 
         # Pull the load-bearing data out of the captured events.
-        # ADR-0011 Phase 2a: three spec snapshots feed three columns.
-        #   spec_event       → column 2 (extracted, post-LLM)
-        #   resolved_event   → column 3 (resolved, post-orchestrator)
-        #   completed_event  → column 4 (validated, post-CompleteProtocolSpec promotion)
-        # Resolved or completed missing → render the columns empty; downstream
-        # tests check both column headers exist regardless.
+        # Phase 3b collapse: all three spec events reference the SAME
+        # mutated spec object (events are captured by reference, the spec
+        # is mutated in place). By finalize() time they all point to the
+        # final state. We pick the most-resolved available and render it
+        # once into the unified "Protocol Steps" column; the chain UI on
+        # each cell surfaces the per-field temporal evolution that the
+        # legacy three-column layout used to convey.
         instruction_event = self.first_of_kind("raw_instruction")
         spec_event = self.first_of_kind("extracted_spec")
         resolved_spec_event = self.first_of_kind("resolved_spec")
@@ -1484,43 +1488,39 @@ class HTMLReporter(CapturingReporter):
 
         instruction = (instruction_event.data.get("instruction", "")
                        if instruction_event else "")
-        spec_steps = []
+        # Phase 3b collapse: ONE unified step list rendered into a single
+        # "Protocol Steps" column. Pick the most-resolved spec available
+        # (completed > resolved > extracted). Since the captured events
+        # all reference the same mutated spec object by finalize() time,
+        # they all point to the final state; the .get() chain is just a
+        # graceful fallback if a stage was skipped (failed run).
         spec = spec_event.data.get("spec") if spec_event else None
-        if spec:
-            spec_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(spec.steps)]
-
-        resolved_steps = []
         rspec = resolved_spec_event.data.get("spec") if resolved_spec_event else None
-        if rspec:
-            resolved_steps = [_step_to_render_dict(s, idx, instruction) for idx, s in enumerate(rspec.steps)]
-
-        validated_steps = []
         cspec = completed_spec_event.data.get("spec") if completed_spec_event else None
-        if cspec:
+        unified_spec = cspec or rspec or spec
+
+        protocol_steps = []
+        if unified_spec:
             # P1-8: pass per-step inline-checks at construction so the
             # green ✓ tags get embedded into the right detail_lines.
             inline_by_step = (
                 constraint_summary.get("inline_checks_by_step")
                 if constraint_summary else None
             ) or {}
-            validated_steps = [
+            protocol_steps = [
                 _step_to_render_dict(
                     s, idx, instruction,
                     inline_checks=inline_by_step.get(s.order),
                 )
-                for idx, s in enumerate(cspec.steps)
+                for idx, s in enumerate(unified_spec.steps)
             ]
 
-        # P1-9: attach per-step warnings to each validated_step dict so the
-        # template can render them inline below the step body. Done after
-        # validated_steps is built so the warning-routing key (step.order)
-        # is available on each render dict.
-        # P1-8: attach per-step inline checks (the green tags) on the
-        # same pass through the list.
-        if constraint_summary and validated_steps:
+        # P1-9: attach per-step warnings to each step dict so the template
+        # can render them inline below the step body.
+        if constraint_summary and protocol_steps:
             per_step_warnings = constraint_summary.get("warnings_by_step") or {}
             per_step_inline = constraint_summary.get("inline_checks_by_step") or {}
-            for step_dict in validated_steps:
+            for step_dict in protocol_steps:
                 order = step_dict.get("order")
                 if order is None:
                     continue
@@ -1578,9 +1578,10 @@ class HTMLReporter(CapturingReporter):
         rendered = template.render(
             instruction=instruction,                # raw text (for any text-only fallback)
             instruction_html=instruction_html,      # marked-up HTML with cite spans
-            spec_steps=spec_steps,
-            resolved_steps=resolved_steps,
-            validated_steps=validated_steps,
+            # Phase 3b: single unified "Protocol Steps" column. Legacy
+            # template var names left unwired (template no longer
+            # references spec_steps / resolved_steps / validated_steps).
+            protocol_steps=protocol_steps,
             generated_script=generated_script,
             success=success,
             prov_stats=prov_stats,
