@@ -404,6 +404,22 @@ class ProvenancedVolume(BaseModel):
         "This is independent of provenance — a value can come from the instruction but still not be exact."
     ))
     provenance: Provenance
+    prior_revisions: List["ProvenancedVolume"] = Field(default_factory=list, description=(
+        "Append-only history of prior states. Each entry is a snapshot of "
+        "(value, unit, exact, provenance) taken just before a write replaced "
+        "them. Oldest first. The head (this object) owns the chain; entries "
+        "themselves carry empty `prior_revisions`."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 class ProvenancedDuration(BaseModel):
@@ -411,18 +427,60 @@ class ProvenancedDuration(BaseModel):
     value: float = Field(..., gt=0, description="Copy the user's number exactly.")
     unit: Literal["seconds", "minutes", "hours"]
     provenance: Provenance
+    prior_revisions: List["ProvenancedDuration"] = Field(default_factory=list, description=(
+        "Append-only history of prior states. Same shape and invariant as "
+        "ProvenancedVolume.prior_revisions."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 class ProvenancedTemperature(BaseModel):
     """A temperature in Celsius with provenance tracking."""
     value: float = Field(..., description="Temperature in degrees Celsius.")
     provenance: Provenance
+    prior_revisions: List["ProvenancedTemperature"] = Field(default_factory=list, description=(
+        "Append-only history of prior states. Same shape and invariant as "
+        "ProvenancedVolume.prior_revisions."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 class ProvenancedString(BaseModel):
     """A string value with provenance tracking."""
     value: str
     provenance: Provenance
+    prior_revisions: List["ProvenancedString"] = Field(default_factory=list, description=(
+        "Append-only history of prior states. Same shape and invariant as "
+        "ProvenancedVolume.prior_revisions."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 # ============================================================================
@@ -479,6 +537,26 @@ class LocationRef(BaseModel):
         "Subject to the same review_status lifecycle (reviewed_agree / "
         "reviewed_disagree / user_confirmed / user_edited)."
     ))
+    prior_revisions: List["LocationRef"] = Field(default_factory=list, description=(
+        "Append-only history of prior LocationRef states. Each entry is a "
+        "full snapshot of the labware reference (description, well/wells/"
+        "well_range, resolved_label, and all three provenances) taken just "
+        "before a write replaced them. Oldest first. Each LocationRef sub-"
+        "field evolves on the SAME chain — a write that changes both "
+        "wells and description shows up as one revision, not two, "
+        "preserving the temporal coupling. The head (this object) owns "
+        "the chain; entries themselves carry empty `prior_revisions`."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
     @model_validator(mode='after')
     def require_wells_provenance_when_wells_present(self) -> 'LocationRef':
@@ -619,6 +697,23 @@ class WellContents(BaseModel):
         "modal surfaces cited_text as a per-row audit trail so users can "
         "cross-check the system's reading of their volume against their wording."
     ))
+    prior_revisions: List["WellContents"] = Field(default_factory=list, description=(
+        "Append-only history of prior WellContents states. Each entry is a "
+        "full snapshot taken just before a write replaced any of labware / "
+        "well / substance / volume_ul / volume_ul_provenance. Oldest first. "
+        "The head owns the chain; entries themselves carry empty "
+        "`prior_revisions`."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 class LabwarePrefill(BaseModel):
@@ -779,3 +874,47 @@ class CompleteProtocolSpec(ProtocolSpec):
             )
 
         return self
+
+
+# ============================================================================
+# REVISION HISTORY HELPER
+# ============================================================================
+
+def push_revision(field, **new_state) -> None:
+    """Snapshot the current state of `field` into its `prior_revisions`,
+    then mutate the head fields to `new_state`.
+
+    Pre:    `field` is a ProvenancedVolume / ProvenancedDuration /
+            ProvenancedTemperature / ProvenancedString / LocationRef /
+            WellContents instance — any type that exposes a
+            `prior_revisions: List[Self]` field. `new_state` carries the
+            fields to overwrite on the head (e.g. `value=15.0,
+            provenance=Provenance(...)`). Empty `new_state` is permitted
+            and produces a snapshot-only revision (a no-op write that
+            still records the prior state).
+
+    Post:   `field.prior_revisions` has one new entry appended at the
+            end: a deep copy of `field`'s state at call time, with that
+            entry's own `prior_revisions` set to `[]`. The head's named
+            fields are updated to the values in `new_state`. Other head
+            fields are unchanged. Order in `prior_revisions` is oldest-
+            first; index 0 is the first state ever pushed (typically the
+            extractor's output).
+
+    Side effects: Mutates `field` in place. Deep-copies the head's state
+            before mutation, so the snapshot is safe against subsequent
+            in-place changes to mutable sub-objects (e.g. a Provenance
+            instance shared between the head and the snapshot would
+            otherwise be a foot-gun).
+
+    Raises: pydantic.ValidationError if any of `new_state` violates the
+            field's own validators (e.g. setting `value=-1` on a
+            ProvenancedVolume with `gt=0`). The snapshot has already
+            been pushed when the head mutation fails — callers
+            mutating-then-recovering should treat this as the head
+            being in an indeterminate state.
+    """
+    snapshot = field.model_copy(update={"prior_revisions": []}, deep=True)
+    field.prior_revisions.append(snapshot)
+    for k, v in new_state.items():
+        setattr(field, k, v)
