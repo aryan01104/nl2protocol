@@ -801,8 +801,19 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
 
 def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
     """Single-path apply — extracted from default_apply_resolution so
-    deduped Gaps can call it once per affected path."""
+    deduped Gaps can call it once per affected path.
+
+    Revision-history contract: each branch performs exactly ONE logical
+    write per call. For fields that carry a `prior_revisions` chain
+    (Provenanced* / LocationRef / WellContents), the pre-write state is
+    captured as a snapshot in `prior_revisions` BEFORE the head fields
+    are mutated. `_stamp_user_action` and `_stamp_resolution_action`
+    operate on the head AFTER the snapshot is pushed, so the head's
+    final state reflects every part of the logical write while the
+    chain captures one revision per call.
+    """
     import re
+    from nl2protocol.models.spec import push_revision, replace_with_history_preserved
 
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
@@ -834,11 +845,15 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
             # new_value is expected to be a Provenance built by the
             # orchestrator from the suggester's reasoning. Replace
             # the slot; review_status already correct on the new prov.
+            if hasattr(parent, "prior_revisions"):
+                push_revision(parent)
             setattr(parent, slot, new_value)
             return
         if resolution.action == "override":
             existing_prov = getattr(parent, slot, None)
             if existing_prov is not None:
+                if hasattr(parent, "prior_revisions"):
+                    push_revision(parent)
                 setattr(parent, slot, Provenance.model_validate({
                     **existing_prov.model_dump(),
                     "review_status": "user_overrode_fabrication",
@@ -846,6 +861,8 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
                 }))
             return
         if resolution.action == "edit" and hasattr(parent, "value"):
+            if hasattr(parent, "prior_revisions"):
+                push_revision(parent)
             parent.value = new_value
             setattr(parent, slot, Provenance(
                 source="inferred",
@@ -873,14 +890,18 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
         if m:
             idx, fname = int(m.group(1)), m.group(2)
             existing = getattr(spec.steps[idx], fname, None)
+            if existing is not None and hasattr(existing, "prior_revisions"):
+                push_revision(existing)
             _stamp_user_action(existing, user_action)
         return
 
-    # initial_contents[N].volume_ul (primitive — no Provenance to stamp)
+    # initial_contents[N].volume_ul (primitive — no Provenance to stamp,
+    # but WellContents itself carries a prior_revisions chain.)
     m = re.match(r"initial_contents\[(\d+)\]\.volume_ul$", path)
     if m:
         idx = int(m.group(1))
-        spec.initial_contents[idx].volume_ul = float(new_value)
+        wc = spec.initial_contents[idx]
+        push_revision(wc, volume_ul=float(new_value))
         return
 
     # steps[N].<field>
@@ -889,15 +910,25 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
         idx, fname = int(m.group(1)), m.group(2)
         if resolution.action == "accept_suggestion":
             # new_value is a Provenance-bearing model from the suggester.
-            # Replace the field, then stamp.
-            setattr(spec.steps[idx], fname, new_value)
-            _stamp_user_action(new_value, user_action)
+            # Preserve the OLD field's chain by transferring it onto the
+            # new instance before the swap; otherwise the old field's
+            # history would be dropped on the floor.
+            old = getattr(spec.steps[idx], fname, None)
+            transferred = (
+                replace_with_history_preserved(old, new_value)
+                if old is not None
+                else new_value
+            )
+            setattr(spec.steps[idx], fname, transferred)
+            _stamp_user_action(transferred, user_action)
         elif resolution.action == "edit":
             # new_value is a user-typed scalar. Mutate the existing model's
             # `.value` (preserving its type + provenance shape) so the field
             # stays a well-formed Provenanced* / LocationRef.
             existing = getattr(spec.steps[idx], fname, None)
             if existing is not None and hasattr(existing, "value"):
+                if hasattr(existing, "prior_revisions"):
+                    push_revision(existing)
                 existing.value = new_value
                 _stamp_user_action(existing, user_action)
             else:
@@ -918,6 +949,12 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
         idx, fname, subfield = int(m.group(1)), m.group(2), m.group(3)
         target = getattr(spec.steps[idx], fname)
         if target is not None:
+            # Snapshot the pre-write state of the LocationRef (or
+            # whatever parent carries `prior_revisions`). The subfield
+            # mutation AND the subsequent stamp both act on the head
+            # under this one revision.
+            if hasattr(target, "prior_revisions"):
+                push_revision(target)
             setattr(target, subfield, new_value)
             # PR3a step 3: when the subfield IS resolved_label, the
             # provenance for that decision lives in resolved_label_provenance,

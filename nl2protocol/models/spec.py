@@ -739,6 +739,23 @@ class LabwarePrefill(BaseModel):
         "WellContents.volume_ul, which has been Optional since the "
         "orchestrator landed."
     ))
+    prior_revisions: List["LabwarePrefill"] = Field(default_factory=list, description=(
+        "Append-only history of prior LabwarePrefill states. Each entry "
+        "is a snapshot taken just before a write replaced any of "
+        "labware / substance / volume_ul. Stage 2.5 labware-assignment "
+        "rewrites this row's `labware` to a config key; the chain "
+        "captures the user-facing description that was replaced."
+    ))
+
+    @field_validator('prior_revisions')
+    @classmethod
+    def _no_nested_history(cls, v):
+        if any(rev.prior_revisions for rev in v):
+            raise ValueError(
+                "prior_revisions entries must themselves have empty "
+                "prior_revisions — only the head owns the chain"
+            )
+        return v
 
 
 class ProtocolSpec(BaseModel):
@@ -918,3 +935,39 @@ def push_revision(field, **new_state) -> None:
     field.prior_revisions.append(snapshot)
     for k, v in new_state.items():
         setattr(field, k, v)
+
+
+def replace_with_history_preserved(old_field, new_field):
+    """Return a copy of `new_field` whose `prior_revisions` carries
+    `old_field`'s history plus a snapshot of `old_field`'s current state.
+
+    Use this when an apply path needs to swap one tracked field for a
+    freshly-constructed one (typical pattern: a suggester emits a
+    complete replacement object). A plain `setattr` would drop
+    `old_field.prior_revisions` on the floor. This helper preserves
+    the chain instead, appending the old field's pre-replacement
+    state to it.
+
+    Pre:    `old_field` and `new_field` are both instances of the same
+            type (or at least both expose a `prior_revisions: List[...]`
+            attribute). When either lacks `prior_revisions`, returns
+            `new_field` unchanged — caller can still setattr it.
+
+    Post:   Returns a new instance equivalent to `new_field` except that
+            its `prior_revisions` equals
+            `list(old_field.prior_revisions) + [snapshot_of_old_field]`,
+            where the appended snapshot itself has empty
+            `prior_revisions`. `new_field`'s own `prior_revisions`
+            (typically empty when fresh from a suggester) is REPLACED,
+            not extended — the contract is that the resulting head owns
+            the chain that came from the predecessor.
+
+    Side effects: None. Both inputs are left unchanged; a new model
+            instance is returned for the caller to assign.
+    """
+    if not hasattr(old_field, "prior_revisions") or not hasattr(new_field, "prior_revisions"):
+        return new_field
+    snapshot = old_field.model_copy(update={"prior_revisions": []}, deep=True)
+    return new_field.model_copy(update={
+        "prior_revisions": list(old_field.prior_revisions) + [snapshot],
+    })

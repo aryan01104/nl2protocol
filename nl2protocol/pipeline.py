@@ -718,13 +718,15 @@ class ProtocolAgent:
         # Apply by (labware, well) match — robust to ordering changes.
         by_key = {(r.get("labware"), r.get("well")): r.get("volume_ul")
                   for r in confirmed}
+        from nl2protocol.models.spec import push_revision
         for ic in spec.initial_contents:
             key = (getattr(ic, "labware", None), getattr(ic, "well", None))
             if key in by_key and by_key[key] is not None:
                 try:
-                    ic.volume_ul = float(by_key[key])
+                    new_vol = float(by_key[key])
                 except (TypeError, ValueError):
-                    pass
+                    continue
+                push_revision(ic, volume_ul=new_vol)
         return True
 
     def _confirm_labware_assignments_via_handler(
@@ -922,6 +924,7 @@ class ProtocolAgent:
         """
         if not confirmed:
             return
+        from nl2protocol.models.spec import push_revision
         for step in spec.steps:
             for ref in (step.source, step.destination):
                 if ref is None:
@@ -932,22 +935,30 @@ class ProtocolAgent:
                 if label is None:
                     continue
                 suggestion = labware_suggestions.get(ref.description)
-                ref.resolved_label = label
-                ref.resolved_label_provenance = self._build_user_action_provenance(
-                    description=ref.description,
-                    label=label,
-                    suggestion=suggestion,
+                # One logical write per LocationRef: snapshot the pre-
+                # assignment state, then update both resolved_label and
+                # resolved_label_provenance on the head.
+                push_revision(
+                    ref,
+                    resolved_label=label,
+                    resolved_label_provenance=self._build_user_action_provenance(
+                        description=ref.description,
+                        label=label,
+                        suggestion=suggestion,
+                    ),
                 )
         # initial_contents and prefilled_labware store labware as plain
         # strings (no LocationRef, no provenance slot). Rewrite them to
         # the confirmed config label so downstream stages see
-        # config-canonical names.
+        # config-canonical names. Snapshot each row before remapping so
+        # the user-facing description (pre-assignment) is preserved in
+        # prior_revisions.
         for wc in spec.initial_contents:
             if wc.labware in confirmed and confirmed[wc.labware] is not None:
-                wc.labware = confirmed[wc.labware]
+                push_revision(wc, labware=confirmed[wc.labware])
         for pf in spec.prefilled_labware:
             if pf.labware in confirmed and confirmed[pf.labware] is not None:
-                pf.labware = confirmed[pf.labware]
+                push_revision(pf, labware=confirmed[pf.labware])
 
     def _build_user_action_provenance(
         self, description: str, label: str, suggestion=None,

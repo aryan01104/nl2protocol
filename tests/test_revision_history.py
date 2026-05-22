@@ -206,3 +206,115 @@ class TestNoNestedHistoryValidator:
             prior_revisions=[flat_snap],
         )
         assert len(head.prior_revisions) == 1
+
+
+# ============================================================================
+# Integration: apply path populates prior_revisions
+# ============================================================================
+
+class TestApplyPathPushesRevisions:
+    """End-to-end: applying a Resolution through default_apply_resolution
+    leaves the corresponding head with one new entry in prior_revisions.
+    Confirms Step C wired the writes through push_revision correctly."""
+
+    def _build_minimal_spec(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, ProtocolSpec,
+        )
+        return ProtocolSpec(
+            summary="t",
+            steps=[ExtractedStep(
+                order=1, action="transfer",
+                source=LocationRef(
+                    description="tube rack", well="A1",
+                    description_provenance=_instr("tube rack A1"),
+                    wells_provenance=_instr("A1"),
+                ),
+                destination=LocationRef(
+                    description="tube rack", well="C7",
+                    description_provenance=_instr("tube C7"),
+                    wells_provenance=_instr("C7"),
+                ),
+                volume=ProvenancedVolume(
+                    value=10.0, unit="uL", exact=True,
+                    provenance=_instr("10uL"),
+                ),
+                composition_provenance=CompositionProvenance(
+                    step_cited_text="Transfer 10uL from A1 to C7",
+                    parameters_cited_texts=["Transfer 10uL from A1 to C7"],
+                    parameters_reasoning="all params cited in single phrase",
+                    grounding=["instruction"],
+                    confidence=1.0,
+                ),
+            )],
+        )
+
+    def test_subfield_apply_pushes_locationref_revision(self):
+        # Path: steps[0].destination.wells — subfield write. Apply path
+        # should snapshot the LocationRef BEFORE setting wells + stamping
+        # provenance.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution.types import Gap, Resolution
+        spec = self._build_minimal_spec()
+        gap = Gap(
+            id="test_gap",
+            step_order=1,
+            field_path="steps[0].destination.wells",
+            kind="constraint_violation",
+            severity="blocker",
+            description="wells C7 out of range",
+            current_value="C7",
+        )
+        resolution = Resolution(
+            action="accept_suggestion",
+            new_value=["D1"],
+            user_action_provenance="user_accepted_suggestion",
+        )
+        default_apply_resolution(spec, gap, resolution, suggestion=None)
+        dest = spec.steps[0].destination
+        assert dest.wells == ["D1"]
+        assert len(dest.prior_revisions) == 1
+        snap = dest.prior_revisions[0]
+        assert snap.well == "C7"
+        assert snap.wells is None
+        # The snapshot preserves the pre-write provenance shape.
+        assert snap.wells_provenance.cited_text == ["C7"]
+        # Head's wells_provenance was re-stamped with user action.
+        assert dest.wells_provenance.review_status == "user_accepted_suggestion"
+
+    def test_fabrication_path_pushes_revision_on_provenance_replace(self):
+        # Path: steps[0].volume.provenance — fabrication-shaped path.
+        # Apply path should snapshot the ProvenancedVolume BEFORE replacing
+        # the provenance slot. Underlying value is untouched.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution.types import Gap, Resolution
+        spec = self._build_minimal_spec()
+        gap = Gap(
+            id="test_gap",
+            step_order=1,
+            field_path="steps[0].volume.provenance",
+            kind="fabricated",
+            severity="blocker",
+            description="cited_text not in instruction",
+            current_value=10.0,
+        )
+        new_prov = Provenance(
+            source="inferred",
+            positive_reasoning="resolver picked this",
+            review_status="user_accepted_suggestion",
+            confidence=0.9,
+        )
+        resolution = Resolution(
+            action="accept_suggestion",
+            new_value=new_prov,
+            user_action_provenance="user_accepted_suggestion",
+        )
+        default_apply_resolution(spec, gap, resolution, suggestion=None)
+        vol = spec.steps[0].volume
+        assert vol.value == 10.0  # untouched
+        assert vol.provenance.source == "inferred"
+        assert vol.provenance.review_status == "user_accepted_suggestion"
+        assert len(vol.prior_revisions) == 1
+        snap = vol.prior_revisions[0]
+        assert snap.provenance.source == "instruction"
+        assert snap.provenance.cited_text == ["10uL"]
