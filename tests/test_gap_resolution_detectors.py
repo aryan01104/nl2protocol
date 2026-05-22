@@ -234,6 +234,99 @@ class TestProvenanceWarningDetector:
         # concern, not the detector's.
         assert all(g.kind != "low_confidence" for g in gaps)
 
+    @pytest.mark.parametrize("terminal_status", [
+        "user_confirmed",
+        "user_edited",
+        "user_accepted_suggestion",
+        "user_overrode_fabrication",
+        "reviewed_agree",
+    ])
+    def test_terminal_review_status_skips_fabrication_check(self, extractor, terminal_status):
+        # A Provenance whose source='instruction' carries cited_text that
+        # would FAIL the substring check, but whose review_status indicates
+        # a terminal user/reviewer action. The verifier must skip the
+        # cited_text checks — otherwise the orchestrator's gap loop
+        # re-raises a gap the user already resolved, bouncing across
+        # iterations until the iteration cap.
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(
+                    value=999.0, unit="uL", exact=True,
+                    provenance=Provenance(
+                        source="instruction",
+                        cited_text="999uL",        # not present in the instruction below
+                        review_status=terminal_status,
+                        confidence=1.0,
+                    ),
+                ),
+                source=LocationRef(
+                    description="tube rack", well="A1",
+                    description_provenance=_instr_prov("from A1"),
+                    wells_provenance=_instr_prov("from A1"),
+                ),
+                destination=LocationRef(
+                    description="tube rack", well="B1",
+                    description_provenance=_instr_prov("to B1"),
+                    wells_provenance=_instr_prov("to B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = ProvenanceWarningDetector(extractor).detect(
+            spec,
+            context={"instruction": "Transfer some liquid from A1 to B1.", "config": {}},
+        )
+        volume_fabrications = [
+            g for g in gaps
+            if g.kind == "fabricated"
+            and g.field_path == "steps[0].volume.provenance"
+        ]
+        assert volume_fabrications == [], (
+            f"verifier re-flagged a {terminal_status} provenance — "
+            f"terminal short-circuit not respected"
+        )
+
+    def test_original_status_still_raises_fabrication(self, extractor):
+        # Counter-check: same shape but review_status='original' MUST still
+        # raise a fabrication gap. Confirms the terminal-status short-circuit
+        # didn't accidentally suppress all fabrications.
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="transfer",
+                volume=ProvenancedVolume(
+                    value=999.0, unit="uL", exact=True,
+                    provenance=Provenance(
+                        source="instruction",
+                        cited_text="999uL",
+                        review_status="original",
+                        confidence=1.0,
+                    ),
+                ),
+                source=LocationRef(
+                    description="tube rack", well="A1",
+                    description_provenance=_instr_prov("from A1"),
+                    wells_provenance=_instr_prov("from A1"),
+                ),
+                destination=LocationRef(
+                    description="tube rack", well="B1",
+                    description_provenance=_instr_prov("to B1"),
+                    wells_provenance=_instr_prov("to B1"),
+                ),
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = ProvenanceWarningDetector(extractor).detect(
+            spec,
+            context={"instruction": "Transfer some liquid from A1 to B1.", "config": {}},
+        )
+        volume_fabrications = [
+            g for g in gaps
+            if g.kind == "fabricated"
+            and g.field_path == "steps[0].volume.provenance"
+        ]
+        assert len(volume_fabrications) == 1
+
     def test_field_path_includes_step_index(self, extractor):
         # Two-step spec — order must be consecutive. The detector should
         # produce 0-indexed field paths matching the renderer's addressing.

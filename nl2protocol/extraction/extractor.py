@@ -111,6 +111,21 @@ def _provenance_text(prov) -> str:
     return prov.cited_text or prov.positive_reasoning or ""
 
 
+# Review states that terminate the fabrication-detection lifecycle for a
+# Provenance. Once a Provenance reaches one of these states, the cited_text
+# substring checks in `_verify_claimed_instruction_provenance` are skipped —
+# the user (or reviewer) has already passed judgment on this value and a
+# re-check would only re-raise a gap they already resolved, causing the
+# orchestrator loop to bounce. See ADR (history-respecting verifier).
+TERMINAL_REVIEW_STATUSES = frozenset({
+    "user_confirmed",
+    "user_edited",
+    "user_accepted_suggestion",
+    "user_overrode_fabrication",
+    "reviewed_agree",
+})
+
+
 # ============================================================================
 # SEMANTIC EXTRACTOR
 # ============================================================================
@@ -331,6 +346,12 @@ class SemanticExtractor:
         def check(step_order: int, field_name: str, field_path: str,
                   value, prov):
             if not prov or prov.source != "instruction":
+                return
+            # A user action (or reviewer agreement) on this Provenance is
+            # terminal for the fabrication lifecycle: re-running the
+            # cited_text checks would re-raise a gap the user already
+            # resolved, looping the orchestrator until iteration cap.
+            if prov.review_status in TERMINAL_REVIEW_STATUSES:
                 return
             quotes = prov.cited_text  # List[str] (normalizer wraps str → [str])
             if not quotes:
