@@ -3127,6 +3127,40 @@
       el.textContent = JSON.stringify(arrows);
     }
 
+    function updateStepBlock(stepDict) {
+      // Phase 3c per-cell update: when a gap is resolved, the server
+      // attaches the affected step's re-rendered dict to the event.
+      // Find the existing step block by data-step-order and rebuild
+      // its body in place. No other step blocks change — only the
+      // affected cell inside this one updates (the revision chain
+      // appears inline because the spec's prior_revisions already
+      // carry the pre-write snapshot).
+      if (!stepDict || stepDict.order == null) return;
+      const block = document.querySelector(
+        '.col-protocol-steps .step[data-step-order="' + stepDict.order + '"]',
+      );
+      if (!block) return;
+      let html = '<div class="step-action">Step ' + stepDict.order + ': '
+                 + escapeHtml(stepDict.action || "") + '</div>';
+      html += '<div class="step-detail-grid">';
+      (stepDict.detail_lines || []).forEach((row) => {
+        const indented = row && row.indented;
+        const labelClass = "cell-label" + (indented ? " is-indented" : "");
+        const indentArrow = indented ? "↳ " : "";
+        const labelText = escapeHtml((row && row.label) || "");
+        const valueHtml = (row && row.value_html) || "";
+        const checkPhrase = (row && row.check) || "";
+        html += '<div class="' + labelClass + '">' + indentArrow + labelText + ':</div>';
+        html += '<div class="cell-value">' + valueHtml + '</div>';
+        html += '<div class="cell-check">' + (checkPhrase ? '<span class="inline-check">' + escapeHtml(checkPhrase) + '</span>' : "") + '</div>';
+      });
+      html += '</div>';
+      if (stepDict.note_line) html += stepDict.note_line;
+      block.innerHTML = html;
+      // Newly-rendered cells need their hover listeners re-wired.
+      try { wireHover(); } catch (e) { /* defensive */ }
+    }
+
     // Column-animation gate. Per ADR-0011 strict-serial spec: each
     // spec/script event triggering a column animation queues behind
     // the previous one. `columnAnimationDoneAt` is the performance.now()
@@ -3204,17 +3238,14 @@
           break;
         }
         case "resolved_spec": {
-          // Same column as extracted_spec. New step dicts carry inline
-          // revision chains where the orchestrator pushed revisions.
-          // No SVG cross-column arrows are needed — the chains are
-          // self-contained per cell.
+          // Phase 3c: per-cell updates already happened during the gap
+          // loop via gap_resolved → updateStepBlock. The spec column
+          // doesn't need a full re-render here; only the instruction
+          // column's cite spans (which can change as values shift) and
+          // the bulk panels need to refresh.
           const data = e.data || {};
-          const steps = data.steps || [];
-          gateColumn(() => {
-            appendStepBlocks(".col-protocol-steps", steps);
-            if (data.instruction_html) updateInstructionColumn(data.instruction_html);
-            updateBulkPanels(data);
-          }, colDurationMs(steps.length, COLUMN_FADE_MS));
+          if (data.instruction_html) updateInstructionColumn(data.instruction_html);
+          updateBulkPanels(data);
           break;
         }
         case "completed_spec": {
@@ -3234,6 +3265,14 @@
         case "gap_resolved":
           if (e.data && Array.isArray(e.data.resolution_arrows)) {
             updateResolutionArrows(e.data.resolution_arrows);
+          }
+          // Phase 3c: per-cell update. The server attaches the affected
+          // step's re-rendered dict to the payload so the browser can
+          // refresh ONE step block in place (chain appears inline)
+          // instead of waiting for the whole column to redraw on
+          // resolved_spec.
+          if (e.data && e.data.step_dict) {
+            updateStepBlock(e.data.step_dict);
           }
           break;
         case "constraint_check_done":

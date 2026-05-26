@@ -376,6 +376,13 @@ class LiveModeApp:
         # whole run; same as the static path's _collect_resolution_arrows
         # walking the captured event list.
         self._gap_resolved_events: list = []
+        # Phase 3c: live reference to the running spec object. Captured
+        # when an extracted/resolved/completed spec event arrives;
+        # mutated in place by the pipeline worker as the gap loop
+        # applies resolutions. Used at gap_resolved time to re-render
+        # JUST the affected step's render dict, so the browser updates
+        # that one step block in place instead of redrawing the column.
+        self._live_spec = None
         # P1-8: cache the constraint checker's passed-check records by
         # step + detail_label between events. constraint_check_done
         # arrives BEFORE completed_spec, so by the time the validated-
@@ -504,6 +511,7 @@ class LiveModeApp:
         self._instruction_text = ""
         self._gap_resolved_events = []
         self._inline_checks_by_step = {}
+        self._live_spec = None
         self._pending_requests.clear()
         self._pending_assignments.clear()
         self._pending_binary_confirms.clear()
@@ -688,6 +696,13 @@ class LiveModeApp:
                 # render with no green tags (they're pre-validation).
                 inline = (self._inline_checks_by_step
                           if event.kind == "completed_spec" else None)
+                # Phase 3c: capture the live spec reference. Both spec
+                # events carry the same mutated object — keep the latest
+                # pointer so gap_resolved can look up the affected step.
+                if isinstance(event.data, dict):
+                    s = event.data.get("spec")
+                    if s is not None and hasattr(s, "steps"):
+                        self._live_spec = s
                 data = _enrich_spec_event_data(
                     event.kind, event.data, self._instruction_text,
                     inline_checks_by_step=inline,
@@ -713,6 +728,31 @@ class LiveModeApp:
                     data["resolution_arrows"] = _collect_resolution_arrows(
                         self._gap_resolved_events,
                     )
+                except Exception:
+                    pass
+                # Phase 3c: re-render JUST the affected step so the
+                # browser can update one step block in place (chain
+                # appears inline on the affected cell) instead of
+                # redrawing the whole column. step_order is 1-based on
+                # the event; spec.steps is 0-indexed.
+                try:
+                    step_order = data.get("step_order")
+                    if (step_order is not None
+                            and self._live_spec is not None):
+                        step_idx = int(step_order) - 1
+                        steps = getattr(self._live_spec, "steps", None) or []
+                        if 0 <= step_idx < len(steps):
+                            from nl2protocol.reporting import (
+                                _step_to_render_dict,
+                            )
+                            inline_for_step = (
+                                self._inline_checks_by_step or {}
+                            ).get(step_order)
+                            data["step_dict"] = _step_to_render_dict(
+                                steps[step_idx], step_idx,
+                                self._instruction_text,
+                                inline_checks=inline_for_step,
+                            )
                 except Exception:
                     pass
             elif event.kind == "generated_script":
