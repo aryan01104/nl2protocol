@@ -444,14 +444,35 @@ def _render_revisioned_value(field, value_formatter, prov_getter, *,
     Side effects: None. Pure formatting.
     """
     priors_raw = list(getattr(field, "prior_revisions", []) or [])
-    # Skip priors whose projected sub-provenance is None — they represent
-    # states where the sub-field wasn't populated, and rendering a bare
-    # value span without provenance would mislead the reader.
-    priors = [r for r in priors_raw if prov_getter(r) is not None]
     head_prov = prov_getter(field)
+    head_text = value_formatter(field)
+
+    # Filter priors that render to the same text as the head for THIS
+    # cell's projection. A push_revision call always snapshots the WHOLE
+    # tracked object (LocationRef / Provenanced* / WellContents); when
+    # projecting a sub-field that wasn't touched in that revision (e.g.,
+    # wells row when only resolved_label changed), the prior's formatted
+    # text matches the head's, and rendering it as a struck-through
+    # duplicate is pure visual noise. If only the provenance source
+    # changed (instruction → inferred) but the displayed text is
+    # identical, the head's own styling (▴ marker, color class) already
+    # communicates the source change to the reader — they don't need a
+    # duplicated chain segment.
+    # Filter rules:
+    #   * skip priors whose projected provenance is None (sub-field
+    #     wasn't populated yet — no provenance to attribute);
+    #   * skip priors whose projected value text equals the head's.
+    def _keep(rev) -> bool:
+        if prov_getter(rev) is None:
+            return False
+        if value_formatter(rev) == head_text:
+            return False
+        return True
+
+    priors = [r for r in priors_raw if _keep(r)]
     if not priors:
         return _render_provenanced_value(
-            value_formatter(field), head_prov,
+            head_text, head_prov,
             prov_id=prov_id, instruction=instruction,
         )
 
@@ -465,7 +486,7 @@ def _render_revisioned_value(field, value_formatter, prov_getter, *,
             f'<span class="prior-rev" data-rev-idx="{i}">{inner}</span>'
         )
     segments.append(_render_provenanced_value(
-        value_formatter(field), head_prov,
+        head_text, head_prov,
         prov_id=prov_id, instruction=instruction,
     ))
     return '<span class="rev-arrow" aria-hidden="true">→</span>'.join(segments)

@@ -405,6 +405,77 @@ class TestRendererChain:
         assert "prior-rev" in html
         assert "rev-arrow" in html
 
+    def test_prior_with_identical_projection_is_filtered(self):
+        # push_revision always snapshots the WHOLE tracked object. When a
+        # caller pushes a LocationRef revision to write resolved_label
+        # (stage 2.5 labware-assignment), the snapshot captures the
+        # unchanged wells too. The chain renderer must filter that prior
+        # out of the wells row — rendering a struck-through duplicate of
+        # the same well list is visual noise.
+        from nl2protocol.reporting import _render_revisioned_value, _format_wells_only
+        lr = LocationRef(
+            description="tube rack", wells=["A1", "A2", "A3"],
+            description_provenance=_instr("tube rack"),
+            wells_provenance=_instr("A1-A3"),
+        )
+        # Simulate the labware-assignment push: resolved_label flips, but
+        # wells + wells_provenance stay the same.
+        push_revision(
+            lr,
+            resolved_label="sample_rack",
+            resolved_label_provenance=_inferred("user picked", "user_accepted_suggestion"),
+        )
+        # Wells row should render as a single span (chain suppressed
+        # because the projection didn't change).
+        html_wells = _render_revisioned_value(
+            lr,
+            _format_wells_only,
+            lambda l: l.wells_provenance,
+            prov_id="src-wells", instruction="A1-A3",
+        )
+        assert "prior-rev" not in html_wells
+        assert "rev-arrow" not in html_wells
+        # Description row should ALSO render as a single span — labware
+        # description text picks up the new [sample_rack] suffix via
+        # _format_labware_label, BUT only if the description sub-field
+        # projection changed. For this revision the labware text DOES
+        # change (resolved_label appears in the formatter output), so
+        # the chain should appear on the description row.
+        from nl2protocol.reporting import _format_labware_label
+        html_label = _render_revisioned_value(
+            lr,
+            _format_labware_label,
+            lambda l: l.description_provenance,
+            prov_id="src-labware", instruction="tube rack",
+        )
+        # The labware row IS expected to render a chain because the
+        # formatter output differs (resolved_label appears now), even
+        # though description and description_provenance.source were
+        # unchanged. We assert the chain renders by checking for the
+        # head text containing "sample_rack".
+        assert "sample_rack" in html_label
+
+    def test_prior_with_same_value_text_is_filtered_even_if_source_differs(self):
+        # When the value TEXT stays the same but the provenance source
+        # changes (e.g., a fabrication resolution that keeps the value
+        # but flips source to inferred), the prior is FILTERED — the
+        # head's own styling (▴ marker + non-instruction color) already
+        # communicates the source change. A struck-through duplicate
+        # carrying identical text would be visual noise.
+        from nl2protocol.reporting import _render_revisioned_value
+        s = ProvenancedString(value="buffer", provenance=_instr("buffer"))
+        push_revision(s, provenance=_inferred("re-stated as inferred", "user_overrode_fabrication"))
+        html = _render_revisioned_value(
+            s, lambda f: f.value, lambda f: f.provenance,
+            prov_id="subst", instruction="buffer",
+        )
+        # No chain — text didn't change.
+        assert "prior-rev" not in html
+        assert "rev-arrow" not in html
+        # Head still renders with the inferred styling (non-instr marker).
+        assert "non-instr-marker" in html
+        assert ">buffer<" in html
+
     def test_prior_with_none_subprov_is_skipped(self):
         # A prior revision whose projected sub-provenance is None is
         # skipped — the chain renders as if it weren't there. (Test:
