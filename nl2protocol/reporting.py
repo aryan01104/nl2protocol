@@ -445,48 +445,68 @@ def _render_revisioned_value(field, value_formatter, prov_getter, *,
     head_prov = prov_getter(field)
     head_text = value_formatter(field)
 
-    # Filter priors that render to the same text as the head for THIS
-    # cell's projection. A push_revision call always snapshots the WHOLE
-    # tracked object (LocationRef / Provenanced* / WellContents); when
-    # projecting a sub-field that wasn't touched in that revision (e.g.,
-    # wells row when only resolved_label changed), the prior's formatted
-    # text matches the head's, and rendering it as a struck-through
-    # duplicate is pure visual noise. If only the provenance source
-    # changed (instruction → inferred) but the displayed text is
-    # identical, the head's own styling (▴ marker, color class) already
-    # communicates the source change to the reader — they don't need a
-    # duplicated chain segment.
-    # Filter rules:
-    #   * skip priors whose projected provenance is None (sub-field
-    #     wasn't populated yet — no provenance to attribute);
-    #   * skip priors whose projected value text equals the head's.
-    def _keep(rev) -> bool:
-        if prov_getter(rev) is None:
-            return False
-        if value_formatter(rev) == head_text:
-            return False
-        return True
+    # Build the chronological chain — oldest prior first, head last.
+    # Each item: (text, prov, is_head). Priors whose projected
+    # provenance is None are skipped (the sub-field wasn't populated
+    # at that revision; rendering would be unattributed).
+    items = []
+    for rev in priors_raw:
+        rev_prov = prov_getter(rev)
+        if rev_prov is None:
+            continue
+        items.append((value_formatter(rev), rev_prov, False))
+    items.append((head_text, head_prov, True))
 
-    priors = [r for r in priors_raw if _keep(r)]
-    if not priors:
+    # Collapse consecutive duplicates by displayed text. A push_revision
+    # call always snapshots the WHOLE tracked object, so a revision can
+    # appear in the chain even when its projection for THIS sub-field
+    # didn't change (e.g., the stage 2.5 labware-assignment push leaves
+    # the wells row's text unchanged). Adjacent-identical text segments
+    # are visual noise — collapse runs to keep only state transitions.
+    #
+    # From each run, pick a single representative: prefer the head when
+    # the head is in the run (so the head's provenance — typically the
+    # most-resolved attribution — survives the collapse), else keep the
+    # first item in the run (the earliest snapshot carrying that value).
+    def _flush(run, out):
+        if not run:
+            return
+        head_in_run = next((x for x in run if x[2]), None)
+        out.append(head_in_run if head_in_run is not None else run[0])
+
+    deduped = []
+    current_run = []
+    current_text = None
+    for item in items:
+        text = item[0]
+        if text == current_text:
+            current_run.append(item)
+        else:
+            _flush(current_run, deduped)
+            current_run = [item]
+            current_text = text
+    _flush(current_run, deduped)
+
+    # When only the head survives, render as a single span (no chain).
+    if len(deduped) == 1:
+        text, p, _ = deduped[0]
         return _render_provenanced_value(
-            head_text, head_prov,
-            prov_id=prov_id, instruction=instruction,
+            text, p, prov_id=prov_id, instruction=instruction,
         )
 
     segments = []
-    for i, rev in enumerate(priors):
-        inner = _render_provenanced_value(
-            value_formatter(rev), prov_getter(rev),
-            prov_id=None, instruction=instruction,
-        )
-        segments.append(
-            f'<span class="prior-rev" data-rev-idx="{i}">{inner}</span>'
-        )
-    segments.append(_render_provenanced_value(
-        head_text, head_prov,
-        prov_id=prov_id, instruction=instruction,
-    ))
+    for i, (text, p, is_head) in enumerate(deduped):
+        if is_head:
+            segments.append(_render_provenanced_value(
+                text, p, prov_id=prov_id, instruction=instruction,
+            ))
+        else:
+            inner = _render_provenanced_value(
+                text, p, prov_id=None, instruction=instruction,
+            )
+            segments.append(
+                f'<span class="prior-rev" data-rev-idx="{i}">{inner}</span>'
+            )
     return '<span class="rev-arrow" aria-hidden="true">→</span>'.join(segments)
 
 

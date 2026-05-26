@@ -282,6 +282,90 @@ class TestApplyPathPushesRevisions:
         # Head's wells_provenance was re-stamped with user action.
         assert dest.wells_provenance.review_status == "user_accepted_suggestion"
 
+    def test_subfield_accept_suggestion_migrates_suggester_reasoning_to_head(self):
+        # Phase 3c fix-2: when accept_suggestion changes a value subfield
+        # (wells, well, description) on a LocationRef, the apply path
+        # must REPLACE the corresponding provenance with one that carries
+        # the suggester's reasoning + sets source=inferred. Otherwise the
+        # head retains a stale instruction-cited provenance whose
+        # cited_text no longer matches the actual value (the screenshot
+        # bug: tooltip says cited "C7" while value is "A1").
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution.types import Gap, Resolution, Suggestion
+        spec = self._build_minimal_spec()
+        gap = Gap(
+            id="test_gap",
+            step_order=1,
+            field_path="steps[0].destination.wells",
+            kind="constraint_violation",
+            severity="blocker",
+            description="wells C7 out of range",
+            current_value="C7",
+        )
+        suggestion = Suggestion(
+            value=["A1"],
+            provenance_source="deterministic",
+            positive_reasoning=(
+                "Wells [C7] exceed the labware's valid range (A1-D6). "
+                "Clipping to in-range wells preserves intent."
+            ),
+            why_not_in_instruction=(
+                "Instruction wells exceeded labware capacity; the "
+                "instruction doesn't say which way to compromise."
+            ),
+            confidence=0.7,
+        )
+        resolution = Resolution(
+            action="accept_suggestion",
+            new_value=["A1"],
+            user_action_provenance="user_accepted_suggestion",
+        )
+        default_apply_resolution(spec, gap, resolution, suggestion=suggestion)
+        dest = spec.steps[0].destination
+        # Head value updated.
+        assert dest.wells == ["A1"]
+        # Head's wells_provenance now reflects the suggester's reasoning
+        # — source flipped from instruction to inferred, no stale cite.
+        assert dest.wells_provenance.source == "inferred"
+        assert dest.wells_provenance.cited_text is None
+        assert "exceed the labware's valid range" in dest.wells_provenance.positive_reasoning
+        assert dest.wells_provenance.review_status == "user_accepted_suggestion"
+        # Prior chain preserves the original instruction citation —
+        # nothing is lost; the audit trail moves.
+        assert len(dest.prior_revisions) == 1
+        prior_prov = dest.prior_revisions[0].wells_provenance
+        assert prior_prov.source == "instruction"
+        assert prior_prov.cited_text == ["C7"]
+
+    def test_subfield_edit_writes_user_edited_inferred_provenance(self):
+        # User-typed edits to a value subfield also replace the
+        # provenance — the new value isn't lifted from the instruction,
+        # so source flips to inferred with a "user edited" reasoning.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution.types import Gap, Resolution
+        spec = self._build_minimal_spec()
+        gap = Gap(
+            id="test_gap",
+            step_order=1,
+            field_path="steps[0].destination.wells",
+            kind="constraint_violation",
+            severity="blocker",
+            description="wells out of range",
+            current_value="C7",
+        )
+        resolution = Resolution(
+            action="edit",
+            new_value=["D1"],
+            user_action_provenance="user_edited",
+        )
+        default_apply_resolution(spec, gap, resolution, suggestion=None)
+        dest = spec.steps[0].destination
+        assert dest.wells == ["D1"]
+        assert dest.wells_provenance.source == "inferred"
+        assert dest.wells_provenance.cited_text is None
+        assert dest.wells_provenance.review_status == "user_edited"
+        assert "User edited" in dest.wells_provenance.positive_reasoning
+
     def test_fabrication_path_pushes_revision_on_provenance_replace(self):
         # Path: steps[0].volume.provenance — fabrication-shaped path.
         # Apply path should snapshot the ProvenancedVolume BEFORE replacing
@@ -404,6 +488,50 @@ class TestRendererChain:
         assert ">wells D1<" in html
         assert "prior-rev" in html
         assert "rev-arrow" in html
+
+    def test_consecutive_identical_priors_collapse(self):
+        # Two pushes happened, but the projected text for THIS cell is
+        # the same across both priors and only changes on the head.
+        # Real-world example from the western blot run: stage 2.5's
+        # labware-assignment push captures the LocationRef (wells
+        # unchanged), then the gap loop pushes again with the actual
+        # wells fix. Wells row was rendering ~~C7~~ → ~~C7~~ → A1 — the
+        # middle segment is pure noise.
+        from nl2protocol.reporting import _render_revisioned_value, _format_wells_only
+        # Construct a LocationRef whose prior_revisions has two snapshots
+        # with the SAME wells value, ending in a head with a different
+        # wells value.
+        lr = LocationRef(
+            description="tube rack", well="A1",
+            description_provenance=_instr("tube rack"),
+            wells_provenance=_inferred("clipped to A1 after C7 invalid",
+                                        "user_accepted_suggestion"),
+            prior_revisions=[
+                LocationRef(
+                    description="tube rack", well="C7",
+                    description_provenance=_instr("tube rack"),
+                    wells_provenance=_instr("C7"),
+                ),
+                LocationRef(
+                    description="tube rack", well="C7",
+                    description_provenance=_instr("tube rack"),
+                    resolved_label="sample_rack",
+                    resolved_label_provenance=_inferred(
+                        "user picked sample_rack", "user_accepted_suggestion"
+                    ),
+                    wells_provenance=_instr("C7"),
+                ),
+            ],
+        )
+        html = _render_revisioned_value(
+            lr, _format_wells_only, lambda l: l.wells_provenance,
+            prov_id="dst-wells", instruction="tube C7",
+        )
+        # Chain renders: well C7 → well A1 (the two C7 priors collapse).
+        # We assert exactly ONE prior-rev wrapper, not two.
+        assert html.count('class="prior-rev"') == 1
+        assert ">well C7<" in html
+        assert ">well A1<" in html
 
     def test_prior_with_identical_projection_is_filtered(self):
         # push_revision always snapshots the WHOLE tracked object. When a

@@ -854,9 +854,15 @@ class TestDefaultApplyStampsUserAction:
         assert prov.reviewer_objection is None
 
     def test_subfield_write_stamps_parent_provenance(self):
-        # steps[0].destination.wells write — the wells subfield doesn't have
-        # its own provenance; the parent (LocationRef) does, and that's what
-        # the user action applies to.
+        # steps[0].destination.wells write — Phase 3c fix-2: editing a
+        # value subfield replaces ONLY the corresponding provenance
+        # (wells_provenance for wells/well/well_range; description_provenance
+        # for description). The OTHER provenance slots on the LocationRef
+        # stay as they were — the user didn't edit the description, so
+        # description_provenance.review_status keeps its prior value.
+        # (Pre-3c: _stamp_user_action broad-stamped every prov slot;
+        # that conflated "user touched part of this object" with "user
+        # touched every part" and is no longer the contract.)
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         new_wells = ["B2", "B3"]
@@ -865,9 +871,11 @@ class TestDefaultApplyStampsUserAction:
                          user_action_provenance="user_edited")
         default_apply_resolution(spec, g, res, suggestion=None)
         assert spec.steps[0].destination.wells == new_wells
-        # User edit on a LocationRef stamps both provenance slots.
-        assert spec.steps[0].destination.description_provenance.review_status == "user_edited"
+        # Wells provenance is REPLACED with an inferred "user edited" prov.
+        assert spec.steps[0].destination.wells_provenance.source == "inferred"
         assert spec.steps[0].destination.wells_provenance.review_status == "user_edited"
+        # Description provenance is untouched — the user didn't edit description.
+        assert spec.steps[0].destination.description_provenance.review_status == "original"
 
     def test_initial_contents_volume_writes_float_no_provenance_changes(self):
         # initial_contents.volume_ul has no Provenance — the apply just

@@ -794,12 +794,26 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
     affected_paths = (gap.metadata or {}).get("affected_paths") if hasattr(gap, "metadata") else None
     if affected_paths and len(affected_paths) > 1:
         for path in affected_paths:
-            _apply_at_path(spec, path, resolution)
+            _apply_at_path(spec, path, resolution, suggestion)
         return
-    _apply_at_path(spec, gap.field_path, resolution)
+    _apply_at_path(spec, gap.field_path, resolution, suggestion)
 
 
-def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
+# LocationRef value sub-fields → their provenance slot. When an apply
+# path changes one of these via accept_suggestion or edit, we replace
+# the corresponding provenance with one that honestly attributes the
+# new value (instead of leaving the stale instruction-cited provenance
+# in place from the old value).
+_LOCATIONREF_VALUE_SUBFIELDS = {
+    "well": "wells_provenance",
+    "wells": "wells_provenance",
+    "well_range": "wells_provenance",
+    "description": "description_provenance",
+}
+
+
+def _apply_at_path(spec, path: str, resolution: Resolution,
+                   suggestion: Optional[Suggestion] = None) -> None:
     """Single-path apply — extracted from default_apply_resolution so
     deduped Gaps can call it once per affected path.
 
@@ -951,8 +965,8 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
         if target is not None:
             # Snapshot the pre-write state of the LocationRef (or
             # whatever parent carries `prior_revisions`). The subfield
-            # mutation AND the subsequent stamp both act on the head
-            # under this one revision.
+            # mutation AND the subsequent provenance update both act on
+            # the head under this one revision.
             if hasattr(target, "prior_revisions"):
                 push_revision(target)
             setattr(target, subfield, new_value)
@@ -964,9 +978,50 @@ def _apply_at_path(spec, path: str, resolution: Resolution) -> None:
             if subfield == "resolved_label":
                 _stamp_resolution_action(target, user_action, new_value)
                 return
-            # Stamp the parent's provenance — the subfield change is a
-            # user action on the same logical value (e.g., editing the
-            # well list under destination is editing destination).
+            # Phase 3c fix-2: when the subfield is a VALUE field on a
+            # LocationRef (description / well / wells / well_range), the
+            # original provenance's cited_text grounded the OLD value
+            # and is no longer truthful after this write. Replace the
+            # provenance slot with one that honestly attributes the new
+            # value — carry the suggester's reasoning when available, or
+            # a generic "user edited" reasoning when the user typed it.
+            # The stale instruction citation isn't lost; it lives on in
+            # prior_revisions[0]'s provenance for that slot.
+            from nl2protocol.models.spec import Provenance
+            prov_slot = _LOCATIONREF_VALUE_SUBFIELDS.get(subfield)
+            if prov_slot is not None:
+                new_prov = None
+                if (resolution.action == "accept_suggestion"
+                        and suggestion is not None):
+                    new_prov = Provenance(
+                        source="inferred",
+                        positive_reasoning=getattr(suggestion, "positive_reasoning", None)
+                            or "Accepted suggester proposal during gap resolution.",
+                        why_not_in_instruction=getattr(suggestion, "why_not_in_instruction", None),
+                        review_status=user_action,
+                        confidence=getattr(suggestion, "confidence", 1.0),
+                    )
+                elif resolution.action == "edit":
+                    new_prov = Provenance(
+                        source="inferred",
+                        positive_reasoning=(
+                            "User edited this value directly during gap "
+                            "resolution; not lifted from the instruction."
+                        ),
+                        why_not_in_instruction=(
+                            "User chose this value; it was not cited from "
+                            "the instruction."
+                        ),
+                        review_status=user_action,
+                        confidence=1.0,
+                    )
+                if new_prov is not None:
+                    setattr(target, prov_slot, new_prov)
+                    return
+            # Fall-through: subfields without a value→prov mapping (or
+            # actions other than accept_suggestion / edit) still get
+            # the legacy review_status stamp so the audit trail captures
+            # that a user action terminated the lifecycle.
             _stamp_user_action(target, user_action)
         return
 
