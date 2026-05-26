@@ -1066,14 +1066,22 @@ class TestADR0011NullFieldPlaceholders:
 
     def test_step_with_null_source_emits_placeholder_with_prov_id(self):
         # Render the step → detail_lines should include a ✗ placeholder
-        # for the missing source carrying the right data-prov-id.
+        # ROW for the missing source carrying the right data-prov-id.
+        # Phase 3c-grid: detail_lines is now a list of dicts (label /
+        # value_html / check / indented / prov_id / is_empty).
         from nl2protocol.reporting import _step_to_render_dict
         step = self._step_with_null_source()
         d = _step_to_render_dict(step, step_idx=0)
-        joined = " ".join(d["detail_lines"])
-        assert 'data-prov-id="s0-source"' in joined
-        assert "✗" in joined
-        assert "(not extracted)" in joined
+        # Find the source row dict.
+        source_rows = [r for r in d["detail_lines"]
+                       if r.get("label") == "source"]
+        assert len(source_rows) == 1
+        row = source_rows[0]
+        assert row["prov_id"] == "s0-source"
+        assert row["is_empty"] is True
+        assert 'data-prov-id="s0-source"' in row["value_html"]
+        assert "✗" in row["value_html"]
+        assert "(not extracted)" in row["value_html"]
 
     def test_unified_column_carries_source_prov_id(self, tmp_path):
         # End-to-end: Phase 3b collapse — the previously-separate Extracted

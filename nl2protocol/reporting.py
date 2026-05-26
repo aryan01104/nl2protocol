@@ -403,12 +403,10 @@ def _render_provenanced_value(
     if reviewer_objection:
         extra_attrs += f' data-prov-reviewer-objection="{html.escape(reviewer_objection, quote=True)}"'
 
-    # Non-instruction atoms get a ▴ marker so readers can spot at a glance
-    # which values were filled in by the model vs literally lifted from
-    # the instruction. The marker is documented in the legend.
-    marker = "" if source == "instruction" else '<span class="non-instr-marker" aria-hidden="true">▴</span>'
-
-    return f'{marker}<span class="{" ".join(classes)}"{extra_attrs}>{rendered_value}</span>'
+    # The ▴ marker that used to prepend non-instruction atoms was removed —
+    # the color class + dotted-underline already communicate "model-filled"
+    # without the third visual cue. The marker was visual noise.
+    return f'<span class="{" ".join(classes)}"{extra_attrs}>{rendered_value}</span>'
 
 
 def _render_revisioned_value(field, value_formatter, prov_getter, *,
@@ -1186,34 +1184,24 @@ _ACTION_EXPECTED_FIELDS = {
 }
 
 
-def _empty_field_cell(prov_id: str, label: str) -> str:
-    """Render a ✗ placeholder cell for a tracked field that's null on
-    this step but expected by the action.
-
-    Per ADR-0011 Phase 2b/4 polish (2026-05-05): the placeholder carries
-    a matching data-prov-id so resolution arrows can anchor at this DOM
-    position when the field gets filled in by the orchestrator (extracted
-    column has the ✗, resolved column has the value, arrow draws between
-    them). It also gives panel-row hover a target in the extracted column
-    so highlighting works symmetrically across both spec snapshots.
-
-    Pre:    `prov_id` matches what the value cell would carry on the same
-            field (e.g., "s2-source"). `label` is the field name shown
-            to the user (e.g., "source").
-
-    Post:   Returns an HTML fragment for the step-detail row. Same shape
-            as a value-bearing line (`<span class="label">...:</span>
-            <span ...>...</span>`) so the template's loop can render it
-            uniformly.
-
-    Side effects: None.
-    """
-    return (
-        f'<span class="label">{label}:</span> '
+def _empty_field_row(prov_id: str, label: str) -> Dict[str, Any]:
+    """Return a detail-row dict for a tracked field that's null on this
+    step but expected by the action — the value cell shows a ✗ placeholder
+    carrying the field's prov_id (so resolution arrows / panel-row hover
+    have an anchor when the field eventually gets filled in)."""
+    value_html = (
         f'<span class="cell-empty" data-prov-id="{prov_id}">'
         f'✗ <em>(not extracted)</em>'
         f'</span>'
     )
+    return {
+        "label": label,
+        "value_html": value_html,
+        "check": "",
+        "indented": False,
+        "prov_id": prov_id,
+        "is_empty": True,
+    }
 
 
 def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = None,
@@ -1247,18 +1235,27 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     grounding = list(getattr(comp, "grounding", []))
     sid = f"s{step_idx}"
 
-    def _maybe_tag(label: str) -> str:
-        """Return the inline-check `<span>` for `label`, or '' when no
-        passing check is available for it. Empty string keeps the
-        detail line unchanged for callers that pass `inline_checks=None`
-        or for labels with no passing check."""
+    def _check_phrase(label: str) -> str:
+        """Return the plain-text passing-check phrase for `label`, or ''
+        when no check applies. The template wraps it with the ✓ glyph +
+        styling — this helper just provides the text content."""
         if not inline_checks:
             return ""
         phrase = inline_checks.get(label)
-        if not phrase:
-            return ""
-        import html as _html
-        return f' <span class="inline-check">{_html.escape(phrase)}</span>'
+        return phrase or ""
+
+    def _row(label, value_html, *, check="", indented=False,
+              prov_id=None, is_empty=False):
+        """Build one detail-row dict. The template renders these as
+        cells in a 3-column grid (label / value / check)."""
+        return {
+            "label": label,
+            "value_html": value_html,
+            "check": check,
+            "indented": indented,
+            "prov_id": prov_id,
+            "is_empty": is_empty,
+        }
 
     detail_lines = []
     expected = _ACTION_EXPECTED_FIELDS.get(step.action, set())
@@ -1271,20 +1268,14 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             prov_id=f"{sid}-volume",
             instruction=instruction,
         )
-        detail_lines.append(
-            f'<span class="label">volume:</span> {v}{_maybe_tag("volume")}'
-        )
+        detail_lines.append(_row("volume", v, check=_check_phrase("volume"),
+                                  prov_id=f"{sid}-volume"))
     elif "volume" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-volume", "volume"))
+        detail_lines.append(_empty_field_row(f"{sid}-volume", "volume"))
 
     # source / destination render as TWO rows each: a labware row
-    # (description + resolved_label bracket) hovering description_provenance,
-    # and an indented wells row hovering wells_provenance. The split
-    # surfaces both provenances independently — previously they were
-    # flattened into one string with only description_provenance on hover,
-    # leaving wells_provenance unreachable. The wells row gets its own
-    # prov_id ("{sid}-source-wells") so resolution arrows targeting
-    # wells_provenance can land cleanly on that specific row.
+    # (description + resolved_label bracket) and an indented wells row.
+    # Each row's value_html surfaces its OWN sub-provenance for hover.
     for role, role_ref in (("source", step.source), ("destination", step.destination)):
         if role_ref is not None:
             desc_prov = role_ref.description_provenance
@@ -1299,10 +1290,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             else:
                 import html as _html
                 v_lab = _html.escape(_format_labware_label(role_ref))
-            detail_lines.append(
-                f'<span class="label">{role}:</span> {v_lab}'
-                f'{_maybe_tag(f"{role}_labware")}'
-            )
+            detail_lines.append(_row(role, v_lab,
+                                      check=_check_phrase(f"{role}_labware"),
+                                      prov_id=f"{sid}-{role}"))
 
             wells_text = _format_wells_only(role_ref)
             if wells_text:
@@ -1318,14 +1308,11 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
                 else:
                     import html as _html
                     v_wells = _html.escape(wells_text)
-                # Indent the wells row visually so it reads as a child
-                # of the source/destination row above.
-                detail_lines.append(
-                    f'<span class="label" style="padding-left: 1.4em;">'
-                    f'↳ wells:</span> {v_wells}{_maybe_tag(f"{role}_wells")}'
-                )
+                detail_lines.append(_row("wells", v_wells, indented=True,
+                                          check=_check_phrase(f"{role}_wells"),
+                                          prov_id=f"{sid}-{role}-wells"))
         elif role in expected:
-            detail_lines.append(_empty_field_cell(f"{sid}-{role}", role))
+            detail_lines.append(_empty_field_row(f"{sid}-{role}", role))
 
     if step.substance is not None:
         v = _render_revisioned_value(
@@ -1335,9 +1322,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             prov_id=f"{sid}-substance",
             instruction=instruction,
         )
-        detail_lines.append(f'<span class="label">substance:</span> {v}')
+        detail_lines.append(_row("substance", v, prov_id=f"{sid}-substance"))
     elif "substance" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-substance", "substance"))
+        detail_lines.append(_empty_field_row(f"{sid}-substance", "substance"))
 
     if step.duration is not None:
         v = _render_revisioned_value(
@@ -1347,9 +1334,9 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             prov_id=f"{sid}-duration",
             instruction=instruction,
         )
-        detail_lines.append(f'<span class="label">duration:</span> {v}')
+        detail_lines.append(_row("duration", v, prov_id=f"{sid}-duration"))
     elif "duration" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-duration", "duration"))
+        detail_lines.append(_empty_field_row(f"{sid}-duration", "duration"))
 
     if step.temperature is not None:
         v = _render_revisioned_value(
@@ -1359,22 +1346,16 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             prov_id=f"{sid}-temperature",
             instruction=instruction,
         )
-        detail_lines.append(f'<span class="label">temperature:</span> {v}')
+        detail_lines.append(_row("temperature", v, prov_id=f"{sid}-temperature"))
     elif "temperature" in expected:
-        detail_lines.append(_empty_field_cell(f"{sid}-temperature", "temperature"))
+        detail_lines.append(_empty_field_row(f"{sid}-temperature", "temperature"))
 
     if step.replicates is not None:
-        detail_lines.append(f'<span class="label">replicates:</span> {step.replicates}×')
+        detail_lines.append(_row("replicates", f"{step.replicates}×"))
 
     # Post-actions (mix / blow_out / touch_tip applied AFTER the main
-    # action) are semantic compression: the LLM folds "Mix each well
-    # 3 times at 10uL after adding template" into a transfer's
-    # post_actions instead of emitting a separate mix step. Without
-    # rendering them here, a user reading the spec column would
-    # legitimately think the mix was dropped — even though codegen
-    # consumes the post-action and emits mix_after=(3, 10). Each post
-    # action gets one detail row; numeric fields stay provenance-
-    # colored so the cite linkage works.
+    # action). Each post-action emits one row; the value cell combines
+    # the repetition count and the volume span.
     post_actions = getattr(step, "post_actions", None) or []
     for pa_idx, pa in enumerate(post_actions):
         bits = []
@@ -1390,7 +1371,7 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
             )
             bits.append(v)
         rhs = " ".join(bits) if bits else '<em class="dim">(no parameters)</em>'
-        detail_lines.append(f'<span class="label">{pa.action}:</span> {rhs}')
+        detail_lines.append(_row(pa.action, rhs))
 
     # Surface the step's `note` field as a footnote inside the step block.
     # Pause/comment steps usually carry their content here (e.g. the

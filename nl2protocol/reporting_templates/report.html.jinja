@@ -196,18 +196,41 @@
   .prov-domain_default { color: var(--col-domain);      font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
   .prov-inferred       { color: var(--col-inferred);    font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
 
-  /* ▴ marker prepended to non-instruction atomic values, repeated in the
-     legend. Visual at-a-glance shorthand: "this value isn't a literal lift
-     from the user — the model filled it in." Sized large enough to spot
-     at column-scan distance, colored with --col-inferred so it reads as
-     "model-filled" without any palette context. */
-  .non-instr-marker {
-    display: inline-block;
-    margin-right: 4px;
-    font-size: 14px;
-    line-height: 1;
-    color: var(--col-inferred);
-    transform: translateY(1px);
+  /* ───────── Step detail grid ─────────
+     Each step renders its parameter rows as a 3-column CSS grid:
+       column 1 — field label (volume, source, destination, …) +
+                   right-side colon. Width sized to the widest label.
+       column 2 — value cell. Flexes to fill remaining width. Carries
+                   the revision chain (~~prior~~ → head) when applicable.
+       column 3 — passing-check tag (right-aligned). Empty cell when
+                   the row has no check (alignment preserved). */
+  .step-detail-grid {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: 14px;
+    row-gap: 4px;
+    align-items: baseline;
+    margin-top: 6px;
+  }
+  .cell-label {
+    color: var(--dim);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .cell-label.is-indented {
+    padding-left: 1.4em;
+  }
+  .cell-value {
+    /* Default text styling; provenance + chain spans handle their own colors. */
+    min-width: 0;       /* Allow long values to wrap rather than overflow. */
+    word-break: break-word;
+  }
+  .cell-check {
+    /* Right-aligned check column. The inline-check span inside carries
+       the visual style (green ✓ pill); the empty cell case preserves
+       the grid column so labels + values stay aligned across rows. */
+    justify-self: end;
+    text-align: right;
   }
 
   /* ───────── Revision chain (ADR history) ─────────
@@ -1071,21 +1094,21 @@
   </div>
   {% endif %}
   {# Legend is the decoder ring for the report's visual encoding. Grouped
-     into four logical concepts (instruction-sourced, model-filled, review
-     markers, step-block grounding) so a reader can scan one group at a
-     time. The model-filled row shows ▴ + dotted underline + categorical
-     color side-by-side so readers see they're three cues for one fact
-     (rather than three separate signals to decode). #}
+     into logical concepts (instruction-sourced atoms, model-filled atoms,
+     review markers, step-block grounding) so a reader can scan one group
+     at a time. Model-filled atoms are communicated via dotted underline +
+     categorical color (the legacy ▴ marker was removed — two cues for one
+     fact is sufficient). #}
   <div class="legend">
     <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition · instruction-sourced atoms get per-citation hue (cite ↔ value)</span>
 
-    <span><span class="non-instr-marker">▴</span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (marker + dotted underline + categorical color — three cues for one fact):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
+    <span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (dotted underline + categorical color):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
 
     <span><span style="color: var(--status-error-fg); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
     <span>step-block left border signals grounding:<span class="swatch" style="background: var(--col-instruction); margin-left: 8px;"></span>grounded ·<span class="swatch" style="background: var(--col-domain);"></span>mixed ·<span class="swatch" style="background: var(--col-inferred);"></span>orphan</span>
 
-    <span><span style="color: var(--res-auto-accepted); font-weight: 700;">→</span> resolution arrow links a cell across extracted ↔ resolved spec — green = auto/user-accepted, blue = user-edited, gray = user-confirmed unchanged</span>
+    <span><span style="color: var(--res-user-edited); font-weight: 700;">~~prior~~ → head</span> = revision chain · hover any segment for that revision's provenance</span>
   </div>
 </header>
 
@@ -1242,9 +1265,13 @@
              data-params-reasoning="{{ step.parameters_reasoning|e }}"
              data-confidence="{{ step.confidence }}">
           <div class="step-action">Step {{ step.order }}: {{ step.action }}</div>
-          {% for line in step.detail_lines %}
-            <div class="step-detail">{{ line|safe }}</div>
-          {% endfor %}
+          <div class="step-detail-grid">
+            {% for row in step.detail_lines %}
+              <div class="cell-label{% if row.indented %} is-indented{% endif %}">{% if row.indented %}↳ {% endif %}{{ row.label }}:</div>
+              <div class="cell-value">{{ row.value_html|safe }}</div>
+              <div class="cell-check">{% if row.check %}<span class="inline-check">{{ row.check|e }}</span>{% endif %}</div>
+            {% endfor %}
+          </div>
           {% if step.note_line %}{{ step.note_line|safe }}{% endif %}
           {# P1-9: per-step constraint warnings surface here so the user
              sees them in the same visual context as the step they refer
@@ -2452,9 +2479,22 @@
         // static template's data-step-order attribute.
         if (step.order != null) div.dataset.stepOrder = String(step.order);
         let html = `<div class="step-action">Step ${step.order}: ${escapeHtml(step.action || "")}</div>`;
-        (step.detail_lines || []).forEach((line) => {
-          html += `<div class="step-detail">${line}</div>`;
+        // 3-column grid: label | value | check. Each row dict carries
+        // label / value_html / check / indented. Mirrors the Jinja loop
+        // in the static template so static and live render identically.
+        html += '<div class="step-detail-grid">';
+        (step.detail_lines || []).forEach((row) => {
+          const indented = row && row.indented;
+          const labelClass = "cell-label" + (indented ? " is-indented" : "");
+          const indentArrow = indented ? "↳ " : "";
+          const labelText = escapeHtml((row && row.label) || "");
+          const valueHtml = (row && row.value_html) || "";
+          const checkPhrase = (row && row.check) || "";
+          html += `<div class="${labelClass}">${indentArrow}${labelText}:</div>`;
+          html += `<div class="cell-value">${valueHtml}</div>`;
+          html += `<div class="cell-check">${checkPhrase ? `<span class="inline-check">${escapeHtml(checkPhrase)}</span>` : ""}</div>`;
         });
+        html += "</div>";
         if (step.note_line) html += step.note_line;
         div.innerHTML = html;
         col.appendChild(div);

@@ -459,7 +459,7 @@ class TestRendererChain:
         # When the value TEXT stays the same but the provenance source
         # changes (e.g., a fabrication resolution that keeps the value
         # but flips source to inferred), the prior is FILTERED — the
-        # head's own styling (▴ marker + non-instruction color) already
+        # head's own styling (color class + dotted underline) already
         # communicates the source change. A struck-through duplicate
         # carrying identical text would be visual noise.
         from nl2protocol.reporting import _render_revisioned_value
@@ -472,8 +472,8 @@ class TestRendererChain:
         # No chain — text didn't change.
         assert "prior-rev" not in html
         assert "rev-arrow" not in html
-        # Head still renders with the inferred styling (non-instr marker).
-        assert "non-instr-marker" in html
+        # Head still renders with the inferred styling.
+        assert "prov-inferred" in html
         assert ">buffer<" in html
 
     def test_prior_with_none_subprov_is_skipped(self):
