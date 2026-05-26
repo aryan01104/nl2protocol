@@ -3,6 +3,8 @@
 **Status:** Proposed
 **Date:** 2026-05-04
 
+**Extended by ADR-0014 (2026-05-27):** the Provenance schema described here is unchanged. The tracked-field types that *contain* Provenance instances (ProvenancedVolume / Duration / Temperature / String, LocationRef, WellContents, LabwarePrefill) now carry `prior_revisions: List[Self]`. Each prior_revisions entry is a frozen snapshot that includes its own Provenance(s) — so the review_status lifecycle described below applies on every revision in the chain, not just the head. See ADR-0014 for details.
+
 ## Context
 
 Today's `Provenance` schema (per ADR-0005) carries:

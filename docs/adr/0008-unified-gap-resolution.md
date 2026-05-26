@@ -3,6 +3,8 @@
 **Status:** Implemented (PR1 + PR2 + PR3a + PR3b — the orchestrator is the only resolution path; legacy `verify/fill/refine` block deleted in PR3b)
 **Date:** 2026-05-04
 
+**Updated by ADR-0014 (2026-05-27):** the apply path described below now routes writes through `push_revision` (snapshots head to `prior_revisions` before mutating), value-subfield accepts/edits build a fresh inferred provenance carrying the suggester's reasoning, and the verifier short-circuits on terminal `review_status`. The detect → suggest → review → resolve → re-detect loop is unchanged; the per-step mechanics inside `default_apply_resolution` and `_verify_claimed_instruction_provenance` are updated. See ADR-0014 for the full delta.
+
 ## Context
 
 Today's post-extraction pipeline routes different kinds of gaps through different ad-hoc paths:

@@ -8,6 +8,8 @@ Exploratory doc. Goal: understand exactly what happens to a Gap from detection t
 
 Reads stages 5-7 of `PIPELINE.md` at the code-line level. Plain-language summaries paired with code snippets. Not a polished diagram doc; a "let's understand this together" doc.
 
+> **Updated 2026-05-27 by ADR-0014.** Tracked-field types now carry per-field revision history (`prior_revisions: List[Self]`). The verifier short-circuits on terminal review states. The apply path snapshots before mutating via `push_revision`, and value-subfield accepts/edits replace the provenance with one carrying the suggester's reasoning. Sections below have been updated where they touched the old (single-Provenance, overwrite-on-write) model; the original "exploratory" framing is preserved.
+
 ---
 
 ## Part 1 — The shapes
@@ -35,9 +37,9 @@ confidence: float                            # 0.0–1.0
 ```
 
 **Key facts:**
-- A Provenance is **a single object** — it does not carry history. There's no `previous_states: List[...]` field. Whoever writes to a provenance slot REPLACES the object.
+- A `Provenance` instance is **a single object** — it doesn't carry history of its own. Whoever writes to a provenance slot REPLACES the Provenance object. _However_ (per ADR-0014, post-2026-05-27): the containing **tracked-field types** (`ProvenancedVolume`/`Duration`/`Temperature`/`String`, `LocationRef`, `WellContents`, `LabwarePrefill`) now carry `prior_revisions: List[Self]`. Each prior_revisions entry is a frozen snapshot of the container at a past moment — and each snapshot has its OWN Provenance(s) inside. So the audit history lives one level above the Provenance: in the container's chain.
 - `cited_text` is a `List[str]` (after the `_normalize_cited_text` validator on line 134 wraps bare strings into one-element lists). The list shape exists specifically to support spread citations.
-- `review_status` is a single value — it tells you what the *last* action on this Provenance was. It doesn't tell you what happened before that action.
+- `review_status` is a single value — it tells you what the *last* action on this Provenance was. The states *before* that action live in `prior_revisions[N].provenance.review_status` (or `.wells_provenance.review_status`, etc.) on the container's chain.
 
 ### `LocationRef` (`models/spec.py:432`)
 
@@ -59,9 +61,16 @@ wells_provenance: Optional[Provenance]        # how the wells were determined
 resolved_label_provenance: Optional[Provenance]  # how the config label was picked
 ```
 
-**Key fact:** `wells_provenance` is ONE Provenance object for the ENTIRE wells set. There is no per-well provenance. If `wells = [A1, A2, A3, A4]`, there's a single `wells_provenance` that's supposed to ground all four.
+Plus the post-ADR-0014 chain field:
 
-This shape is the source of half the friction below. We'll come back to it.
+```python
+prior_revisions: List["LocationRef"]          # full-LocationRef snapshots in chrono order
+```
+
+**Key facts:**
+- `wells_provenance` is ONE Provenance object for the ENTIRE wells set. There is no per-well provenance. If `wells = [A1, A2, A3, A4]`, there's a single `wells_provenance` that's supposed to ground all four. This shape is the source of half the friction below.
+- A push to `prior_revisions` snapshots the WHOLE LocationRef. The sub-fields (description, wells, resolved_label, all three provenances) evolve on one chain — temporal coupling between them is preserved. The renderer projects the chain per-sub-field (e.g., the wells row reads `[rev.wells_provenance for rev in prior_revisions]`); see `_render_revisioned_value` in `reporting.py` for the projection logic and the consecutive-dedup that hides "this push didn't touch the wells" snapshots from the wells row.
+- Entries in `prior_revisions` themselves have empty `prior_revisions` (the head owns the chain; revisions are frozen).
 
 ### `Gap`, `Suggestion`, `Resolution` (`gap_resolution/types.py`)
 
@@ -196,7 +205,7 @@ for role in ("source", "destination"):
 
 **Key behavior here:** the reviewer's verdict on `steps[N].source` gets stamped onto BOTH `description_provenance` AND `wells_provenance`, even though the original review was about one logical claim. This is what CodeRabbit flagged at `suggesters.py:807` — independent provenance slots get the same verdict because the reviewer only sees one claim per LocationRef.
 
-Also: **the old Provenance object is replaced.** `setattr(ref, prov_attr, Provenance.model_validate({**prov.model_dump(), ...updates}))` constructs a new object and overwrites. The original review_status (probably `"original"`) is gone after this line.
+Also: **the Provenance object on each slot is REPLACED.** `setattr(ref, prov_attr, Provenance.model_validate({**prov.model_dump(), ...updates}))` constructs a new object and overwrites. Pre-ADR-0014 the original Provenance (probably `review_status="original"`) was gone after this line. Post-ADR-0014 it depends on which path got here: the reviewer-verdict stamping shown above does NOT push a revision (the verdict is an intermediate pre-resolution event; we don't capture it as a separate point in the chain). The user-action apply path (step 8 below) DOES push the LocationRef before mutating, so the original Provenance survives in `prior_revisions[N].wells_provenance`.
 
 ### Step 6 — Auto-accept gate (`orchestrator.py:277`)
 
@@ -242,33 +251,42 @@ if (resolution.action == "accept_suggestion"
 
 This is the "for fabrication gaps, accept restates the provenance as inferred" path the architecture doc describes. **And this is where `confidence` gets overwritten** with the suggester's confidence — the user didn't endorse that confidence number; the code just attached it.
 
-### Step 8 — Apply (`orchestrator.py:357` → `default_apply_resolution` at `:748` → `_apply_at_path` at `:802`)
+### Step 8 — Apply (`orchestrator.py:357` → `default_apply_resolution` at `:748` → `_apply_at_path`)
 
 `_apply_at_path` regex-matches the field_path. For fabrication-shaped paths (`steps[N].<field>.<...provenance>`):
 
 ```python
-# orchestrator.py:826-838
 m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w*provenance)$", path)
 if m:
     idx, fname, slot = int(m.group(1)), m.group(2), m.group(3)
     parent = getattr(spec.steps[idx], fname, None)
     if resolution.action == "accept_suggestion":
-        setattr(parent, slot, new_value)         # ← the entire provenance is replaced
+        if hasattr(parent, "prior_revisions"):
+            push_revision(parent)                # ADR-0014: snapshot before mutating
+        setattr(parent, slot, new_value)         # ← replaces the provenance slot
         return
 ```
 
-`setattr(parent, slot, new_value)` — the WHOLE `wells_provenance` object is replaced with the new one the orchestrator built. **The original Provenance is gone.** No backup, no history, no `previous_provenance` list. Just gone.
+The provenance slot on the head is replaced with the new one the orchestrator built. **Per ADR-0014: the original Provenance is NOT gone** — `push_revision(parent)` ran first, snapshotting the whole tracked field (its value, all its provenance slots, everything) into `parent.prior_revisions`. The renderer's chain UI walks back through that list to show the cell's evolution. To answer "what was the extractor's original cite?", read `parent.prior_revisions[0].wells_provenance.cited_text` (or whatever provenance slot is in play).
+
+For **value-subfield writes** (subfield like `wells` / `well` / `description`, NOT `*_provenance`), `_apply_at_path` also pushes the parent first, and additionally — when the action is `accept_suggestion` or `edit` — **replaces the corresponding `*_provenance` slot** with a fresh `source="inferred"` Provenance carrying the suggester's `positive_reasoning` and `why_not_in_instruction`. The stale `cited_text` that grounded the OLD value moves into `prior_revisions[0]`'s provenance for that slot; the head's tooltip honestly attributes the new value to the inference that produced it. See ADR-0014 §4 for the exact mapping (`_LOCATIONREF_VALUE_SUBFIELDS`).
 
 ### Step 9 — Re-detect for iteration 2 (`orchestrator.py:206` again)
 
-Loop restarts. `detect_all` runs again. The verifier walks the spec again. The `wells_provenance` it sees now has `source = "inferred"` (not "instruction"), so the `check` function short-circuits at line 307:
+Loop restarts. `detect_all` runs again. The verifier walks the spec again. The `wells_provenance` it sees now has `source = "inferred"` (not "instruction"), so the `check` function short-circuits at the source check:
 
 ```python
 if not prov or prov.source != "instruction":
     return
+# ADR-0014 added: also short-circuit when the review lifecycle has
+# terminated, so user-accepted / user-edited / user-overrode /
+# reviewed-agree values stay out of the verifier's scope on
+# subsequent iterations.
+if prov.review_status in TERMINAL_REVIEW_STATUSES:
+    return
 ```
 
-Inferred provenance is not subject to the cited_text check — there's nothing to verify. The fabrication gap doesn't re-fire. The iteration ends with zero gaps. Loop converges.
+Inferred provenance is not subject to the cited_text check (no instruction citation to verify). The terminal short-circuit handles the edge cases where source stayed `instruction` but a user action terminated the lifecycle. The fabrication gap doesn't re-fire. The iteration ends with zero gaps. Loop converges.
 
 ### What's recorded for audit
 
@@ -285,7 +303,9 @@ class GapResolutionRecord:
     auto_accepted: bool
 ```
 
-**This is the only place the original gap state is preserved.** The spec itself only has the post-resolution Provenance. To answer "what was the original cite that fired the fabrication?", you have to read the state log, NOT the spec.
+**Pre-ADR-0014: the state log was the only place the original gap state was preserved.** The spec only had the post-resolution Provenance.
+
+**Post-ADR-0014: the spec ALSO preserves the original state**, in `prior_revisions[N]` on each tracked-field container that was mutated. To answer "what was the extractor's original cite that fired the fabrication?", read `spec.steps[step_idx].destination.prior_revisions[0].wells_provenance.cited_text` (or whatever container's chain you care about). The state log is still the audit trail of the gap-loop process (gap → suggestion → review → resolution per iteration); the spec's prior_revisions are the audit trail of the *value*'s evolution. They overlap but answer different questions.
 
 ---
 
@@ -315,25 +335,25 @@ In those cases, the verifier produces N warnings (one per offending well), the d
 
 ### Q2 — Does provenance get overwritten across iterations? Is the old state accessible?
 
-**Yes, it gets overwritten. No, the old state is not accessible from the spec.**
+**Updated post-ADR-0014 (2026-05-27): the spec NOW preserves history.** The original answer (pre-ADR-0014) is preserved below for context.
 
-Two overwrite paths to know about:
+**Today's answer:**
 
-1. **Reviewer verdict stamping** (`orchestrator.py:519-555`) — when the reviewer runs in iteration K, EVERY Provenance whose field_path got a verdict gets REPLACED with a new Provenance carrying the verdict. The original `review_status = "original"` or whatever was there before is gone.
+When the apply path or stage 2.5 writes to a tracked field (Provenanced*, LocationRef, WellContents, LabwarePrefill), it calls `push_revision(field)` BEFORE mutating. The snapshot — including all the provenance slots — lives on `field.prior_revisions[N]`. So the original Provenance, its `source`, `cited_text`, `confidence`, `review_status`, `reviewer_objection` — all of it — survives the write, just at a different address in the spec tree.
 
-2. **Resolution apply** (`orchestrator.py:826-933`) — when a Resolution is applied, the existing Provenance is replaced wholesale via `setattr(parent, slot, new_value)`.
+To answer "what was the extractor's original cited_text for this cell?", walk back to `field.prior_revisions[0]`'s relevant provenance slot (`wells_provenance`, `description_provenance`, etc.). The leftmost segment of the chain UI in the HTML report renders exactly that snapshot.
 
-**What survives:**
-- `state_log["stage_3_gap_resolver"]["iterations"]` records every (Gap, Suggestion, ReviewResult, Resolution) tuple per iteration. This is the audit trail — but it's separate from the spec.
-- The spec's current Provenance shows ONLY the latest state: `review_status` tells you what the LAST action was (e.g. `"user_accepted_suggestion"`), but not what happened before.
+What's still NOT history-preserving (intentional):
+- **Reviewer verdict stamping** (`orchestrator.py:519-555`) does NOT push a revision. The reviewer's verdict is a pre-resolution event; we don't surface it as its own point in the chain. The verdict mutates the Provenance in place (changing `review_status` to `reviewed_agree` / `reviewed_disagree`), and then a downstream user action either resolves or overrides — the user action DOES push, capturing the post-reviewer state as a snapshot.
+- The state log audit trail in `output/pipeline_state_*.json` → `stage_3_gap_resolver.iterations[*]` still exists and is still the canonical record of the GAP-LOOP PROCESS (which gaps fired, what suggesters proposed, what reviewer said, what user did, in what order). The spec's `prior_revisions` is the record of the VALUE'S EVOLUTION (what the value was at each write). They overlap but answer different questions.
 
-**What does NOT survive:**
-- The original `source = "instruction"` + cited_text, after a fabrication accept replaces them with `source = "inferred"` + reasoning.
-- The original `confidence` value (rewritten to the suggester's confidence in the fabrication-accept path).
-- The original `reviewer_objection` (cleared by user actions per `_stamp_user_action`).
-- Anything from iteration K-1 that iteration K touched.
+**Pre-ADR-0014 answer (historical, no longer accurate):**
 
-**For the audit trail:** the right place to look is `output/pipeline_state_*.json` → `stage_3_gap_resolver.iterations[*]`. The spec itself is a moving target.
+> Yes, it gets overwritten. No, the old state is not accessible from the spec.
+>
+> Two overwrite paths: reviewer verdict stamping (`orchestrator.py:519-555`) and resolution apply (`orchestrator.py:826-933`). Both replaced the existing Provenance wholesale via `setattr(parent, slot, new_value)`. The original `source`, `cited_text`, `confidence`, `reviewer_objection`, and anything from a prior iteration that the current iteration touched — all gone after the write. The state log was the only audit trail.
+
+Kept here so the original framing is legible; superseded by the updated answer above.
 
 ### Q3 — Is the "value in citation" check broken?
 
@@ -378,7 +398,7 @@ Summarizing what this code-walk surfaces that the architecture doc and the earli
 
 2. **The reviewer verdict gets stamped on BOTH description_provenance AND wells_provenance from one review claim.** This is a real audit-trail dishonesty: the reviewer reviewed one claim, but two provenance slots get the verdict. Confirms CodeRabbit's `suggesters.py:807` finding from a different angle.
 
-3. **There's no provenance history in the spec.** Every overwrite is destructive. If you want to know "what did the LLM originally extract, before the user resolved the gap?", you have to read the state log, not the spec. This is fine in principle (the state log IS the audit trail) but worth knowing.
+3. **~~There's no provenance history in the spec.~~ Updated post-ADR-0014:** tracked-field containers now carry `prior_revisions: List[Self]`, so the spec preserves history alongside the state log. `field.prior_revisions[0]` is the extractor's original state; later entries are intermediate snapshots. The state log still complements it (covers the gap-loop process: suggester proposals, reviewer verdicts), but the question "what did the LLM originally extract?" is now answerable from the spec alone.
 
 4. **The fabrication-accept confidence overwrite** (orchestrator.py:351) is exactly the "overdetermined" concern. Re-verified here in context: user accepts the suggester's reasoning; system also overwrites confidence to the suggester's confidence. Two unrelated things bundled into one user click.
 
@@ -393,7 +413,7 @@ Summarizing what this code-walk surfaces that the architecture doc and the earli
 None of the above is a crash bug. The pipeline runs end-to-end and produces working scripts. But the user-facing experience suffers in specific shapes:
 
 - Recruiters who try a multi-well transfer protocol will likely hit a fabrication false-positive and see a misleading "Current: X" modal.
-- The state log is the only place the original spec state is preserved across iterations.
+- ~~The state log is the only place the original spec state is preserved across iterations.~~ Post-ADR-0014: the spec ALSO preserves it via `prior_revisions`. State log + prior_revisions are complementary now (process vs. value evolution).
 - The "honest provenance" pitch in the README needs to acknowledge the substring-check limitation.
 
 **Fix prioritization (re-stating from the testing-critique doc with this new context):**

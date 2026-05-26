@@ -3,6 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-05-05
 
+**Updated by ADR-0014 (2026-05-27):** the override path described here still works, but its interaction with the verifier changed. Previously the override flipped `review_status="user_overrode_fabrication"` but the next iteration's verifier re-ran the cited_text check and re-raised the fabrication (the bouncing-loop bug). Post-ADR-0014, the verifier short-circuits on `user_overrode_fabrication` (it's in `TERMINAL_REVIEW_STATUSES`), so an override genuinely terminates the lifecycle for that value. Additionally, the override apply branch now `push_revision`s the field before stamping, so the pre-override state survives in `prior_revisions`. See ADR-0014 §1 and §3.
+
 ## Context
 
 ADR-0008's orchestrator routes every kind of Gap through one detect → suggest → review → user-confirm loop. `ProvenanceWarningDetector` emits Gaps for fabrications — values whose claimed `cited_text` doesn't appear in the user's instruction. Generic suggesters (deterministic + `LLMSpotSuggester`) try to resolve them; if nothing succeeds, the user gets a CLI prompt with accept / edit / skip / quit.
