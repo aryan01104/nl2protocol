@@ -80,7 +80,7 @@ class LabwareResolver:
                 to an empty `{}` and every description's
                 `LabwareSuggestion.suggested_label` is None.
 
-        Post:   Returns a dict keyed on each unique description (from
+        Post:   Returns a dict keyed on each unique name (from
                 step source/destination refs, initial_contents, and
                 prefilled_labware). Each value is a `LabwareSuggestion`:
                   * `suggested_label`: the LLM's pick, OR None when
