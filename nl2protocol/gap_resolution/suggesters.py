@@ -49,9 +49,8 @@ class ConfigLookupSuggester:
     """For a Gap on `step.source` where the step has a substance, search
     `config.labware.contents` for a well containing that substance.
 
-    Lifted from `extractor.fill_lookup_and_carryover_gaps`'s lookup branch.
-    Same matching logic (case-insensitive substring); same first-match-wins
-    over labware iteration order; now wrapped as a Suggester.
+    Matching logic: case-insensitive substring; first-match-wins over
+    labware iteration order.
 
     Pre:    `gap.kind == "missing"`, gap.field_path ends in `.source`,
             spec has a substance on the relevant step,

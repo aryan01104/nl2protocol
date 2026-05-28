@@ -1127,7 +1127,7 @@ class ProtocolAgent:
                 client=self.config_loader.client,
                 model_name=self.config_loader.model_name
             )
-            spec = extractor.extract(prompt, self.config_loader.config)
+            spec = extractor.extract(prompt)
 
             if spec is not None:
                 # Emit extracted spec event for downstream reporters.
@@ -1365,7 +1365,7 @@ class ProtocolAgent:
             orch = Orchestrator(
                 detectors=[
                     MissingFieldsDetector(),
-                    ProvenanceWarningDetector(extractor),  # only fabrications surface as Gaps
+                    ProvenanceWarningDetector(),  # only fabrications surface as Gaps
                     InitialContentsVolumeDetector(),
                     ConstraintViolationDetector(),
                     LabwareAmbiguityDetector(),

@@ -101,6 +101,13 @@ class TestConfigLookupSuggester:
         # describes the synthesized ref instead).
         assert s.value.resolved_label_provenance is not None
         assert "buffer" in s.value.resolved_label_provenance.positive_reasoning
+        # Silent-black-text guard (historical bug): both LocationRef
+        # provenances must be populated with source="inferred", otherwise
+        # the renderer shows the synthesized ref without the ▴ marker.
+        assert s.value.description_provenance is not None
+        assert s.value.description_provenance.source == "inferred"
+        assert s.value.wells_provenance is not None
+        assert s.value.wells_provenance.source == "inferred"
         assert s.provenance_source == "deterministic"
         assert "buffer" in s.positive_reasoning
         assert s.confidence == 0.9
@@ -195,6 +202,27 @@ class TestConfigLookupSuggester:
             context={"config": {"labware": {"r": {"contents": {"A1": "buffer"}}}}}
         ) is None
 
+    def test_does_not_mutate_input_spec(self):
+        # The suggester returns a Suggestion; applying it is the caller's
+        # job. The input spec must be untouched after .suggest() — otherwise
+        # pipeline-state logs would diverge from what the prior stage emitted.
+        spec = ProtocolSpec(summary="t", steps=[
+            ExtractedStep(
+                order=1, action="transfer",
+                substance=ProvenancedString(value="buffer", provenance=_instr_prov("buffer")),
+                source=None,
+                destination=LocationRef(description="dest", well="A1",
+                                        description_provenance=_instr_prov("A1"), wells_provenance=_instr_prov("A1")),
+                composition_provenance=_comp(),
+            ),
+        ])
+        config = {"labware": {"reagent_rack": {"contents": {"B3": "buffer"}}}}
+        gap = _gap("steps[0].source", description="missing source for buffer")
+        original = spec.model_dump()
+        ConfigLookupSuggester().suggest(spec=spec, gap=gap,
+                                        context={"config": config})
+        assert spec.model_dump() == original
+
 
 # ============================================================================
 # CarryoverSuggester
@@ -219,6 +247,9 @@ class TestCarryoverSuggester:
         assert s.value.value == 4.0
         assert s.confidence == 0.95
         assert "4.0" in s.positive_reasoning
+        # The ▴ tooltip names which prior step the value came from,
+        # so the reasoning must mention "set_temperature".
+        assert "set_temperature" in s.positive_reasoning
 
     def test_picks_most_recent_set_temperature(self):
         spec = ProtocolSpec(summary="t", steps=[
@@ -258,6 +289,23 @@ class TestCarryoverSuggester:
         ])
         gap = _gap("steps[0].temperature")
         assert CarryoverSuggester().suggest(spec=spec, gap=gap, context={}) is None
+
+    def test_does_not_mutate_input_spec(self):
+        # Same contract as ConfigLookupSuggester: .suggest() must be pure
+        # w.r.t. the input spec.
+        spec = ProtocolSpec(summary="t", steps=[
+            ExtractedStep(order=1, action="set_temperature",
+                          temperature=ProvenancedTemperature(
+                              value=4.0, provenance=_instr_prov("4°C")),
+                          composition_provenance=_comp()),
+            ExtractedStep(order=2, action="wait_for_temperature",
+                          temperature=None,
+                          composition_provenance=_comp()),
+        ])
+        gap = _gap("steps[1].temperature", step_order=2)
+        original = spec.model_dump()
+        CarryoverSuggester().suggest(spec=spec, gap=gap, context={})
+        assert spec.model_dump() == original
 
 
 # ============================================================================

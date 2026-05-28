@@ -341,7 +341,7 @@ class TestNonsensicalInstruction:
 
         client = Anthropic()
         extractor = SemanticExtractor(client)
-        spec = extractor.extract(instruction, config)
+        spec = extractor.extract(instruction)
 
         if spec is not None:
             # If extraction succeeds, there should be no useful liquid handling steps
@@ -366,7 +366,7 @@ class TestMisspelledInstruction:
 
         client = Anthropic()
         extractor = SemanticExtractor(client)
-        spec = extractor.extract(instruction, config)
+        spec = extractor.extract(instruction)
 
         assert spec is not None
         # Should still extract the key volumes despite misspellings
@@ -389,7 +389,7 @@ class TestEquivalentNames:
 
         client = Anthropic()
         extractor = SemanticExtractor(client)
-        spec = extractor.extract(instruction, config)
+        spec = extractor.extract(instruction)
 
         assert spec is not None
 
@@ -436,7 +436,7 @@ class TestCompactInstruction:
 
         client = Anthropic()
         extractor = SemanticExtractor(client)
-        spec = extractor.extract(instruction, config)
+        spec = extractor.extract(instruction)
 
         assert spec is not None
         assert len(spec.steps) >= 3  # standards + samples + reagent + mix

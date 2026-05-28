@@ -186,7 +186,7 @@ def run_one_eval(eval_dir: Path) -> EvalResult:
         loader = ConfigLoader(api_key=api_key, config_path=str(config_path))
         loader.load_config()
         extractor = SemanticExtractor(client=loader.client, model_name=loader.model_name)
-        spec = extractor.extract(instruction, loader.config)
+        spec = extractor.extract(instruction)
         if spec is not None:
             resolver = LabwareResolver(
                 config=loader.config,

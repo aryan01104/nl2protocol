@@ -171,7 +171,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec,
             context={"instruction": "Transfer 100uL from tube rack A1 to tube rack B1.", "config": {}},
         )
@@ -197,7 +197,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec,
             context={"instruction": "Transfer some liquid.", "config": {}},
         )
@@ -226,7 +226,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec,
             context={"instruction": "Mix at half the total volume of 100uL.", "config": {}},
         )
@@ -273,7 +273,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec,
             context={"instruction": "Transfer some liquid from A1 to B1.", "config": {}},
         )
@@ -316,7 +316,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec,
             context={"instruction": "Transfer some liquid from A1 to B1.", "config": {}},
         )
@@ -346,7 +346,7 @@ class TestProvenanceWarningDetector:
                 composition_provenance=_comp(),
             ),
         ])
-        gaps = ProvenanceWarningDetector(extractor).detect(
+        gaps = ProvenanceWarningDetector().detect(
             spec, context={"instruction": "Mix.", "config": {}},
         )
         # step.order=2 → field_path index = 1 (0-indexed)

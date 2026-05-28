@@ -154,7 +154,7 @@ class TestPipelineHappyPath:
         extractor = _make_mock_extractor(_spec_simple_transfer(volume_uL=100.0))
 
         # Stage 2 — extract
-        spec = extractor.extract("Transfer 100uL from A1 to B1", simple_config)
+        spec = extractor.extract("Transfer 100uL from A1 to B1")
         assert spec is not None
         assert len(spec.steps) == 1
         assert spec.steps[0].volume.value == 100.0
@@ -186,7 +186,7 @@ class TestPipelineConstraintFailure:
         # simple_config has only p300 (max 300uL). 500uL exceeds it.
         extractor = _make_mock_extractor(_spec_simple_transfer(volume_uL=500.0))
 
-        spec = extractor.extract("Transfer 500uL from A1 to B1", simple_config)
+        spec = extractor.extract("Transfer 500uL from A1 to B1")
         assert spec is not None  # extraction itself succeeds — Pydantic doesn't know about pipettes
 
         result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
@@ -202,7 +202,7 @@ class TestPipelineConstraintFailure:
         # Well "I1" matches [A-P] regex but corning 96-well only has rows A-H.
         extractor = _make_mock_extractor(_spec_with_well_outside_grid())
 
-        spec = extractor.extract("Transfer 100uL from I1 to B1", simple_config)
+        spec = extractor.extract("Transfer 100uL from I1 to B1")
         assert spec is not None  # Pydantic accepts the well-name; constraints don't
 
         result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
@@ -225,7 +225,7 @@ class TestPipelineMalformedLLMOutput:
         mock_client.messages.create.return_value = garbage_response
 
         extractor = SemanticExtractor(client=mock_client)
-        spec = extractor.extract("Transfer 100uL from A1 to B1", simple_config)
+        spec = extractor.extract("Transfer 100uL from A1 to B1")
 
         # Per extractor's docstring: "Returns ProtocolSpec on success, None on failure (fail-fast)."
         assert spec is None
@@ -238,7 +238,7 @@ class TestPipelineMultiStep:
     def test_three_step_spec_round_trips(self, simple_config):
         extractor = _make_mock_extractor(_spec_multi_step())
 
-        spec = extractor.extract("Transfer, delay, transfer", simple_config)
+        spec = extractor.extract("Transfer, delay, transfer")
         assert spec is not None
         assert len(spec.steps) == 3
 

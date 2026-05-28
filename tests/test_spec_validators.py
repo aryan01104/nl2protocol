@@ -349,8 +349,8 @@ class TestLocationRefProvenanceRequired:
 
     def test_inferred_provenance_acceptable_for_locationref(self):
         # The required-field rule doesn't constrain the SOURCE — inferred
-        # provenance from gap-filling (e.g. fill_lookup_and_carryover_gaps)
-        # is just as valid as instruction-sourced provenance.
+        # provenance from gap-filling (e.g. ConfigLookupSuggester) is just
+        # as valid as instruction-sourced provenance.
         ref = LocationRef(
             description="reagent_rack (inferred from config)",
             well="A1",

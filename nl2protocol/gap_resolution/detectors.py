@@ -81,9 +81,9 @@ def _missing_field_kind_and_severity(description: str) -> tuple:
 
 
 class MissingFieldsDetector:
-    """Wraps `SemanticExtractor.missing_fields`.
+    """Wraps `extraction.sufficient.verify_no_missing_field`.
 
-    Calls `missing_fields(spec)` (which attempts CompleteProtocolSpec
+    Calls `verify_no_missing_field(spec)` (which attempts CompleteProtocolSpec
     promotion and collects validation errors), then translates each
     error string into a `Gap`.
 
@@ -95,10 +95,10 @@ class MissingFieldsDetector:
     """
 
     def detect(self, spec, context: dict) -> List[Gap]:
-        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.extraction.sufficient import verify_no_missing_field
 
         gaps: List[Gap] = []
-        for msg in SemanticExtractor.missing_fields(spec):
+        for msg in verify_no_missing_field(spec):
             m = _MISSING_FIELD_PATTERN.match(msg)
             if m:
                 step_order = int(m.group(1))
@@ -133,7 +133,7 @@ class MissingFieldsDetector:
 
 
 # ============================================================================
-# ProvenanceWarningDetector — wraps SemanticExtractor.verify_provenance_claims
+# ProvenanceWarningDetector — wraps provenance_checking.inspect_provenance_claims
 # ============================================================================
 
 _SEVERITY_MAP = {
@@ -178,12 +178,12 @@ def _warning_id(warning: dict) -> str:
 
 
 class ProvenanceWarningDetector:
-    """Wraps `SemanticExtractor.verify_provenance_claims`.
+    """Wraps `provenance_checking.inspect_provenance_claims`.
 
-    Calls the public verifier (which internally runs fabrication detection
-    on instruction- and config-claimed values, plus uncertainty flagging
-    for low-confidence inferred / domain_default values), and translates
-    each warning dict into a Gap.
+    Calls the public verifier (which runs fabrication detection on
+    instruction-claimed values plus uncertainty flagging for low-confidence
+    inferred / domain_default values), and translates each warning dict
+    into a Gap.
 
     Severity mapping per ADR-0008:
       "fabrication"    → kind="fabricated",     severity="blocker"
@@ -192,21 +192,17 @@ class ProvenanceWarningDetector:
 
     Pre:    `spec` is a parsed ProtocolSpec; `context` includes
             "instruction" (raw text) and "config" (lab config dict).
-            The underlying verifier requires both.
     Post:   Returns one Gap per warning. Gap.id is deterministic from
             (step, field, severity) so re-detection across iterations
             can match.
     Side effects: None.
     """
 
-    def __init__(self, extractor):
-        # Underlying function is an instance method — needs the SemanticExtractor.
-        self._extractor = extractor
-
     def detect(self, spec, context: dict) -> List[Gap]:
+        from nl2protocol.extraction.provenance_checking import inspect_provenance_claims
         instruction = context.get("instruction", "")
         config = context.get("config", {})
-        warnings = self._extractor.verify_provenance_claims(spec, instruction, config)
+        warnings = inspect_provenance_claims(spec, instruction, config)
         gaps: List[Gap] = []
         for w in warnings:
             severity_str = w.get("severity", "unverified")
@@ -560,7 +556,7 @@ def default_extractor_detectors(extractor) -> List:
     """
     return [
         MissingFieldsDetector(),
-        ProvenanceWarningDetector(extractor),
+        ProvenanceWarningDetector(),
     ]
 
 

@@ -5,7 +5,7 @@ this cite" predicate consumed by the verifier in extractor.py.
 """
 
 from nl2protocol.citing import cite_covers_well
-from nl2protocol.extraction.extractor import SemanticExtractor
+from nl2protocol.extraction.provenance_checking import value_in_quote
 
 
 # ============================================================================
@@ -194,47 +194,47 @@ class TestValueInQuote_RangeRelaxation:
     def test_well_in_range_cite_passes(self):
         # The bacterial-transformation case: 'B2' against '(B1-B4)'
         # used to fire a fabrication warning; now it passes.
-        assert SemanticExtractor._value_in_quote("B2", "(B1-B4)") is True
-        assert SemanticExtractor._value_in_quote("B3", "(B1-B4)") is True
+        assert value_in_quote("B2", "(B1-B4)") is True
+        assert value_in_quote("B3", "(B1-B4)") is True
 
     def test_well_outside_range_cite_fails(self):
         # The check still has teeth: a well outside the cited range
         # is still flagged.
-        assert SemanticExtractor._value_in_quote("B5", "(B1-B4)") is False
-        assert SemanticExtractor._value_in_quote("E5", "A1-D4") is False
+        assert value_in_quote("B5", "(B1-B4)") is False
+        assert value_in_quote("E5", "A1-D4") is False
 
     def test_literal_substring_unchanged(self):
         # Existing substring path: 'B2' literally inside 'cells B2'.
-        assert SemanticExtractor._value_in_quote("B2", "cells B2") is True
+        assert value_in_quote("B2", "cells B2") is True
 
     def test_numeric_unchanged(self):
         # Numeric path untouched by the range relaxation.
-        assert SemanticExtractor._value_in_quote(100, "100uL") is True
-        assert SemanticExtractor._value_in_quote(100.0, "100uL") is True
-        assert SemanticExtractor._value_in_quote(50, "100uL") is False
+        assert value_in_quote(100, "100uL") is True
+        assert value_in_quote(100.0, "100uL") is True
+        assert value_in_quote(50, "100uL") is False
 
     def test_string_non_well_unchanged(self):
         # Non-well strings still use substring semantics only.
-        assert SemanticExtractor._value_in_quote("plasmid DNA",
+        assert value_in_quote("plasmid DNA",
                                                   "plasmid DNA samples") is True
-        assert SemanticExtractor._value_in_quote("buffer", "plasmid DNA") is False
+        assert value_in_quote("buffer", "plasmid DNA") is False
 
     def test_column_cite_covers_well(self):
         # Natural-language column expression in the cite.
-        assert SemanticExtractor._value_in_quote("A1", "column 1") is True
-        assert SemanticExtractor._value_in_quote("H1", "column 1") is True
-        assert SemanticExtractor._value_in_quote("A2", "column 1") is False
+        assert value_in_quote("A1", "column 1") is True
+        assert value_in_quote("H1", "column 1") is True
+        assert value_in_quote("A2", "column 1") is False
 
     def test_well_name_uses_word_boundaries_not_substring(self):
         # CodeRabbit P1: 'B2' must NOT match a cite containing 'B20',
         # which would otherwise hide a fabricated well. The fallback for
         # well-name-shaped values now requires word boundaries on both
         # sides instead of plain substring containment.
-        assert SemanticExtractor._value_in_quote("B2", "cells B20") is False
-        assert SemanticExtractor._value_in_quote("A1", "wells A10, A11") is False
+        assert value_in_quote("B2", "cells B20") is False
+        assert value_in_quote("A1", "wells A10, A11") is False
         # Sanity: a real boundary match still passes.
-        assert SemanticExtractor._value_in_quote("B2", "cells B2 here") is True
-        assert SemanticExtractor._value_in_quote("B2", "(B1, B2, B3)") is True
+        assert value_in_quote("B2", "cells B2 here") is True
+        assert value_in_quote("B2", "(B1, B2, B3)") is True
         # Well at the start / end of the cite still passes.
-        assert SemanticExtractor._value_in_quote("A1", "A1") is True
-        assert SemanticExtractor._value_in_quote("B5", "cells in B5") is True
+        assert value_in_quote("A1", "A1") is True
+        assert value_in_quote("B5", "cells in B5") is True
