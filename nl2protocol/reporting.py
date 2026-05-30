@@ -159,6 +159,209 @@ class CapturingReporter:
 
 
 # ============================================================================
+# MetricsReporter — writes per-run timing + token + gap stats at finalize()
+# ============================================================================
+
+class MetricsReporter:
+    """Reporter that captures per-stage wall-clock time, gap counts,
+    and writes metrics_{run_ts}.json + metrics_{run_ts}.md at finalize().
+
+    Holds a reference to a `RunMeter` that an externally-wired
+    `MeteredClient` has been populating with token + call data. On
+    `stage_start`, sets the `current_stage` contextvar so subsequent
+    LLM calls in the pipeline thread attribute their tokens to this
+    stage; on `stage_complete`, records the stage's wall-clock duration.
+    `gap_detected` / `gap_resolved` tally counts by kind +
+    auto-vs-user breakdown; `labware_resolution_done` records the
+    final mapping count.
+
+    Pre:    `meter` is a `RunMeter` (typically the same instance
+            handed to a `MeteredClient` wrapping the agent's
+            `config_loader.client`). `output_dir` is an existing
+            writable directory. `run_ts` is a filename-safe
+            timestamp ("20260530_103045"). `model_name` is
+            recorded verbatim in the Run section.
+    Post:   `emit` mutates the contextvar + counters synchronously
+            on each event; never raises into the pipeline.
+            `finalize` writes two files:
+              - `{output_dir}/metrics_{run_ts}.json` (full snapshot,
+                machine-readable, suitable for an aggregation script)
+              - `{output_dir}/metrics_{run_ts}.md`   (human-readable,
+                tight format matching the actual.md skeleton in
+                notes/eval-stats.html)
+            Resets the contextvar back to NO_STAGE so a subsequent
+            run (or test) starts from a clean slot.
+    """
+
+    def __init__(self, meter, output_dir: str, run_ts: str,
+                 model_name: str = ""):
+        # Local import: metering imports nothing from reporting, but
+        # keeping it lazy avoids a top-of-module cycle if anyone later
+        # introduces one.
+        import time as _time
+        from collections import defaultdict as _dd
+        self._meter = meter
+        self._output_dir = output_dir
+        self._run_ts = run_ts
+        self.model_name = model_name
+        self._run_started_at = _time.perf_counter()
+        self._run_ended_at: Optional[float] = None
+        self._stage_started_at: Dict[str, float] = {}
+        self._stage_order: List[str] = []
+        self._gaps_detected_by_kind: Dict[str, int] = _dd(int)
+        self._gaps_resolved_by_kind: Dict[str, int] = _dd(int)
+        self._gaps_resolved_auto = 0
+        self._gaps_resolved_user = 0
+        self._labware_mappings = 0
+
+    def emit(self, event: StageEvent) -> None:
+        import time as _time
+        from .metering import current_stage
+        kind = event.kind
+        stage = event.stage_name or ""
+        data = event.data or {}
+
+        if kind == "stage_start":
+            if stage:
+                current_stage.set(stage)
+                self._stage_started_at[stage] = _time.perf_counter()
+                if stage not in self._stage_order:
+                    self._stage_order.append(stage)
+        elif kind == "stage_complete":
+            t0 = self._stage_started_at.get(stage)
+            if t0 is not None:
+                # Use the same per_stage StageStats slot the meter writes
+                # to; wall_clock_s is the field the meter never touches.
+                self._meter.per_stage[stage].wall_clock_s += (
+                    _time.perf_counter() - t0
+                )
+        elif kind == "gap_detected":
+            gk = data.get("gap_kind") or "unknown"
+            self._gaps_detected_by_kind[gk] += 1
+        elif kind == "gap_resolved":
+            rk = data.get("resolution_kind") or "unknown"
+            self._gaps_resolved_by_kind[rk] += 1
+            if data.get("auto_accepted"):
+                self._gaps_resolved_auto += 1
+            else:
+                self._gaps_resolved_user += 1
+        elif kind == "labware_resolution_done":
+            resolutions = data.get("resolutions") or {}
+            self._labware_mappings = len(resolutions)
+
+    def finalize(self) -> None:
+        import json as _json
+        import os as _os
+        import time as _time
+        from .metering import current_stage, NO_STAGE
+        self._run_ended_at = _time.perf_counter()
+        wall_clock_s = self._run_ended_at - self._run_started_at
+
+        snapshot = self._meter.snapshot()
+        payload = {
+            "run": {
+                "timestamp": self._run_ts,
+                "model": self.model_name,
+                "wall_clock_s": round(wall_clock_s, 3),
+            },
+            "totals": snapshot["totals"],
+            "per_stage": snapshot["per_stage"],
+            "stage_order": self._stage_order,
+            "gaps": {
+                "detected_total": sum(self._gaps_detected_by_kind.values()),
+                "detected_by_kind": dict(self._gaps_detected_by_kind),
+                "resolved_total": sum(self._gaps_resolved_by_kind.values()),
+                "resolved_by_kind": dict(self._gaps_resolved_by_kind),
+                "resolved_auto": self._gaps_resolved_auto,
+                "resolved_user": self._gaps_resolved_user,
+            },
+            "labware_mappings": self._labware_mappings,
+        }
+
+        _os.makedirs(self._output_dir, exist_ok=True)
+        json_path = _os.path.join(
+            self._output_dir, f"metrics_{self._run_ts}.json"
+        )
+        md_path = _os.path.join(
+            self._output_dir, f"metrics_{self._run_ts}.md"
+        )
+        try:
+            with open(json_path, "w") as f:
+                _json.dump(payload, f, indent=2)
+            with open(md_path, "w") as f:
+                f.write(self._render_md(payload))
+        finally:
+            current_stage.set(NO_STAGE)
+
+    def _render_md(self, payload: dict) -> str:
+        run = payload["run"]
+        totals = payload["totals"]
+        gaps = payload["gaps"]
+        per_stage = payload["per_stage"]
+        stage_order = payload["stage_order"] or list(per_stage.keys())
+
+        lines: List[str] = []
+        lines.append(f"# metrics — {run['timestamp']}")
+        lines.append("")
+        lines.append("## Run")
+        lines.append(f"- Model: `{run['model'] or 'unknown'}`")
+        lines.append(f"- Wall-clock: {run['wall_clock_s']:.2f}s")
+        lines.append("")
+        lines.append("## Cost")
+        lines.append(f"- LLM calls: {totals['calls']}")
+        lines.append(
+            f"- Input tokens: {totals['input_tokens']:,} "
+            f"(cache-read {totals['cache_read_tokens']:,}, "
+            f"cache-creation {totals['cache_creation_tokens']:,})"
+        )
+        lines.append(f"- Output tokens: {totals['output_tokens']:,}")
+        lines.append(f"- API time: {totals['api_duration_s']:.2f}s")
+        lines.append("")
+        lines.append("## Per stage")
+        if per_stage:
+            lines.append("| Stage | Calls | Input | Output | API time | Wall |")
+            lines.append("|---|---:|---:|---:|---:|---:|")
+            for stage in stage_order:
+                s = per_stage.get(stage)
+                if not s:
+                    continue
+                lines.append(
+                    f"| {stage} | {s['calls']} | {s['input_tokens']:,} | "
+                    f"{s['output_tokens']:,} | {s['api_duration_s']:.2f}s | "
+                    f"{s['wall_clock_s']:.2f}s |"
+                )
+        else:
+            lines.append("_(no stages recorded)_")
+        lines.append("")
+        lines.append("## Gaps")
+        lines.append(
+            f"- Detected: {gaps['detected_total']} "
+            + (
+                "(" + ", ".join(
+                    f"{n} {k}" for k, n in
+                    sorted(gaps['detected_by_kind'].items())
+                ) + ")"
+                if gaps['detected_by_kind'] else ""
+            )
+        )
+        lines.append(
+            f"- Resolved: {gaps['resolved_total']} "
+            f"({gaps['resolved_auto']} auto, {gaps['resolved_user']} user)"
+        )
+        if gaps['resolved_by_kind']:
+            lines.append(
+                "  - by kind: "
+                + ", ".join(
+                    f"{n} {k}" for k, n in
+                    sorted(gaps['resolved_by_kind'].items())
+                )
+            )
+        lines.append(f"- Labware mappings: {payload['labware_mappings']}")
+        lines.append("")
+        return "\n".join(lines)
+
+
+# ============================================================================
 # HTMLReporter — renders a self-contained report.html at finalize()
 # ============================================================================
 

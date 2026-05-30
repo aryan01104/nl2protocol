@@ -920,8 +920,9 @@ class LiveModeApp:
         POST /start (instruction, config_path, api_key), builds reporters,
         runs the pipeline, finalizes, and cleans up the temp config file."""
         from nl2protocol.confirmation import AutoConfirmCM
+        from nl2protocol.metering import MeteredClient, RunMeter
         from nl2protocol.pipeline import ProtocolAgent
-        from nl2protocol.reporting import HTMLReporter
+        from nl2protocol.reporting import HTMLReporter, MetricsReporter
 
         instruction = self._instruction
         config_path = self._config_path
@@ -931,9 +932,22 @@ class LiveModeApp:
         Path(self._output_dir).mkdir(parents=True, exist_ok=True)
         self._html_report_path = f"{self._output_dir}/report_{ts}.html"
 
+        # Per-run meter: shared between MeteredClient (which records on
+        # every messages.create) and MetricsReporter (which records
+        # per-stage wall-clock + gap counts and writes metrics_{ts}.{json,md}
+        # at finalize()). Constructed here, before the agent, so the meter
+        # can be installed onto agent.config_loader.client below.
+        run_meter = RunMeter()
         ws_reporter = WebSocketReporter(self._event_queue)
         html_reporter = HTMLReporter(self._html_report_path)
-        composite = CompositeReporter(ws_reporter, html_reporter)
+        metrics_reporter = MetricsReporter(
+            meter=run_meter,
+            output_dir=self._output_dir,
+            run_ts=ts,
+        )
+        composite = CompositeReporter(
+            ws_reporter, html_reporter, metrics_reporter,
+        )
 
         # Phase 3c: gap-resolver prompts route through the browser.
         # Phase 3d: labware-assignments confirmation also routes through
@@ -972,6 +986,16 @@ class LiveModeApp:
                 binary_confirm_handler=binary_confirm_handler,
                 initial_contents_handler=initial_contents_handler,
             )
+            # Wrap the agent's Anthropic client with the metering proxy.
+            # Downstream helpers (SemanticExtractor, LabwareMatcher,
+            # gap-resolution suggesters, input validator) take their
+            # client from agent.config_loader.client — by the transitive
+            # property they all see the metered proxy without any
+            # call-site changes.
+            agent.config_loader.client = MeteredClient(
+                agent.config_loader.client, run_meter,
+            )
+            metrics_reporter.model_name = agent.config_loader.model_name
             agent.run_pipeline(instruction)
         except Exception as e:
             # Surface the error to the browser. The status indicator
