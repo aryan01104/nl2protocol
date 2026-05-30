@@ -56,15 +56,6 @@ from nl2protocol.models.spec import (
 )
 
 from nl2protocol.extraction.prompts import REASONING_SYSTEM_PROMPT, REASONING_USER_PROMPT
-from nl2protocol.extraction.resolver import LabwareResolver
-from nl2protocol.extraction.schema_builder import (
-    spec_to_schema as _spec_to_schema,
-    validate_schema_against_spec as _validate_schema_against_spec,
-    _format_step_line,
-)
-
-
-
 
 def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     """Look up the provenance reason string for a given field on a step."""
@@ -194,7 +185,8 @@ class SemanticExtractor:
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
 
-    def _save_debug_output(self, full_response: Optional[str], spec_json: Optional[str], error: Exception):
+    @staticmethod
+    def _save_debug_output(full_response: Optional[str], spec_json: Optional[str], error: Exception):
         """Save failed LLM output for debugging."""
         from datetime import datetime
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -223,7 +215,8 @@ class SemanticExtractor:
                 snippet = full_response[:1000] + "..." if len(full_response) > 1000 else full_response
                 print(f"  Raw response snippet:\n{snippet}")
 
-    def _parse_response(self, response: str) -> tuple[str, str]:
+    @staticmethod
+    def _parse_response(response: str) -> tuple[str, str]:
         """Parse <reasoning> and <spec> blocks from LLM response."""
         reasoning = ""
         spec_json = ""
@@ -252,14 +245,3 @@ class SemanticExtractor:
             raise ValueError("No structured spec found in LLM response")
 
         return reasoning, spec_json
-
-    @staticmethod
-    def validate_schema_against_spec(spec: ProtocolSpec, schema) -> List[str]:
-        """Delegate to extraction.schema_builder."""
-        return _validate_schema_against_spec(spec, schema)
-
-    @staticmethod
-    def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
-        """Delegate to extraction.schema_builder."""
-        return _spec_to_schema(spec, config)
-

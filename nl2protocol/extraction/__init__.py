@@ -3,7 +3,7 @@ extraction — Protocol extraction pipeline.
 
 extractor.py      — SemanticExtractor (LLM extraction, provenance, gap fill, formatting)
 prompts.py        — LLM prompt templates
-resolver.py       — LabwareResolver (labware description → config label)
+resolver.py       — LabwareMatcher (labware description → config label)
 schema_builder.py — spec_to_schema (deterministic spec → hardware commands)
 """
 
@@ -16,7 +16,7 @@ from nl2protocol.extraction.prompts import (
     REASONING_SYSTEM_PROMPT,
     REASONING_USER_PROMPT,
 )
-from nl2protocol.extraction.resolver import LabwareResolver, LabwareSuggestion
+from nl2protocol.extraction.resolver import LabwareMatcher, LabwareMatchSuggestion
 from nl2protocol.extraction.extractor import (
     SemanticExtractor,
     _find_provenance_reason,

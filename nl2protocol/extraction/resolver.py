@@ -2,9 +2,9 @@
 resolver.py — Resolves user-language labware descriptions to config labels.
 
 One LLM call maps every unique description that appears in the spec to a
-config label (or null when no reasonable match exists). The resolver
-returns SUGGESTIONS — it does NOT mutate the spec. The pipeline's
-labware-assignments confirmation flow is the sole writer of
+config label (or null when no reasonable match exists). 
+The resolver returns SUGGESTIONS — it does NOT mutate the spec.
+The pipeline's labware-assignments confirmation flow is the sole writer of
 `resolved_label` and `resolved_label_provenance` on LocationRef objects;
 that lets the provenance honestly reflect whether the user accepted the
 resolver's pick or overrode it (review_status="user_accepted_suggestion"
@@ -26,7 +26,7 @@ from nl2protocol.models.spec import LocationRef, ProtocolSpec
 
 
 @dataclass(frozen=True)
-class LabwareSuggestion:
+class LabwareMatchSuggestion:
     """The resolver's tentative pick for one labware description.
 
     Carries the suggested label + the reasoning the resolver constructed
@@ -49,7 +49,8 @@ class LabwareSuggestion:
     candidates: List[str]
 
 
-class LabwareResolver:
+# public artifact of the file, specifically suggest func.
+class LabwareMatcher:
     """Produces labware suggestions for user-language descriptions.
 
     One LLM call maps every unique description in the spec to a config
@@ -109,7 +110,7 @@ class LabwareResolver:
             entry = resolved.get(desc)
             if entry is not None:
                 label, llm_reasoning = entry
-                suggestions[desc] = LabwareSuggestion(
+                suggestions[desc] = LabwareMatchSuggestion(
                     description=desc,
                     suggested_label=label,
                     positive_reasoning=self._positive_reasoning(desc, label, llm_reasoning),
@@ -118,7 +119,7 @@ class LabwareResolver:
                     candidates=list(self.labware_labels),
                 )
             else:
-                suggestions[desc] = LabwareSuggestion(
+                suggestions[desc] = LabwareMatchSuggestion(
                     description=desc,
                     suggested_label=None,
                     positive_reasoning=None,

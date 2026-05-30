@@ -1048,6 +1048,7 @@ class ProtocolAgent:
         """
         from datetime import datetime
         from .extraction import SemanticExtractor
+        from .extraction.schema_builder import spec_to_schema
         from .reporting import StageEvent
 
         # Emit raw instruction event for downstream reporters (HTMLReporter etc.)
@@ -1220,7 +1221,7 @@ class ProtocolAgent:
             # labware_resolution_done fires AFTER apply so its payload
             # carries the user-confirmed final mappings, not the resolver's
             # tentative picks.
-            from .extraction import LabwareResolver as _EarlyLabwareResolver
+            from .extraction import LabwareMatcher as _EarlyLabwareResolver
             labware_suggestions = _EarlyLabwareResolver(
                 config=self.config_loader.config,
                 client=extractor.client,
@@ -1538,7 +1539,7 @@ class ProtocolAgent:
                     data={"spec": complete_spec},
                     stage_name="stage_5_spec",
                 ))
-                protocol_schema, well_state_warnings, step_summaries = extractor.spec_to_schema(
+                protocol_schema, well_state_warnings, step_summaries = spec_to_schema(
                     complete_spec, self.config_loader.config)
                 _log(f"  {C.dim('Schema generated.')}")
             except Exception as e:
