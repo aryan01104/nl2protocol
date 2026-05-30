@@ -123,6 +123,70 @@ def validate_schema_against_spec(spec: ProtocolSpec, schema) -> List[str]:
     return mismatches
 
 
+def expand_well_range(well_range: str) -> List[str]:
+    """Expand well range descriptions into explicit well lists.
+
+    Handles many formats:
+      'A1-A12'              → A1, A2, ..., A12  (single row)
+      'A1-H1'              → A1, B1, ..., H1   (single column)
+      'A1-H3'              → A1, B1, ..., H1, A2, ..., H3  (block, column-major)
+      'column 1'           → A1, B1, ..., H1
+      'columns 2-8'        → all wells in columns 2-8
+      'columns 2-8, rows A-H' → explicit row/col specification
+      'rows A-D'           → all wells in rows A-D
+      'A1, A2, A3'         → explicit list
+    Returns empty list when nothing parses (caller's responsibility to
+    surface — e.g., the labware capability filter treats this as
+    "no wells referenced", which keeps all candidates).
+    """
+    text = well_range.strip()
+
+    comma_wells = re.findall(r'([A-P]\d{1,2})', text)
+    if ',' in text and comma_wells:
+        return comma_wells
+
+    m = re.match(r'([A-P])(\d+)\s*[-–]\s*([A-P])(\d+)$', text)
+    if m:
+        r1, c1, r2, c2 = m.group(1), int(m.group(2)), m.group(3), int(m.group(4))
+        wells = []
+        for col in range(c1, c2 + 1):
+            for row in range(ord(r1), ord(r2) + 1):
+                wells.append(f"{chr(row)}{col}")
+        return wells
+
+    col_start, col_end = 1, 12
+    col_match = re.search(r'columns?\s+(\d+)\s*[-–]\s*(\d+)', text, re.IGNORECASE)
+    col_single = re.search(r'column\s+(\d+)', text, re.IGNORECASE)
+    if col_match:
+        col_start, col_end = int(col_match.group(1)), int(col_match.group(2))
+    elif col_single:
+        col_start = col_end = int(col_single.group(1))
+
+    row_start, row_end = 'A', 'H'
+    row_match = re.search(r'rows?\s+([A-P])\s*[-–]\s*([A-P])', text, re.IGNORECASE)
+    row_single = re.search(r'row\s+([A-P])', text, re.IGNORECASE)
+    if row_match:
+        row_start, row_end = row_match.group(1).upper(), row_match.group(2).upper()
+    elif row_single:
+        row_start = row_end = row_single.group(1).upper()
+
+    if col_match or col_single or row_match or row_single:
+        wells = []
+        for col in range(col_start, col_end + 1):
+            for row in range(ord(row_start), ord(row_end) + 1):
+                wells.append(f"{chr(row)}{col}")
+        return wells
+
+    if 'all wells' in text.lower():
+        wells = []
+        for col in range(1, 13):
+            for row in range(ord('A'), ord('H') + 1):
+                wells.append(f"{chr(row)}{col}")
+        return wells
+
+    return []
+
+
 def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
     """Deterministically convert a CompleteProtocolSpec + config into a ProtocolSchema.
 

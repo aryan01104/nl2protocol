@@ -95,7 +95,15 @@ def _load_name_category(load_name: str) -> Optional[str]:
 
     Side effects: None. Pure.
     """
-    raise NotImplementedError("Phase 3: implement _load_name_category")
+    if not load_name:
+        return None
+    parts = load_name.split("_")
+    if len(parts) < 3:
+        return None
+    category = parts[2]
+    if category in _KNOWN_LOAD_NAME_CATEGORIES:
+        return category
+    return None
 
 
 def _description_category_filter(description: str) -> Optional[set]:
@@ -123,7 +131,26 @@ def _description_category_filter(description: str) -> Optional[set]:
 
     Side effects: None. Pure.
     """
-    raise NotImplementedError("Phase 3: implement _description_category_filter")
+    if not description:
+        return None
+    d = description.lower()
+    # Tip cues first so "tip rack" doesn't fall into the bare-"rack" branch.
+    if any(k in d for k in ("tipbox", "tiprack", "tip rack")):
+        return {"tiprack"}
+    # "tips" / "tip" — match as whole tokens (or with trailing s) so words
+    # like "stripe" don't trigger.
+    tokens = set(d.replace(",", " ").split())
+    if "tip" in tokens or "tips" in tokens:
+        return {"tiprack"}
+    if any(k in d for k in ("reservoir", "trough", "basin")):
+        return {"reservoir"}
+    if any(k in d for k in ("wellplate", "microplate", "well plate",
+                              "96-well", "384-well", "plate")):
+        return {"wellplate"}
+    if any(k in d for k in ("tube", "tubes", "eppendorf", "falcon",
+                              "1.5ml", "2ml")):
+        return {"tuberack", "aluminumblock"}
+    return None
 
 
 def _capability_filter(wells: set, config: dict) -> List[str]:
@@ -147,7 +174,27 @@ def _capability_filter(wells: set, config: dict) -> List[str]:
 
     Side effects: None. Calls `get_well_info` per candidate.
     """
-    raise NotImplementedError("Phase 3: implement _capability_filter")
+    from nl2protocol.models.labware import get_well_info
+    labware_map = (config or {}).get("labware", {})
+    if not labware_map:
+        return []
+    survivors: List[str] = []
+    for label, lw in labware_map.items():
+        if not wells:
+            survivors.append(label)
+            continue
+        load_name = lw.get("load_name", "")
+        try:
+            info = get_well_info(load_name)
+        except ValueError:
+            # Fail-open: unknown load_name keeps the candidate; constraints
+            # checker re-flags downstream (mirrors constraints.py:553-559).
+            survivors.append(label)
+            continue
+        valid = set(info.get("valid_wells", []))
+        if wells.issubset(valid):
+            survivors.append(label)
+    return survivors
 
 
 def _type_filter(description: str, candidates: List[str],
@@ -174,7 +221,17 @@ def _type_filter(description: str, candidates: List[str],
 
     Side effects: None. Pure.
     """
-    raise NotImplementedError("Phase 3: implement _type_filter")
+    allowed = _description_category_filter(description)
+    if allowed is None:
+        return list(candidates)
+    labware_map = (config or {}).get("labware", {})
+    survivors: List[str] = []
+    for label in candidates:
+        load_name = labware_map.get(label, {}).get("load_name", "")
+        category = _load_name_category(load_name)
+        if category in allowed:
+            survivors.append(label)
+    return survivors
 
 
 def _has_namespace_split(description: str, wells: set,
@@ -346,8 +403,44 @@ class LabwareMatcher:
         Side effects: None. Pure aggregation. Uses `expand_well_range`
                       from `nl2protocol.extraction.schema_builder`.
         """
-        raise NotImplementedError(
-            "Phase 3: implement _collect_descriptions_with_wells")
+        from nl2protocol.extraction.schema_builder import expand_well_range
+        result: dict = {}
+
+        def _ensure(desc):
+            if desc not in result:
+                result[desc] = {"wells": set(), "contexts": []}
+            return result[desc]
+
+        def _wells_of(ref) -> set:
+            ws: set = set()
+            if ref.well:
+                ws.add(ref.well)
+            if ref.wells:
+                ws.update(ref.wells)
+            if ref.well_range:
+                ws.update(expand_well_range(ref.well_range))
+            return ws
+
+        for step in spec.steps:
+            for ref, role in [(step.source, "source"),
+                              (step.destination, "destination")]:
+                if ref is None:
+                    continue
+                entry = _ensure(ref.description)
+                entry["wells"].update(_wells_of(ref))
+                entry["contexts"].append(f"Step {step.order}: {step.action} {role}")
+
+        for wc in spec.initial_contents:
+            entry = _ensure(wc.labware)
+            if wc.well:
+                entry["wells"].add(wc.well)
+            entry["contexts"].append("initial contents")
+
+        for pf in spec.prefilled_labware:
+            entry = _ensure(pf.labware)
+            entry["contexts"].append("prefilled labware")
+
+        return result
 
     def _resolve_one(self, description: str, wells: set) -> tuple:
         """Decide the resolution branch for ONE description.
