@@ -757,20 +757,41 @@ class TestResolveOne:
         assert branch == "llm"
         assert len(survivors) >= 2
 
-    def test_zero_survivors_with_namespace_pattern_returns_namespace_split(self):
-        # 3-rack config + A/B/C wells (each fits a 24-rack but the union
-        # exceeds any single rack's row count → 0 capability survivors).
+    def test_zero_survivors_with_namespace_pattern_returns_namespace_split(
+        self, monkeypatch,
+    ):
+        # Real Opentrons labware is always-A-rooted rectangles, which
+        # makes "aggregate fits nothing + each subgroup fits something"
+        # impossible to construct (a labware big enough to host one
+        # subgroup hosts every smaller one too). Monkey-patch
+        # get_well_info to return row-disjoint shapes so the strict
+        # algorithm's positive path can be exercised.
+        shapes = {
+            "opentrons_8_tuberack_top_thing":
+                ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"],
+            "opentrons_8_tuberack_bot_thing":
+                ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "D4"],
+        }
+
+        def fake_well_info(load_name):
+            if load_name not in shapes:
+                raise ValueError(f"unknown {load_name}")
+            return {"valid_wells": shapes[load_name]}
+
+        monkeypatch.setattr(
+            "nl2protocol.models.labware.get_well_info", fake_well_info,
+        )
         cfg = {
             "labware": {
-                "rack_a": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "1"},
-                "rack_b": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "2"},
-                "rack_c": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "3"},
+                "top": {"load_name": "opentrons_8_tuberack_top_thing", "slot": "1"},
+                "bot": {"load_name": "opentrons_8_tuberack_bot_thing", "slot": "2"},
             }
         }
         matcher = LabwareMatcher(config=cfg, client=None)
-        # Use wells that span 5 row-prefixes (A,B,C,D,E) — 24-rack only
-        # has rows A-D, so the merged set exceeds any single rack.
-        wells = {"A1", "B1", "C1", "D1", "E1"}
+        # Aggregate {A1, B1, C1, D1}: top has A/B but not C/D; bot has
+        # C/D but not A/B. Neither single labware fits all four.
+        # Subgroups: A→top, B→top, C→bot, D→bot. All fit something.
+        wells = {"A1", "B1", "C1", "D1"}
         branch, survivors = matcher._resolve_one("tube rack", wells)
         assert branch == "namespace_split"
         assert survivors == []
@@ -789,21 +810,41 @@ class TestHasNamespaceSplit:
     `NamespaceSplitDetector`. Returns dict on clean partition, None
     otherwise."""
 
-    def test_clean_three_way_partition_detected(self):
-        # 3 tuberack labels in config, wells span A/B/C — each subgroup
-        # fits its own 24-rack.
+    def test_clean_partition_detected_with_row_disjoint_shapes(
+        self, monkeypatch,
+    ):
+        # See TestResolveOne::namespace_split for why monkey-patching
+        # is needed (real Opentrons labware can't be row-disjoint).
+        shapes = {
+            "opentrons_8_tuberack_top_thing":
+                ["A1", "A2", "B1", "B2"],
+            "opentrons_8_tuberack_bot_thing":
+                ["C1", "C2", "D1", "D2"],
+        }
+
+        def fake_well_info(load_name):
+            if load_name not in shapes:
+                raise ValueError(f"unknown {load_name}")
+            return {"valid_wells": shapes[load_name]}
+
+        monkeypatch.setattr(
+            "nl2protocol.models.labware.get_well_info", fake_well_info,
+        )
         cfg = {
             "labware": {
-                "rack_a": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "1"},
-                "rack_b": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "2"},
-                "rack_c": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "3"},
+                "top": {"load_name": "opentrons_8_tuberack_top_thing", "slot": "1"},
+                "bot": {"load_name": "opentrons_8_tuberack_bot_thing", "slot": "2"},
             }
         }
-        wells = {"A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4"}
+        wells = {"A1", "B1", "C1", "D1"}
         result = _has_namespace_split("tube rack", wells, cfg)
         assert result is not None
-        assert set(result["partition"].keys()) == {"A", "B", "C"}
-        assert len(result["candidate_pairs"]) == 3
+        assert set(result["partition"].keys()) == {"A", "B", "C", "D"}
+        pair_dict = dict(result["candidate_pairs"])
+        assert pair_dict["A"] == "top"
+        assert pair_dict["B"] == "top"
+        assert pair_dict["C"] == "bot"
+        assert pair_dict["D"] == "bot"
 
     def test_single_prefix_returns_none(self):
         # Only A-prefixes — not a multi-rack pattern.

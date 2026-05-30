@@ -844,13 +844,44 @@ _THREE_RACK_CONFIG = {
 }
 
 
+# Row-disjoint synthetic shapes for the positive split case. Real
+# Opentrons labware is always-A-rooted rectangles which can't trigger
+# the strict algorithm — see the resolver tests for the same monkey-
+# patch pattern. The load_names match the Opentrons category convention
+# (`opentrons_<count>_tuberack_*`) so the type filter for "tube rack"
+# keeps both.
+_DISJOINT_SHAPES = {
+    "opentrons_8_tuberack_top_thing":
+        ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"],
+    "opentrons_8_tuberack_bot_thing":
+        ["C1", "C2", "C3", "C4", "D1", "D2", "D3", "D4"],
+}
+_DISJOINT_CONFIG = {
+    "labware": {
+        "top": {"load_name": "opentrons_8_tuberack_top_thing", "slot": "1"},
+        "bot": {"load_name": "opentrons_8_tuberack_bot_thing", "slot": "2"},
+    }
+}
+
+
+def _patch_disjoint_shapes(monkeypatch):
+    def fake_well_info(load_name):
+        if load_name not in _DISJOINT_SHAPES:
+            raise ValueError(f"unknown {load_name}")
+        return {"valid_wells": _DISJOINT_SHAPES[load_name]}
+    monkeypatch.setattr(
+        "nl2protocol.models.labware.get_well_info", fake_well_info,
+    )
+
+
 class TestNamespaceSplitDetector:
     """Detects A/B/C-prefix partitions on a single description's well
     set when no single labware fits but each subgroup fits some labware."""
 
-    def _western_blot_step(self, well_range, description="tube rack"):
+    def _western_blot_step(self, well_range, description="tube rack",
+                            order=1):
         return ExtractedStep(
-            order=1, action="transfer", composition_provenance=_comp(),
+            order=order, action="transfer", composition_provenance=_comp(),
             source=LocationRef(
                 description=description, well_range=well_range,
                 description_provenance=_instr_prov("rack"),
@@ -858,33 +889,31 @@ class TestNamespaceSplitDetector:
             ),
         )
 
-    def test_partition_across_five_rows_emits_one_gap(self):
-        # 24-rack has rows A-D only; using rows A,B,C,D,E forces the
-        # merged set to fit NO single rack while each row-subgroup fits.
+    def test_partition_across_row_disjoint_shapes_emits_one_gap(
+        self, monkeypatch,
+    ):
+        _patch_disjoint_shapes(monkeypatch)
+        # Wells {A1, B1, C1, D1} on row-disjoint shapes: top has A/B,
+        # bot has C/D. Aggregate fits neither; each subgroup fits one.
         steps = [
-            self._western_blot_step("A1-A4"),
-            ExtractedStep(order=2, action="transfer",
+            ExtractedStep(order=1, action="transfer",
                           composition_provenance=_comp(),
                           source=LocationRef(
-                              description="tube rack", wells=["B1", "B2"],
-                              description_provenance=_instr_prov("B"),
-                              wells_provenance=_instr_prov("B1 B2"))),
-            ExtractedStep(order=3, action="transfer",
-                          composition_provenance=_comp(),
-                          source=LocationRef(
-                              description="tube rack", wells=["C1", "D1", "E1"],
-                              description_provenance=_instr_prov("CDE"),
-                              wells_provenance=_instr_prov("C1 D1 E1"))),
+                              description="tube rack",
+                              wells=["A1", "B1", "C1", "D1"],
+                              description_provenance=_instr_prov("ABCD"),
+                              wells_provenance=_instr_prov("A1 B1 C1 D1"))),
         ]
         spec = _spec(steps)
-        gaps = NamespaceSplitDetector().detect(spec, {"config": _THREE_RACK_CONFIG})
+        gaps = NamespaceSplitDetector().detect(
+            spec, {"config": _DISJOINT_CONFIG})
         assert len(gaps) == 1
         g = gaps[0]
         assert g.kind == "ambiguous"
         assert g.severity == "blocker"
         assert g.metadata["subkind"] == "namespace_split"
         assert g.metadata["description"] == "tube rack"
-        assert set(g.metadata["partition"].keys()) >= {"A", "B", "C", "D", "E"}
+        assert set(g.metadata["partition"].keys()) == {"A", "B", "C", "D"}
 
     def test_single_prefix_no_gap(self):
         spec = _spec([self._western_blot_step("A1-A4")])
@@ -917,8 +946,8 @@ class TestNamespaceSplitDetector:
         # {A1-A4, B1, B2} all fits a single 24-rack — capability filter
         # leaves a survivor → no namespace-split gap fires.
         steps = [
-            self._western_blot_step("A1-A4"),
-            self._western_blot_step("B1-B2"),
+            self._western_blot_step("A1-A4", order=1),
+            self._western_blot_step("B1-B2", order=2),
         ]
         spec = _spec(steps)
         assert NamespaceSplitDetector().detect(

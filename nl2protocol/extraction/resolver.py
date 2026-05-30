@@ -253,16 +253,39 @@ def _has_namespace_split(description: str, wells: set,
               - every well in `wells` matches the regex `^([A-Z])(\\d+)$`,
               - grouping by the leading letter yields ≥2 groups,
               - EVERY group's well subset fits at least one config
-                labware passing both capability AND type filter,
-              - the chosen fitting labware can DIFFER across groups
-                (so the partition implies multiple distinct racks).
-            Returns `None` otherwise. The `candidate_pairs` list picks
-            the FIRST fitting labware per group (config insertion order).
+                labware passing both capability AND type filter.
+            Returns `None` otherwise. Strict by design: if some
+            subgroup can't be hosted (e.g., C7 fits nothing in
+            config), the detector stays silent and downstream constraint
+            checking surfaces the real issue ("no labware fits C7")
+            rather than proposing a mapping the user will then have
+            to fight.
 
     Side effects: None. Calls `_capability_filter` + `_type_filter` per
                   subgroup.
     """
-    raise NotImplementedError("Phase 4: implement _has_namespace_split")
+    import re as _re
+    grouped: dict = {}
+    for w in wells:
+        m = _re.match(r"^([A-Z])(\d+)$", w)
+        if not m:
+            return None
+        grouped.setdefault(m.group(1), []).append(w)
+    if len(grouped) < 2:
+        return None
+    candidate_pairs: list = []
+    for prefix in sorted(grouped.keys()):
+        sub_wells = set(grouped[prefix])
+        survivors = _type_filter(description,
+                                  _capability_filter(sub_wells, config),
+                                  config)
+        if not survivors:
+            return None
+        candidate_pairs.append((prefix, survivors[0]))
+    return {
+        "partition": {p: sorted(grouped[p]) for p in sorted(grouped.keys())},
+        "candidate_pairs": candidate_pairs,
+    }
 
 
 # public artifact of the file, specifically suggest func.
@@ -468,7 +491,17 @@ class LabwareMatcher:
         Side effects: None. Calls `_capability_filter`, `_type_filter`,
                       `_has_namespace_split`. No LLM call.
         """
-        raise NotImplementedError("Phase 4: implement _resolve_one")
+        survivors = _type_filter(description,
+                                  _capability_filter(wells, self.config),
+                                  self.config)
+        if len(survivors) == 1:
+            return ("deterministic", survivors)
+        if len(survivors) >= 2:
+            return ("llm", survivors)
+        # 0 survivors
+        if _has_namespace_split(description, wells, self.config) is not None:
+            return ("namespace_split", [])
+        return ("unresolvable", [])
 
     def _positive_reasoning(self, description: str, label: str,
                             reasoning: Optional[str] = None) -> str:

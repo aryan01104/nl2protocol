@@ -595,7 +595,61 @@ class NamespaceSplitDetector:
 
         Reads `context["config"]`. Returns `[]` if config missing.
         """
-        raise NotImplementedError("Phase 4: implement NamespaceSplitDetector.detect")
+        from nl2protocol.extraction.resolver import (
+            LabwareMatcher, _capability_filter, _type_filter,
+            _has_namespace_split,
+        )
+        config = (context or {}).get("config", {})
+        if not config or not config.get("labware"):
+            return []
+        # Use the matcher's aggregator so the same well-collection logic
+        # the resolver uses drives this detector — keeps them in sync.
+        per_desc = LabwareMatcher(
+            config=config, client=None,
+        )._collect_descriptions_with_wells(spec)
+        gaps: List[Gap] = []
+        for desc, payload in per_desc.items():
+            wells = payload["wells"]
+            if not wells:
+                continue
+            # Only fire when NO single labware fits the aggregate (else
+            # normal resolution handles it; double-emitting would also
+            # noise the gap list).
+            survivors_after_filter = _type_filter(
+                desc, _capability_filter(wells, config), config,
+            )
+            if survivors_after_filter:
+                continue
+            split = _has_namespace_split(desc, wells, config)
+            if split is None:
+                continue
+            partition = split["partition"]
+            candidate_pairs = split["candidate_pairs"]
+            human = ", ".join(
+                f"{p} → {lbl}" for p, lbl in candidate_pairs
+            )
+            slug = "".join(c if c.isalnum() else "_" for c in desc)
+            gaps.append(Gap(
+                id=f"labware.namespace_split.{slug}",
+                step_order=None,
+                field_path=f"labware.namespace_split:{desc}",
+                kind="ambiguous",
+                current_value=None,
+                description=(
+                    f"'{desc}' references wells across multiple letter "
+                    f"prefixes that no single config labware can hold. "
+                    f"Inferred prefix groups: {human}. Confirm each group's "
+                    f"labware in the modal."
+                ),
+                severity="blocker",
+                metadata={
+                    "subkind": "namespace_split",
+                    "description": desc,
+                    "partition": partition,
+                    "candidate_pairs": candidate_pairs,
+                },
+            ))
+        return gaps
 
 
 # ============================================================================
@@ -626,4 +680,5 @@ def default_spec_detectors() -> List:
         InitialContentsVolumeDetector(),
         ConstraintViolationDetector(),
         LabwareAmbiguityDetector(),
+        NamespaceSplitDetector(),
     ]
