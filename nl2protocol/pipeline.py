@@ -1197,19 +1197,21 @@ class ProtocolAgent:
                 LabwareAmbiguityDetector,
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
-                WellRangeClipSuggester, LabwareSuggester, LLMSpotSuggester,
+                WellRangeClipSuggester, LLMSpotSuggester,
                 IndependentReviewSuggester,
             )
 
             # Build the suggester registry once — used by both the
             # pre-orchestrator IC batch confirmation AND the orchestrator.
+            # LabwareSuggester was removed in the Phase 5 capability-
+            # matcher refactor: token-overlap is obsolete now that
+            # LabwareMatcher pre-filters candidates physically upstream.
             ic_suggesters = [
                 ConfigLookupSuggester(),
                 CarryoverSuggester(),
                 WellCapacitySuggester(),
                 RegexFromNoteSuggester(),
                 WellRangeClipSuggester(),
-                LabwareSuggester(),
                 LLMSpotSuggester(client=extractor.client,
                                   model_name=extractor.model_name),
             ]

@@ -515,103 +515,13 @@ class WellRangeClipSuggester:
 
 
 # ============================================================================
-# 6. LabwareSuggester — propose a config label for an ambiguous LocationRef
+# 6. LLMSpotSuggester — focused per-Gap LLM call
 # ============================================================================
-
-class LabwareSuggester:
-    """For an ambiguous LocationRef Gap (resolver couldn't pick a config
-    label), propose the config label whose name or load_name best
-    matches the user's description by token-overlap heuristic.
-
-    Per ADR-0008 PR3a step 3 + the user-validated design: this suggester
-    ALWAYS surfaces to the user (confidence 0.5, below the auto-accept
-    threshold) — a wrong labware mapping has physical consequences (the
-    protocol runs against the wrong container), so we never auto-accept
-    even confident heuristic matches. The user picks; the orchestrator
-    stamps user_accepted_suggestion / user_edited / user_skipped on
-    the LocationRef's resolved_label_provenance via
-    default_apply_resolution's resolved-label-aware branch.
-
-    Pre:    `gap.kind == "ambiguous"` AND `gap.metadata` carries
-            `"description"` (the user's wording for this LocationRef).
-            `context["config"]` has the lab config under "labware";
-            if absent or empty, returns None (no candidate space).
-
-    Post:   Returns a `Suggestion` whose:
-              * `value` is the top-scoring config label (a string —
-                the apply path setattr's it onto LocationRef.resolved_label).
-              * `provenance_source = "deterministic"` (token match,
-                no LLM call here).
-              * `positive_reasoning` names the picked label + load_name.
-              * `why_not_in_instruction` notes the natural-language vs
-                config-key naming gap.
-              * `confidence = 0.5` — surfaces to user, never auto-accept.
-            Returns None when:
-              * gap.kind isn't "ambiguous";
-              * config has no labware entries;
-              * no description token (≥3 chars) appears in any label name
-                or load_name (no plausible match → don't suggest noise).
-
-    Side effects: None.
-    """
-
-    def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
-        if gap.kind != "ambiguous":
-            return None
-        config = context.get("config", {})
-        labware_map = config.get("labware", {})
-        if not labware_map:
-            return None
-        description = (gap.metadata or {}).get("description", "")
-        if not description:
-            return None
-        scored = self._score_labels(description, labware_map)
-        if not scored or scored[0][1] == 0:
-            return None
-        best_label, best_score = scored[0]
-        load_name = labware_map[best_label].get("load_name", "")
-        load_hint = f" (load_name '{load_name}')" if load_name else ""
-        return Suggestion(
-            value=best_label,
-            provenance_source="deterministic",
-            positive_reasoning=(
-                f"Config label '{best_label}'{load_hint} best matches "
-                f"description '{description}' by token overlap (score {best_score})."
-            ),
-            why_not_in_instruction=(
-                f"User wrote '{description}' rather than the config key "
-                f"'{best_label}' — natural-language vs config-key gap. "
-                f"Heuristic match; please confirm."
-            ),
-            confidence=0.5,
-        )
-
-    @staticmethod
-    def _score_labels(description: str, labware_map: dict):
-        """Score each config label by token overlap with description.
-
-        Tokens: lowercased substrings of length ≥3 split on non-word chars
-        ("the tube rack" → ["the", "tube", "rack"] → ["tube", "rack"] after
-        the length filter; "the" is dropped). Each label's score is the
-        count of distinct tokens that appear as substrings in either the
-        label name or the labware entry's load_name (both lowercased).
-
-        Returns sorted [(label, score), ...] descending by score; ties
-        broken by config-dict insertion order (Python dict iteration).
-        """
-        tokens = {t for t in re.split(r"\W+", description.lower()) if len(t) >= 3}
-        scored = []
-        for label, lw in labware_map.items():
-            haystack = (label + " " + lw.get("load_name", "")).lower()
-            score = sum(1 for t in tokens if t in haystack)
-            scored.append((label, score))
-        scored.sort(key=lambda x: -x[1])
-        return scored
-
-
-# ============================================================================
-# 7. LLMSpotSuggester — focused per-Gap LLM call
-# ============================================================================
+#
+# Note: the former `LabwareSuggester` (token-overlap heuristic for ambiguous
+# LocationRef Gaps) was deleted in the Phase 5 capability-matcher refactor.
+# `LabwareMatcher` (extraction/resolver.py) now produces physically-pre-
+# filtered candidates upstream, making the token-overlap fallback obsolete.
 
 class LLMSpotSuggester:
     """For Gaps no deterministic suggester resolved, ask the LLM with

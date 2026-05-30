@@ -663,13 +663,19 @@ class TestConstraintViolationDetector:
 
     def test_dedupes_labware_not_found_by_description(self):
         # Two steps both reference a labware whose description isn't in
-        # config → one Gap covering both steps.
+        # config → one Gap covering both steps. Config has TWO labware
+        # so the Phase 5 capability fallback can't rescue uniquely
+        # (A1 fits both → ambiguous → original LABWARE_NOT_FOUND path).
         bad_config = {
             "pipettes": {"left": {"model": "p300_single_gen2"}},
             "labware": {
                 "real_rack": {
                     "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
                     "deck_slot": "1",
+                },
+                "spare_rack": {
+                    "load_name": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+                    "deck_slot": "2",
                 },
             },
         }

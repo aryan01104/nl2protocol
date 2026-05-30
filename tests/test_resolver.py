@@ -412,96 +412,111 @@ class TestLLMResolve:
 
 
 class TestSuggestIntegration:
-    """`suggest()` builds a LabwareSuggestion per unique description,
-    threading the LLM's reasoning into `positive_reasoning`."""
+    """`suggest()` builds a LabwareMatchSuggestion per unique description.
+
+    These exercise the LLM branch (≥2 candidates after capability + type
+    filters). The deterministic branch is exercised by
+    `TestSuggestCapabilityBranching` below. Specs use the bare
+    description "rack" so the type filter is None (no cue) and every
+    config tuberack survives — forcing the LLM-disambiguation path.
+    """
+
+    # Two-tuberack config: bare "rack" description leaves both as
+    # survivors after capability + type filters, triggering the llm branch.
+    _TWO_TUBERACK_CONFIG = {
+        "labware": {
+            "reagent_rack": {
+                "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+                "slot": "2",
+            },
+            "spare_rack": {
+                "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+                "slot": "3",
+            },
+        }
+    }
+
+    def _ambiguous_spec(self) -> ProtocolSpec:
+        comp = CompositionProvenance(
+            step_cited_text="Add 2uL sample to A1",
+            parameters_cited_texts=["Add 2uL sample to A1"],
+            parameters_reasoning="t",
+            grounding=["instruction"],
+            confidence=1.0,
+        )
+        step = ExtractedStep(
+            order=1, action="transfer", composition_provenance=comp,
+            source=LocationRef(
+                description="rack", well="A1",
+                description_provenance=_inst_prov("A1"),
+                wells_provenance=_inst_prov("A1"),
+            ),
+        )
+        return ProtocolSpec(summary="t", steps=[step])
 
     def test_llm_reasoning_threaded_into_suggestion(self):
         response = json.dumps({
             "assignments": {
-                "tube rack": {
+                "rack": {
                     "label": "reagent_rack",
-                    "reasoning": "Only tuberack-typed labware in config.",
-                },
-                "plate": {
-                    "label": "wellplate_96",
-                    "reasoning": "Only 96-well container in config.",
+                    "reasoning": "Step 1 source role matches reagent rack convention.",
                 },
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
-        spec = _make_min_spec("tube rack")
-
-        suggestions = resolver.suggest(spec)
-        sug = suggestions["tube rack"]
+        resolver = LabwareMatcher(config=self._TWO_TUBERACK_CONFIG, client=client)
+        sug = resolver.suggest(self._ambiguous_spec())["rack"]
         assert sug.suggested_label == "reagent_rack"
-        assert "Only tuberack-typed labware in config." in sug.positive_reasoning
-        # Mapping prefix retained.
-        assert "'tube rack'" in sug.positive_reasoning
-        # CARRY-C1: load_name no longer surfaced in modal text.
+        assert "Step 1 source role matches reagent rack convention." in sug.positive_reasoning
+        assert "'rack'" in sug.positive_reasoning
         assert "opentrons_24_tuberack" not in sug.positive_reasoning
         assert "load_name" not in sug.positive_reasoning
 
     def test_legacy_shape_yields_fallback_reasoning(self):
         response = json.dumps({
-            "assignments": {
-                "tube rack": "reagent_rack",
-                "plate": "wellplate_96",
-            }
+            "assignments": {"rack": "reagent_rack"},
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
-        spec = _make_min_spec("tube rack")
-
-        suggestions = resolver.suggest(spec)
-        sug = suggestions["tube rack"]
-        # Label still resolved.
+        resolver = LabwareMatcher(config=self._TWO_TUBERACK_CONFIG, client=client)
+        sug = resolver.suggest(self._ambiguous_spec())["rack"]
         assert sug.suggested_label == "reagent_rack"
-        # Reasoning is the honest fallback, not the old template.
         assert "Reasoning was not surfaced" in sug.positive_reasoning
         assert "based on description text" not in sug.positive_reasoning
 
     def test_null_label_yields_unresolvable_suggestion(self):
         response = json.dumps({
             "assignments": {
-                "tube rack": {"label": None,
-                                "reasoning": "No tuberack-like labware in config."},
-                "plate": {"label": "wellplate_96",
-                            "reasoning": "Only 96-well container in config."},
+                "rack": {"label": None,
+                          "reasoning": "Insufficient signal to disambiguate."},
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
-        spec = _make_min_spec("tube rack")
-
-        suggestions = resolver.suggest(spec)
-        sug = suggestions["tube rack"]
+        resolver = LabwareMatcher(config=self._TWO_TUBERACK_CONFIG, client=client)
+        sug = resolver.suggest(self._ambiguous_spec())["rack"]
         assert sug.suggested_label is None
         assert sug.positive_reasoning is None
         assert sug.confidence == 0.0
-        # Candidates still surfaced for the dropdown.
+        # Candidates are now narrowed survivors (not the full config),
+        # so the dropdown shows only physically valid choices.
         assert "reagent_rack" in sug.candidates
-        assert "wellplate_96" in sug.candidates
+        assert "spare_rack" in sug.candidates
 
-    def test_prompt_includes_new_shape_instructions(self):
-        # Sanity: the prompt actually asks for {label, reasoning}.
-        # If someone reverts the prompt to legacy shape without updating
-        # the parser, this test catches it.
+    def test_prompt_includes_narrowed_candidates(self):
+        # Verifies the new narrowed-candidate prompt shape: each
+        # description gets a pre-filtered candidate list rather than
+        # the full config.
         response = json.dumps({"assignments": {}})
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
-        spec = _make_min_spec("tube rack")
-
-        resolver.suggest(spec)
+        resolver = LabwareMatcher(config=self._TWO_TUBERACK_CONFIG, client=client)
+        resolver.suggest(self._ambiguous_spec())
         assert len(client.create_calls) == 1
         prompt = client.create_calls[0]["messages"][0]["content"]
-        # The new prompt names both fields and warns against the
-        # specific bad phrasings.
         assert '"label"' in prompt
         assert '"reasoning"' in prompt
-        assert "Based on description text and step context" in prompt
-        # The user's flagged anti-pattern phrase appears in the
-        # "do NOT write these" section.
+        assert "candidates" in prompt
+        # The new prompt requires the LLM to pick FROM the listed
+        # candidates — that constraint must be spelled out.
+        assert "MUST be one of the listed candidates" in prompt
 
 
 # ============================================================================

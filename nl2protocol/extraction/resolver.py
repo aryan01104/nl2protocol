@@ -311,53 +311,69 @@ class LabwareMatcher:
         self.model_name = model_name
 
     def suggest(self, spec: ProtocolSpec) -> dict:
-        """Build a `{description: LabwareSuggestion}` dict for every
+        """Build a `{description: LabwareMatchSuggestion}` dict for every
         unique labware description that appears in the spec.
 
-        Pre:    `spec` is a ProtocolSpec post-extraction. The spec is
-                NOT mutated by this call. `self.client` may be None for
-                test fakes; in that case the LLM resolution short-circuits
-                to an empty `{}` and every description's
-                `LabwareSuggestion.suggested_label` is None.
+        Three-branch dispatch per description:
+          - deterministic (capability + type filters leave exactly one
+            survivor): no LLM call, suggested_label set with
+            confidence 0.95.
+          - llm (≥2 survivors): one batched LLM call resolves the
+            ambiguity, choosing among the narrowed survivors. The LLM
+            cannot pick outside the survivor list (its return is
+            re-validated against it).
+          - namespace_split / unresolvable (0 survivors): no LLM call;
+            suggested_label is None, branch tag distinguishes the
+            two cases so the UI / detector can decide.
 
-        Post:   Returns a dict keyed on each unique name (from
+        Pre:    `spec` is a ProtocolSpec post-extraction. Not mutated.
+                `self.client` may be None for test fakes; in that case
+                the llm-branch falls back to "no suggestion" but the
+                deterministic / namespace_split / unresolvable
+                branches still work (they never touch the LLM).
+
+        Post:   Returns a dict keyed on each unique description (from
                 step source/destination refs, initial_contents, and
-                prefilled_labware). Each value is a `LabwareSuggestion`:
-                  * `suggested_label`: the LLM's pick, OR None when
-                    unresolvable.
-                  * `positive_reasoning` / `why_not_in_instruction`:
-                    populated iff `suggested_label is not None`. Both
-                    are None for unresolvable descriptions (the user's
-                    pick in the confirm step will generate fresh
-                    reasoning).
-                  * `confidence`: 0.85 for successful picks (matches the
-                    legacy hardcoded value), 0.0 for unresolvable.
-                  * `candidates`: the full list of valid config labels,
-                    so the confirmation UI can populate dropdowns.
+                prefilled_labware) — same key set as
+                `_collect_descriptions_with_wells(spec)`. Each value
+                carries the resolver's pick + provenance + branch tag.
 
-        Side effects: One Sonnet call when `self.client` is set and the
-                spec carries at least one description. Otherwise no I/O.
+        Side effects: At most one Sonnet call (for the llm-branch
+                descriptions), batched. Otherwise no I/O.
         """
-        unique_descs = self._collect_unique_descriptions(spec)
-        if not unique_descs:
+        per_desc = self._collect_descriptions_with_wells(spec)
+        if not per_desc:
             return {}
 
-        resolved = self._llm_resolve(unique_descs, spec)
+        suggestions: dict = {}
+        # Collect llm-branch survivors so we can issue a single batched
+        # LLM call after all deterministic / namespace / unresolvable
+        # branches are recorded.
+        llm_branch: dict = {}  # description -> survivors
 
-        suggestions = {}
-        for desc in unique_descs:
-            entry = resolved.get(desc)
-            if entry is not None:
-                label, llm_reasoning = entry
+        for desc, payload in per_desc.items():
+            wells = payload["wells"]
+            branch, survivors = self._resolve_one(desc, wells)
+            if branch == "deterministic":
+                label = survivors[0]
                 suggestions[desc] = LabwareMatchSuggestion(
                     description=desc,
                     suggested_label=label,
-                    positive_reasoning=self._positive_reasoning(desc, label, llm_reasoning),
-                    why_not_in_instruction=self._why_not_in_instruction(desc, label),
-                    confidence=0.85,
-                    candidates=list(self.labware_labels),
+                    positive_reasoning=self._positive_reasoning(
+                        desc, label,
+                        f"Single capability + type filter survivor for "
+                        f"'{desc}' across the wells the spec references.",
+                    ),
+                    why_not_in_instruction=self._why_not_in_instruction(
+                        desc, label),
+                    confidence=0.95,
+                    candidates=survivors,
+                    branch="deterministic",
                 )
+            elif branch == "llm":
+                llm_branch[desc] = survivors
             else:
+                # namespace_split / unresolvable — modal / detector decides.
                 suggestions[desc] = LabwareMatchSuggestion(
                     description=desc,
                     suggested_label=None,
@@ -365,6 +381,39 @@ class LabwareMatcher:
                     why_not_in_instruction=None,
                     confidence=0.0,
                     candidates=list(self.labware_labels),
+                    branch=branch,
+                )
+
+        if llm_branch:
+            resolved = self._llm_resolve_narrowed(llm_branch, per_desc)
+            for desc, survivors in llm_branch.items():
+                entry = resolved.get(desc)
+                if entry is not None:
+                    label, llm_reasoning = entry
+                    if label in survivors:
+                        suggestions[desc] = LabwareMatchSuggestion(
+                            description=desc,
+                            suggested_label=label,
+                            positive_reasoning=self._positive_reasoning(
+                                desc, label, llm_reasoning),
+                            why_not_in_instruction=self._why_not_in_instruction(
+                                desc, label),
+                            confidence=0.85,
+                            candidates=survivors,
+                            branch="llm",
+                        )
+                        continue
+                # LLM returned nothing valid → leave as unresolved with the
+                # narrowed survivor list so the user picks from physically
+                # valid candidates.
+                suggestions[desc] = LabwareMatchSuggestion(
+                    description=desc,
+                    suggested_label=None,
+                    positive_reasoning=None,
+                    why_not_in_instruction=None,
+                    confidence=0.0,
+                    candidates=survivors,
+                    branch="llm",
                 )
         return suggestions
 
@@ -675,35 +724,113 @@ class LabwareMatcher:
             "'trough' = reservoir, 'microplate' = wellplate, etc.\n"
             "- Use the step context to disambiguate: sources are typically racks/reservoirs, "
             "destinations are typically plates.\n"
-            "- Use null label if NO config label is a reasonable match — do not force a match.\n"
             "- Each config label can be assigned to multiple descriptions if appropriate "
             "(e.g., source and destination on the same plate).\n"
         )
 
+        return self._call_llm_and_parse(prompt, self.config.get("labware", {}))
+
+    def _llm_resolve_narrowed(self, narrowed: dict, per_desc: dict) -> dict:
+        """Variant of `_llm_resolve` that asks the LLM to pick AMONG a
+        pre-filtered candidate list per description rather than from the
+        full config.
+
+        Pre:    `narrowed` is `{description: list[candidate_label]}` —
+                each candidate has already passed capability + type
+                filters, so they're all physically valid. List has ≥2
+                entries (single-candidate cases bypass the LLM).
+                `per_desc` is `{description: {wells, contexts}}` from
+                `_collect_descriptions_with_wells` so the prompt can
+                carry the same per-step context.
+
+        Post:   Returns `{description: (label, reasoning)}` only for
+                descriptions whose LLM pick is one of that description's
+                narrowed candidates. Validation is strict: a label
+                outside the narrowed list is dropped from the result —
+                the caller falls back to "no suggestion, pick from
+                survivors" for those descriptions.
+
+        Side effects: One Sonnet call.
+        """
+        if not self.client or not narrowed:
+            return {}
+        prompt = (
+            "You are picking ONE labware label per description from a "
+            "pre-filtered list of candidates that already match the wells "
+            "the user referenced AND the semantic labware category implied "
+            "by their wording. Your job is to disambiguate among these "
+            "physically valid candidates using the step context.\n\n"
+            "LABWARE REFERENCES TO RESOLVE:\n"
+        )
+        for desc, candidates in narrowed.items():
+            payload = per_desc.get(desc, {})
+            contexts = payload.get("contexts", [])
+            wells = sorted(payload.get("wells", set()))
+            prompt += f'\n  "{desc}":\n'
+            prompt += f"    candidates: {candidates}\n"
+            if wells:
+                prompt += f"    wells referenced: {wells}\n"
+            for ctx in contexts:
+                prompt += f"    - {ctx}\n"
+        prompt += (
+            "\nFor each description, respond with JSON only:\n"
+            '{\n'
+            '  "assignments": {\n'
+            '    "<description>": {\n'
+            '      "label": "<one of the listed candidates>",\n'
+            '      "reasoning": "<one or two short sentences naming the SPECIFIC signal that drove the pick>"\n'
+            '    }\n'
+            '  }\n'
+            '}\n\n'
+            "Rules:\n"
+            "- The label MUST be one of the listed candidates for that "
+            "description. Any other string will be rejected.\n"
+            "- Reasoning must name the specific signal (load_name match, "
+            "well capacity, substance, step role) that picked this "
+            "candidate over the others.\n"
+        )
+        return self._call_llm_and_parse(
+            prompt, self.config.get("labware", {}),
+        )
+
+    def _call_llm_and_parse(self, prompt: str, valid_labels: dict) -> dict:
+        """Shared LLM-call + JSON-parse + label-validate plumbing for
+        both `_llm_resolve` and `_llm_resolve_narrowed`.
+
+        Replaces the previous bare `except: return {}` with typed
+        handling so we can distinguish API errors, JSON parse failures,
+        and schema mismatches in logs (silent drops were the root cause
+        of "modal shows no suggestions for everything" diagnosis pain).
+        """
+        from nl2protocol.spinner import Spinner
         try:
-            from nl2protocol.spinner import Spinner
             with Spinner("Resolving labware references..."):
                 response = self.client.messages.create(
                     model=self.model_name,
-                    max_tokens=512,
-                    messages=[{"role": "user", "content": prompt}]
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}],
                 )
-
             result_text = response.content[0].text
             if "```json" in result_text:
                 result_text = result_text.split("```json")[1].split("```")[0]
             elif "```" in result_text:
                 result_text = result_text.split("```")[1].split("```")[0]
-
-            result = json.loads(result_text.strip())
+            try:
+                result = json.loads(result_text.strip())
+            except json.JSONDecodeError as e:
+                print(f"  [resolver] LLM returned non-JSON; skipping all "
+                      f"descriptions. Error: {e}")
+                return {}
             assignments = result.get("assignments", {})
-
-            resolved: dict = {}
-            valid_labels = self.config.get("labware", {})
-            for desc, value in assignments.items():
-                label, reasoning = self._parse_assignment(value)
-                if label is not None and label in valid_labels:
-                    resolved[desc] = (label, reasoning)
-            return resolved
-        except Exception:
+        except Exception as e:
+            # Network / SDK / unexpected — log and degrade. Same effect
+            # as the old bare except, but the message names the cause.
+            print(f"  [resolver] LLM call failed; skipping all "
+                  f"descriptions. Error: {type(e).__name__}: {e}")
             return {}
+        resolved: dict = {}
+        for desc, value in assignments.items():
+            label, reasoning = self._parse_assignment(value)
+            if label is not None and label in valid_labels:
+                resolved[desc] = (label, reasoning)
+        return resolved

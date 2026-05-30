@@ -492,7 +492,17 @@ class PhysicalConstraintsChecker:
             ))
 
     def _verify_labwares_exist_in_config(self, step: ExtractedStep, result: PhysicalConstraintsCheckResult):
-        """Check that source/destination have been resolved to config labware."""
+        """Check that source/destination have been resolved to config labware.
+
+        Augmented with a capability fallback: when the literal label lookup
+        misses but the ref's referenced wells uniquely fit ONE config
+        labware, rescue the lookup and emit a PASSED record naming the
+        capability match. This stops the constraint check from being a
+        pure string-equality gate while keeping it strict (ambiguous
+        multi-fit still fails, no fit still fails — the fallback only
+        rescues unique fits).
+        """
+        from nl2protocol.extraction.resolver import _capability_filter
         config_labels = set(self.config.get("labware", {}).keys())
         if not config_labels:
             return
@@ -503,12 +513,58 @@ class PhysicalConstraintsChecker:
             # Check resolved_label, fall back to description for legacy specs
             label = ref.resolved_label or ref.description
             if label not in config_labels:
+                # Capability fallback: maybe the description is non-canonical
+                # but the wells uniquely fit a known labware.
+                ref_wells = self._wells_of_ref(ref)
+                if ref_wells:
+                    survivors = _capability_filter(ref_wells, self.config)
+                    if len(survivors) == 1:
+                        rescued = survivors[0]
+                        slot = self.config["labware"][rescued].get("slot")
+                        phrase = (
+                            f"rescued via capability fit: '{ref.description}' "
+                            f"→ '{rescued}'"
+                            + (f" at slot {slot}" if slot else "")
+                        )
+                        result._checks.append(CheckResult(
+                            violation_type=ViolationType.LABWARE_NOT_FOUND,
+                            severity=Severity.PASSED,
+                            step=step.order,
+                            what=phrase,
+                            detail_label=f"{role}_labware",
+                            values={"role": role, "label": rescued,
+                                     "slot": slot,
+                                     "rescued_from": ref.description},
+                        ))
+                        continue
+                # Original failure path. Mention the capability-fallback
+                # outcome in `why` so the user can tell whether the miss
+                # is "no labware fits these wells" vs "multiple fit
+                # ambiguously".
+                survivors = (_capability_filter(ref_wells, self.config)
+                             if ref_wells else [])
+                if ref_wells and not survivors:
+                    why = (
+                        f"Wells {sorted(ref_wells)} do not fit any "
+                        f"configured labware. Available labware: "
+                        f"{sorted(config_labels)}."
+                    )
+                elif ref_wells and len(survivors) > 1:
+                    why = (
+                        f"Wells fit multiple labware ambiguously: "
+                        f"{sorted(survivors)}. Resolver couldn't pick."
+                    )
+                else:
+                    why = (
+                        f"Available labware: {sorted(config_labels)}. "
+                        f"No match found."
+                    )
                 result._checks.append(CheckResult(
                     violation_type=ViolationType.LABWARE_NOT_FOUND,
                     severity=Severity.ERROR,
                     step=step.order,
                     what=f"Cannot resolve {role} '{ref.description}' to any configured labware",
-                    why=f"Available labware: {sorted(config_labels)}. No match found.",
+                    why=why,
                     suggestion=f"Check your config has labware matching '{ref.description}', or rename it.",
                     values={"description": ref.description, "role": role, "available": sorted(config_labels)}
                 ))
@@ -772,6 +828,30 @@ class PhysicalConstraintsChecker:
         if label in self.config["labware"]:
             return label
         return None
+
+    def _wells_of_ref(self, ref) -> set:
+        """Aggregate every well referenced by a LocationRef into a set.
+
+        Pre:    `ref` is a LocationRef (any of `well`, `wells`,
+                `well_range` may be None).
+        Post:   Returns the union of `{ref.well}` (if set), `ref.wells`
+                (if set), and `expand_well_range(ref.well_range)` (if
+                set). Empty set when none of those carry well data —
+                callers should treat that as "no wells referenced".
+        Side effects: None. Imports `expand_well_range` lazily to avoid
+                      a cycle between validation and extraction modules.
+        """
+        from nl2protocol.extraction.schema_builder import expand_well_range
+        out: set = set()
+        if ref is None:
+            return out
+        if ref.well:
+            out.add(ref.well)
+        if ref.wells:
+            out.update(ref.wells)
+        if ref.well_range:
+            out.update(expand_well_range(ref.well_range))
+        return out
 
 
 # ============================================================================
