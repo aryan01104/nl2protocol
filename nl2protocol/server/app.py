@@ -43,7 +43,9 @@ from nl2protocol.server.handlers import (
     HTMLBinaryConfirmHandler,
     HTMLConfirmationHandler,
     HTMLInitialContentsHandler,
+    HTMLNamespaceSplitHandler,
     InitialContentsConfirmation,
+    NamespaceSplitConfirmation,
     PendingRequest,
 )
 from nl2protocol.server.reporter import (
@@ -411,6 +413,12 @@ class LiveModeApp:
         # (replaces N per-Gap modals during gap resolution). Same
         # dict-by-rid pattern.
         self._pending_initial_contents: Dict[str, InitialContentsConfirmation] = {}
+        # Phase 5 capability matcher: NamespaceSplitDetector emits gaps
+        # for "tube rack A1-A6, B1, C1-C7"-style descriptions that span
+        # multiple letter-prefix racks. The handler bridges those gaps
+        # to a browser modal asking the user to map each prefix to a
+        # config labware. Same dict-by-rid pattern as the other handlers.
+        self._pending_namespace_splits: Dict[str, NamespaceSplitConfirmation] = {}
         # Per-IP rate limit. Defense in depth on top of BYO-key: even if a
         # visitor brings their own key, we don't want a bot to spam /start
         # 100x and exhaust our Fly machine's CPU. Dict grows with unique
@@ -516,6 +524,7 @@ class LiveModeApp:
         self._pending_assignments.clear()
         self._pending_binary_confirms.clear()
         self._pending_initial_contents.clear()
+        self._pending_namespace_splits.clear()
 
     def _list_examples(self) -> list:
         if not self._examples_dir.exists():
@@ -833,6 +842,11 @@ class LiveModeApp:
                 if pending_ic is None:
                     continue
                 pending_ic.set_response(action, msg.get("volumes"))
+            elif kind == "namespace_split_response":
+                pending_ns = self._pending_namespace_splits.get(rid)
+                if pending_ns is None:
+                    continue
+                pending_ns.set_response(action, msg.get("mappings"))
 
     def _replay_pending_requests(self) -> None:
         """When the browser reconnects mid-run, re-emit a panel_request
@@ -865,6 +879,18 @@ class LiveModeApp:
                 kind="initial_contents_request",
                 data=payload,
                 stage_name="stage_2_5_initial_contents",
+            ))
+        except queue.Full:
+            pass
+
+    def _send_namespace_split_request(self, payload: Dict[str, Any]) -> None:
+        """Push a namespace_split_request envelope onto the outbound queue."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="namespace_split_request",
+                data=payload,
+                stage_name="stage_2_5_namespace_split",
             ))
         except queue.Full:
             pass
@@ -974,6 +1000,11 @@ class LiveModeApp:
             pending_initial_contents=self._pending_initial_contents,
             timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         )
+        namespace_split_handler = HTMLNamespaceSplitHandler(
+            send_request=self._send_namespace_split_request,
+            pending_namespace_splits=self._pending_namespace_splits,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
 
         try:
             agent = ProtocolAgent(
@@ -985,6 +1016,7 @@ class LiveModeApp:
                 assignments_handler=assignments_handler,
                 binary_confirm_handler=binary_confirm_handler,
                 initial_contents_handler=initial_contents_handler,
+                namespace_split_handler=namespace_split_handler,
             )
             # Wrap the agent's Anthropic client with the metering proxy.
             # Downstream helpers (SemanticExtractor, LabwareMatcher,

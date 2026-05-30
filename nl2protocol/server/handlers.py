@@ -279,8 +279,13 @@ class NamespaceSplitConfirmation:
 
         Raises: Never.
         """
-        raise NotImplementedError(
-            "Phase 6: implement NamespaceSplitConfirmation.set_response")
+        if action == "abort":
+            self.aborted = True
+            self.confirmed = None
+        else:
+            self.aborted = False
+            self.confirmed = mappings or {}
+        self.event.set()
 
 
 class HTMLNamespaceSplitHandler:
@@ -338,8 +343,24 @@ class HTMLNamespaceSplitHandler:
                 empty. The dict's keys are the prefix letters from
                 the payload (one per row).
         """
-        raise NotImplementedError(
-            "Phase 6: implement HTMLNamespaceSplitHandler.confirm")
+        if not payload:
+            return {}
+        rid = self._next_request_id()
+        confirmation = NamespaceSplitConfirmation()
+        self._pending[rid] = confirmation
+        try:
+            self._send({
+                "request_id": rid,
+                "namespace_split": payload,
+            })
+            signaled = confirmation.event.wait(timeout=self._timeout)
+        finally:
+            self._pending.pop(rid, None)
+        if not signaled:
+            return None
+        if confirmation.aborted:
+            return None
+        return confirmation.confirmed
 
 
 class InitialContentsConfirmation:

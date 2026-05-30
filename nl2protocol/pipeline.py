@@ -452,7 +452,8 @@ class ProtocolAgent:
                  confirmation_handler=None,
                  assignments_handler=None,
                  binary_confirm_handler=None,
-                 initial_contents_handler=None):
+                 initial_contents_handler=None,
+                 namespace_split_handler=None):
         """
         Args:
             config_path: path to lab_config.json
@@ -508,6 +509,10 @@ class ProtocolAgent:
         self.assignments_handler = assignments_handler
         self.binary_confirm_handler = binary_confirm_handler
         self.initial_contents_handler = initial_contents_handler
+        # Phase 5 capability matcher: handler for "A1-A6 / B1 / C1-C7"-
+        # style multi-rack descriptions. Fires before the labware-
+        # assignments confirm so the partition is settled first.
+        self.namespace_split_handler = namespace_split_handler
 
     def _emit_stage_started(self, number: int, name: str) -> None:
         """Emit a structured stage_started event for the live-mode indicator.
@@ -728,6 +733,105 @@ class ProtocolAgent:
                     continue
                 push_revision(ic, volume_ul=new_vol)
         return True
+
+    def _maybe_handle_namespace_split(self, spec) -> Optional[bool]:
+        """Detect + resolve namespace-split gaps before the assignments
+        confirm runs.
+
+        Pre:    `spec` is post-extraction, pre-assignment. The handler
+                may be None (CLI mode) — then this is a no-op and
+                returns None.
+
+        Post:   When the handler exists AND
+                `NamespaceSplitDetector` emits ≥1 gap with
+                `subkind="namespace_split"`:
+                  - Builds the modal payload from the gap metadata
+                    (one row per prefix group + per-row candidates).
+                  - Calls `self.namespace_split_handler.confirm(...)`.
+                  - On user abort (handler returns None): returns False
+                    so the caller can save state and halt the run.
+                  - On user confirm: rewrites every LocationRef whose
+                    description matches the namespace-split's
+                    `description` to a per-group description tagged
+                    with the prefix (e.g. "tube rack [A]"). Subsequent
+                    resolver passes treat each tagged description as a
+                    separate labware so the assignments confirm
+                    operates on per-rack rows.
+                  - Returns True so the caller knows to re-run
+                    suggest() against the rewritten spec.
+                When no namespace_split gaps exist OR the handler is
+                None, returns None (caller treats as "no change").
+
+        Side effects: Mutates `spec.steps[*].source/destination.description`
+                      in place for refs touched by an accepted split.
+        """
+        if self.namespace_split_handler is None:
+            return None
+        from .gap_resolution import NamespaceSplitDetector
+        gaps = NamespaceSplitDetector().detect(
+            spec, {"config": self.config_loader.config})
+        ns_gaps = [g for g in gaps
+                   if (g.metadata or {}).get("subkind") == "namespace_split"]
+        if not ns_gaps:
+            return None
+        # One modal per detected description (typically just one — most
+        # protocols have a single ambiguous rack name). Each row carries
+        # the prefix, the wells in that subgroup, the candidate labware,
+        # and the resolver's first-fit suggestion.
+        applied_any = False
+        for gap in ns_gaps:
+            meta = gap.metadata or {}
+            description = meta.get("description", "")
+            partition = meta.get("partition", {}) or {}
+            pairs = dict(meta.get("candidate_pairs", []) or [])
+            payload = []
+            all_labels = list(self.config_loader.config.get("labware", {}).keys())
+            for prefix in sorted(partition.keys()):
+                payload.append({
+                    "prefix": prefix,
+                    "wells": list(partition[prefix]),
+                    "candidates": all_labels,
+                    "suggested_label": pairs.get(prefix),
+                })
+            confirmed = self.namespace_split_handler.confirm(payload)
+            if confirmed is None:
+                return False
+            if not confirmed:
+                continue
+            self._apply_namespace_split(spec, description, confirmed)
+            applied_any = True
+        return applied_any if applied_any else None
+
+    def _apply_namespace_split(self, spec, description: str,
+                                mappings: dict) -> None:
+        """Rewrite every LocationRef whose description matches and
+        whose well falls in one of the partition's prefix groups —
+        replacing the description with a per-prefix tag.
+
+        Naming convention: original "tube rack" + prefix "A" becomes
+        "tube rack [A]". This stays human-readable while making the
+        downstream resolver see each rack as a distinct description.
+        Wells stay unchanged — the user wrote "A1", "A2", etc. and
+        their positional meaning carries over to the per-rack labware.
+        """
+        for step in spec.steps:
+            for ref in (step.source, step.destination):
+                if ref is None or ref.description != description:
+                    continue
+                # Determine which prefix the ref belongs to.
+                wells = set()
+                if ref.well:
+                    wells.add(ref.well)
+                if ref.wells:
+                    wells.update(ref.wells)
+                if ref.well_range:
+                    from .extraction.schema_builder import expand_well_range
+                    wells.update(expand_well_range(ref.well_range))
+                prefixes = {w[0] for w in wells
+                            if w and w[0].isalpha() and w[0] in mappings}
+                if len(prefixes) == 1:
+                    prefix = next(iter(prefixes))
+                    ref.description = f"{description} [{prefix}]"
 
     def _confirm_labware_assignments_via_handler(
         self, spec, labware_suggestions: dict,
@@ -1229,6 +1333,26 @@ class ProtocolAgent:
                 client=extractor.client,
                 model_name=extractor.model_name,
             ).suggest(spec)
+
+            # Phase 5: NamespaceSplitDetector — fires when one description
+            # (e.g. "tube rack") spans multiple letter-prefix racks the
+            # user mentally treats as separate. Modal asks the user to
+            # map each prefix to a config labware; the result is applied
+            # by rewriting the affected refs' description before the
+            # assignments confirm runs.
+            ns_split_applied = self._maybe_handle_namespace_split(spec)
+            if ns_split_applied is False:
+                _save_state_log("stage_2_5_namespace_split")
+                return None
+            if ns_split_applied:
+                # Re-run resolver against the rewritten spec so the
+                # assignments modal carries fresh, single-rack
+                # suggestions for the newly-named descriptions.
+                labware_suggestions = _EarlyLabwareResolver(
+                    config=self.config_loader.config,
+                    client=extractor.client,
+                    model_name=extractor.model_name,
+                ).suggest(spec)
 
             # ============================================================
             # Phase 3f (Group D): pre-orchestrator confirmations
