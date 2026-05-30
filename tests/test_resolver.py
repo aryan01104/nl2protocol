@@ -9,7 +9,7 @@ Covers (a) `_parse_assignment` (new-shape vs legacy-shape unpacking),
 import json
 from typing import Any, Optional
 
-from nl2protocol.extraction.resolver import LabwareResolver, LabwareSuggestion
+from nl2protocol.extraction.resolver import LabwareMatcher, LabwareMatchSuggestion
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
@@ -117,13 +117,13 @@ class TestParseAssignment_NewShape:
     """LLM emits `{"label": ..., "reasoning": ...}` per description."""
 
     def test_label_and_reasoning_extracted(self):
-        result = LabwareResolver._parse_assignment(
+        result = LabwareMatcher._parse_assignment(
             {"label": "reagent_rack", "reasoning": "Only tuberack in config."}
         )
         assert result == ("reagent_rack", "Only tuberack in config.")
 
     def test_null_label_in_new_shape(self):
-        result = LabwareResolver._parse_assignment(
+        result = LabwareMatcher._parse_assignment(
             {"label": None, "reasoning": "No tuberack-like labware exists."}
         )
         # label None is propagated; caller filters it out, but reasoning
@@ -132,11 +132,11 @@ class TestParseAssignment_NewShape:
 
     def test_missing_reasoning_field(self):
         # New shape without `reasoning` key → reasoning is None.
-        result = LabwareResolver._parse_assignment({"label": "reagent_rack"})
+        result = LabwareMatcher._parse_assignment({"label": "reagent_rack"})
         assert result == ("reagent_rack", None)
 
     def test_missing_label_field(self):
-        result = LabwareResolver._parse_assignment({"reasoning": "x"})
+        result = LabwareMatcher._parse_assignment({"reasoning": "x"})
         assert result == (None, "x")
 
 
@@ -144,12 +144,12 @@ class TestParseAssignment_LegacyShape:
     """LLM emits a bare string label (pre-refactor shape)."""
 
     def test_bare_string(self):
-        result = LabwareResolver._parse_assignment("reagent_rack")
+        result = LabwareMatcher._parse_assignment("reagent_rack")
         # Reasoning is None — `_positive_reasoning` will fall back honestly.
         assert result == ("reagent_rack", None)
 
     def test_empty_string(self):
-        result = LabwareResolver._parse_assignment("")
+        result = LabwareMatcher._parse_assignment("")
         # Empty / whitespace-only labels collapse to None at parse
         # time (CodeRabbit P1 strictening) so they never reach a
         # downstream `config[""]` lookup. Pre-fix this returned
@@ -161,15 +161,15 @@ class TestParseAssignment_OtherShapes:
     """Null and unexpected types both degrade to (None, None)."""
 
     def test_none(self):
-        assert LabwareResolver._parse_assignment(None) == (None, None)
+        assert LabwareMatcher._parse_assignment(None) == (None, None)
 
     def test_int(self):
         # Defensive: an LLM hallucinating an integer instead of a label
         # shouldn't crash the resolver.
-        assert LabwareResolver._parse_assignment(42) == (None, None)
+        assert LabwareMatcher._parse_assignment(42) == (None, None)
 
     def test_list(self):
-        assert LabwareResolver._parse_assignment(["reagent_rack"]) == (None, None)
+        assert LabwareMatcher._parse_assignment(["reagent_rack"]) == (None, None)
 
 
 class TestParseAssignment_TypeGuards:
@@ -181,7 +181,7 @@ class TestParseAssignment_TypeGuards:
 
     def test_non_string_label_in_dict_becomes_none(self):
         # Label as list → not a real config label; treat as missing.
-        result = LabwareResolver._parse_assignment(
+        result = LabwareMatcher._parse_assignment(
             {"label": ["reagent_rack"], "reasoning": "ok"}
         )
         assert result == (None, "ok")
@@ -189,29 +189,29 @@ class TestParseAssignment_TypeGuards:
     def test_non_string_reasoning_in_dict_becomes_none(self):
         # Reasoning as int → no .strip(); treat as missing reasoning
         # (label still parses if it's a string).
-        result = LabwareResolver._parse_assignment(
+        result = LabwareMatcher._parse_assignment(
             {"label": "reagent_rack", "reasoning": 42}
         )
         assert result == ("reagent_rack", None)
 
     def test_empty_string_label_becomes_none(self):
         # Whitespace-only / empty label is not a real label.
-        result = LabwareResolver._parse_assignment(
+        result = LabwareMatcher._parse_assignment(
             {"label": "   ", "reasoning": "ok"}
         )
         assert result == (None, "ok")
 
     def test_legacy_string_shape_strips_whitespace(self):
         # Existing bare-string callers get whitespace normalization for free.
-        result = LabwareResolver._parse_assignment("  reagent_rack  ")
+        result = LabwareMatcher._parse_assignment("  reagent_rack  ")
         assert result == ("reagent_rack", None)
 
     def test_legacy_empty_string_becomes_none(self):
         # Pre-fix: ("", None). Post-fix: (None, None) — empty string
         # isn't a real label, treating as missing prevents it slipping
         # through to a config[""] lookup downstream.
-        assert LabwareResolver._parse_assignment("") == (None, None)
-        assert LabwareResolver._parse_assignment("   ") == (None, None)
+        assert LabwareMatcher._parse_assignment("") == (None, None)
+        assert LabwareMatcher._parse_assignment("   ") == (None, None)
 
 
 # ============================================================================
@@ -225,7 +225,7 @@ class TestPositiveReasoning_WithLLMReasoning:
     structural context and the concrete signal."""
 
     def test_includes_mapping_prefix(self):
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
             description="tube rack",
             label="reagent_rack",
@@ -240,7 +240,7 @@ class TestPositiveReasoning_WithLLMReasoning:
         # regardless of whether the config carries one. The full
         # Opentrons identifier (50+ chars) was noise for reviewers;
         # it lives on in config["labware"][label] for audit purposes.
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
             description="tube rack",
             label="reagent_rack",
@@ -251,7 +251,7 @@ class TestPositiveReasoning_WithLLMReasoning:
         assert "'tube rack'" in out and "'reagent_rack'" in out
 
     def test_strips_surrounding_whitespace_in_reasoning(self):
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
             description="tube rack",
             label="reagent_rack",
@@ -268,7 +268,7 @@ class TestPositiveReasoning_FallbackBranch:
     pre-fix template that falsely claimed reasoning based on context."""
 
     def test_fallback_used_when_reasoning_none(self):
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
             description="tube rack",
             label="reagent_rack",
@@ -279,7 +279,7 @@ class TestPositiveReasoning_FallbackBranch:
         assert "'tube rack'" in out and "'reagent_rack'" in out
 
     def test_fallback_used_when_reasoning_blank(self):
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out = r._positive_reasoning(
             description="tube rack",
             label="reagent_rack",
@@ -291,7 +291,7 @@ class TestPositiveReasoning_FallbackBranch:
         # Regression guard: the old "based on description text + step
         # usage context" template was the exact phrase the user
         # flagged. Make sure neither branch emits it.
-        r = LabwareResolver(config=_DEFAULT_CONFIG)
+        r = LabwareMatcher(config=_DEFAULT_CONFIG)
         out_with = r._positive_reasoning(
             description="tube rack", label="reagent_rack",
             reasoning="Real reason.",
@@ -327,7 +327,7 @@ class TestLLMResolve:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack", "plate"], spec)
@@ -343,7 +343,7 @@ class TestLLMResolve:
             "assignments": {"tube rack": "reagent_rack"}
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack"], spec)
@@ -358,7 +358,7 @@ class TestLLMResolve:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack"], spec)
@@ -373,7 +373,7 @@ class TestLLMResolve:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack"], spec)
@@ -383,7 +383,7 @@ class TestLLMResolve:
         # Network error or malformed response → empty dict (existing
         # exception-swallow path, preserved).
         client = FakeAnthropic(raise_exc=RuntimeError("network down"))
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack"], spec)
@@ -392,7 +392,7 @@ class TestLLMResolve:
     def test_no_client_returns_empty(self):
         # Without a client (test-fake path), returns empty dict and
         # makes no calls.
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=None)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
         spec = _make_min_spec("tube rack")
 
         resolved = resolver._llm_resolve(["tube rack"], spec)
@@ -422,7 +422,7 @@ class TestSuggestIntegration:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         suggestions = resolver.suggest(spec)
@@ -443,7 +443,7 @@ class TestSuggestIntegration:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         suggestions = resolver.suggest(spec)
@@ -464,7 +464,7 @@ class TestSuggestIntegration:
             }
         })
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         suggestions = resolver.suggest(spec)
@@ -482,7 +482,7 @@ class TestSuggestIntegration:
         # the parser, this test catches it.
         response = json.dumps({"assignments": {}})
         client = FakeAnthropic(response_text=response)
-        resolver = LabwareResolver(config=_DEFAULT_CONFIG, client=client)
+        resolver = LabwareMatcher(config=_DEFAULT_CONFIG, client=client)
         spec = _make_min_spec("tube rack")
 
         resolver.suggest(spec)

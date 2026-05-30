@@ -13,7 +13,7 @@ from pathlib import Path
 from nl2protocol.extraction import (
     CompleteProtocolSpec, ExtractedStep, ProvenancedVolume,
     Provenance, CompositionProvenance, LocationRef, PostAction,
-    SemanticExtractor,
+    spec_to_schema,
 )
 from nl2protocol.models import Transfer, PickUpTip, DropTip
 
@@ -71,7 +71,7 @@ def _spec(steps, **kwargs):
 def _get_schema(steps, config, **kwargs):
     """Build a CompleteProtocolSpec and convert to schema."""
     spec = _spec(steps, **kwargs)
-    schema, _, _ = SemanticExtractor.spec_to_schema(spec, config)
+    schema, _, _ = spec_to_schema(spec, config)
     return schema
 
 

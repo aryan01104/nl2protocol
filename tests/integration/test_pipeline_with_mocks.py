@@ -10,7 +10,7 @@ Scope:
   - Stage 2 (LLM extraction): MOCKED — canned `<reasoning>...</reasoning>
     <spec>{...}</spec>` responses per scenario.
   - Stage 4 (constraint check): real `ConstraintChecker.check_all`.
-  - Stage 5a (spec → schema): real `extractor.spec_to_schema`.
+  - Stage 5a (spec → schema): real `schema_builder.spec_to_schema`.
   - Stage 5b (schema → script): real `generate_python_script`.
   - Stages 1, 3, 6, 7, the full ProtocolAgent.run_pipeline orchestrator,
     and any interactive `_prompt_input` flows are OUT OF SCOPE — those
@@ -28,6 +28,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from nl2protocol.extraction.extractor import SemanticExtractor
+from nl2protocol.extraction.schema_builder import spec_to_schema
 from nl2protocol.pipeline import generate_python_script
 from nl2protocol.validation.constraints import (
     PhysicalConstraintsChecker, Severity, ViolationType,
@@ -164,7 +165,7 @@ class TestPipelineHappyPath:
         assert result.errors == []  # clean
 
         # Stage 5a — spec → schema
-        schema, _well_warnings, _step_summaries = extractor.spec_to_schema(spec, simple_config)
+        schema, _well_warnings, _step_summaries = spec_to_schema(spec, simple_config)
         assert schema is not None
         # A single transfer collapses to ONE high-level Transfer command
         # (not aspirate + dispense atoms — the schema is the planning level).
@@ -245,7 +246,7 @@ class TestPipelineMultiStep:
         result = PhysicalConstraintsChecker(simple_config).assert_physical_constraints(spec)
         assert result.errors == []
 
-        schema, _, _ = extractor.spec_to_schema(spec, simple_config)
+        schema, _, _ = spec_to_schema(spec, simple_config)
         assert schema is not None
         # 2 transfers + 1 delay = 3 high-level commands.
         assert len(schema.commands) == 3

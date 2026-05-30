@@ -382,7 +382,7 @@ class TestEquivalentNames:
 
     def test_llm_maps_equivalent_names(self):
         from anthropic import Anthropic
-        from nl2protocol.extraction import LabwareResolver
+        from nl2protocol.extraction import LabwareMatcher
 
         config = load_config("equivalent_names")
         instruction = load_instruction("equivalent_names")
@@ -406,7 +406,7 @@ class TestEquivalentNames:
         # Post-refactor API: suggest() returns a {description: LabwareSuggestion}
         # dict (NOT a mutated spec). The pipeline is the sole writer of
         # resolved_label + resolved_label_provenance after user confirmation.
-        resolver = LabwareResolver(config=config, client=client)
+        resolver = LabwareMatcher(config=config, client=client)
         suggestions = resolver.suggest(spec)
         # Every unique description should get a non-null suggested_label.
         descriptions_seen = set()

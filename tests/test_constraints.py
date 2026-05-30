@@ -988,7 +988,7 @@ class TestVolumeValidation:
         """An inferred (source != 'instruction') mix volume must not cause a
         validate_schema_against_spec mismatch — only instruction-sourced
         volumes are required to appear verbatim in the generated schema."""
-        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.extraction import spec_to_schema, validate_schema_against_spec
         from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
@@ -1009,8 +1009,8 @@ class TestVolumeValidation:
         )
 
         enriched = enrich_config_with_wells(qpcr_config)
-        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
-        mismatches = SemanticExtractor.validate_schema_against_spec(spec, schema)
+        schema, _, _ = spec_to_schema(spec, enriched)
+        mismatches = validate_schema_against_spec(spec, schema)
 
         # 50.0uL mix is inferred, so it isn't required to appear in schema.
         assert len(mismatches) == 0
@@ -1025,7 +1025,7 @@ class TestSerialDilution:
 
     def test_serial_dilution_chain_complete(self, serial_dilution_config):
         """Serial dilution from A1 through B1-H1 should produce 7 sequential transfers."""
-        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.extraction import spec_to_schema
         from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
@@ -1045,7 +1045,7 @@ class TestSerialDilution:
         )
 
         enriched = enrich_config_with_wells(serial_dilution_config)
-        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = spec_to_schema(spec, enriched)
 
         # Filter to just transfer commands
         transfers = [c for c in schema.commands if c.command_type == "transfer"]
@@ -1066,7 +1066,7 @@ class TestSerialDilution:
 
     def test_serial_dilution_no_spurious_distribute(self, serial_dilution_config):
         """Serial dilution should NOT generate a distribute command."""
-        from nl2protocol.extraction import SemanticExtractor
+        from nl2protocol.extraction import spec_to_schema
         from nl2protocol.config import enrich_config_with_wells
 
         spec = make_spec(
@@ -1086,7 +1086,7 @@ class TestSerialDilution:
         )
 
         enriched = enrich_config_with_wells(serial_dilution_config)
-        schema, _, _ = SemanticExtractor.spec_to_schema(spec, enriched)
+        schema, _, _ = spec_to_schema(spec, enriched)
 
         distributes = [c for c in schema.commands if c.command_type == "distribute"]
         assert len(distributes) == 0, "Serial dilution should not auto-distribute diluent"
