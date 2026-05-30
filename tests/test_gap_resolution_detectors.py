@@ -825,3 +825,101 @@ class TestDetectAllRegistry:
         out = detect_all(spec, context={},
                          detectors=[FakeDetectorA(), FakeDetectorB()])
         assert [g.id for g in out] == ["a1", "b1"]
+
+
+# ============================================================================
+# NamespaceSplitDetector — emits ambiguous Gaps when wells partition by
+# letter prefix into ≥2 racks each fitting a distinct config labware
+# ============================================================================
+
+from nl2protocol.gap_resolution import NamespaceSplitDetector
+
+
+_THREE_RACK_CONFIG = {
+    "labware": {
+        "rack_a": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "1"},
+        "rack_b": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "2"},
+        "rack_c": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "3"},
+    }
+}
+
+
+class TestNamespaceSplitDetector:
+    """Detects A/B/C-prefix partitions on a single description's well
+    set when no single labware fits but each subgroup fits some labware."""
+
+    def _western_blot_step(self, well_range, description="tube rack"):
+        return ExtractedStep(
+            order=1, action="transfer", composition_provenance=_comp(),
+            source=LocationRef(
+                description=description, well_range=well_range,
+                description_provenance=_instr_prov("rack"),
+                wells_provenance=_instr_prov(well_range),
+            ),
+        )
+
+    def test_partition_across_five_rows_emits_one_gap(self):
+        # 24-rack has rows A-D only; using rows A,B,C,D,E forces the
+        # merged set to fit NO single rack while each row-subgroup fits.
+        steps = [
+            self._western_blot_step("A1-A4"),
+            ExtractedStep(order=2, action="transfer",
+                          composition_provenance=_comp(),
+                          source=LocationRef(
+                              description="tube rack", wells=["B1", "B2"],
+                              description_provenance=_instr_prov("B"),
+                              wells_provenance=_instr_prov("B1 B2"))),
+            ExtractedStep(order=3, action="transfer",
+                          composition_provenance=_comp(),
+                          source=LocationRef(
+                              description="tube rack", wells=["C1", "D1", "E1"],
+                              description_provenance=_instr_prov("CDE"),
+                              wells_provenance=_instr_prov("C1 D1 E1"))),
+        ]
+        spec = _spec(steps)
+        gaps = NamespaceSplitDetector().detect(spec, {"config": _THREE_RACK_CONFIG})
+        assert len(gaps) == 1
+        g = gaps[0]
+        assert g.kind == "ambiguous"
+        assert g.severity == "blocker"
+        assert g.metadata["subkind"] == "namespace_split"
+        assert g.metadata["description"] == "tube rack"
+        assert set(g.metadata["partition"].keys()) >= {"A", "B", "C", "D", "E"}
+
+    def test_single_prefix_no_gap(self):
+        spec = _spec([self._western_blot_step("A1-A4")])
+        assert NamespaceSplitDetector().detect(
+            spec, {"config": _THREE_RACK_CONFIG}) == []
+
+    def test_partition_exists_but_no_fitting_labware_no_gap(self):
+        # Two prefixes (A, B) against tiprack-only config — type filter
+        # drops every candidate per subgroup → no detector hit.
+        steps = [
+            self._western_blot_step("A1-A4"),
+            ExtractedStep(order=2, action="transfer",
+                          composition_provenance=_comp(),
+                          source=LocationRef(
+                              description="tube rack", wells=["B1", "B2"],
+                              description_provenance=_instr_prov("B"),
+                              wells_provenance=_instr_prov("B1 B2"))),
+        ]
+        cfg = {"labware": {
+            "tiprack_20": {"load_name": "opentrons_96_tiprack_20ul", "slot": "1"},
+        }}
+        spec = _spec(steps)
+        assert NamespaceSplitDetector().detect(spec, {"config": cfg}) == []
+
+    def test_missing_config_in_context_returns_empty(self):
+        spec = _spec([self._western_blot_step("A1-A4")])
+        assert NamespaceSplitDetector().detect(spec, context={}) == []
+
+    def test_aggregate_fitting_single_labware_no_gap(self):
+        # {A1-A4, B1, B2} all fits a single 24-rack — capability filter
+        # leaves a survivor → no namespace-split gap fires.
+        steps = [
+            self._western_blot_step("A1-A4"),
+            self._western_blot_step("B1-B2"),
+        ]
+        spec = _spec(steps)
+        assert NamespaceSplitDetector().detect(
+            spec, {"config": _THREE_RACK_CONFIG}) == []

@@ -3,19 +3,26 @@
 Covers (a) `_parse_assignment` (new-shape vs legacy-shape unpacking),
 (b) `_positive_reasoning` (LLM-reasoning vs honest-fallback branches),
 (c) `_llm_resolve` end-to-end with a fake Anthropic client,
-(d) `suggest` integration on a minimal ProtocolSpec.
+(d) `suggest` integration on a minimal ProtocolSpec,
+(e) capability + type filters and branch-resolving helpers (Phase 1+).
 """
 
 import json
+import pytest
 from typing import Any, Optional
 
-from nl2protocol.extraction.resolver import LabwareMatcher, LabwareMatchSuggestion
+from nl2protocol.extraction.resolver import (
+    LabwareMatcher, LabwareMatchSuggestion,
+    _load_name_category, _description_category_filter,
+    _capability_filter, _type_filter, _has_namespace_split,
+)
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
     LocationRef,
     Provenance,
     ProtocolSpec,
+    WellContents,
 )
 
 
@@ -495,3 +502,322 @@ class TestSuggestIntegration:
         assert "Based on description text and step context" in prompt
         # The user's flagged anti-pattern phrase appears in the
         # "do NOT write these" section.
+
+
+# ============================================================================
+# Capability-based matcher helpers (Phase 1+ contract stubs)
+# ============================================================================
+# Tests assert the FINAL behavior. Until the helpers are implemented,
+# they raise NotImplementedError so the tests fail with that signal —
+# clear marker of which contracts are still pending implementation.
+
+
+# Shared fixture: a config with three labware spanning two categories +
+# two capacities. Used by capability-filter and type-filter tests so the
+# fit/drop decisions have something to bite on.
+_THREE_LABWARE_CONFIG = {
+    "labware": {
+        "tiprack_20": {
+            "load_name": "opentrons_96_tiprack_20ul",
+            "slot": "1",
+        },
+        "sample_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+            "slot": "2",
+        },
+        "wellplate_96": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "5",
+        },
+    }
+}
+
+
+class TestLoadNameCategory:
+    """Closed-set extraction of the category token from Opentrons load_names.
+
+    Pattern: `<vendor>_<count>_<type>_<details...>`. The third token is the
+    category. Closed set:
+    {tiprack, tuberack, wellplate, reservoir, aluminumblock}. Anything
+    else returns None (treated as unknown by the filter pipeline)."""
+
+    def test_tuberack_extracted(self):
+        assert _load_name_category(
+            "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap"
+        ) == "tuberack"
+
+    def test_tiprack_extracted(self):
+        assert _load_name_category("opentrons_96_tiprack_20ul") == "tiprack"
+
+    def test_wellplate_extracted(self):
+        assert _load_name_category("corning_96_wellplate_360ul_flat") == "wellplate"
+
+    def test_aluminumblock_extracted(self):
+        assert _load_name_category(
+            "opentrons_24_aluminumblock_nest_1.5ml_snapcap"
+        ) == "aluminumblock"
+
+    def test_unknown_third_token_returns_none(self):
+        # Made-up category, well-formed shape but not in closed set.
+        assert _load_name_category("opentrons_24_widget_foo") is None
+
+    def test_shape_too_short_returns_none(self):
+        assert _load_name_category("opentrons_24") is None
+
+    def test_empty_returns_none(self):
+        assert _load_name_category("") is None
+
+
+class TestDescriptionCategoryFilter:
+    """Maps user wording to allowed-category sets. `None` means
+    "no category cue — don't filter by type"."""
+
+    def test_tube_rack_allows_tuberack_and_aluminumblock(self):
+        result = _description_category_filter("tube rack")
+        assert result == {"tuberack", "aluminumblock"}
+
+    def test_eppendorf_alone_allows_tuberack_and_aluminumblock(self):
+        result = _description_category_filter("Eppendorf 1.5ml")
+        assert result == {"tuberack", "aluminumblock"}
+
+    def test_tipbox_keeps_only_tiprack(self):
+        assert _description_category_filter("tipbox") == {"tiprack"}
+
+    def test_96_well_plate_keeps_only_wellplate(self):
+        assert _description_category_filter("96-well plate") == {"wellplate"}
+
+    def test_reservoir_keeps_only_reservoir(self):
+        assert _description_category_filter("reservoir") == {"reservoir"}
+
+    def test_bare_rack_returns_none(self):
+        # No qualifier — could mean tube or tip — don't filter.
+        assert _description_category_filter("rack") is None
+
+    def test_no_cue_returns_none(self):
+        # Description with no category keyword at all.
+        assert _description_category_filter("widget") is None
+
+
+class TestCollectDescriptionsWithWells:
+    """Aggregates wells per description across the whole spec. Order
+    preserves first-seen; wells union across all occurrences."""
+
+    def _comp(self):
+        return CompositionProvenance(
+            step_cited_text="x", parameters_cited_texts=["x"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+
+    def test_empty_spec_returns_empty(self):
+        # Pause-only step contributes no descriptions.
+        spec = ProtocolSpec(summary="t", steps=[
+            ExtractedStep(order=1, action="pause", note="hold",
+                          composition_provenance=self._comp()),
+        ])
+        matcher = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
+        assert matcher._collect_descriptions_with_wells(spec) == {}
+
+    def test_single_well_collected(self):
+        # _make_min_spec puts source desc=description, dest desc="plate",
+        # both with single wells (A1, B1).
+        spec = _make_min_spec("tube rack")
+        matcher = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
+        result = matcher._collect_descriptions_with_wells(spec)
+        assert list(result.keys()) == ["tube rack", "plate"]
+        assert result["tube rack"]["wells"] == {"A1"}
+        assert result["plate"]["wells"] == {"B1"}
+
+    def test_well_range_expands_via_helper(self):
+        step = ExtractedStep(
+            order=1, action="transfer", composition_provenance=self._comp(),
+            source=LocationRef(
+                description="tube rack", well_range="A1-A6",
+                description_provenance=_inst_prov("A1-A6"),
+                wells_provenance=_inst_prov("A1-A6"),
+            ),
+        )
+        spec = ProtocolSpec(summary="t", steps=[step])
+        matcher = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
+        result = matcher._collect_descriptions_with_wells(spec)
+        assert result["tube rack"]["wells"] == {"A1", "A2", "A3", "A4", "A5", "A6"}
+
+    def test_two_steps_same_description_merge_wells(self):
+        # Same description on two steps — wells union, contexts list has both.
+        steps = [
+            ExtractedStep(order=1, action="transfer",
+                          composition_provenance=self._comp(),
+                          source=LocationRef(description="tube rack", well="A1",
+                                             description_provenance=_inst_prov("A1"),
+                                             wells_provenance=_inst_prov("A1"))),
+            ExtractedStep(order=2, action="transfer",
+                          composition_provenance=self._comp(),
+                          source=LocationRef(description="tube rack", well="B2",
+                                             description_provenance=_inst_prov("B2"),
+                                             wells_provenance=_inst_prov("B2"))),
+        ]
+        spec = ProtocolSpec(summary="t", steps=steps)
+        matcher = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
+        result = matcher._collect_descriptions_with_wells(spec)
+        assert result["tube rack"]["wells"] == {"A1", "B2"}
+        assert len(result["tube rack"]["contexts"]) == 2
+
+    def test_initial_contents_description_appears(self):
+        step = ExtractedStep(
+            order=1, action="pause", note="hold",
+            composition_provenance=self._comp(),
+        )
+        ic = WellContents(labware="reagent rack", well="C3", substance="buffer")
+        spec = ProtocolSpec(summary="t", steps=[step], initial_contents=[ic])
+        matcher = LabwareMatcher(config=_DEFAULT_CONFIG, client=None)
+        result = matcher._collect_descriptions_with_wells(spec)
+        assert "reagent rack" in result
+        assert result["reagent rack"]["wells"] == {"C3"}
+
+
+class TestCapabilityFilter:
+    """Drops candidates whose valid_wells doesn't superset the referenced
+    wells. Fail-open on unknown load_names."""
+
+    def test_all_wells_fit_both_candidates_kept(self):
+        # A1 fits every labware in _THREE_LABWARE_CONFIG.
+        result = _capability_filter({"A1"}, _THREE_LABWARE_CONFIG)
+        assert set(result) == {"tiprack_20", "sample_rack", "wellplate_96"}
+
+    def test_c7_drops_24_rack_keeps_96_layouts(self):
+        # 24-rack is 4x6 — no column 7. C7 must drop it.
+        # tiprack_20 (96-well, 8x12) and wellplate_96 (96-well) still fit.
+        result = _capability_filter({"A1", "B2", "C7"}, _THREE_LABWARE_CONFIG)
+        assert "sample_rack" not in result
+        assert set(result) == {"tiprack_20", "wellplate_96"}
+
+    def test_empty_wells_keeps_all_candidates(self):
+        # No constraint at all → every labware survives.
+        result = _capability_filter(set(), _THREE_LABWARE_CONFIG)
+        assert set(result) == {"tiprack_20", "sample_rack", "wellplate_96"}
+
+    def test_empty_config_returns_empty(self):
+        assert _capability_filter({"A1"}, {"labware": {}}) == []
+
+    def test_unknown_load_name_fails_open_and_keeps_candidate(self):
+        # Labware with a load_name get_well_info doesn't recognize must
+        # NOT be dropped — mirrors constraints.py:553-559 convention.
+        cfg = {"labware": {
+            "weird_box": {"load_name": "made_up_box_format", "slot": "3"},
+        }}
+        assert _capability_filter({"A1"}, cfg) == ["weird_box"]
+
+
+class TestTypeFilter:
+    """Filters by load_name category. `None`-filter (bare description)
+    passes candidates through unchanged."""
+
+    def test_tube_description_drops_tipracks_and_wellplates(self):
+        # "tube rack" → allowed {tuberack, aluminumblock}. Out of the
+        # three-labware fixture, only sample_rack qualifies.
+        result = _type_filter("tube rack",
+                               ["tiprack_20", "sample_rack", "wellplate_96"],
+                               _THREE_LABWARE_CONFIG)
+        assert result == ["sample_rack"]
+
+    def test_bare_rack_passes_candidates_through(self):
+        # No category cue → filter returns input unchanged.
+        result = _type_filter("rack",
+                               ["tiprack_20", "sample_rack"],
+                               _THREE_LABWARE_CONFIG)
+        assert result == ["tiprack_20", "sample_rack"]
+
+    def test_no_rule_match_passes_through(self):
+        # "widget" has no category cue → no filter.
+        result = _type_filter("widget", ["tiprack_20"], _THREE_LABWARE_CONFIG)
+        assert result == ["tiprack_20"]
+
+    def test_all_filtered_returns_empty(self):
+        # "tube rack" against tiprack-only candidate list → nothing survives.
+        result = _type_filter("tube rack", ["tiprack_20"], _THREE_LABWARE_CONFIG)
+        assert result == []
+
+
+class TestResolveOne:
+    """Composes capability + type + namespace-split detection to pick
+    a branch for one description. Returns (branch, survivors)."""
+
+    def test_single_survivor_returns_deterministic(self):
+        # "plate" + wells {A1, B1}: capability keeps all 3 candidates;
+        # type filter keeps only wellplate_96 → deterministic.
+        matcher = LabwareMatcher(config=_THREE_LABWARE_CONFIG, client=None)
+        branch, survivors = matcher._resolve_one("plate", {"A1", "B1"})
+        assert branch == "deterministic"
+        assert survivors == ["wellplate_96"]
+
+    def test_multi_survivor_returns_llm(self):
+        # "rack" (no type cue) + wells {A1}: capability keeps all;
+        # type filter no-ops → 3 survivors → llm.
+        matcher = LabwareMatcher(config=_THREE_LABWARE_CONFIG, client=None)
+        branch, survivors = matcher._resolve_one("rack", {"A1"})
+        assert branch == "llm"
+        assert len(survivors) >= 2
+
+    def test_zero_survivors_with_namespace_pattern_returns_namespace_split(self):
+        # 3-rack config + A/B/C wells (each fits a 24-rack but the union
+        # exceeds any single rack's row count → 0 capability survivors).
+        cfg = {
+            "labware": {
+                "rack_a": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "1"},
+                "rack_b": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "2"},
+                "rack_c": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "3"},
+            }
+        }
+        matcher = LabwareMatcher(config=cfg, client=None)
+        # Use wells that span 5 row-prefixes (A,B,C,D,E) — 24-rack only
+        # has rows A-D, so the merged set exceeds any single rack.
+        wells = {"A1", "B1", "C1", "D1", "E1"}
+        branch, survivors = matcher._resolve_one("tube rack", wells)
+        assert branch == "namespace_split"
+        assert survivors == []
+
+    def test_zero_survivors_no_pattern_returns_unresolvable(self):
+        # Wells with no letter-prefix pattern (Z99 alone) and no candidate
+        # fits → unresolvable.
+        matcher = LabwareMatcher(config=_THREE_LABWARE_CONFIG, client=None)
+        branch, survivors = matcher._resolve_one("widget", {"Z99"})
+        assert branch == "unresolvable"
+        assert survivors == []
+
+
+class TestHasNamespaceSplit:
+    """Module-level helper used by `_resolve_one` and by
+    `NamespaceSplitDetector`. Returns dict on clean partition, None
+    otherwise."""
+
+    def test_clean_three_way_partition_detected(self):
+        # 3 tuberack labels in config, wells span A/B/C — each subgroup
+        # fits its own 24-rack.
+        cfg = {
+            "labware": {
+                "rack_a": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "1"},
+                "rack_b": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "2"},
+                "rack_c": {"load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap", "slot": "3"},
+            }
+        }
+        wells = {"A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4"}
+        result = _has_namespace_split("tube rack", wells, cfg)
+        assert result is not None
+        assert set(result["partition"].keys()) == {"A", "B", "C"}
+        assert len(result["candidate_pairs"]) == 3
+
+    def test_single_prefix_returns_none(self):
+        # Only A-prefixes — not a multi-rack pattern.
+        result = _has_namespace_split("tube rack",
+                                       {"A1", "A2", "A3"},
+                                       _THREE_LABWARE_CONFIG)
+        assert result is None
+
+    def test_partition_without_fitting_labware_returns_none(self):
+        # Two prefixes but config has only a tiprack — type filter drops
+        # every candidate per subgroup → no partition.
+        cfg = {
+            "labware": {
+                "tiprack_20": {"load_name": "opentrons_96_tiprack_20ul", "slot": "1"},
+            }
+        }
+        assert _has_namespace_split("tube rack", {"A1", "B1"}, cfg) is None

@@ -1270,3 +1270,100 @@ class TestCheckResultUnification:
         assert len(result.passes) > 0
         # `violations` filters to non-PASSED outcomes.
         assert all(v.severity != Severity.PASSED for v in result.violations)
+
+
+# ============================================================================
+# CONSTRAINT CHECKER: CAPABILITY FALLBACK FOR LABWARE RESOLUTION
+# ============================================================================
+
+class TestLabwareResolutionCapabilityFallback:
+    """When `ref.resolved_label or ref.description` is not literally in
+    config keys, the augmented checker runs a capability filter against
+    the ref's wells and rescues the lookup if exactly one labware fits.
+    Replaces today's blanket "string equality miss → LABWARE_NOT_FOUND"
+    with "string equality miss + no unique physical fit → LABWARE_NOT_FOUND".
+    """
+
+    _CFG = {
+        "labware": {
+            "tiprack_20": {"load_name": "opentrons_96_tiprack_20ul", "slot": "1"},
+            "sample_rack": {
+                "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+                "slot": "2",
+            },
+            "wellplate_96": {"load_name": "corning_96_wellplate_360ul_flat", "slot": "5"},
+        },
+        "pipettes": {
+            "left": {"model": "p20_single_gen2"},
+        },
+    }
+
+    def test_legacy_unresolvable_still_fails(self):
+        """A description with no matching config label AND wells that fit
+        multiple labware (no unique rescue) still emits LABWARE_NOT_FOUND."""
+        spec = make_spec([
+            ExtractedStep(
+                order=1, action="transfer", volume=_vol(10.0),
+                source=_loc(description="centrifuge_vial", well="A1"),
+                destination=_loc(description="centrifuge_vial", well="A1"),
+                composition_provenance=_comp(),
+            )
+        ])
+        checker = PhysicalConstraintsChecker(self._CFG)
+        result = checker.assert_physical_constraints(spec)
+        errors = [v for v in result.errors
+                  if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
+        # A1 fits all three labware → no unique rescue → original error.
+        assert len(errors) >= 1
+
+    def test_capability_rescue_promotes_to_passed(self):
+        """Description doesn't match config key, but wells uniquely fit
+        ONE labware → emit PASSED (with that label) instead of error."""
+        # Use wells that fit only sample_rack: A1-D6 grid is 24 positions.
+        # But A1-D6 also fits the 96-well plates (which have rows A-H, cols 1-12).
+        # To force a unique fit, use a description like "my custom box"
+        # and wells that exceed what the 24-rack holds but fit a 96-well.
+        # Actually simpler: use a config with just one labware that fits.
+        cfg_unique = {
+            "labware": {
+                "the_rack": {
+                    "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+                    "slot": "2",
+                },
+            },
+            "pipettes": {"left": {"model": "p20_single_gen2"}},
+        }
+        spec = make_spec([
+            ExtractedStep(
+                order=1, action="transfer", volume=_vol(10.0),
+                source=_loc(description="user_wording_for_rack", well="A1"),
+                destination=_loc(description="user_wording_for_rack", well="A1"),
+                composition_provenance=_comp(),
+            )
+        ])
+        checker = PhysicalConstraintsChecker(cfg_unique)
+        result = checker.assert_physical_constraints(spec)
+        errors = [v for v in result.errors
+                  if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
+        # Capability fallback rescues: only one config labware exists and
+        # A1 fits it → no error after Phase 5 implementation.
+        # Until then, the original blanket "not in config keys" path fires.
+        assert errors == []
+
+    def test_capability_multi_survivor_still_fails(self):
+        """Description not in config + wells fit 2+ labware → ambiguous;
+        original LABWARE_NOT_FOUND error fires (no auto-pick)."""
+        spec = make_spec([
+            ExtractedStep(
+                order=1, action="transfer", volume=_vol(10.0),
+                source=_loc(description="some_box", well="A1"),
+                destination=_loc(description="some_box", well="A1"),
+                composition_provenance=_comp(),
+            )
+        ])
+        checker = PhysicalConstraintsChecker(self._CFG)
+        result = checker.assert_physical_constraints(spec)
+        errors = [v for v in result.errors
+                  if v.violation_type == ViolationType.LABWARE_NOT_FOUND]
+        # A1 fits all three labware → ambiguous → no rescue → original error.
+        assert len(errors) >= 1

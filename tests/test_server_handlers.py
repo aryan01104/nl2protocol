@@ -27,7 +27,9 @@ from nl2protocol.server.handlers import (
     HTMLBinaryConfirmHandler,
     HTMLConfirmationHandler,
     HTMLInitialContentsHandler,
+    HTMLNamespaceSplitHandler,
     InitialContentsConfirmation,
+    NamespaceSplitConfirmation,
     PendingRequest,
 )
 
@@ -693,3 +695,112 @@ class TestHTMLInitialContentsHandlerConfirm:
         ])
         assert result is None
         assert pending == {}
+
+
+# ============================================================================
+# NamespaceSplitConfirmation + HTMLNamespaceSplitHandler
+# ============================================================================
+# Same blocking pattern as AssignmentsConfirmation/HTMLAssignmentsHandler
+# but the payload carries letter-prefix groups (A/B/C) + per-group
+# candidate labware rather than free-text descriptions.
+
+
+class TestNamespaceSplitConfirmationActionMapping:
+    """Receiver writes the prefix-to-label map (or aborted flag) onto
+    the primitive; pipeline thread reads either off the same instance."""
+
+    def test_confirm_stores_prefix_mapping(self):
+        nc = NamespaceSplitConfirmation()
+        nc.set_response(
+            "confirm",
+            {"A": "sample_rack", "B": "reagent_rack", "C": "dest_block"},
+        )
+        assert nc.aborted is False
+        assert nc.confirmed == {"A": "sample_rack", "B": "reagent_rack",
+                                 "C": "dest_block"}
+        assert nc.event.is_set()
+
+    def test_abort_clears_confirmed_and_sets_aborted(self):
+        nc = NamespaceSplitConfirmation()
+        nc.set_response("abort", None)
+        assert nc.aborted is True
+        assert nc.confirmed is None
+        assert nc.event.is_set()
+
+
+class TestHTMLNamespaceSplitHandlerConfirm:
+    """The handler's confirm() blocks until the WS receiver fills the
+    NamespaceSplitConfirmation; returns the dict or None on abort/timeout.
+    Empty input list short-circuits without touching the queue."""
+
+    def test_empty_payload_returns_empty_dict_no_send(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, NamespaceSplitConfirmation] = {}
+        h = HTMLNamespaceSplitHandler(
+            send_request=sent.append,
+            pending_namespace_splits=pending,
+            timeout_seconds=2,
+        )
+        assert h.confirm([]) == {}
+        assert sent == []
+
+    def test_confirm_returns_prefix_to_label_mapping(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, NamespaceSplitConfirmation] = {}
+        h = HTMLNamespaceSplitHandler(
+            send_request=sent.append,
+            pending_namespace_splits=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("confirm", {"A": "rack_a", "B": "rack_b"})
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"prefix": "A", "wells": ["A1", "A2"],
+             "candidates": ["rack_a", "rack_b"], "suggested_label": "rack_a"},
+            {"prefix": "B", "wells": ["B1"],
+             "candidates": ["rack_a", "rack_b"], "suggested_label": "rack_b"},
+        ])
+        assert result == {"A": "rack_a", "B": "rack_b"}
+        assert len(sent) == 1
+        payload = sent[0]
+        assert "request_id" in payload
+
+    def test_confirm_returns_none_on_abort(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, NamespaceSplitConfirmation] = {}
+        h = HTMLNamespaceSplitHandler(
+            send_request=sent.append,
+            pending_namespace_splits=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("abort", None)
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"prefix": "A", "wells": ["A1"], "candidates": ["rack_a"],
+             "suggested_label": "rack_a"},
+        ])
+        assert result is None
+
+    def test_confirm_returns_none_on_timeout(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, NamespaceSplitConfirmation] = {}
+        h = HTMLNamespaceSplitHandler(
+            send_request=sent.append,
+            pending_namespace_splits=pending,
+            timeout_seconds=0.05,
+        )
+        result = h.confirm([
+            {"prefix": "A", "wells": ["A1"], "candidates": ["rack_a"],
+             "suggested_label": "rack_a"},
+        ])
+        assert result is None
