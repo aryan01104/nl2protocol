@@ -333,7 +333,9 @@
     border-radius: 0 4px 4px 0;
   }
   .step.step-orphan { border-left-color: var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
-  .step.step-grounded-instruction { border-left-color: var(--col-instruction); }
+  /* Instruction-grounded is the common case (most steps), so the blue
+     left-bar dominates the column without conveying useful signal.
+     Leave it transparent; the rarer orphan / mixed cases still show. */
   .step.step-grounded-mixed { border-left-color: var(--col-domain); }
   .step-header {
     font-size: 12px;
@@ -476,10 +478,13 @@
 
   /* ───────── Cite markers in instruction ─────────
      Three cite kinds, three treatments:
-       composite-step  → arrow ANCHOR. Subtle underline (muted red) at
-                         rest, brightens on hover; pairs with the SVG
-                         arrow into the step block. Multiple step cites
-                         can share one anchor (fan-out arrows).
+       composite-step  → arrow ANCHOR. Ghost-grey underline at rest,
+                         pulls to instruction-blue (matching the SVG
+                         arrow hue) on hover. Pair-syncing means the
+                         underline and its arrow light up together,
+                         so the rest state stays quiet across the
+                         whole page. Multiple step cites can share
+                         one anchor (fan-out arrows).
        atomic-color    → COLOR MATCH. The .palette-N class on the same
                          span paints the substring the same hue as the
                          atomic value in the spec column — no arrow.
@@ -493,13 +498,13 @@
     transition: background 0.12s, border-color 0.12s;
   }
   .cite-composite-step {
-    background: rgba(184, 68, 79, 0.05);
-    border-bottom: 2px solid rgba(184, 68, 79, 0.45);
+    background: transparent;
+    border-radius: 2px;
+    padding: 0 2px;
   }
   .cite-composite-step:hover,
   .cite-composite-step.cite-active {
-    background: rgba(184, 68, 79, 0.18);
-    border-bottom-color: rgba(184, 68, 79, 0.85);
+    background: rgba(37, 99, 235, 0.16);
   }
   .cite-atomic-color {
     /* color comes from the .palette-N class on the same span */
@@ -726,8 +731,10 @@
      The overlay hosts TWO arrow categories:
        - Composite-step arrows (instruction → extracted spec block).
          Reserved for step-existence grounding; existing pre-Phase-2b
-         language. Stroke is var(--col-instruction) so the arrow hue
-         tracks the instruction-source provenance token.
+         language. Ghost-grey at rest so the full set never reads as
+         spaghetti; pulls to var(--col-instruction) blue when its
+         pair is active (cite underline + arrow light up together
+         via setPairActive).
        - Resolution arrows (extracted spec atomic value → resolved
          spec atomic value). One per gap_resolved event with a
          drawable resolution_kind. Per ADR-0011 Phase 2b. Color-coded
@@ -741,12 +748,13 @@
   }
   #arrow-overlay path {
     fill: none;
-    stroke: var(--col-instruction);
-    stroke-opacity: 0.32;
+    stroke: #94a3b8;       /* slate-400 — ghost at rest */
+    stroke-opacity: 0.22;
     stroke-width: 2.5;
-    transition: stroke-opacity 0.12s, stroke-width 0.12s;
+    transition: stroke 0.12s, stroke-opacity 0.12s, stroke-width 0.12s;
   }
   #arrow-overlay path.arrow-active {
+    stroke: var(--col-instruction);
     stroke-opacity: 0.9;
     stroke-width: 3.5;
   }
@@ -1382,12 +1390,12 @@
   const sel = (attr, token) => `[${attr}~="${CSS.escape(token)}"]`;
 
   function bezierPath(srcRect, dstRect) {
-    // Right edge of source → left edge of destination, smooth horizontal sweep.
-    const x1 = srcRect.right;
-    const y1 = srcRect.top + srcRect.height / 2;
-    const x2 = dstRect.left;
-    const y2 = dstRect.top + dstRect.height / 2;
-    const dx = Math.max(40, (x2 - x1) * 0.5);
+    // |dy| term in dx prevents tall vertical sweeps from kinking — without
+    // it the curve flicks horizontally then sweeps wildly. Clamp at 220
+    // stops far-down steps from producing wild loops.
+    const x1 = srcRect.right, y1 = srcRect.top + srcRect.height / 2;
+    const x2 = dstRect.left,  y2 = dstRect.top + dstRect.height / 2;
+    const dx = Math.max(60, Math.min(220, Math.abs(x2 - x1) * 0.55 + Math.abs(y2 - y1) * 0.25));
     return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   }
 
@@ -1444,13 +1452,21 @@
   const COLUMN_FADE_MS = 605;        // matches CSS .step.fade-in transition (0.605s)
   const ARROW_STAGGER_MS = ARROW_TRACE_MS + COLUMN_FADE_MS;   // 1375 — slot duration
 
+  // Latest performance.now() timestamp at which any composite-step or
+  // resolution arrow is still mid-trace. Bumped whenever renderArrows /
+  // triggerResolutionTrace schedules a fresh trace. gateModal reads
+  // this so confirmation modals (IC volumes, panel prompts, etc.)
+  // can't pop while arrows are still drawing — that race produces
+  // the "Initial contents popped before arrows finished" symptom.
+  let arrowsTracingDoneAt = 0;
+
   function renderArrows() {
     const arrowGroup = document.getElementById("arrow-paths");
     if (!arrowGroup) return;
     // Update the clip-path rect to match the spec column's visible bounds.
     // Arrows that would extend above/below the column get clipped without
     // changing their bezier shape.
-    const specCol = document.querySelector(".col-extracted-spec");
+    const specCol = document.querySelector(".col-protocol-steps");
     const clipRect = document.getElementById("arrow-clip-rect");
     if (specCol && clipRect) {
       const r = specCol.getBoundingClientRect();
@@ -1462,9 +1478,15 @@
       clipRect.setAttribute("width", String(r.right - r.left + leftExtend));
       clipRect.setAttribute("height", String(r.bottom - r.top));
     }
-    // Dedupe by step-trigger id: one arrow per (cite-anchor, step) pair.
-    // When the same step-trigger id appears across multiple DOM segments
-    // (because of overlap segmentation), pick the leftmost segment as anchor.
+    // One arrow per (step, cite-region) pair. After overlap segmentation
+    // — atomic cites stack onto adjacent words and chop the step's cite
+    // into pieces, each piece tagged with all the cite-ids covering it —
+    // the step cite is spread across multiple sibling spans all carrying
+    // the same step-trigger id. We want the arrow to exit from the END
+    // of the highlighted region (where the eye finishes reading), not
+    // the start. querySelectorAll returns elements in DOM order, which
+    // is reading order, so iterating and letting the LAST write win
+    // gives the rect of the final piece of the step cite.
     const anchorByStepId = new Map();
     document.querySelectorAll(".cite-composite-step[data-cite-id]").forEach((citeEl) => {
       const ids = (citeEl.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
@@ -1472,10 +1494,7 @@
       if (!r.width) return;
       ids.forEach((id) => {
         if (!id.endsWith("-step-trigger")) return;
-        const prev = anchorByStepId.get(id);
-        if (!prev || r.left < prev.rect.left) {
-          anchorByStepId.set(id, { rect: r });
-        }
+        anchorByStepId.set(id, { rect: r });  // last write wins = end of cite
       });
     });
     // Track which mapped ids we resolved this render so we can prune
@@ -1510,6 +1529,10 @@
             const m = id.match(/^s(\d+)/);
             const stepIdx = m ? parseInt(m[1], 10) : 0;
             const delay = stepIdx * ARROW_STAGGER_MS;
+            arrowsTracingDoneAt = Math.max(
+              arrowsTracingDoneAt,
+              performance.now() + delay + ARROW_TRACE_MS,
+            );
             setTimeout(() => {
               // Bring the destination step block into view in the
               // extracted column before/while the arrow traces. Smooth
@@ -1518,10 +1541,21 @@
               // path tracking the cell as it moves.
               scrollColumnsForStep(
                 stepIdx,
-                [document.querySelector(".col-extracted-spec")],
+                [document.querySelector(".col-protocol-steps")],
               );
               path.style.transition = `stroke-dashoffset ${ARROW_TRACE_MS}ms ease-out`;
               path.style.strokeDashoffset = "0";
+              // Once the trace settles, clear the dash machinery so
+              // future `d` mutations from scheduleRender (scroll,
+              // resize, panel collapse) render along the new path
+              // length. Without this, dasharray stays locked to the
+              // initial length: when the bezier grows, the solid
+              // stroke ends at `len` and the arrow visually
+              // disconnects from the step card.
+              setTimeout(() => {
+                path.style.strokeDasharray = "none";
+                path.style.strokeDashoffset = "0";
+              }, ARROW_TRACE_MS + 50);
             }, delay);
           }
         } catch (e) { /* defensive — getTotalLength may not be available */ }
@@ -1539,9 +1573,20 @@
 
   function setPairActive(id, active) {
     // Toggle highlight on every cite-segment, prov-target, and arrow sharing one id.
-    document.querySelectorAll(sel("data-cite-id", id)).forEach((e) =>
-      e.classList.toggle("cite-active", active)
-    );
+    // Step-trigger pair: a segment that lies INSIDE both the step's
+    // composite cite AND an atomic-color cite (e.g. "sample tube"
+    // inside "Add 5uL of 4X Laemmli buffer to each sample tube")
+    // carries both ids. Toggling cite-active on the atomic-color
+    // segment would flash its palette-N solid background (per the
+    // .cite-marker.cite-atomic-color.palette-N.cite-active rule),
+    // which reads as a noisy secondary highlight unrelated to the
+    // step hover. Restrict step-trigger activation to segments that
+    // aren't also atomic-color so only the composite cite lights up.
+    const isStepTrigger = id.endsWith("-step-trigger");
+    document.querySelectorAll(sel("data-cite-id", id)).forEach((e) => {
+      if (isStepTrigger && e.classList.contains("cite-atomic-color")) return;
+      e.classList.toggle("cite-active", active);
+    });
     document.querySelectorAll(sel("data-prov-id", id)).forEach((e) => {
       if (e.classList.contains("step")) {
         e.classList.toggle("step-active", active);
@@ -1685,19 +1730,16 @@
       });
     });
 
-    // Step blocks — Q2 cohesion lighting + step-trigger pair highlight + tooltip.
+    // Step blocks — step-trigger pair highlight + tooltip.
     document.querySelectorAll(".step[data-prov-id]").forEach((stepEl) => {
       const provId = stepEl.getAttribute("data-prov-id");
-      const stepId = provId.replace(/-step-trigger$/, "");
       stepEl.addEventListener("mouseenter", (e) => {
         setPairActive(provId, true);
-        setQ2Active(stepId, true);
         showTip(tooltipHtmlForStepBlock(stepEl), e);
       });
       stepEl.addEventListener("mousemove", moveTip);
       stepEl.addEventListener("mouseleave", () => {
         setPairActive(provId, false);
-        setQ2Active(stepId, false);
         hideTip();
       });
     });
@@ -1707,19 +1749,6 @@
       stepEl.addEventListener("mouseenter", (e) => showTip(tooltipHtmlForStepBlock(stepEl), e));
       stepEl.addEventListener("mousemove", moveTip);
       stepEl.addEventListener("mouseleave", hideTip);
-    });
-
-    // Reverse Q2 wiring: hovering a Q2 cite-span surfaces its step.
-    document.querySelectorAll(".cite-q2-cohesion[data-q2-step-id]").forEach((citeEl) => {
-      const stepIds = (citeEl.getAttribute("data-q2-step-id") || "").split(/\s+/).filter(Boolean);
-      citeEl.addEventListener("mouseenter", () => stepIds.forEach((sid) => {
-        setQ2Active(sid, true);
-        setPairActive(`${sid}-step-trigger`, true);
-      }));
-      citeEl.addEventListener("mouseleave", () => stepIds.forEach((sid) => {
-        setQ2Active(sid, false);
-        setPairActive(`${sid}-step-trigger`, false);
-      }));
     });
 
     // Phase 4 polish: bulk-panel row hover lights up corresponding spec cells.
@@ -1771,9 +1800,20 @@
       if (!(len > 0)) return;
       path.style.strokeDasharray = String(len);
       path.style.strokeDashoffset = String(len);
+      arrowsTracingDoneAt = Math.max(
+        arrowsTracingDoneAt,
+        performance.now() + delayMs + ARROW_TRACE_MS,
+      );
       setTimeout(() => {
         path.style.transition = `stroke-dashoffset ${ARROW_TRACE_MS}ms ease-out`;
         path.style.strokeDashoffset = "0";
+        // Mirror renderArrows: clear dash machinery once the trace
+        // settles so future `d` mutations track the full bezier
+        // instead of being truncated at the initial path length.
+        setTimeout(() => {
+          path.style.strokeDasharray = "none";
+          path.style.strokeDashoffset = "0";
+        }, ARROW_TRACE_MS + 50);
       }, delayMs);
     } catch (e) { /* defensive */ }
   }
@@ -3187,7 +3227,19 @@
     // yet (e.g. IC volumes referencing labware whose step block is
     // still 5 slots away from fading in).
     function gateModal(showFn) {
-      const delay = Math.max(0, columnAnimationDoneAt - performance.now());
+      // Wait for whichever of the two animation deadlines is later:
+      //   columnAnimationDoneAt — the column-fade queue's projected end,
+      //                           set per gateColumn call.
+      //   arrowsTracingDoneAt  — the actual last-arrow-trace-completes
+      //                           timestamp, bumped from renderArrows /
+      //                           triggerResolutionTrace as paths are
+      //                           created. Catches cases where the
+      //                           column-duration estimate undercounts
+      //                           the real trace window (e.g. arrows
+      //                           created via per-cell gap_resolved
+      //                           updates after the gate window closed).
+      const target = Math.max(columnAnimationDoneAt, arrowsTracingDoneAt);
+      const delay = Math.max(0, target - performance.now());
       if (delay <= 0) {
         showFn();
       } else {
