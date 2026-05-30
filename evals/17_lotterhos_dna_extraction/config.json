@@ -1,0 +1,38 @@
+{
+    "labware": {
+        "tiprack_1000": {
+            "load_name": "opentrons_96_filtertiprack_1000ul",
+            "slot": "1"
+        },
+        "buffer_al_reservoir": {
+            "load_name": "nest_1_reservoir_195ml",
+            "slot": "2"
+        },
+        "buffer_aw1_reservoir": {
+            "load_name": "nest_1_reservoir_195ml",
+            "slot": "3"
+        },
+        "buffer_aw2_reservoir": {
+            "load_name": "nest_1_reservoir_195ml",
+            "slot": "5"
+        },
+        "elution_buffer_reservoir": {
+            "load_name": "nest_12_reservoir_15ml",
+            "slot": "6"
+        },
+        "sample_rack": {
+            "load_name": "opentrons_96_aluminumblock_nest_wellplate_100ul",
+            "slot": "8"
+        },
+        "dneasy_plate": {
+            "load_name": "nest_96_wellplate_2ml_deep",
+            "slot": "9"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p1000_single_gen2",
+            "tipracks": ["tiprack_1000"]
+        }
+    }
+}

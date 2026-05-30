@@ -1,0 +1,37 @@
+CLEANUP OF FRAGMENTED DNA
+
+2.1 Ensure that KAPA Pure Beads has been equilibrated to room temperature and that the beads are fully resuspended before proceeding.
+
+2.2 Add 80 μL of KAPA Pure Beads to the 100 μL fragmented DNA sample.
+
+2.3 Mix thoroughly by vortexing and/or pipetting up and down multiple times.
+
+2.4 Incubate the plate/tube(s) at room temperature for 5 – 15 min to bind the DNA to the beads.
+
+2.5 Place the plate/tube(s) on a magnet to capture the beads. Incubate until the liquid is clear.
+
+2.6 Carefully remove and discard the supernatant.
+
+2.7 Keeping the plate/tube(s) on the magnet, add 200 μL of 80% ethanol.
+
+2.8 Incubate the plate/tube(s) on the magnet at room temperature for ≥30 sec.
+
+2.9 Carefully remove and discard the ethanol.
+
+2.10 Keeping the plate/tube(s) on the magnet, add 200 μL of 80% ethanol.
+
+2.11 Incubate the plate/tube(s) on the magnet at room temperature for ≥30 sec.
+
+2.12 Carefully remove and discard the ethanol. Try to remove all residual ethanol without disturbing the beads.
+
+2.13 Dry the beads at room temperature for 3 – 5 min, or until all of the ethanol has evaporated. Caution: over-drying the beads may result in reduced yield.
+
+2.14 Remove the plate/tube(s) from the magnet.
+
+2.15 Resuspend the beads in an appropriate volume of elution buffer (10 mM Tris-HCl, pH 8.0 – 8.5) or PCR-grade water, depending on the downstream application.
+
+2.16 Incubate the plate/tube(s) at room temperature for 2 min to elute the DNA off the beads. The elution time may be extended up to 10 min if necessary to improve DNA recovery.
+
+2.17 Place the plate/tube(s) on a magnet to capture the beads. Incubate until the liquid is clear.
+
+2.18 Transfer the clear supernatant to a new plate/ tube(s). Proceed with your downstream application, or store DNA at 4ºC for 1 – 2 weeks, or at -20ºC.

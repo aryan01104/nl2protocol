@@ -1,0 +1,3 @@
+Stamp the source plate to the destination plate.
+
+Transfer 10 µL from each well of the source plate to the corresponding well of the destination plate (1:1 by well position). Use the multichannel pipette. Each source well contains a unique sample — do not cross-contaminate between wells.

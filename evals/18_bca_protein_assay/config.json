@@ -1,0 +1,44 @@
+{
+    "labware": {
+        "tiprack_20": {
+            "load_name": "opentrons_96_filtertiprack_20ul",
+            "slot": "1"
+        },
+        "tiprack_300": {
+            "load_name": "opentrons_96_filtertiprack_200ul",
+            "slot": "2"
+        },
+        "reagent_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+            "slot": "3"
+        },
+        "standards_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "4"
+        },
+        "wr_reservoir": {
+            "load_name": "nest_1_reservoir_195ml",
+            "slot": "5"
+        },
+        "assay_plate": {
+            "load_name": "corning_96_wellplate_360ul_flat",
+            "slot": "10"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p20_single_gen2",
+            "tipracks": ["tiprack_20"]
+        },
+        "right": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300"]
+        }
+    },
+    "modules": {
+        "heater_shaker": {
+            "module_type": "heater_shaker",
+            "slot": "10"
+        }
+    }
+}

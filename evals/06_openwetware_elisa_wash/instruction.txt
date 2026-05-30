@@ -1,0 +1,7 @@
+ELISA Wash Step
+
+Wash the plate 5 times with PBS containing 0.05% Tween 20 (300 µl per well).
+
+By using excess volumes (300 µl instead of 200 µl or 100 µl in the other steps), the researcher ensures that no residual molecules cling to the walls of the wells.
+
+After the washing steps, remove all wash buffer by tapping the plate against absorbent paper. Immediately proceed to the next step of the assay (do not leave the plate to dry).

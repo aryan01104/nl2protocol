@@ -1,0 +1,30 @@
+{
+    "labware": {
+        "tiprack_300": {
+            "load_name": "opentrons_96_tiprack_300ul",
+            "slot": "1"
+        },
+        "reagent_rack": {
+            "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+            "slot": "2"
+        },
+        "ethanol_reservoir": {
+            "load_name": "nest_12_reservoir_15ml",
+            "slot": "3"
+        },
+        "sample_plate": {
+            "load_name": "nest_96_wellplate_2ml_deep",
+            "slot": "4"
+        },
+        "elution_plate": {
+            "load_name": "nest_96_wellplate_100ul_pcr_full_skirt",
+            "slot": "5"
+        }
+    },
+    "pipettes": {
+        "left": {
+            "model": "p300_single_gen2",
+            "tipracks": ["tiprack_300"]
+        }
+    }
+}

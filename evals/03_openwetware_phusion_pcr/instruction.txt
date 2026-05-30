@@ -1,0 +1,23 @@
+Condition C: Phusion Polymerase
+
+Setup Steps:
+1. Use NEB Phusion Polymerase Kit
+2. Combine components:
+
+Reaction Mix (50 µL total):
+- 10 µL Phusion Buffer
+- 1 µL 10mM dNTPs
+- 2.5 µL Forward Primer (10 µM)
+- 2.5 µL Reverse Primer (10 µM)
+- 2 µL Genomic Template (less for plasmid)
+- 0.5 µL Phusion polymerase
+- 31.5 µL Distilled Water
+
+PCR Program:
+- Start: 98 °C for 30 sec
+- Cycle: 98 °C for 10 sec
+- 45-72 °C for 15 sec (3 degrees above primer Tm)
+- 72 °C for 15-30 sec/kb
+- 25-35 cycles total
+- 72 °C for 5-10 min
+- End: 4 °C indefinitely
