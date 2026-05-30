@@ -35,7 +35,22 @@ class LabwareMatchSuggestion:
     not pick (LLM returned null, or returned a label that doesn't exist
     in config).
 
-    Used by `LabwareResolver.suggest()`; consumed by the pipeline's
+    `branch` records WHICH path produced this suggestion so the modal
+    can suppress UI for the deterministic case (single candidate fit
+    both capability and type filters — nothing to ask the user) and
+    show the right shape for ambiguous / namespace-split / unresolvable
+    cases. Values:
+      - "deterministic": exactly one capability+type survivor; no LLM call.
+      - "llm":           2+ survivors after filters; LLM picked among them.
+      - "namespace_split": 0 survivors AND wells partition cleanly by
+                          letter prefix into ≥2 subgroups each fitting
+                          a distinct config labware (handled by the
+                          separate `NamespaceSplitDetector` + modal).
+      - "unresolvable":  0 survivors with no clean partition; user
+                          must pick from full candidate list (or fix
+                          the config).
+
+    Used by `LabwareMatcher.suggest()`; consumed by the pipeline's
     labware-assignments confirmation flow which decides whether to
     stamp the suggestion's reasoning into a Provenance (user accepted)
     or construct override-reasoning (user picked a different label).
@@ -47,6 +62,150 @@ class LabwareMatchSuggestion:
     why_not_in_instruction: Optional[str]
     confidence: float
     candidates: List[str]
+    branch: str = "unresolvable"
+
+
+# ============================================================================
+# Capability + type filters (module-level so tests can exercise without LLM)
+# ============================================================================
+
+# Closed set of Opentrons load_name categories the type filter recognizes.
+# Anything else returned by `_load_name_category` is treated as unknown and
+# the candidate stays in the running (fail-open).
+_KNOWN_LOAD_NAME_CATEGORIES = frozenset({
+    "tiprack", "tuberack", "wellplate", "reservoir", "aluminumblock",
+})
+
+
+def _load_name_category(load_name: str) -> Optional[str]:
+    """Extract the category token from an Opentrons-style load_name.
+
+    Pre:    `load_name` is the string stored in `config["labware"][k]
+            ["load_name"]`. Opentrons convention is
+            `<vendor>_<count>_<type>_<details...>` (e.g.
+            `opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap`),
+            so the category lives at index 2 after splitting on `_`.
+
+    Post:   Returns the third underscore-separated token iff that token
+            is in the closed set
+            {"tiprack","tuberack","wellplate","reservoir","aluminumblock"}.
+            Returns `None` when `load_name` has fewer than 3 segments
+            OR the third token is not in the closed set. Empty string
+            input also returns `None`.
+
+    Side effects: None. Pure.
+    """
+    raise NotImplementedError("Phase 3: implement _load_name_category")
+
+
+def _description_category_filter(description: str) -> Optional[set]:
+    """Map a user-written labware description to the categories it allows.
+
+    Pre:    `description` is the user's free-text labware reference,
+            e.g. "tube rack", "Eppendorf tubes", "tipbox", "96-well
+            plate", "reservoir", "rack". Match is case-insensitive on
+            substring.
+
+    Post:   Returns a `set` of allowed categories when the description
+            carries a strong category cue:
+              - contains "tube"/"tubes"/"eppendorf"/"falcon"/"1.5ml"/"2ml"
+                → {"tuberack", "aluminumblock"}
+              - contains "tip"/"tips"/"tipbox"/"tiprack"
+                → {"tiprack"}
+              - contains "plate"/"wellplate"/"microplate"/"96-well"/"384-well"
+                → {"wellplate"}
+              - contains "reservoir"/"trough"/"basin"
+                → {"reservoir"}
+            Returns `None` for ambiguous / no-cue descriptions (e.g.
+            bare "rack", or anything none of the rules match). `None`
+            means "do not filter by type" — let the LLM / capability
+            filter alone decide.
+
+    Side effects: None. Pure.
+    """
+    raise NotImplementedError("Phase 3: implement _description_category_filter")
+
+
+def _capability_filter(wells: set, config: dict) -> List[str]:
+    """Drop config labware that can't physically hold every well referenced.
+
+    Pre:    `wells` is the aggregated set of well IDs the user
+            referenced for ONE description across the whole spec
+            (e.g. {"A1","A2",...,"C7"}). `config` is the lab config
+            dict (the same shape `LabwareMatcher.config` carries).
+
+    Post:   Returns a list of config labware keys (preserving config
+            dict insertion order) whose
+            `get_well_info(load_name)["valid_wells"]` is a superset of
+            `wells`. Special cases:
+              - `wells` empty → return ALL labware keys (no constraint).
+              - `get_well_info` raises `ValueError` (unknown load_name)
+                → KEEP that candidate (fail-open, matches the
+                convention in constraints.py:553-559 where unknown
+                load_names skip the constraint).
+              - `config` has no "labware" key OR an empty one → `[]`.
+
+    Side effects: None. Calls `get_well_info` per candidate.
+    """
+    raise NotImplementedError("Phase 3: implement _capability_filter")
+
+
+def _type_filter(description: str, candidates: List[str],
+                 config: dict) -> List[str]:
+    """Drop candidates whose load_name category contradicts the description.
+
+    Pre:    `description` is the user wording for one labware
+            reference. `candidates` is a list of config labware keys
+            (typically the output of `_capability_filter`). `config`
+            carries each candidate's `load_name`.
+
+    Post:   Returns the candidates filtered by the rules in
+            `_description_category_filter`:
+              - If filter is `None` (no category cue): return
+                `candidates` unchanged.
+              - Else: keep candidate iff
+                `_load_name_category(config["labware"][c]["load_name"])
+                in allowed_categories`. A candidate whose
+                `_load_name_category` returns `None` (unknown shape)
+                is DROPPED when a filter is active — we trust the
+                category cue over an unparseable load_name.
+            Preserves input order. Returns `[]` if everything is
+            filtered out.
+
+    Side effects: None. Pure.
+    """
+    raise NotImplementedError("Phase 3: implement _type_filter")
+
+
+def _has_namespace_split(description: str, wells: set,
+                         config: dict) -> Optional[dict]:
+    """Test whether referenced wells partition cleanly by letter prefix
+    into ≥2 subgroups, each fitting a distinct config labware.
+
+    Pre:    `description` is the user wording (used for type filter on
+            each subgroup). `wells` is the aggregated well set that
+            `_capability_filter` already proved fits NO single labware.
+            `config` is the lab config dict.
+
+    Post:   Returns a dict
+              {
+                "partition":      {prefix_letter: sorted_list_of_wells},
+                "candidate_pairs": [(prefix_letter, fitting_label), ...],
+              }
+            iff:
+              - every well in `wells` matches the regex `^([A-Z])(\\d+)$`,
+              - grouping by the leading letter yields ≥2 groups,
+              - EVERY group's well subset fits at least one config
+                labware passing both capability AND type filter,
+              - the chosen fitting labware can DIFFER across groups
+                (so the partition implies multiple distinct racks).
+            Returns `None` otherwise. The `candidate_pairs` list picks
+            the FIRST fitting labware per group (config insertion order).
+
+    Side effects: None. Calls `_capability_filter` + `_type_filter` per
+                  subgroup.
+    """
+    raise NotImplementedError("Phase 4: implement _has_namespace_split")
 
 
 # public artifact of the file, specifically suggest func.
@@ -153,6 +312,70 @@ class LabwareMatcher:
                 seen.add(pf.labware)
                 ordered.append(pf.labware)
         return ordered
+
+    def _collect_descriptions_with_wells(self, spec: ProtocolSpec) -> dict:
+        """Aggregate per-description well sets + step contexts across the spec.
+
+        Pre:    `spec` is a post-extraction ProtocolSpec. Not mutated.
+
+        Post:   Returns a dict
+                  {description: {"wells": set[str],
+                                 "contexts": list[str]}}
+                covering every unique description found in
+                `spec.steps[*].source/destination`,
+                `spec.initial_contents[*].labware`, and
+                `spec.prefilled_labware[*].labware`. First-seen order
+                preserved (so `list(result.keys())` matches
+                `_collect_unique_descriptions(spec)`).
+
+                For each description:
+                  - `wells` is the union of every well referenced —
+                    from `ref.well` (singleton), `ref.wells` (explicit
+                    list), `ref.well_range` (parsed via
+                    `expand_well_range` from schema_builder), and the
+                    `wc.well` field on initial_contents rows.
+                    `prefilled_labware` rows contribute no wells
+                    (they're labware-level metadata).
+                  - `contexts` is a list of short strings describing
+                    each step the description appears in (e.g.
+                    "Step 2: transfer source", "Step 5: mix
+                    destination"). Order matches step.order ascending,
+                    initial_contents appended last as
+                    "initial contents".
+
+        Side effects: None. Pure aggregation. Uses `expand_well_range`
+                      from `nl2protocol.extraction.schema_builder`.
+        """
+        raise NotImplementedError(
+            "Phase 3: implement _collect_descriptions_with_wells")
+
+    def _resolve_one(self, description: str, wells: set) -> tuple:
+        """Decide the resolution branch for ONE description.
+
+        Pre:    `description` is the user wording. `wells` is the
+                aggregated well set for that description (from
+                `_collect_descriptions_with_wells`). `self.config` is
+                already loaded.
+
+        Post:   Returns `(branch, survivors)` where `branch` is one of
+                {"deterministic","llm","namespace_split","unresolvable"}
+                and `survivors` is a list of config labware keys:
+                  - len==1 AND branch=="deterministic"  → unambiguous
+                    match (single candidate survived capability + type
+                    filters).
+                  - len>=2 AND branch=="llm"            → LLM must
+                    disambiguate among physically valid candidates.
+                  - len==0 AND branch=="namespace_split" → 0 survivors
+                    AND `_has_namespace_split` detected a clean
+                    partition (caller routes to NamespaceSplitDetector).
+                  - len==0 AND branch=="unresolvable"   → 0 survivors
+                    AND no clean partition; caller surfaces full
+                    candidate list for manual pick.
+
+        Side effects: None. Calls `_capability_filter`, `_type_filter`,
+                      `_has_namespace_split`. No LLM call.
+        """
+        raise NotImplementedError("Phase 4: implement _resolve_one")
 
     def _positive_reasoning(self, description: str, label: str,
                             reasoning: Optional[str] = None) -> str:

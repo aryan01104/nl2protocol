@@ -242,6 +242,106 @@ class HTMLAssignmentsHandler:
         return confirmation.confirmed
 
 
+class NamespaceSplitConfirmation:
+    """Coordination primitive for one in-flight namespace-split
+    confirmation round-trip. Analog of `AssignmentsConfirmation` but
+    keyed on letter-prefix groups rather than free-text descriptions.
+
+    Pre:    Constructed before the namespace_split_request envelope is
+            sent. Owning handler stores it on a slot the WS receiver
+            can read; pipeline thread blocks on `event.wait`.
+    Post:   `set_response(action, mappings)` populates `confirmed`
+            (a {prefix: chosen_label} dict on confirm, None on abort)
+            and signals the event. Pipeline thread reads `confirmed`
+            and routes the mappings back into the spec by rewriting
+            each affected ref's description to include the prefix
+            tag + its resolved label.
+    """
+
+    def __init__(self):
+        self.event = threading.Event()
+        self.confirmed: Optional[Dict[str, str]] = None
+        self.aborted: bool = False
+
+    def set_response(self, action: str,
+                      mappings: Optional[Dict[str, str]]) -> None:
+        """Map browser response onto the confirmation slots and signal.
+
+        Pre:    `action` is "confirm" or "abort". For "confirm",
+                `mappings` is a {prefix_letter: chosen_label} dict
+                the browser collected from the modal rows.
+        Post:   On "abort": `aborted=True`, `confirmed=None`.
+                On "confirm": `confirmed=mappings` (may be empty if
+                there were no groups to map — the handler short-
+                circuits empty payloads earlier).
+                `event` is set last so the waiter sees fully-populated
+                slots.
+
+        Raises: Never.
+        """
+        raise NotImplementedError(
+            "Phase 6: implement NamespaceSplitConfirmation.set_response")
+
+
+class HTMLNamespaceSplitHandler:
+    """Browser-bridged handler for namespace-split confirmation. Same
+    blocking pattern as `HTMLAssignmentsHandler`, payload carries the
+    detected prefix-group partition + per-group candidate labware
+    instead of a free-text assignments table.
+
+    Pre:    `send_request` pushes a payload dict onto the outbound
+            queue (WS sender drains). `pending_namespace_splits` is
+            the shared dict keyed on request_id (one in-flight at a
+            time per pipeline run). `timeout_seconds` controls the
+            per-request wait — same default as the other handlers.
+
+    Post:   Each `confirm(payload)` call:
+              - Empty payload short-circuits to `{}` (nothing to ask).
+              - Otherwise: generates a request_id, stores a
+                `NamespaceSplitConfirmation` on the dict, sends the
+                payload, blocks on the event.
+              - On signal: clears the slot, returns the
+                `{prefix: chosen_label}` dict.
+              - On abort: returns `None`.
+              - On timeout: returns `None` (treated as abort —
+                pipeline halts gracefully).
+    """
+
+    def __init__(
+        self,
+        send_request: Callable[[Dict[str, Any]], None],
+        pending_namespace_splits: Dict[str, "NamespaceSplitConfirmation"],
+        timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    ):
+        self._send = send_request
+        self._pending = pending_namespace_splits
+        self._timeout = timeout_seconds
+        self._counter = 0
+        self._lock = threading.Lock()
+
+    def _next_request_id(self) -> str:
+        with self._lock:
+            self._counter += 1
+            return f"nssplit-{self._counter}"
+
+    def confirm(self, payload: list) -> Optional[Dict[str, str]]:
+        """Send the namespace-split partition to the browser and block
+        until the user confirms or aborts.
+
+        Pre:    `payload` is a list of dicts, each carrying
+                `{prefix, wells, candidates, suggested_label}` for one
+                detected prefix group. An empty list means no
+                namespace-split groups to confirm — return `{}`
+                immediately.
+        Post:   Returns `{prefix: confirmed_label}` on confirm, or
+                `None` on abort/timeout. Empty dict when input was
+                empty. The dict's keys are the prefix letters from
+                the payload (one per row).
+        """
+        raise NotImplementedError(
+            "Phase 6: implement HTMLNamespaceSplitHandler.confirm")
+
+
 class InitialContentsConfirmation:
     """Coordination primitive for one in-flight initial-contents
     batch confirmation. Same shape as AssignmentsConfirmation, but

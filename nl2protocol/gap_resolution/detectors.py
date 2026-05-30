@@ -543,6 +543,62 @@ class LabwareAmbiguityDetector:
 
 
 # ============================================================================
+# NamespaceSplitDetector — fires when "tube rack A1-A6, B1, C1-C7" pattern
+# is detected: wells on one description partition cleanly by letter prefix
+# into multiple racks, each fitting a distinct config labware.
+# ============================================================================
+
+class NamespaceSplitDetector:
+    """Emits one Gap per description whose aggregated wells partition by
+    letter prefix into ≥2 subgroups, each fitting a distinct config
+    labware. Used when the user wrote `A1-A6, B1, B2, C1-C7` on a
+    single description like "tube rack" and the letter prefixes actually
+    correspond to separate physical racks rather than well coordinates
+    on one labware.
+
+    The detector only fires when:
+      - the aggregated well set fits NO single config labware (else
+        normal resolution path handles it), AND
+      - wells regex-match `^([A-Z])(\\d+)$` (so a partition is even
+        possible), AND
+      - grouping by leading letter yields ≥2 groups, each individually
+        fitting at least one config labware via capability + type
+        filter.
+
+    Pre:    `spec` is a ProtocolSpec; `context["config"]` is the lab
+            config dict — required. If absent or empty labware → `[]`.
+    Post:   Returns one Gap per description matching the conditions:
+              * `id`         = f"labware.namespace_split.{description_slug}"
+              * `step_order` = None (spec-level gap; affects multiple steps)
+              * `field_path` = f"labware.namespace_split:{description}"
+                                (not a real spec path — flags this Gap as
+                                non-standard for the apply layer)
+              * `kind`       = "ambiguous"
+              * `severity`   = "blocker"
+              * `description`= human-readable summary naming the prefix
+                                groups and candidate labware per group
+              * `metadata`   = {
+                  "subkind": "namespace_split",
+                  "description": <user wording>,
+                  "partition": {prefix: [wells]},
+                  "candidate_pairs": [(prefix, fitting_label), ...],
+                }
+            Descriptions that ARE single-fit (capability+type filter
+            survives ≥1) are skipped — `LabwareAmbiguityDetector` and
+            the normal resolver flow handle them.
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        """Walk the spec; emit one Gap per description with a clean
+        prefix partition that no single labware satisfies.
+
+        Reads `context["config"]`. Returns `[]` if config missing.
+        """
+        raise NotImplementedError("Phase 4: implement NamespaceSplitDetector.detect")
+
+
+# ============================================================================
 # Adapter list for the registry
 # ============================================================================
 
