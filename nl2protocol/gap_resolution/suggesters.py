@@ -564,10 +564,30 @@ THE GAP:
 - description: {description}
 - current value: {current_value}
 
+SCOPE — read carefully:
+Your reasoning MUST justify ONLY the value of THIS field. Do not propose
+or imply changes to other fields on the same step or anywhere else in
+the spec. The apply path writes ONLY the field named above; reasoning
+that argues for additional changes will be misleading because those
+changes will not actually happen.
+
+Examples (assume the gap is a wells field like `steps[3].destination.well`):
+  BAD:  "A1 on the heating block is appropriate for the ladder so it can
+         be denatured." (Implies the labware should change too. Misleading
+         — only the well field will be updated.)
+  GOOD: "A1 is the conventional starting position on this destination
+         labware when the instruction doesn't specify a target well."
+
+If you can't justify the value WITHIN the constraints of the other
+existing fields (e.g. the resolved labware can't host the well you're
+proposing), return confidence < 0.5 and say so in positive_reasoning
+rather than inventing a justification that requires changing something
+else.
+
 Your task: produce ONE JSON object with this exact shape:
 {{
   "value": <the proposed value, in the same shape the spec field expects>,
-  "positive_reasoning": "<one sentence: why this value is right>",
+  "positive_reasoning": "<one sentence: why THIS field's value is right, given the existing values of other fields on this step>",
   "why_not_in_instruction": "<one sentence: name the specific element the instruction lacks; do not write 'not specified' generically — state what you would have expected to find>",
   "confidence": <0.0-1.0>
 }}

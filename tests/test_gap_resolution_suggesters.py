@@ -614,3 +614,92 @@ class TestWellRangeClipSuggester:
                   severity="blocker")
         assert WellRangeClipSuggester().suggest(spec=spec, gap=gap, context={}) is None
 
+
+
+# ============================================================================
+# LLMSpotSuggester scope-guidance prompt (Phase 7 follow-up)
+# ============================================================================
+
+from nl2protocol.gap_resolution.suggesters import LLMSpotSuggester
+
+
+class TestLLMSpotSuggesterPromptScope:
+    """The spot suggester proposes a value for ONE field. Its prompt
+    must explicitly tell the LLM that the reasoning is scoped to THAT
+    field and must not imply changes elsewhere — otherwise the LLM
+    happily writes "A1 on dest_block" reasoning when only the well is
+    being changed (the labware stays sample_rack), and the user is
+    misled by reasoning that argues for a change that won't happen."""
+
+    class _StubClient:
+        def __init__(self):
+            self.messages = self
+            self.create_calls = []
+
+        def create(self, **kwargs):
+            self.create_calls.append(kwargs)
+            class _R:
+                content = [type("C", (), {"text": '{"value": "A1", '
+                                          '"positive_reasoning": "ok", '
+                                          '"why_not_in_instruction": "ok", '
+                                          '"confidence": 0.6}'})()]
+            return _R()
+
+    def _spec(self):
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        step = ExtractedStep(
+            order=1, action="transfer", composition_provenance=comp,
+            destination=LocationRef(
+                description="rack", well="A1",
+                description_provenance=_instr_prov("A1"),
+                wells_provenance=_instr_prov("A1"),
+            ),
+        )
+        return ProtocolSpec(summary="t", steps=[step])
+
+    def _gap(self):
+        return Gap(
+            id="g1", step_order=1, field_path="steps[0].destination.well",
+            kind="missing", current_value=None,
+            description="well missing", severity="blocker", metadata={},
+        )
+
+    def test_prompt_names_scope_constraint(self):
+        client = self._StubClient()
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        sug.suggest(self._gap(), self._spec(), context={
+            "instruction": "Add 5uL", "config": {"labware": {}},
+        })
+        assert len(client.create_calls) == 1
+        prompt = client.create_calls[0]["messages"][0]["content"]
+        assert "SCOPE" in prompt
+        assert "only the value of THIS field" in prompt.lower() \
+            or "only the value of this field" in prompt.lower()
+
+    def test_prompt_carries_bad_vs_good_example(self):
+        client = self._StubClient()
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        sug.suggest(self._gap(), self._spec(), context={
+            "instruction": "x", "config": {},
+        })
+        prompt = client.create_calls[0]["messages"][0]["content"]
+        # Anti-pattern: reasoning implying a labware change that won't happen.
+        assert "BAD" in prompt
+        assert "heating block" in prompt
+        # Counter-example showing scope-respecting reasoning.
+        assert "GOOD" in prompt
+
+    def test_prompt_steers_low_confidence_when_field_constrained(self):
+        client = self._StubClient()
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        sug.suggest(self._gap(), self._spec(), context={
+            "instruction": "x", "config": {},
+        })
+        prompt = client.create_calls[0]["messages"][0]["content"]
+        # The prompt must tell the LLM what to do when it can't justify
+        # the value without implying a change elsewhere — confidence < 0.5
+        # is the signal, not an invented justification.
+        assert "confidence < 0.5" in prompt
