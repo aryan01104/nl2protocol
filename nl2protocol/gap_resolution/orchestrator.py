@@ -497,12 +497,41 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
     """
     from nl2protocol.models.spec import Provenance
 
+    # User-action statuses are TERMINAL: once the user has acted on a
+    # slot, the reviewer pass MUST NOT overwrite that decision. Without
+    # this guard a reviewer that fires after a pre-orchestrator modal
+    # closes would silently flip the user's decision to a reviewer
+    # verdict (the objection stays in the field but the audit trail
+    # forgets the user ever acted).
+    _TERMINAL_USER_STATUSES = frozenset({
+        "user_confirmed",
+        "user_edited",
+        "user_accepted_suggestion",
+        "user_skipped",
+        "user_overrode_fabrication",
+    })
+
     def _verdict_updates(review):
         agreed = review.confirms_positive and review.confirms_negative
         return {
             "review_status": "reviewed_agree" if agreed else "reviewed_disagree",
             "reviewer_objection": None if agreed else review.objection,
         }
+
+    def _should_stamp(prov) -> bool:
+        """A slot is stamped iff (a) the reviewer would have actually
+        looked at it (skip instruction-sourced — same rule
+        IndependentReviewSuggester applies when collecting claims),
+        AND (b) it doesn't already carry a terminal user-action
+        status (user decisions are sacrosanct in their own slot).
+        """
+        if prov is None:
+            return False
+        if prov.source == "instruction":
+            return False
+        if prov.review_status in _TERMINAL_USER_STATUSES:
+            return False
+        return True
 
     for step_idx, step in enumerate(spec.steps):
         # Atomic-field provenances (one slot each).
@@ -511,7 +540,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             if field_obj is None:
                 continue
             prov = getattr(field_obj, "provenance", None)
-            if prov is None:
+            if not _should_stamp(prov):
                 continue
             review = reviews.get(f"steps[{step_idx}].{fname}")
             if review is None:
@@ -521,9 +550,12 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             })
 
         # LocationRef field provenances (two slots: description + wells).
-        # A reviewer verdict on `steps[N].source` covers the whole field —
-        # it propagates to both slots so each remains independently
-        # re-validatable.
+        # A reviewer verdict on `steps[N].source` covers the field as a
+        # whole, but each slot is gated independently by `_should_stamp`
+        # — an instruction-sourced sibling stays at its original status
+        # rather than picking up a verdict from a slot the model
+        # actually reviewed (mirror of the reviewer's own skip rule
+        # over instruction-sourced provenances).
         for role in ("source", "destination"):
             ref = getattr(step, role, None)
             if ref is None:
@@ -533,7 +565,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
                 continue
             for prov_attr in ("description_provenance", "wells_provenance"):
                 prov = getattr(ref, prov_attr, None)
-                if prov is None:
+                if not _should_stamp(prov):
                     continue
                 setattr(ref, prov_attr, Provenance.model_validate({
                     **prov.model_dump(), **_verdict_updates(review),
@@ -545,7 +577,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             if ref is None:
                 continue
             rprov = getattr(ref, "resolved_label_provenance", None)
-            if rprov is None:
+            if not _should_stamp(rprov):
                 continue
             review = reviews.get(f"steps[{step_idx}].{role}.resolved_label")
             if review is None:

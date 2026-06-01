@@ -1029,6 +1029,7 @@ class ProtocolAgent:
         if not confirmed:
             return
         from nl2protocol.models.spec import push_revision
+        from nl2protocol.extraction.schema_builder import expand_well_range
         for step in spec.steps:
             for ref in (step.source, step.destination):
                 if ref is None:
@@ -1039,6 +1040,16 @@ class ProtocolAgent:
                 if label is None:
                     continue
                 suggestion = labware_suggestions.get(ref.description)
+                # Per-ref wells for the shape-mismatch check in
+                # _build_user_action_provenance. Same shape-aggregation
+                # logic as constraints._wells_of_ref.
+                ref_wells: set = set()
+                if ref.well:
+                    ref_wells.add(ref.well)
+                if ref.wells:
+                    ref_wells.update(ref.wells)
+                if ref.well_range:
+                    ref_wells.update(expand_well_range(ref.well_range))
                 # One logical write per LocationRef: snapshot the pre-
                 # assignment state, then update both resolved_label and
                 # resolved_label_provenance on the head.
@@ -1049,6 +1060,7 @@ class ProtocolAgent:
                         description=ref.description,
                         label=label,
                         suggestion=suggestion,
+                        ref_wells=ref_wells,
                     ),
                 )
         # initial_contents and prefilled_labware store labware as plain
@@ -1066,6 +1078,7 @@ class ProtocolAgent:
 
     def _build_user_action_provenance(
         self, description: str, label: str, suggestion=None,
+        ref_wells: Optional[set] = None,
     ):
         """Build the Provenance stamped onto a confirmed labware
         mapping. `review_status` reflects user action: accepted the
@@ -1076,6 +1089,10 @@ class ProtocolAgent:
                 the config key the user confirmed. `suggestion` is the
                 matching `LabwareSuggestion` from the resolver (or None
                 if the resolver returned nothing for this description).
+                `ref_wells` is the set of wells referenced by THIS
+                LocationRef (not aggregated across the spec). Used to
+                detect a shape mismatch between the user's pick and the
+                wells they expect to touch.
 
         Post:   Returns a `Provenance` with:
                   * source="inferred" (labware mapping is never
@@ -1088,9 +1105,18 @@ class ProtocolAgent:
                     the resolver's own reasoning when the user accepted,
                     fresh override-reasoning when the user picked a
                     different label (or the resolver had no pick).
+                    When `ref_wells` contains any well outside the
+                    picked labware's `valid_wells`, a "[shape mismatch]"
+                    note naming the offending wells + the labware's
+                    valid range is APPENDED to positive_reasoning so
+                    the warning surfaces wherever positive_reasoning
+                    is rendered (modal + report).
                   * confidence: 0.85 on accept (matches the resolver's
                     self-assessment), 1.0 on user override (user is
-                    authoritative).
+                    authoritative). When a shape mismatch is detected,
+                    confidence is clamped at min(existing, 0.5) — the
+                    physical impossibility downgrades trust regardless
+                    of user/resolver agreement.
         Side effects: None.
         """
         from nl2protocol.models.spec import Provenance
@@ -1101,33 +1127,91 @@ class ProtocolAgent:
             and suggestion.positive_reasoning is not None
         )
         if accepted:
-            return Provenance(
-                source="inferred",
-                positive_reasoning=suggestion.positive_reasoning,
-                why_not_in_instruction=suggestion.why_not_in_instruction,
-                confidence=suggestion.confidence,
-                review_status="user_accepted_suggestion",
-            )
-        suggested = suggestion.suggested_label if suggestion is not None else None
-        if suggested is not None:
-            positive = (
-                f"User picked '{label}' for description '{description}' "
-                f"over the resolver's suggestion of '{suggested}'."
-            )
+            base_positive = suggestion.positive_reasoning
+            base_why = suggestion.why_not_in_instruction
+            base_conf = suggestion.confidence
+            base_status = "user_accepted_suggestion"
         else:
-            positive = (
-                f"User picked '{label}' for description '{description}'; "
-                f"resolver had no suggestion."
-            )
-        return Provenance(
-            source="inferred",
-            positive_reasoning=positive,
-            why_not_in_instruction=(
+            suggested = suggestion.suggested_label if suggestion is not None else None
+            if suggested is not None:
+                base_positive = (
+                    f"User picked '{label}' for description '{description}' "
+                    f"over the resolver's suggestion of '{suggested}'."
+                )
+            else:
+                base_positive = (
+                    f"User picked '{label}' for description '{description}'; "
+                    f"resolver had no suggestion."
+                )
+            base_why = (
                 f"Labware label '{label}' is a config key, not an "
                 f"instruction phrase."
-            ),
-            confidence=1.0,
-            review_status="user_edited",
+            )
+            base_conf = 1.0
+            base_status = "user_edited"
+
+        # Shape-mismatch warning: if the user-picked labware can't
+        # physically host every well referenced by this ref, append a
+        # warning into positive_reasoning so the modal + report surface
+        # it inline. Constraint check still emits its own WELL_INVALID
+        # error downstream; this just makes the provenance honest about
+        # the mismatch at the moment of decision.
+        mismatch_note = self._shape_mismatch_note(label, ref_wells)
+        if mismatch_note:
+            base_positive = f"{base_positive} {mismatch_note}"
+            base_conf = min(base_conf, 0.5)
+
+        return Provenance(
+            source="inferred",
+            positive_reasoning=base_positive,
+            why_not_in_instruction=base_why,
+            confidence=base_conf,
+            review_status=base_status,
+        )
+
+    def _shape_mismatch_note(self, label: str,
+                              ref_wells: Optional[set]) -> Optional[str]:
+        """Build a "[shape mismatch]" note when `ref_wells` contains any
+        well outside the picked labware's `valid_wells`.
+
+        Pre:    `label` is a config labware key. `ref_wells` is the set
+                of wells the ref touches (or None / empty for "no wells
+                to check").
+        Post:   Returns a single-sentence note naming the offending
+                wells + the labware's valid range, or None when there's
+                nothing to warn about (no wells, unknown load_name,
+                or wells fully fit). Unknown load_names → None
+                (fail-open, matches the constraint checker's
+                convention).
+        Side effects: None.
+        """
+        if not ref_wells:
+            return None
+        lw = self.config_loader.config.get("labware", {}).get(label, {})
+        load_name = lw.get("load_name", "")
+        if not load_name:
+            return None
+        try:
+            from nl2protocol.models.labware import get_well_info
+            info = get_well_info(load_name)
+        except (ValueError, ImportError):
+            return None
+        valid = set(info.get("valid_wells", []))
+        if not valid:
+            return None
+        offending = sorted(w for w in ref_wells if w not in valid)
+        if not offending:
+            return None
+        row_range = info.get("row_range", "?")
+        col_range = info.get("col_range", "?")
+        # Cap the listed wells to 5 so the modal text stays scannable.
+        shown = offending[:5]
+        ellipsis = "" if len(offending) <= 5 else f" (+{len(offending) - 5} more)"
+        return (
+            f"[shape mismatch] Wells {shown}{ellipsis} do not exist on "
+            f"'{label}' (valid rows {row_range}, columns {col_range}). "
+            f"Constraint check will flag this downstream; the user "
+            f"picked this labware anyway."
         )
 
     def run_pipeline(self, prompt: str, csv_path: str = None,

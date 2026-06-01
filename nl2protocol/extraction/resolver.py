@@ -374,13 +374,24 @@ class LabwareMatcher:
                 llm_branch[desc] = survivors
             else:
                 # namespace_split / unresolvable — modal / detector decides.
+                # Even with no capability survivors, narrow the candidate
+                # dropdown semantically: a "tube rack" description should
+                # never offer a tiprack option, even when no labware
+                # physically fits the wells (the user picks a labware and
+                # the shape mismatch is then flagged at assignment-apply
+                # time via _build_user_action_provenance).
+                semantic_candidates = _type_filter(
+                    desc, list(self.labware_labels), self.config,
+                )
                 suggestions[desc] = LabwareMatchSuggestion(
                     description=desc,
                     suggested_label=None,
                     positive_reasoning=None,
                     why_not_in_instruction=None,
                     confidence=0.0,
-                    candidates=list(self.labware_labels),
+                    candidates=(semantic_candidates
+                                if semantic_candidates
+                                else list(self.labware_labels)),
                     branch=branch,
                 )
 

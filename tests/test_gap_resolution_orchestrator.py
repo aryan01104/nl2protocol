@@ -725,6 +725,88 @@ class TestStampReviewerVerdicts:
             if ref.wells_provenance:
                 assert ref.wells_provenance.review_status == "original"
 
+    def test_user_action_statuses_are_terminal_and_not_overwritten(self):
+        """User-action statuses (user_accepted_suggestion, user_edited,
+        user_confirmed, user_skipped, user_overrode_fabrication) are
+        TERMINAL — once the user has acted on a slot, the reviewer pass
+        must NOT overwrite that decision. Without this guard, a reviewer
+        pass that fires after a pre-orchestrator modal closes would
+        silently flip review_status away from the user-action status,
+        masking the user's choice and burying any objection in the
+        provenance audit trail only."""
+        from nl2protocol.models.spec import Provenance
+        for terminal in (
+            "user_confirmed", "user_edited", "user_accepted_suggestion",
+            "user_skipped", "user_overrode_fabrication",
+        ):
+            spec = _real_spec()
+            # Stamp the user-action status onto volume's provenance.
+            existing = spec.steps[0].volume.provenance
+            spec.steps[0].volume.provenance = Provenance.model_validate({
+                **existing.model_dump(),
+                "review_status": terminal,
+            })
+            reviews = {
+                "steps[0].volume": ReviewResult(
+                    field_path="steps[0].volume",
+                    confirms_positive=False, confirms_negative=False,
+                    objection="reviewer disagrees",
+                ),
+            }
+            stamp_reviewer_verdicts(spec, reviews)
+            assert spec.steps[0].volume.provenance.review_status == terminal, (
+                f"{terminal} got overwritten")
+
+    def test_instruction_sourced_slot_not_stamped_via_sibling(self):
+        """When the reviewer judges a LocationRef as a whole (returning
+        a verdict keyed on `steps[N].source`), the stamp must ONLY
+        touch slots whose source != "instruction". The reviewer itself
+        skips instruction-sourced provenances when collecting claims,
+        so propagating a verdict onto an instruction-sourced sibling
+        slot creates a false audit trail ("reviewed_agree" on a slot
+        no model ever read)."""
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec,
+        )
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        # description_provenance: inferred (gets reviewed).
+        # wells_provenance: instruction-sourced (must NOT be stamped).
+        step = ExtractedStep(
+            order=1, action="transfer",
+            source=LocationRef(
+                description="src", well="A1",
+                description_provenance=Provenance(
+                    source="inferred",
+                    positive_reasoning="config lookup",
+                    why_not_in_instruction="instruction omits source",
+                    confidence=0.9,
+                ),
+                wells_provenance=Provenance(
+                    source="instruction",
+                    cited_text=["A1"],
+                    confidence=1.0,
+                ),
+            ),
+            composition_provenance=comp,
+        )
+        spec = ProtocolSpec(summary="t", steps=[step])
+        reviews = {
+            "steps[0].source": ReviewResult(
+                field_path="steps[0].source",
+                confirms_positive=True, confirms_negative=True,
+                objection=None,
+            ),
+        }
+        stamp_reviewer_verdicts(spec, reviews)
+        # Description slot got the verdict (inferred → reviewable).
+        assert spec.steps[0].source.description_provenance.review_status == "reviewed_agree"
+        # Wells slot stayed "original" — never reviewed, never stamped.
+        assert spec.steps[0].source.wells_provenance.review_status == "original"
+
     def test_orchestrator_wires_stamp_after_review(self):
         # Wire-level test: the orchestrator's run() invokes stamp after the
         # reviewer pass, so the spec carries reviewer state by the time the
