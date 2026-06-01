@@ -835,6 +835,7 @@ class ProtocolAgent:
 
     def _confirm_labware_assignments_via_handler(
         self, spec, labware_suggestions: dict,
+        reviewer_objections: Optional[dict] = None,
     ) -> Optional[dict]:
         """Browser-bridged variant of `_confirm_labware_assignments`.
 
@@ -846,8 +847,14 @@ class ProtocolAgent:
                 drives the rows. `labware_suggestions` is the dict
                 returned by `LabwareResolver.suggest()`, keyed on
                 description with values exposing `.suggested_label` +
-                `.candidates`. `self.assignments_handler` is non-None
-                (caller checks).
+                `.candidates`. `reviewer_objections` is optional —
+                `{description: objection_text}` from a pre-modal
+                reviewer pass (see `_review_labware_suggestions`).
+                When present, each objection is prefixed onto the
+                row's `positive_reasoning` with a "⚠ Reviewer
+                flagged:" tag so it surfaces in the existing
+                per-row hint slot in the modal. `self.assignments_handler`
+                is non-None (caller checks).
         Post:   Returns dict {description: confirmed_label} or None
                 (None means user aborted or browser timed out).
                 Empty dict when there were no LocationRefs to confirm
@@ -856,6 +863,7 @@ class ProtocolAgent:
         config_labels = list(
             self.config_loader.config.get("labware", {}).keys()
         )
+        objections = reviewer_objections or {}
         seen = set()
         table = []
         for step in spec.steps:
@@ -869,20 +877,67 @@ class ProtocolAgent:
                     suggestion.candidates if suggestion is not None
                     else config_labels
                 )
+                base_reasoning = (
+                    suggestion.positive_reasoning
+                    if suggestion is not None else None
+                )
+                objection = objections.get(ref.description)
+                if objection:
+                    prefix = f"⚠ Reviewer flagged: {objection}"
+                    reasoning = (
+                        f"{prefix}\n\nOriginal reasoning: {base_reasoning}"
+                        if base_reasoning else prefix
+                    )
+                else:
+                    reasoning = base_reasoning
                 table.append({
                     "description": ref.description,
                     "suggested_label": suggested,
                     "candidates": candidates,
-                    # Carry the resolver's reasoning through so the
+                    # Carry the resolver's reasoning (optionally prefixed
+                    # with the pre-modal reviewer's objection) so the
                     # modal can surface it inline per row. None when
-                    # the resolver had no suggestion (user's pick is
-                    # authoritative; nothing to explain).
-                    "positive_reasoning": (
-                        suggestion.positive_reasoning
-                        if suggestion is not None else None
-                    ),
+                    # the resolver had no suggestion AND the reviewer
+                    # had no objection (user's pick is authoritative;
+                    # nothing to explain).
+                    "positive_reasoning": reasoning,
                 })
         return self.assignments_handler.confirm(table)
+
+    def _review_labware_suggestions(
+        self, labware_suggestions: dict, instruction: str, extractor,
+    ) -> dict:
+        """Run the IndependentReviewSuggester against the labware
+        suggestions BEFORE the assignments modal opens. Returns
+        `{description: objection_text}` for every suggestion the
+        reviewer disagreed with. Failures degrade silently to `{}`
+        — a missed pre-modal review is no worse than today's
+        behavior where the reviewer fires later inside the
+        orchestrator loop.
+
+        Pre:    `labware_suggestions` is the dict from
+                `LabwareMatcher.suggest()`. `instruction` is the
+                user's free-text protocol description. `extractor`
+                supplies `client` + `model_name` for the LLM call
+                (uses the same metered client as everything else).
+        Post:   Returns dict {description: objection_text}. Empty
+                when no suggestions to review, all agreed, the LLM
+                call failed, or the client is None (test-mode).
+        Side effects: At most one LLM call. The metered client tracks
+                      it like any other.
+        """
+        if not labware_suggestions or extractor is None \
+                or extractor.client is None:
+            return {}
+        from nl2protocol.gap_resolution.suggesters import (
+            IndependentReviewSuggester,
+        )
+        reviewer = IndependentReviewSuggester(
+            client=extractor.client, model_name=extractor.model_name,
+        )
+        return reviewer.review_suggestions(
+            labware_suggestions, {"instruction": instruction or ""},
+        )
 
     def _confirm_labware_assignments(
         self, spec, labware_suggestions: dict,
@@ -1418,6 +1473,16 @@ class ProtocolAgent:
                 model_name=extractor.model_name,
             ).suggest(spec)
 
+            # Pre-modal reviewer pass on the labware suggestions: catches
+            # objections (e.g. "C7 is part of the fresh-tubes system,
+            # not sample_rack") BEFORE the assignments modal opens, so
+            # the user sees the objection inline per row and can act on
+            # it. Without this, the reviewer fires inside the
+            # orchestrator loop later and its objections never surface.
+            labware_reviewer_objections = self._review_labware_suggestions(
+                labware_suggestions, prompt, extractor,
+            )
+
             # Phase 5: NamespaceSplitDetector — fires when one description
             # (e.g. "tube rack") spans multiple letter-prefix racks the
             # user mentally treats as separate. Modal asks the user to
@@ -1431,12 +1496,16 @@ class ProtocolAgent:
             if ns_split_applied:
                 # Re-run resolver against the rewritten spec so the
                 # assignments modal carries fresh, single-rack
-                # suggestions for the newly-named descriptions.
+                # suggestions for the newly-named descriptions. Re-run
+                # the reviewer too — the descriptions are new keys.
                 labware_suggestions = _EarlyLabwareResolver(
                     config=self.config_loader.config,
                     client=extractor.client,
                     model_name=extractor.model_name,
                 ).suggest(spec)
+                labware_reviewer_objections = self._review_labware_suggestions(
+                    labware_suggestions, prompt, extractor,
+                )
 
             # ============================================================
             # Phase 3f (Group D): pre-orchestrator confirmations
@@ -1527,6 +1596,7 @@ class ProtocolAgent:
             if self.assignments_handler is not None:
                 confirmed = self._confirm_labware_assignments_via_handler(
                     spec, labware_suggestions,
+                    reviewer_objections=labware_reviewer_objections,
                 )
             elif sys.stdin.isatty():
                 confirmed = self._confirm_labware_assignments(

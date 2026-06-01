@@ -715,6 +715,66 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
         claims = self._collect_claims(spec)
         if not claims:
             return {}
+        return self._review_claims(claims, context)
+
+    def review_suggestions(self, labware_suggestions: dict,
+                            context: dict) -> dict:
+        """Review labware-resolver suggestions BEFORE they reach the
+        assignments modal so the modal can surface objections inline.
+
+        Pre:    `labware_suggestions` is the dict from
+                `LabwareMatcher.suggest()` — keyed on description,
+                values are `LabwareMatchSuggestion` with .suggested_label,
+                .positive_reasoning, .why_not_in_instruction,
+                .confidence. `context` carries at least
+                `{"instruction": <user instruction text>}` so the
+                reviewer can text-ground claims.
+
+        Post:   Returns `{description: objection_text}` for every
+                suggestion the reviewer disagreed with. Descriptions
+                the reviewer agreed with — or that had no
+                suggested_label / no positive_reasoning to review —
+                are omitted. Empty dict on LLM error / parse failure
+                (degrade silently — caller continues with un-reviewed
+                suggestions, no worse than today).
+        Side effects: One Sonnet/Haiku call when there's at least one
+                      reviewable suggestion. Otherwise no I/O.
+        """
+        claims = []
+        for desc, sug in (labware_suggestions or {}).items():
+            if sug is None or sug.suggested_label is None:
+                continue
+            if not sug.positive_reasoning:
+                continue
+            # field_path uses a synthetic "labware.{description}" key —
+            # not a real spec path. The reviewer just round-trips it
+            # back so we can re-key by description.
+            claims.append({
+                "field_path": f"labware.{desc}",
+                "value": sug.suggested_label,
+                "positive_reasoning": sug.positive_reasoning,
+                "why_not_in_instruction": sug.why_not_in_instruction or "",
+                "source": "inferred",
+                "confidence": sug.confidence,
+            })
+        if not claims:
+            return {}
+        verdicts = self._review_claims(claims, context)
+        objections: dict = {}
+        for fp, result in verdicts.items():
+            if not fp.startswith("labware."):
+                continue
+            desc = fp[len("labware."):]
+            agreed = result.confirms_positive and result.confirms_negative
+            if not agreed and result.objection:
+                objections[desc] = result.objection
+        return objections
+
+    def _review_claims(self, claims: list, context: dict) -> dict:
+        """Internal: send a pre-built claim list through the reviewer
+        LLM and parse the response. Shared by `review` (spec-walk
+        claims) and `review_suggestions` (resolver-suggestion claims).
+        """
         prompt = self._build_prompt(claims, context)
         try:
             response = self._client.messages.create(
