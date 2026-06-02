@@ -614,6 +614,155 @@
     to { stroke-dashoffset: -14; }
   }
 
+  /* ───────── Gap-prompt modal (ADR-0013 Phase 3c) ─────────
+     Bottom-right docked panel that surfaces a Gap to the user with
+     a Suggestion (when available) and action buttons. Layout reads
+     Problem → Replacement → Rationale so the user's eye lands on
+     the bad value before the proposed fix; the old layout buried
+     the problem in a dim description line and put bold weight on
+     the suggestion, which inverted the reading order. */
+  .gap-modal {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 400px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+    z-index: 1000;
+    font-size: 13px;
+  }
+  .gap-modal-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--grid);
+    background: var(--modal-header-bg);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .gap-modal-title { color: var(--ink); }
+  .gap-modal-severity {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 3px;
+    background: var(--status-neutral-bg);
+    color: var(--dim);
+    font-weight: 500;
+    /* bg + fg are overridden inline by showPanel based on severity. */
+  }
+  .gap-modal-body { padding: 12px 14px; }
+
+  /* Problem block — the loudest element. Warning-tinted card with a
+     3px left bar in the error color, large value text. Lands first
+     in the user's visual scan. */
+  .gap-modal-problem {
+    border-left: 3px solid var(--status-error-fg);
+    background: color-mix(in srgb, var(--status-error-fg) 6%, transparent);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 0 4px 4px 0;
+  }
+  .gap-modal-problem-field {
+    font-size: 11px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .gap-modal-problem-value {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+  .gap-modal-problem-summary {
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* Suggestion block — visually distinct from the Problem block via
+     a different border color (instruction-blue, not error). Hidden
+     when no suggestion was produced. */
+  .gap-modal-suggestion {
+    border: 1px solid color-mix(in srgb, var(--col-instruction) 35%, transparent);
+    background: color-mix(in srgb, var(--col-instruction) 4%, transparent);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+  }
+  .gap-modal-suggestion-label {
+    font-size: 11px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+  .gap-modal-suggestion-value-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .gap-modal-suggestion-value {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 14px;
+    word-break: break-word;
+  }
+  .gap-modal-suggestion-badge {
+    font-size: 11px;
+    color: var(--dim);
+  }
+
+  /* Rationale — two labeled paragraphs + confidence. Lighter weight
+     than the two cards above. */
+  .gap-modal-rationale { margin-bottom: 10px; }
+  .gap-modal-rationale-block { margin-bottom: 8px; }
+  .gap-modal-rationale-block:last-of-type { margin-bottom: 4px; }
+  .gap-modal-rationale-label {
+    font-size: 11px;
+    color: var(--dim);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .gap-modal-rationale-text {
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+  .gap-modal-confidence {
+    font-size: 11px;
+    color: var(--dim);
+    margin-top: 8px;
+  }
+
+  /* Reviewer objection — kept distinct from rationale; orange-tinted
+     to match the "⚠ reviewer disagreed" marker. */
+  .gap-modal-objection {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--status-error-fg);
+    background: var(--disagree-bg);
+    font-size: 12px;
+  }
+
+  .gap-modal-buttons {
+    padding: 10px 14px;
+    border-top: 1px solid var(--grid);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   /* ───────── ADR-0013 Phase 3b-3 (Group C): modal spotlight ─────────
      When a gap modal pops asking the user about an initial-contents
      volume (or similar field that has cross-column anchor cells), the
@@ -1082,24 +1231,58 @@
     </div>
   </div>
   <!-- ADR-0013 Phase 3c: gap-prompt modal. Hidden until a panel_request
-       arrives over the WebSocket. Anchored bottom-right per ADR-0013. -->
-  <div id="live-panel" style="display: none; position: fixed; right: 24px; bottom: 24px; width: 380px; max-height: 70vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); z-index: 1000; font-size: 13px;">
-    <div style="padding: 10px 14px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
-      <span id="live-panel-title">Confirm gap</span>
-      <span id="live-panel-severity" style="float: right; font-size: 11px; padding: 1px 8px; border-radius: 3px; background: var(--status-neutral-bg); color: var(--dim); font-weight: 500;"></span>
+       arrives over the WebSocket. Anchored bottom-right per ADR-0013.
+       Visual hierarchy: header → Problem block (warning-tinted, the
+       thing the user must understand first) → Suggestion block
+       (visually distinct, the proposed fix) → Rationale (two labeled
+       paragraphs explaining the suggestion) → optional reviewer
+       objection → action buttons. -->
+  <div id="live-panel" class="gap-modal" style="display: none">
+    <div class="gap-modal-header">
+      <span id="live-panel-title" class="gap-modal-title">Confirm gap</span>
+      <span id="live-panel-severity" class="gap-modal-severity"></span>
     </div>
-    <div style="padding: 12px 14px;">
-      <div id="live-panel-description" style="margin-bottom: 8px;"></div>
-      <div id="live-panel-current" style="margin-bottom: 8px; color: var(--dim); font-size: 12px;"></div>
-      <div id="live-panel-suggestion" style="margin-bottom: 10px;"></div>
-      <div id="live-panel-reasoning" style="font-size: 12px; color: var(--dim); font-style: italic; margin-bottom: 10px;"></div>
+    <div class="gap-modal-body">
+      <!-- Problem block — populated by showPanel() from gap.step_order,
+           parsed gap.field_path, gap.current_value, and a kind-keyed
+           framing line. Loudest element in the modal so attention
+           lands here first. -->
+      <div id="live-panel-problem" class="gap-modal-problem">
+        <div id="live-panel-problem-field" class="gap-modal-problem-field"></div>
+        <div id="live-panel-problem-value" class="gap-modal-problem-value"></div>
+        <div id="live-panel-problem-summary" class="gap-modal-problem-summary"></div>
+      </div>
+      <!-- Suggestion block — distinct accent so the eye can clearly
+           separate "the problem" from "the proposed fix". Hidden when
+           no suggestion was produced. -->
+      <div id="live-panel-suggestion" class="gap-modal-suggestion">
+        <div class="gap-modal-suggestion-label">Suggested replacement</div>
+        <div class="gap-modal-suggestion-value-row">
+          <span id="live-panel-suggestion-value" class="gap-modal-suggestion-value"></span>
+          <span id="live-panel-suggestion-badge" class="gap-modal-suggestion-badge"></span>
+        </div>
+      </div>
+      <!-- Rationale — two labeled paragraphs. Renamed from "Reasoning"
+           and "Why not from instruction" to "Why this value" and
+           "Why we couldn't directly cite" for clarity. -->
+      <div id="live-panel-rationale" class="gap-modal-rationale">
+        <div id="live-panel-rationale-positive" class="gap-modal-rationale-block">
+          <div class="gap-modal-rationale-label">Why this value</div>
+          <div id="live-panel-rationale-positive-text" class="gap-modal-rationale-text"></div>
+        </div>
+        <div id="live-panel-rationale-negative" class="gap-modal-rationale-block">
+          <div class="gap-modal-rationale-label">Why we couldn't directly cite</div>
+          <div id="live-panel-rationale-negative-text" class="gap-modal-rationale-text"></div>
+        </div>
+        <div id="live-panel-confidence" class="gap-modal-confidence"></div>
+      </div>
       <!-- Reviewer objection. Populated by showPanel() when the
            gap.metadata.reviewer_objection field is non-empty. Orange-tinted
            to match the legend's "⚠ reviewer disagreed" marker. Hidden by
            default; showPanel toggles display. -->
-      <div id="live-panel-objection" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-left: 3px solid var(--status-error-fg); background: var(--disagree-bg); font-size: 12px;"></div>
+      <div id="live-panel-objection" class="gap-modal-objection" style="display: none"></div>
     </div>
-    <div id="live-panel-buttons" style="padding: 10px 14px; border-top: 1px solid var(--grid); display: flex; gap: 8px; flex-wrap: wrap;">
+    <div id="live-panel-buttons" class="gap-modal-buttons">
       <!-- buttons injected per-gap by JS (accept / skip / override / abort) -->
     </div>
   </div>
@@ -2290,11 +2473,53 @@
       "quality":    { label: "optional",     bg: cssVar("--status-neutral-bg"), fg: cssVar("--status-neutral-fg") },
     };
 
+    // Per-kind plain-language framing for the Problem block. Must cover
+    // every GapKind literal in gap_resolution/types.py; an unknown kind
+    // falls back to a generic line. The framing tells the user *what
+    // kind of problem* the gap represents in one sentence, replacing
+    // the old single-line `gap.description` which read like a system
+    // error message.
+    const KIND_FRAMING = {
+      "fabricated":           "This value isn't grounded in any cited text from the instruction.",
+      "missing":              "This field is required, but no value was extracted.",
+      "low_confidence":       "The extractor wasn't confident about this value.",
+      "ambiguous":            "Multiple valid interpretations exist for this field.",
+      "constraint_violation": "This value violates a hardware or labware constraint.",
+      "unverifiable":         "No reliable check exists for this value at this stage.",
+    };
+
+    // Extract a human-readable field name from a dotted field_path like
+    // "steps[1].substance.provenance" → "substance", or
+    // "steps[3].destination.wells_provenance" → "destination wells",
+    // or "initial_contents[2].volume" → "volume". Strips trailing
+    // ".provenance" / "_provenance" suffixes since those are noise.
+    function parseFieldName(fieldPath) {
+      if (!fieldPath) return "";
+      // Split on "." then drop bracketed indices like "[1]".
+      const segments = String(fieldPath).split(".").map(s => s.replace(/\[\d+\]/g, ""));
+      // Drop trailing provenance noise.
+      const meaningful = segments.filter(
+        s => s && s !== "provenance" && s !== "description_provenance" && s !== "wells_provenance"
+      );
+      // Drop the leading "steps" / "initial_contents" container word.
+      const tail = meaningful.filter(s => s !== "steps" && s !== "initial_contents");
+      // "destination.wells_provenance" → ["destination"]; "destination wells"
+      // is more informative for wells gaps — reattach by inspecting the
+      // dropped suffix.
+      const lower = fieldPath.toLowerCase();
+      if (lower.endsWith("wells_provenance") && tail.length) {
+        return tail[tail.length - 1] + " wells";
+      }
+      return tail.length ? tail[tail.length - 1] : (segments[segments.length - 1] || "");
+    }
+
     function showPanel(req) {
       if (!panel) return;
       activeReq = req;
       const gap = req.gap || {};
       const sug = req.suggestion;
+      // Header: title + severity badge. Title kept simple ("Gap: <kind>")
+      // because the heavy lifting now happens in the Problem block.
       document.getElementById("live-panel-title").textContent =
         gap.kind ? "Gap: " + gap.kind : "Confirm gap";
       const sev = document.getElementById("live-panel-severity");
@@ -2305,40 +2530,67 @@
       sev.textContent = sevTag.label;
       sev.style.background = sevTag.bg;
       sev.style.color = sevTag.fg;
-      document.getElementById("live-panel-description").textContent =
-        gap.description || "";
-      const cur = document.getElementById("live-panel-current");
-      cur.textContent = gap.current_value
-        ? "Current: " + gap.current_value : "";
-      // Suggestion block: value + provenance_source + reasoning +
-      // why_not_in_instruction + confidence (CLI _render_gap parity).
-      const sugDiv = document.getElementById("live-panel-suggestion");
-      const reasoningDiv = document.getElementById("live-panel-reasoning");
-      if (sug) {
-        sugDiv.innerHTML = '<strong>Suggested:</strong> '
-          + escapeHtml(String(sug.value_repr || ""))
-          + (sug.provenance_source
-              ? ' <span style="color:var(--dim);font-size:11px">('
-                + escapeHtml(sug.provenance_source) + ')</span>'
-              : "");
-        let r = "";
-        if (sug.positive_reasoning) {
-          r += '<div><strong>Reasoning:</strong> '
-            + escapeHtml(sug.positive_reasoning) + '</div>';
-        }
-        if (sug.why_not_in_instruction) {
-          r += '<div style="margin-top:4px"><strong>Why not from instruction:</strong> '
-            + escapeHtml(sug.why_not_in_instruction) + '</div>';
-        }
-        if (typeof sug.confidence === "number") {
-          r += '<div style="margin-top:4px"><strong>Confidence:</strong> '
-            + Math.round(sug.confidence * 100) + '%</div>';
-        }
-        reasoningDiv.innerHTML = r;
-        reasoningDiv.style.fontStyle = "normal";
+
+      // Problem block — composed from already-structured Gap fields.
+      // Field label "Step N <field>" / Value <current_value> / Summary
+      // <kind-framing>. The block is always shown (the modal exists
+      // because there IS a problem), even when current_value is null.
+      const fieldName = parseFieldName(gap.field_path);
+      const fieldLabel = (gap.step_order != null && fieldName)
+        ? "Step " + gap.step_order + " · " + fieldName
+        : (fieldName || (gap.field_path || ""));
+      document.getElementById("live-panel-problem-field").textContent = fieldLabel;
+      const valueEl = document.getElementById("live-panel-problem-value");
+      if (gap.current_value !== undefined && gap.current_value !== null && gap.current_value !== "") {
+        valueEl.textContent = String(gap.current_value);
+        valueEl.style.display = "";
       } else {
-        sugDiv.innerHTML = '<em style="color:var(--dim)">(no suggestion available)</em>';
-        reasoningDiv.innerHTML = "";
+        valueEl.textContent = "(no current value)";
+        valueEl.style.display = "";
+        valueEl.style.fontStyle = "italic";
+        valueEl.style.color = "var(--dim)";
+      }
+      document.getElementById("live-panel-problem-summary").textContent =
+        KIND_FRAMING[gap.kind] || (gap.description || "");
+
+      // Suggestion block — value + provenance source badge. Hidden
+      // entirely when no suggestion was produced.
+      const sugBlock = document.getElementById("live-panel-suggestion");
+      const sugValueEl = document.getElementById("live-panel-suggestion-value");
+      const sugBadgeEl = document.getElementById("live-panel-suggestion-badge");
+      if (sug) {
+        sugBlock.style.display = "";
+        sugValueEl.textContent = String(sug.value_repr || "");
+        sugBadgeEl.textContent = sug.provenance_source ? "(" + sug.provenance_source + ")" : "";
+      } else {
+        sugBlock.style.display = "none";
+      }
+
+      // Rationale — two labeled paragraphs, renamed from the old
+      // "Reasoning" / "Why not from instruction". Each block hides
+      // independently when its field is empty.
+      const ratPosBlock = document.getElementById("live-panel-rationale-positive");
+      const ratPosText = document.getElementById("live-panel-rationale-positive-text");
+      const ratNegBlock = document.getElementById("live-panel-rationale-negative");
+      const ratNegText = document.getElementById("live-panel-rationale-negative-text");
+      const confEl = document.getElementById("live-panel-confidence");
+      if (sug && sug.positive_reasoning) {
+        ratPosText.textContent = sug.positive_reasoning;
+        ratPosBlock.style.display = "";
+      } else {
+        ratPosBlock.style.display = "none";
+      }
+      if (sug && sug.why_not_in_instruction) {
+        ratNegText.textContent = sug.why_not_in_instruction;
+        ratNegBlock.style.display = "";
+      } else {
+        ratNegBlock.style.display = "none";
+      }
+      if (sug && typeof sug.confidence === "number") {
+        confEl.textContent = "Confidence: " + Math.round(sug.confidence * 100) + "%";
+        confEl.style.display = "";
+      } else {
+        confEl.style.display = "none";
       }
       // Reviewer objection. Stamped onto gap.metadata by the orchestrator
       // after the reviewer pass; populated only when the reviewer
