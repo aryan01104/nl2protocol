@@ -1177,21 +1177,34 @@ class TestADR0011NullFieldPlaceholders:
         # No tracked-field placeholders for pause's empty volume/source/etc.
         assert "✗" not in joined
 
-    def test_hover_flip_css_rules_present(self, tmp_path):
-        # The new hover-flip rules for value cells exist in the rendered
-        # template's <style> block. Per-palette + per-source rules.
+    def test_value_cell_hover_color_rules_present(self, tmp_path):
+        # The hover/active rules paint TEXT (not background) on value
+        # cells, gated on .prov-active / .cite-active / direct hover.
+        # Background fills were removed: the visual language is
+        # text-color-only, with the neutral currentColor outline
+        # supplying the affordance box.
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # Per-palette flip on .prov-active.
-        assert "span.palette-0.prov-active" in rendered
-        assert "background: var(--palette-0)" in rendered
-        # Per-source flip on .prov-active.
+        # Per-palette: state-gated text color, palette-0 as canary.
+        assert ".palette-0.prov-active" in rendered
+        assert "color: var(--palette-0)" in rendered
+        # Per-source: state-gated text color, inferred as canary.
         assert "span.prov-inferred.prov-active" in rendered
-        assert "background: var(--col-inferred)" in rendered
-        # Empty-cell styling defined.
+        assert "color: var(--col-inferred)" in rendered
+        # No hover-flip background rules on value cells. The old rules
+        # had the shape `span.palette-N.prov-active { background: ...; }`
+        # and `.cite-marker.cite-atomic-color.palette-N.cite-active
+        # { background: ...; }`; both deleted. The standalone color
+        # variables still appear in legend swatches (line ~1091),
+        # so the assertion has to target the specific hover-flip rule
+        # signatures, not the variable usage in isolation.
+        assert "span.palette-0.prov-active, span.palette-0.prov-spotlight" not in rendered
+        assert ".cite-marker.cite-atomic-color.palette-0.cite-active" not in rendered
+        # Empty-cell styling still defined (separate affordance for
+        # null-field placeholders, intentionally retained).
         assert ".cell-empty" in rendered
 
 

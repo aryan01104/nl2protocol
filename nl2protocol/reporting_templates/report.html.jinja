@@ -287,34 +287,21 @@
   }
 
   /* ───────── Per-citation palette ─────────
-     `.palette-N` paints the text for both:
-       - .cite-marker.cite-atomic-color in the instruction column
-       - .prov-instruction value spans in the spec column
-     Same hue on both sides == same cited_text on both sides. */
-  .palette-0 { color: var(--palette-0); }
-  .palette-1 { color: var(--palette-1); }
-  .palette-2 { color: var(--palette-2); }
-  .palette-3 { color: var(--palette-3); }
-  .palette-4 { color: var(--palette-4); }
-  .palette-5 { color: var(--palette-5); }
-  .palette-6 { color: var(--palette-6); }
-  .palette-7 { color: var(--palette-7); }
-
-  /* Hover-flip: when a cite-marker becomes "cite-active" (because the
-     reader is hovering its matching value-span in the spec column), the
-     cite span fills with its palette color and the text flips to a
-     hardcoded contrast shade (white for dark hues, ink for light hues).
-     The flip is done by overriding text color and adding a strong bg
-     of the same palette hue. Per-palette contrast is hardcoded — chosen
-     once for legibility, not computed. */
-  .cite-marker.cite-atomic-color.palette-0.cite-active { background: var(--palette-0); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-1.cite-active { background: var(--palette-1); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-2.cite-active { background: var(--palette-2); color: var(--ink); }
-  .cite-marker.cite-atomic-color.palette-3.cite-active { background: var(--palette-3); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-4.cite-active { background: var(--palette-4); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-5.cite-active { background: var(--palette-5); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-6.cite-active { background: var(--palette-6); color: var(--panel); }
-  .cite-marker.cite-atomic-color.palette-7.cite-active { background: var(--palette-7); color: var(--panel); }
+     `.palette-N` paints text in palette hue ONLY when the parent step
+     is being hovered (via .prov-active on the value-span side, or
+     .cite-active on the cite-marker side), or when the element itself
+     is being directly hovered. Resting state is plain ink — keeps the
+     three columns calm and forces palette-driven attention into the
+     parent-step hover model. Backgrounds are intentionally NOT used
+     here; the visual language is text-color-only. */
+  .palette-0.prov-active, .palette-0.cite-active, span.palette-0[data-prov-id]:hover { color: var(--palette-0); }
+  .palette-1.prov-active, .palette-1.cite-active, span.palette-1[data-prov-id]:hover { color: var(--palette-1); }
+  .palette-2.prov-active, .palette-2.cite-active, span.palette-2[data-prov-id]:hover { color: var(--palette-2); }
+  .palette-3.prov-active, .palette-3.cite-active, span.palette-3[data-prov-id]:hover { color: var(--palette-3); }
+  .palette-4.prov-active, .palette-4.cite-active, span.palette-4[data-prov-id]:hover { color: var(--palette-4); }
+  .palette-5.prov-active, .palette-5.cite-active, span.palette-5[data-prov-id]:hover { color: var(--palette-5); }
+  .palette-6.prov-active, .palette-6.cite-active, span.palette-6[data-prov-id]:hover { color: var(--palette-6); }
+  .palette-7.prov-active, .palette-7.cite-active, span.palette-7[data-prov-id]:hover { color: var(--palette-7); }
 
   /* ───────── Instruction column ───────── */
   .instruction-text {
@@ -612,31 +599,22 @@
      from .prov-active so hover-leave handlers don't accidentally clear
      the spotlight while the user is exploring other cells. */
 
-  /* ───────── ADR-0011 Phase 2b/4 polish: hover-flip on value cells ─────────
-     Mirrors the cite-side `.cite-marker.cite-atomic-color.palette-N.cite-active`
-     pattern from above. When a value cell is hovered (or panel-row hover
-     marks it .prov-active), the cell fills with its color and the text
-     flips to white/black for contrast. Same visual language on both
-     sides of the cite ↔ value pair. */
-  span.palette-0.prov-active, span.palette-0.prov-spotlight, span.palette-0[data-prov-id]:hover { background: var(--palette-0); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-1.prov-active, span.palette-1.prov-spotlight, span.palette-1[data-prov-id]:hover { background: var(--palette-1); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-2.prov-active, span.palette-2.prov-spotlight, span.palette-2[data-prov-id]:hover { background: var(--palette-2); color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-3.prov-active, span.palette-3.prov-spotlight, span.palette-3[data-prov-id]:hover { background: var(--palette-3); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-4.prov-active, span.palette-4.prov-spotlight, span.palette-4[data-prov-id]:hover { background: var(--palette-4); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-5.prov-active, span.palette-5.prov-spotlight, span.palette-5[data-prov-id]:hover { background: var(--palette-5); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-6.prov-active, span.palette-6.prov-spotlight, span.palette-6[data-prov-id]:hover { background: var(--palette-6); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.palette-7.prov-active, span.palette-7.prov-spotlight, span.palette-7[data-prov-id]:hover { background: var(--palette-7); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-
-  /* Non-instruction sources without palette: use their categorical hue. */
-  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { background: var(--col-config);      color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { background: var(--col-domain);      color: var(--ink);   outline: none; text-decoration: none; border-radius: 2px; }
-  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { background: var(--col-inferred);    color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+  /* ───────── Hover/active styling on value cells (text-only) ─────────
+     Per the UX directive: parent-step hover (and direct atom hover, and
+     the modal-driven .prov-spotlight) paints text in the source's hue;
+     no background fill, no contrast flip. The neutral `currentColor`
+     outline from the rule above (~ line 577) supplies the hover/active
+     affordance box; here we just supply the text hue per source kind.
+     Palette spans already get their hue from the .palette-N rules above. */
+  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { color: var(--col-config); }
+  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { color: var(--col-domain); }
+  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { color: var(--col-inferred); }
 
   /* Instruction-sourced spans WITHOUT a palette (cite not recoverable):
-     fall back to instruction-red. Spans WITH a palette take the palette
-     rules above (later in the cascade with the same specificity, so
-     palette wins by source order). */
-  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { background: var(--col-instruction); color: var(--panel); outline: none; text-decoration: none; border-radius: 2px; }
+     fall back to instruction-red text. Spans WITH a palette take the
+     palette rules above (same specificity; palette declarations come
+     first in cascade so this rule loses for palette spans). */
+  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { color: var(--col-instruction); }
 
   /* ───────── ADR-0011 Phase 2b/4 polish: ✗ placeholder cells ─────────
      For action-expected fields that are null on the step, the renderer
@@ -1594,6 +1572,24 @@
         e.classList.toggle("prov-active", active);
       }
     });
+    // Parent-step hover: also light up every atomic value cell whose
+    // data-prov-id starts with the step prefix (e.g. "s2-volume",
+    // "s2-source", "s2-substance" for step s2). This is what makes
+    // col 3 atoms colorize together when the user hovers a step in
+    // col 2, mirroring the col 1 ↔ col 2 hover pair model. The step
+    // block itself carries data-prov-id="s{idx}-step-trigger" which
+    // also matches the prefix; the .step guard above already gave it
+    // .step-active, so skip it here to avoid double-toggling.
+    if (isStepTrigger) {
+      const stepPrefix = id.split("-")[0];  // "s2"
+      if (stepPrefix) {
+        document.querySelectorAll(`[data-prov-id^="${stepPrefix}-"]`).forEach((e) => {
+          if (e.classList.contains("step")) return;
+          if (e.getAttribute("data-prov-id") === id) return;
+          e.classList.toggle("prov-active", active);
+        });
+      }
+    }
     overlay.querySelectorAll(`path[data-cite-id="${CSS.escape(id)}"]`).forEach((p) =>
       p.classList.toggle("arrow-active", active)
     );
