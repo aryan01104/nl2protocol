@@ -7,7 +7,7 @@ default), AutoConfirmCM (non-interactive), ScriptedCM (tests/evals).
 
 import pytest
 
-from nl2protocol.confirmation import (
+from nl2protocol.for_cli.confirmation import (
     AutoConfirmCM,
     InteractiveCM,
     ScriptedCM,

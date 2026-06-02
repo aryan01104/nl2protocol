@@ -148,7 +148,7 @@ class SemanticExtractor:
         )
 
         try:
-            from nl2protocol.spinner import Spinner
+            from nl2protocol.for_cli.spinner import Spinner
             with Spinner("Reasoning through protocol..."):
                 response = self.client.messages.create(
                     model=self.model_name,

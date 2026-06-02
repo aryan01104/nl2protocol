@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore", module="opentrons")
 
 LINE_WIDTH = 60  # Same as the ===== separator
 
-from . import colors as C
+from .for_cli import colors as C
 
 def _log(msg: str = ""):
     """Print progress/status to stderr (keeps stdout clean for data output)."""
@@ -498,7 +498,7 @@ class ProtocolAgent:
                 modal with one row per IC entry, lets the user accept
                 or edit each volume in a single batch.
         """
-        from nl2protocol.confirmation import InteractiveCM
+        from nl2protocol.for_cli.confirmation import InteractiveCM
         from nl2protocol.reporting import ConsoleReporter
         self.config_path = config_path
         self._api_key = api_key
@@ -1926,7 +1926,7 @@ class ProtocolAgent:
 
 if __name__ == "__main__":
     import sys
-    from nl2protocol.cli import main
+    from nl2protocol.for_cli.cli import main
 
     # If no arguments provided, show help
     if len(sys.argv) == 1:

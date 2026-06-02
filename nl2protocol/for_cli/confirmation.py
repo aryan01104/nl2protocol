@@ -37,7 +37,7 @@ class InteractiveCM:
 
     def prompt(self, question: str) -> str:
         # Lazy imports to avoid coupling on the colors / pipeline modules at module-load time.
-        from nl2protocol import colors as C
+        from nl2protocol.for_cli import colors as C
         print()  # blank line for visual breathing room before the prompt
         return input(C.prompt(question)).strip()
 

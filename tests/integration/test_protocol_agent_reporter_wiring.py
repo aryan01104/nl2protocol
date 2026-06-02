@@ -10,7 +10,7 @@ Verifies the Phase 1 reporter wiring:
 
 import pytest
 
-from nl2protocol.confirmation import ScriptedCM
+from nl2protocol.for_cli.confirmation import ScriptedCM
 from nl2protocol.reporting import (
     CapturingReporter,
     ConsoleReporter,

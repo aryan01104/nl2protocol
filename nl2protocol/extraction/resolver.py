@@ -813,7 +813,7 @@ class LabwareMatcher:
         and schema mismatches in logs (silent drops were the root cause
         of "modal shows no suggestions for everything" diagnosis pain).
         """
-        from nl2protocol.spinner import Spinner
+        from nl2protocol.for_cli.spinner import Spinner
         try:
             with Spinner("Resolving labware references..."):
                 response = self.client.messages.create(

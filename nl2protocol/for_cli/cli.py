@@ -422,7 +422,7 @@ def handle_robot_upload(protocol_path: str) -> bool:
     Returns:
         True if successful or skipped, False if error occurred.
     """
-    from .robot import (
+    from ..robot import (
         RobotClient,
         load_robot_config,
         save_robot_config,
@@ -518,7 +518,7 @@ def main(argv: list = None) -> int:
 
     # Handle --version
     if args.version:
-        from . import __version__
+        from .. import __version__
         print(f"nl2protocol {__version__}")
         return 0
 
@@ -542,7 +542,7 @@ def main(argv: list = None) -> int:
         # LiveModeApp.__init__ runs and reads the flag.
         from dotenv import find_dotenv, load_dotenv
         load_dotenv(find_dotenv(usecwd=True))
-        from .server import run_serve
+        from ..server import run_serve
         try:
             run_serve(
                 host=args.serve_host,
@@ -576,8 +576,8 @@ def main(argv: list = None) -> int:
     output_path = get_timestamped_output_path(args.output)
 
     # Import here to allow --help to work without dependencies
-    from .pipeline import ProtocolAgent
-    from .errors import NL2ProtocolError, APIKeyError, ConfigFileError
+    from ..pipeline import ProtocolAgent
+    from ..errors import NL2ProtocolError, APIKeyError, ConfigFileError
 
     # Handle --generate-config mode (deprecated)
     config_path = args.config
@@ -638,7 +638,7 @@ def main(argv: list = None) -> int:
     html_report_path = None
     if args.html_report is not None:
         from datetime import datetime
-        from .reporting import HTMLReporter
+        from ..reporting import HTMLReporter
         if args.html_report == '_DEFAULT_':
             html_report_path = f"output/report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         else:

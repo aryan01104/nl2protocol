@@ -945,7 +945,7 @@ class LiveModeApp:
         """Worker-thread entry point. Reads request-scoped state set by
         POST /start (instruction, config_path, api_key), builds reporters,
         runs the pipeline, finalizes, and cleans up the temp config file."""
-        from nl2protocol.confirmation import AutoConfirmCM
+        from nl2protocol.for_cli.confirmation import AutoConfirmCM
         from nl2protocol.metering import MeteredClient, RunMeter
         from nl2protocol.pipeline import ProtocolAgent
         from nl2protocol.reporting import HTMLReporter, MetricsReporter

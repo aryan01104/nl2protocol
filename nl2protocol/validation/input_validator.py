@@ -152,7 +152,7 @@ class InputValidator:
             return early
 
         try:
-            from nl2protocol.spinner import Spinner
+            from nl2protocol.for_cli.spinner import Spinner
             with Spinner("Classifying input..."):
                 response = self.client.messages.create(
                     model=self.model_name,
