@@ -442,7 +442,32 @@
     white-space: pre;
     overflow-x: auto;
     color: var(--ink);
+    /* Positioning context for .step-code-bracket children, which are
+       absolutely positioned to span the top of each step's first
+       generated code line through the bottom of its last line. */
+    position: relative;
+    /* Reserve column-left gutter for the bracket bars. Indents code
+       text inside <pre> by the bracket's column width + a small gap;
+       the brackets render at left:0 inside this padding. */
+    padding-left: 14px;
   }
+  /* Vertical bracket bar to the left of a step's generated code lines.
+     Positioned absolutely inside <pre.code>; top/height are recomputed
+     by renderStepCodeBrackets() from the first/last code-line bounding
+     rects of the matching step. Reveal animation matches .step.fade-in
+     (COLUMN_FADE_MS = 605ms) so the bar appears with the code rather
+     than after. */
+  .step-code-bracket {
+    position: absolute;
+    left: 0;
+    width: 2px;
+    background: var(--dim);
+    opacity: 0;
+    transition: opacity 0.605s ease;
+    pointer-events: none;
+    border-radius: 1px;
+  }
+  .step-code-bracket.is-visible { opacity: 1; }
   /* Phase 3i (#72): per-line spans inside <pre.code>. Each <span> ends
      in a literal newline so the <pre> still wraps line-by-line. The
      spans get [data-script-step="s{idx}"] when their line was emitted
@@ -1314,6 +1339,11 @@
          Rect is sized to the resolved column's bounding box on each
          render — see updateResolutionArrowClip() below. -->
     <clipPath id="resolution-arrow-clip"><rect id="resolution-arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
+    <!-- Step → code arrows (col 2 protocol-step → col 3 generated-code
+         bracket bar). Sibling pass to #arrow-paths above. Clipped
+         vertically to the union of the steps + code columns so the
+         bezier's sweep stays inside the strip the user is looking at. -->
+    <clipPath id="step-code-arrow-clip"><rect id="step-code-arrow-clip-rect" x="0" y="0" width="0" height="0"/></clipPath>
   </defs>
   <!-- Composite-step arrows (instruction → extracted spec). Clipped to the
        extracted-spec column so off-screen segments don't visually escape. -->
@@ -1324,6 +1354,11 @@
        is hidden so when the user scrolls source + destination back into
        view the arrow re-emerges intact. -->
   <g clip-path="url(#resolution-arrow-clip)" id="resolution-arrow-paths"></g>
+  <!-- Step → code arrows (col 2 → col 3). One bezier per spec step,
+       anchored at the step block's right edge in col 2 and the
+       midpoint of the step's vertical bracket bar in col 3. Animation
+       (trace timing, stagger, hover-active) mirrors #arrow-paths. -->
+  <g clip-path="url(#step-code-arrow-clip)" id="step-code-arrow-paths"></g>
 </svg>
 
 <!-- ADR-0011 Phase 2b: resolution-arrow data embedded as JSON.
@@ -1930,10 +1965,156 @@
     // 2→3 gate (live mode) or init() (static mode).
   }
 
+  // ────────── Step → code arrows (col 2 → col 3) ──────────
+  // Parallel pass to renderArrows / renderResolutionArrows. For each
+  // spec step that emitted code, draw a vertical bracket bar to the
+  // left of its code lines (in pre.code) and a bezier arrow from the
+  // step block's right edge to the midpoint of that bracket.
+  //
+  // Animation: stroke-dash trace mirrors renderArrows() exactly —
+  // same ARROW_TRACE_MS (770), same per-step stagger so each step's
+  // 1→2 arrow and 2→3 arrow trace in the same animation slot.
+  // Bracket bars fade in (.is-visible) on first creation, matching
+  // .step.fade-in's 605ms transition.
+
+  const stepCodeArrowPathMap = new Map();
+  const stepCodeBracketMap = new Map();
+
+  function renderStepCodeBrackets() {
+    const pre = document.querySelector("pre.code");
+    if (!pre) return;
+    // Group code-line spans by their step id. First + last line of
+    // each step give the bracket's top and bottom; non-contiguous
+    // lines (split by a comment / blank) still get one bracket
+    // spanning first → last.
+    const linesByStep = new Map();
+    pre.querySelectorAll(".code-line[data-script-step]").forEach((lineEl) => {
+      const sid = lineEl.getAttribute("data-script-step");
+      if (!sid) return;
+      if (!linesByStep.has(sid)) linesByStep.set(sid, []);
+      linesByStep.get(sid).push(lineEl);
+    });
+    const seenThisRender = new Set();
+    linesByStep.forEach((lines, sid) => {
+      if (!lines.length) return;
+      const first = lines[0];
+      const last = lines[lines.length - 1];
+      // offsetTop is relative to the nearest positioned ancestor,
+      // which is pre.code itself (position: relative is set in CSS).
+      const top = first.offsetTop;
+      const height = (last.offsetTop + last.offsetHeight) - top;
+      if (height <= 0) return;
+      let bracket = stepCodeBracketMap.get(sid);
+      if (!bracket || bracket.parentNode !== pre) {
+        bracket = document.createElement("div");
+        bracket.className = "step-code-bracket";
+        bracket.setAttribute("data-script-step", sid);
+        pre.appendChild(bracket);
+        stepCodeBracketMap.set(sid, bracket);
+        // Fade in next frame so the transition runs from opacity 0.
+        requestAnimationFrame(() => bracket.classList.add("is-visible"));
+      }
+      bracket.style.top = `${top}px`;
+      bracket.style.height = `${height}px`;
+      seenThisRender.add(sid);
+    });
+    // Prune brackets for steps that no longer have code lines.
+    stepCodeBracketMap.forEach((bracket, sid) => {
+      if (!seenThisRender.has(sid)) {
+        if (bracket.parentNode === pre) pre.removeChild(bracket);
+        stepCodeBracketMap.delete(sid);
+      }
+    });
+  }
+
+  function renderStepCodeArrows() {
+    const group = document.getElementById("step-code-arrow-paths");
+    if (!group) return;
+    const stepsCol = document.querySelector(".col-protocol-steps");
+    const codeCol = document.querySelector(".col-generated-code");
+    if (!stepsCol || !codeCol) return;
+    // Update clip rect: vertically union of both columns (so the
+    // bezier sweep is preserved as the user scrolls), horizontally
+    // generous so the curve mid-point isn't clipped sideways.
+    const clipRect = document.getElementById("step-code-arrow-clip-rect");
+    if (clipRect) {
+      const r1 = stepsCol.getBoundingClientRect();
+      const r2 = codeCol.getBoundingClientRect();
+      const yTop = Math.min(r1.top, r2.top);
+      const yBot = Math.max(r1.bottom, r2.bottom);
+      clipRect.setAttribute("x", "0");
+      clipRect.setAttribute("y", String(yTop));
+      clipRect.setAttribute("width", String(window.innerWidth));
+      clipRect.setAttribute("height", String(yBot - yTop));
+    }
+    const seenThisRender = new Set();
+    // For each step block in col 2 with a step-trigger id, find the
+    // bracket in col 3 with the matching step prefix and draw an arrow.
+    document.querySelectorAll('.col-protocol-steps .step[data-prov-id$="-step-trigger"]').forEach((stepEl) => {
+      const stepProvId = stepEl.getAttribute("data-prov-id");
+      if (!stepProvId) return;
+      const m = stepProvId.match(/^(s\d+)-/);
+      if (!m) return;
+      const sid = m[1];
+      const bracket = stepCodeBracketMap.get(sid);
+      if (!bracket) return;
+      const srcRect = stepEl.getBoundingClientRect();
+      const dstRect = bracket.getBoundingClientRect();
+      if (!srcRect.width || !dstRect.height) return;
+      const d = bezierPath(srcRect, dstRect);
+      let path = stepCodeArrowPathMap.get(sid);
+      if (path && path.parentNode === group) {
+        path.setAttribute("d", d);
+      } else {
+        path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        // dataset.citeId = step trigger id so setPairActive's existing
+        // overlay.querySelectorAll(`path[data-cite-id="${id}"]`) finds
+        // this path too and toggles .arrow-active on parent-step hover.
+        path.dataset.citeId = stepProvId;
+        path.dataset.stepCodeArrow = "1";
+        group.appendChild(path);
+        stepCodeArrowPathMap.set(sid, path);
+        try {
+          const len = path.getTotalLength();
+          if (len > 0) {
+            path.style.strokeDasharray = String(len);
+            path.style.strokeDashoffset = String(len);
+            const idxMatch = sid.match(/^s(\d+)/);
+            const stepIdx = idxMatch ? parseInt(idxMatch[1], 10) : 0;
+            const delay = stepIdx * ARROW_STAGGER_MS;
+            arrowsTracingDoneAt = Math.max(
+              arrowsTracingDoneAt,
+              performance.now() + delay + ARROW_TRACE_MS,
+            );
+            setTimeout(() => {
+              path.style.transition = `stroke-dashoffset ${ARROW_TRACE_MS}ms ease-out`;
+              path.style.strokeDashoffset = "0";
+              setTimeout(() => {
+                path.style.strokeDasharray = "none";
+                path.style.strokeDashoffset = "0";
+              }, ARROW_TRACE_MS + 50);
+            }, delay);
+          }
+        } catch (e) { /* defensive — getTotalLength may not be available */ }
+      }
+      seenThisRender.add(sid);
+    });
+    // Prune step-code arrows whose steps no longer have brackets.
+    stepCodeArrowPathMap.forEach((path, sid) => {
+      if (!seenThisRender.has(sid)) {
+        if (path.parentNode === group) group.removeChild(path);
+        stepCodeArrowPathMap.delete(sid);
+      }
+    });
+  }
+
   function scheduleRender() {
     requestAnimationFrame(() => {
       renderArrows();
       renderResolutionArrows();
+      renderStepCodeBrackets();
+      renderStepCodeArrows();
     });
   }
 
@@ -2006,6 +2187,12 @@
     wireHover();
     wirePanelToggles();
     wireScriptLinkage();
+    // Static-mode first paint of the step→code arrows. The brackets
+    // need pre.code to exist (mounted server-side in static mode) and
+    // wireScriptLinkage to have run, since brackets read offsetTop of
+    // .code-line[data-script-step] spans inside pre.code.
+    renderStepCodeBrackets();
+    renderStepCodeArrows();
     wireChecksToggle();
     // Re-render on every layout-affecting event so arrows track their anchors.
     window.addEventListener("resize", scheduleRender);
