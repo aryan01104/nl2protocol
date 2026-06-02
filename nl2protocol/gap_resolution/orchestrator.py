@@ -196,7 +196,20 @@ class Orchestrator:
         from nl2protocol.reporting import StageEvent
         self._reporter.emit(StageEvent(kind=kind, data=data, stage_name=stage_name))
 
-    def run(self, spec: Any, context: dict) -> OrchestratorOutcome:
+    def run(self, spec: Any, context: dict,
+            gap_filter: Optional[Callable[[Gap], bool]] = None) -> OrchestratorOutcome:
+        """Drive the detect → suggest → review → present → apply loop until
+        convergence or iteration cap.
+
+        `gap_filter`, when supplied, narrows the loop to a sub-set of gaps:
+        each iteration's detected gaps are filtered through the predicate
+        before topo-sort, and only matching gaps are presented / applied.
+        Used by the pre-orchestrator description-gap pass in pipeline.py
+        to resolve description-fabrication gaps BEFORE labware matching
+        runs, so labware picks land against finalized descriptions.
+        The full orchestrator at the end of the pipeline uses no filter
+        and sees the remaining gaps (volume, wells, etc.).
+        """
         from nl2protocol.gap_resolution.registry import detect_all
 
         iterations: List[IterationResult] = []
@@ -204,6 +217,8 @@ class Orchestrator:
             # DETECT first so a clean spec doesn't append an empty iteration
             # record (would mislead state-log readers about how much work happened).
             gaps = detect_all(spec, context, self._detectors)
+            if gap_filter is not None:
+                gaps = [g for g in gaps if gap_filter(g)]
             if not gaps:
                 # Converged. Don't record an empty iteration unless this is
                 # iteration 1 (caller may want to know the spec was already clean).
@@ -331,29 +346,11 @@ class Orchestrator:
                 if resolution.action == "skip":
                     self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                     continue
-                # For fabricated gaps, "accept_suggestion" means "trust
-                # the suggester's reasoning, restate the provenance as
-                # inferred." Transform the Resolution so the apply path
-                # receives a Provenance object to write into the
-                # provenance slot at gap.field_path — NOT a raw value.
-                # The underlying value is left untouched. See
-                # _apply_at_path's fabrication-shaped path branch.
-                if (resolution.action == "accept_suggestion"
-                        and gap.kind == "fabricated"
-                        and suggestion is not None):
-                    from nl2protocol.models.spec import Provenance
-                    resolution = Resolution(
-                        action="accept_suggestion",
-                        new_value=Provenance(
-                            source="inferred",
-                            positive_reasoning=suggestion.positive_reasoning,
-                            why_not_in_instruction=suggestion.why_not_in_instruction,
-                            confidence=suggestion.confidence,
-                            review_status="user_accepted_suggestion",
-                        ),
-                        user_action_provenance="user_accepted_suggestion",
-                    )
                 # accept_suggestion or edit → apply
+                # Note: for fabricated gaps, the apply path builds the new
+                # Provenance directly from `suggestion` (so it can land both
+                # value AND provenance when the suggester proposed a value
+                # rewrite). resolution.new_value stays as suggestion.value.
                 self._apply(spec, gap, resolution, suggestion)
                 self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                 resolved_in_iteration += 1
@@ -868,9 +865,13 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
     # verifier produces this when a cited_text fails the substring
     # check; the broken slot is the provenance itself, not the value.
     # Resolutions:
-    #   accept_suggestion → new_value is a Provenance object (the
-    #     orchestrator built it from the suggester's reasoning). Write
-    #     it into the slot directly. Underlying value is left alone.
+    #   accept_suggestion → build a fresh inferred+user_accepted_suggestion
+    #     Provenance from `suggestion`. If suggestion.value is not None
+    #     AND the slot has a known value-field counterpart (atom `.value`,
+    #     LocationRef `.description`), write BOTH the value and the new
+    #     provenance — one push_revision snapshot per call. Otherwise
+    #     (suggestion.value is None, or slot is wells/resolved_label),
+    #     write provenance only (the citation-only fix case).
     #   override          → keep value AND existing provenance object,
     #     but stamp review_status=user_overrode_fabrication (the user
     #     accepted responsibility for the fabricated cite).
@@ -888,12 +889,37 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             return
         from nl2protocol.models.spec import Provenance
         if resolution.action == "accept_suggestion":
-            # new_value is expected to be a Provenance built by the
-            # orchestrator from the suggester's reasoning. Replace
-            # the slot; review_status already correct on the new prov.
+            # Build the new Provenance from the suggester's reasoning.
+            # Defensive: if no suggestion was threaded through (legacy
+            # callers / tests passing a Provenance directly as new_value),
+            # fall back to using new_value as the provenance.
+            if suggestion is not None:
+                new_prov = Provenance(
+                    source="inferred",
+                    positive_reasoning=suggestion.positive_reasoning,
+                    why_not_in_instruction=suggestion.why_not_in_instruction,
+                    confidence=suggestion.confidence,
+                    review_status="user_accepted_suggestion",
+                )
+                proposed_value = suggestion.value
+            else:
+                new_prov = new_value if isinstance(new_value, Provenance) else None
+                proposed_value = None
+            if new_prov is None:
+                return
+            # Map slot → value-field name. Only slots with a known
+            # counterpart trigger a value write; others stay prov-only.
+            value_field = None
+            if proposed_value is not None:
+                if slot == "provenance" and hasattr(parent, "value"):
+                    value_field = "value"
+                elif slot == "description_provenance" and hasattr(parent, "description"):
+                    value_field = "description"
             if hasattr(parent, "prior_revisions"):
                 push_revision(parent)
-            setattr(parent, slot, new_value)
+            if value_field is not None:
+                setattr(parent, value_field, proposed_value)
+            setattr(parent, slot, new_prov)
             return
         if resolution.action == "override":
             existing_prov = getattr(parent, slot, None)

@@ -1516,3 +1516,263 @@ class TestCLIConfirmationHandlerOverride:
         res = handler.present(self._gap("missing"), suggestion=None)
         assert res.action == "skip"
         assert any("override only valid for fabrication" in msg for msg in log)
+
+
+# ============================================================================
+# Fabrication accept_suggestion writes both value and provenance
+# ============================================================================
+
+class TestFabricationAcceptWritesNewValue:
+    """Regression: when accept_suggestion fires on a fabrication-shaped
+    gap (path ends in ``...provenance``) AND the suggester proposed a new
+    value, both the value AND the provenance must land. Pre-fix, only the
+    provenance was written and ``suggestion.value`` was silently dropped.
+
+    Scope (Fix D): supported value-field counterparts are
+      * slot=``provenance`` → atom ``.value`` (Provenanced* fields)
+      * slot=``description_provenance`` → LocationRef ``.description``
+    For slot=``wells_provenance`` / ``resolved_label_provenance`` the
+    branch remains provenance-only; that's tracked separately."""
+
+    def _spec_with_fabricated_locationref(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume,
+        )
+        instr_prov = Provenance(
+            source="instruction", cited_text="50uL of sample", confidence=1.0,
+        )
+        # description_provenance is inferred — the slot the suggester
+        # will rewrite when it proposes a new description.
+        inferred_desc_prov = Provenance(
+            source="inferred",
+            positive_reasoning="old reasoning",
+            why_not_in_instruction="instruction is ambiguous",
+            confidence=0.6,
+        )
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                      provenance=instr_prov),
+            source=LocationRef(description="tube rack", well="A1",
+                                description_provenance=inferred_desc_prov,
+                                wells_provenance=instr_prov),
+            destination=LocationRef(description="plate", well="B1",
+                                     description_provenance=instr_prov,
+                                     wells_provenance=instr_prov),
+            composition_provenance=comp,
+        )])
+
+    def _spec_with_fabricated_atom(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, LocationRef,
+            Provenance, ProtocolSpec, ProvenancedVolume,
+        )
+        instr_prov = Provenance(
+            source="instruction", cited_text="t", confidence=1.0,
+        )
+        # The volume's provenance is inferred and the suggester proposes
+        # a new value (e.g. correcting a fabricated volume number).
+        inferred_vol_prov = Provenance(
+            source="inferred",
+            positive_reasoning="old reasoning",
+            why_not_in_instruction="instruction did not specify",
+            confidence=0.6,
+        )
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"],
+            confidence=1.0,
+        )
+        return ProtocolSpec(summary="t", steps=[ExtractedStep(
+            order=1, action="transfer",
+            volume=ProvenancedVolume(value=50.0, unit="uL", exact=True,
+                                      provenance=inferred_vol_prov),
+            source=LocationRef(description="rack", well="A1",
+                                description_provenance=instr_prov,
+                                wells_provenance=instr_prov),
+            destination=LocationRef(description="plate", well="B1",
+                                     description_provenance=instr_prov,
+                                     wells_provenance=instr_prov),
+            composition_provenance=comp,
+        )])
+
+    def test_locationref_description_rewrite_lands_value_and_prov(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_locationref()
+        g = gap("g1",
+                field_path="steps[0].source.description_provenance",
+                kind="fabricated")
+        sug = Suggestion(
+            value="fresh tubes in C1-C6",
+            provenance_source="inferred",
+            positive_reasoning="ICs use fresh tubes per protocol convention",
+            why_not_in_instruction="instruction said 'tube rack' ambiguously",
+            confidence=0.85,
+        )
+        res = Resolution(action="accept_suggestion",
+                         new_value=sug.value,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sug)
+        src = spec.steps[0].source
+        assert src.description == "fresh tubes in C1-C6"
+        assert src.description_provenance.review_status == "user_accepted_suggestion"
+        assert src.description_provenance.positive_reasoning == (
+            "ICs use fresh tubes per protocol convention"
+        )
+        # One revision pushed; head holds new value, snapshot holds old.
+        assert len(src.prior_revisions) == 1
+        assert src.prior_revisions[-1].description == "tube rack"
+
+    def test_locationref_description_rewrite_does_not_touch_wells(self):
+        # Scope check: writing the description must not touch the well
+        # or its provenance.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_locationref()
+        g = gap("g1",
+                field_path="steps[0].source.description_provenance",
+                kind="fabricated")
+        sug = Suggestion(
+            value="fresh tubes in C1-C6",
+            provenance_source="inferred",
+            positive_reasoning="r", why_not_in_instruction="w",
+            confidence=0.85,
+        )
+        res = Resolution(action="accept_suggestion",
+                         new_value=sug.value,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sug)
+        src = spec.steps[0].source
+        assert src.well == "A1"
+        assert src.wells_provenance.cited_text == ["50uL of sample"]
+
+    def test_atom_value_rewrite_lands_value_and_prov(self):
+        # slot=='provenance' on a Provenanced* atom — write both value
+        # and a fresh inferred+user_accepted_suggestion provenance.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_atom()
+        g = gap("g1",
+                field_path="steps[0].volume.provenance",
+                kind="fabricated")
+        sug = Suggestion(
+            value=100.0,
+            provenance_source="inferred",
+            positive_reasoning="standard WB transfer volume",
+            why_not_in_instruction="instruction silent",
+            confidence=0.9,
+        )
+        res = Resolution(action="accept_suggestion",
+                         new_value=sug.value,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sug)
+        vol = spec.steps[0].volume
+        assert vol.value == 100.0
+        assert vol.provenance.review_status == "user_accepted_suggestion"
+        assert vol.provenance.positive_reasoning == "standard WB transfer volume"
+        assert len(vol.prior_revisions) == 1
+        assert vol.prior_revisions[-1].value == 50.0
+
+    def test_prov_only_fix_when_suggestion_value_is_none(self):
+        # When the suggester proposes only better reasoning (value=None),
+        # behavior matches the legacy citation-only fix: write the prov,
+        # leave value untouched.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec_with_fabricated_locationref()
+        original_desc = spec.steps[0].source.description
+        g = gap("g1",
+                field_path="steps[0].source.description_provenance",
+                kind="fabricated")
+        sug = Suggestion(
+            value=None,
+            provenance_source="inferred",
+            positive_reasoning="clarified reasoning",
+            why_not_in_instruction="instruction ambiguous",
+            confidence=0.7,
+        )
+        res = Resolution(action="accept_suggestion",
+                         new_value=None,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sug)
+        src = spec.steps[0].source
+        assert src.description == original_desc
+        assert src.description_provenance.review_status == "user_accepted_suggestion"
+        assert src.description_provenance.positive_reasoning == "clarified reasoning"
+
+
+# ============================================================================
+# Orchestrator.run gap_filter param
+# ============================================================================
+
+class TestOrchestratorRunGapFilter:
+    """`gap_filter` narrows the loop to a sub-set of detected gaps so the
+    same Orchestrator wiring can drive scoped pre-passes (e.g. the
+    description-fabrication pass that runs before labware matching) and
+    the full end-of-pipeline pass."""
+
+    def test_filter_excludes_non_matching_gaps_from_iteration(self):
+        # Two gaps detected; filter keeps only one. The other is not
+        # presented, not applied, and not counted in the iteration.
+        spec = make_spec()
+        kept = gap("g_kept", kind="missing",
+                   field_path="steps[0].source.description_provenance")
+        dropped = gap("g_drop", kind="missing",
+                      field_path="steps[0].volume")
+        sug = good_suggestion(confidence=0.9)
+        orch = Orchestrator(
+            detectors=[FakeDetector([[kept, dropped], []])],
+            suggesters=[FakeSuggester({"g_kept": sug, "g_drop": sug})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            auto_accept_threshold=0.85,
+        )
+        outcome = orch.run(
+            spec, context={},
+            gap_filter=lambda g: "description" in g.field_path,
+        )
+        applied_ids = [aid for aid, _ in spec["applied"]]
+        assert "g_kept" in applied_ids
+        assert "g_drop" not in applied_ids
+        assert outcome.converged
+
+    def test_empty_after_filter_converges_without_running_loop(self):
+        # Filter rejects every detected gap → behave as a clean spec
+        # (converged, no records, no applies).
+        spec = make_spec()
+        dropped = gap("g_drop", kind="missing",
+                      field_path="steps[0].volume")
+        orch = Orchestrator(
+            detectors=[FakeDetector([[dropped], []])],
+            suggesters=[FakeSuggester({"g_drop": good_suggestion()})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            auto_accept_threshold=0.85,
+        )
+        outcome = orch.run(spec, context={},
+                            gap_filter=lambda g: False)
+        assert outcome.converged
+        assert spec["applied"] == []
+
+    def test_default_no_filter_passes_all_gaps_through(self):
+        # Sanity: default call signature (no gap_filter) preserves the
+        # full-orchestrator behavior used at the end of the pipeline.
+        spec = make_spec()
+        gaps_iter1 = [gap("g1", kind="missing")]
+        sug = good_suggestion(confidence=0.9)
+        orch = Orchestrator(
+            detectors=[FakeDetector([gaps_iter1, []])],
+            suggesters=[FakeSuggester({"g1": sug})],
+            reviewer=None,
+            handler=FakeHandler([]),
+            apply_resolution=fake_apply,
+            auto_accept_threshold=0.85,
+        )
+        outcome = orch.run(spec, context={})
+        assert outcome.converged
+        assert ("g1", "filled") in spec["applied"]

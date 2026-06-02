@@ -860,10 +860,31 @@ class ProtocolAgent:
                 Empty dict when there were no LocationRefs to confirm
                 (handler short-circuits).
         """
+        from .extraction.schema_builder import expand_well_range
         config_labels = list(
             self.config_loader.config.get("labware", {}).keys()
         )
         objections = reviewer_objections or {}
+
+        # Fix A: aggregate wells per description across every ref that
+        # shares it, so the shape-mismatch check on a row reflects the
+        # union of wells the user's labware pick would need to host.
+        wells_by_desc: dict = {}
+        for step in spec.steps:
+            for ref in (step.source, step.destination):
+                if ref is None:
+                    continue
+                wells = wells_by_desc.setdefault(ref.description, set())
+                if ref.well:
+                    wells.add(ref.well)
+                if ref.wells:
+                    wells.update(ref.wells)
+                if ref.well_range:
+                    try:
+                        wells.update(expand_well_range(ref.well_range))
+                    except Exception:
+                        pass
+
         seen = set()
         table = []
         for step in spec.steps:
@@ -881,25 +902,40 @@ class ProtocolAgent:
                     suggestion.positive_reasoning
                     if suggestion is not None else None
                 )
+                # Fix A: stack warnings ABOVE the resolver's reasoning.
+                # Shape mismatch (objective physical-fit fact) first,
+                # then reviewer objection (LLM judgment), then the
+                # resolver's own reasoning labeled "Original reasoning:".
+                #
+                # Shape mismatch is computed across EVERY candidate, not
+                # just the resolver's `suggested` pick, because the modal
+                # exists so the user can override the suggestion (and
+                # the resolver often returns None when candidates are
+                # ambiguous — exactly when the user picks unaided and
+                # most needs the warning). Per the existing handover the
+                # frontend can't recompute on dropdown change, so we
+                # surface every candidate-vs-wells mismatch upfront,
+                # grouped by shape signature to dedupe shared racks.
+                shape_warnings = self._shape_mismatch_warnings(
+                    candidates, wells_by_desc.get(ref.description),
+                )
                 objection = objections.get(ref.description)
+                parts = list(shape_warnings)
                 if objection:
-                    prefix = f"⚠ Reviewer flagged: {objection}"
-                    reasoning = (
-                        f"{prefix}\n\nOriginal reasoning: {base_reasoning}"
-                        if base_reasoning else prefix
-                    )
-                else:
-                    reasoning = base_reasoning
+                    parts.append(f"⚠ Reviewer flagged: {objection}")
+                if base_reasoning:
+                    label = "Original reasoning: " if parts else ""
+                    parts.append(f"{label}{base_reasoning}")
+                reasoning = "\n\n".join(parts) if parts else None
                 table.append({
                     "description": ref.description,
                     "suggested_label": suggested,
                     "candidates": candidates,
                     # Carry the resolver's reasoning (optionally prefixed
-                    # with the pre-modal reviewer's objection) so the
-                    # modal can surface it inline per row. None when
-                    # the resolver had no suggestion AND the reviewer
-                    # had no objection (user's pick is authoritative;
-                    # nothing to explain).
+                    # with shape-mismatch and/or reviewer-objection
+                    # warnings) so the modal can surface it inline per
+                    # row. None when the resolver had no suggestion AND
+                    # nothing flagged.
                     "positive_reasoning": reasoning,
                 })
         return self.assignments_handler.confirm(table)
@@ -938,6 +974,70 @@ class ProtocolAgent:
         return reviewer.review_suggestions(
             labware_suggestions, {"instruction": instruction or ""},
         )
+
+    def _resolve_description_gaps_pre_pass(
+        self, spec, ic_suggesters, prompt: str, extractor,
+        reviewer_model: str,
+    ) -> bool:
+        """Run a scoped gap-resolution pass over source/destination
+        descriptions BEFORE labware matching. Resolves missing-description
+        and fabricated-citation gaps so labware picks land against
+        finalized descriptions instead of strings the user later rewrites
+        inside the main orchestrator loop (silent staleness, Fix E).
+
+        Pre:    `spec` is the freshly-extracted ProtocolSpec. `ic_suggesters`
+                is the suggester registry shared with the IC batch and
+                main orchestrator (includes LLMSpotSuggester, which can
+                propose new descriptions). `extractor` supplies the LLM
+                client + model name. `reviewer_model` is the smaller model
+                used by the IndependentReviewSuggester.
+        Post:   Returns True iff the pass either found nothing to fix or
+                resolved everything it found; False iff the user aborted.
+                Mutates `spec` in place via the orchestrator's apply path.
+        Side effects: At most one or two LLM calls per detected gap
+                      (suggester + reviewer). Emits the usual storytelling
+                      events under stage_3_gap_resolver.
+        """
+        from .gap_resolution import (
+            Orchestrator, CLIConfirmationHandler, default_apply_resolution,
+            MissingFieldsDetector, ProvenanceWarningDetector,
+            IndependentReviewSuggester,
+        )
+
+        def _is_description_gap(gap) -> bool:
+            return (
+                gap.field_path.endswith(".description")
+                or gap.field_path.endswith(".description_provenance")
+            )
+
+        orch = Orchestrator(
+            detectors=[
+                MissingFieldsDetector(),
+                ProvenanceWarningDetector(),
+            ],
+            suggesters=ic_suggesters,
+            reviewer=IndependentReviewSuggester(
+                client=extractor.client,
+                model_name=reviewer_model,
+            ) if extractor is not None and extractor.client is not None else None,
+            handler=(
+                self.confirmation_handler
+                or CLIConfirmationHandler(cm=self.cm, log=_log)
+            ),
+            apply_resolution=default_apply_resolution,
+            reporter=self.reporter,
+        )
+        outcome = orch.run(
+            spec,
+            context={
+                "instruction": prompt,
+                "config": self.config_loader.config,
+            },
+            gap_filter=_is_description_gap,
+        )
+        if outcome.aborted:
+            return False
+        return True
 
     def _confirm_labware_assignments(
         self, spec, labware_suggestions: dict,
@@ -1224,19 +1324,84 @@ class ProtocolAgent:
             review_status=base_status,
         )
 
-    def _shape_mismatch_note(self, label: str,
-                              ref_wells: Optional[set]) -> Optional[str]:
-        """Build a "[shape mismatch]" note when `ref_wells` contains any
-        well outside the picked labware's `valid_wells`.
+    def _shape_mismatch_warnings(
+        self, candidates: Optional[list], ref_wells: Optional[set],
+    ) -> list:
+        """Build per-shape shape-mismatch warning strings for a row in the
+        labware-assignments modal. Surfaces a warning for every candidate
+        whose `valid_wells` cannot host the union of wells the row's
+        description touches — NOT just the resolver's `suggested` pick —
+        so the user gets a warning regardless of which dropdown option
+        they choose.
+
+        Pre:    `candidates` is the list of config labware keys offered as
+                dropdown options for this row (from the resolver's
+                `LabwareSuggestion.candidates`). `ref_wells` is the union
+                of wells every ref sharing this description references
+                across the spec.
+        Post:   Returns a list of `"⚠ Shape mismatch: ..."` strings, one
+                per unique (offending-wells, valid-rows, valid-columns)
+                signature. Candidates with the same signature are named
+                together in one warning so configs whose racks share a
+                load_name produce one line instead of N duplicates.
+                Returns an empty list when there are no candidates, no
+                wells, or every candidate can host every well.
+        Side effects: None. Imports `get_well_info` lazily.
+        """
+        if not candidates or not ref_wells:
+            return []
+        from nl2protocol.models.labware import get_well_info
+        labware_cfg = self.config_loader.config.get("labware", {})
+        sig_to_labels: dict = {}
+        for cand in candidates:
+            lw = labware_cfg.get(cand, {})
+            load_name = lw.get("load_name", "")
+            if not load_name:
+                continue
+            try:
+                info = get_well_info(load_name)
+            except (ValueError, ImportError):
+                continue
+            valid = set(info.get("valid_wells", []))
+            if not valid:
+                continue
+            offending = tuple(sorted(w for w in ref_wells if w not in valid))
+            if not offending:
+                continue
+            sig = (offending,
+                   info.get("row_range", "?"),
+                   info.get("col_range", "?"))
+            sig_to_labels.setdefault(sig, []).append(cand)
+        warnings = []
+        for (offending, row_range, col_range), labels in sig_to_labels.items():
+            shown = list(offending[:5])
+            ellipsis = (
+                "" if len(offending) <= 5
+                else f" (+{len(offending) - 5} more)"
+            )
+            labels_str = ", ".join(labels)
+            warnings.append(
+                f"⚠ Shape mismatch: Wells {shown}{ellipsis} do not exist "
+                f"on {labels_str} (valid rows {row_range}, columns "
+                f"{col_range})."
+            )
+        return warnings
+
+    def _shape_mismatch_facts(self, label: str,
+                                ref_wells: Optional[set]) -> Optional[str]:
+        """Build the just-the-facts shape-mismatch sentence when
+        `ref_wells` contains any well outside `label`'s `valid_wells`.
 
         Pre:    `label` is a config labware key. `ref_wells` is the set
                 of wells the ref touches (or None / empty for "no wells
                 to check").
-        Post:   Returns a single-sentence note naming the offending
-                wells + the labware's valid range, or None when there's
-                nothing to warn about (no wells, unknown load_name,
-                or wells fully fit). Unknown load_names → None
-                (fail-open, matches the constraint checker's
+        Post:   Returns a single sentence "Wells [...] do not exist on
+                '<label>' (valid rows X, columns Y)." with no marker
+                prefix and no post-decision context. Callers add their
+                own framing (provenance vs modal hint). Returns None
+                when there's nothing to warn about (no wells, unknown
+                load_name, or wells fully fit). Unknown load_names →
+                None (fail-open, matches the constraint checker's
                 convention).
         Side effects: None.
         """
@@ -1263,10 +1428,24 @@ class ProtocolAgent:
         shown = offending[:5]
         ellipsis = "" if len(offending) <= 5 else f" (+{len(offending) - 5} more)"
         return (
-            f"[shape mismatch] Wells {shown}{ellipsis} do not exist on "
-            f"'{label}' (valid rows {row_range}, columns {col_range}). "
-            f"Constraint check will flag this downstream; the user "
-            f"picked this labware anyway."
+            f"Wells {shown}{ellipsis} do not exist on "
+            f"'{label}' (valid rows {row_range}, columns {col_range})."
+        )
+
+    def _shape_mismatch_note(self, label: str,
+                              ref_wells: Optional[set]) -> Optional[str]:
+        """Provenance-side wrapper around `_shape_mismatch_facts`. Used
+        AFTER the user has picked, so the tail captures that context.
+
+        Returns "[shape mismatch] <facts> Constraint check will flag
+        this downstream; the user picked this labware anyway." or None.
+        """
+        facts = self._shape_mismatch_facts(label, ref_wells)
+        if facts is None:
+            return None
+        return (
+            f"[shape mismatch] {facts} Constraint check will flag this "
+            f"downstream; the user picked this labware anyway."
         )
 
     def run_pipeline(self, prompt: str, csv_path: str = None,
@@ -1459,6 +1638,29 @@ class ProtocolAgent:
                                   model_name=extractor.model_name),
             ]
 
+            # Reviewer: smaller / different model than the extractor's per
+            # ADR-0008's bias-mitigation rationale. Haiku is cheap, fast,
+            # and sufficient for the structured two-claim verification
+            # task. Used by both the pre-labware description-gap pass
+            # below and the main orchestrator at the end of this stage.
+            reviewer_model = "claude-haiku-4-5"
+
+            # Fix E — description-gap pre-pass. Resolve missing-description
+            # and fabricated-citation gaps over source/destination
+            # descriptions BEFORE labware matching runs, so labware picks
+            # are made against finalized descriptions. The main
+            # orchestrator at the end of this stage still runs unfiltered
+            # for the rest of the gap kinds (volume, wells, etc.).
+            self._emit_progress("auditing labware descriptions",
+                                 stage_name="stage_3_labware_resolver")
+            desc_ok = self._resolve_description_gaps_pre_pass(
+                spec, ic_suggesters, prompt, extractor, reviewer_model,
+            )
+            if not desc_ok:
+                _log("  Description-gap pre-pass aborted.")
+                _save_state_log("stage_3_description_pre_pass")
+                return None
+
             # Produce labware SUGGESTIONS (not mutations). The pipeline's
             # labware-assignments confirmation flow below is the sole writer
             # of resolved_label + resolved_label_provenance, so the
@@ -1639,10 +1841,8 @@ class ProtocolAgent:
                 stage_name="stage_3_labware_resolver",
             ))
 
-            # Reviewer: smaller / different model than the extractor's per ADR-0008's
-            # bias-mitigation rationale. Haiku is cheap, fast, and sufficient for
-            # the structured two-claim verification task.
-            reviewer_model = "claude-haiku-4-5"
+            # `reviewer_model` defined above (before description-gap pre-pass);
+            # main orchestrator reuses the same Haiku instance.
             orch = Orchestrator(
                 detectors=[
                     MissingFieldsDetector(),
