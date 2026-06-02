@@ -282,6 +282,12 @@ TEMPERATURE STEPS (set_temperature, wait_for_temperature):
   Example: "Set temperature module to 42°C" →
     {{"action": "set_temperature", "temperature": {{"value": 42, "provenance": {{...}}}}}}
 - The "volume" field is ONLY for liquid volumes (uL/mL). Temperatures are NOT volumes.
+- Leave "source" and "destination" null. Temperature steps act on the
+  temperature module (resolved from the lab config) — they have no
+  liquid source or destination. Even if the instruction names the
+  temperature module by phrase ("set temperature module to 95°C"), do
+  NOT put that phrase into source.description or
+  destination.description; it is not a LocationRef.
 
 INITIAL CONTENTS (two fields — use the right one):
 

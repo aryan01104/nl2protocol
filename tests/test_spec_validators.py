@@ -128,13 +128,16 @@ class TestCoerceReplicates:
         assert step.replicates is None
 
     # Post: replicates=2 stays 2
+    # (uses action="transfer" because delay's keep-set excludes
+    # replicates per ADR-0015; the test targets coerce_replicates, not
+    # the pruner.)
     def test_two_stays_two(self):
-        step = _step(replicates=2)
+        step = _step(action="transfer", replicates=2)
         assert step.replicates == 2
 
     # Post: replicates=10 stays 10
     def test_large_value_stays_unchanged(self):
-        step = _step(replicates=10)
+        step = _step(action="transfer", replicates=10)
         assert step.replicates == 10
 
     # Post: replicates=1 coerces to None

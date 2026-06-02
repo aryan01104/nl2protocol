@@ -9,7 +9,7 @@ Every extracted value carries a Provenance tag saying where it came from
 can verify claims and route uncertain values for user confirmation.
 """
 
-from typing import Annotated, List, Optional, Literal
+from typing import Annotated, Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -604,6 +604,70 @@ ActionType = Literal[
 ]
 
 
+# ADR-0015 — action-field pruning
+#
+# `ExtractedStep` is a one-class-fits-all model the LLM fills. The final
+# command layer (`nl2protocol/models/schema.py`) has a tight per-action
+# class for each ActionType. The LLM regularly fills fields the action
+# doesn't consume (e.g. `destination` on `set_temperature`). Pydantic
+# accepts them; downstream consumers walk the fields polymorphically and
+# treat the LLM-imagined values as real (the labware matcher surfaces
+# them as phantom rows in the assignments modal). `_ACTION_KEEPS` names
+# the fields each action keeps; the `prune_irrelevant_fields_by_action`
+# validator on `ExtractedStep` nulls everything outside that set and
+# records the scrubbed value in `ExtractedStep.pruned_fields` for later
+# analysis. The matrix is derived from the schema-layer command classes
+# plus the fields `extraction/schema_builder.py` actually reads off an
+# `ExtractedStep` when building each command.
+_PRUNABLE_FIELDS: frozenset = frozenset({
+    "substance", "volume", "temperature", "duration",
+    "source", "destination", "post_actions", "replicates", "note",
+})
+
+_ACTION_KEEPS: dict = {
+    "transfer":             {"volume", "substance", "source", "destination",
+                              "post_actions", "replicates"},
+    "distribute":           {"volume", "substance", "source", "destination",
+                              "post_actions", "replicates"},
+    "consolidate":          {"volume", "substance", "source", "destination",
+                              "post_actions", "replicates"},
+    "serial_dilution":      {"volume", "substance", "source", "destination",
+                              "post_actions", "replicates"},
+    "mix":                  {"volume", "substance", "destination"},
+    "aspirate":             {"volume", "substance", "source"},
+    "dispense":             {"volume", "substance", "destination"},
+    "blow_out":             {"destination"},
+    "touch_tip":            {"destination"},
+    "delay":                {"duration", "note"},
+    "pause":                {"duration", "note", "substance"},
+    "comment":              {"note", "substance"},
+    "set_temperature":      {"temperature"},
+    "wait_for_temperature": {"temperature"},
+    "engage_magnets":       set(),
+    "disengage_magnets":    set(),
+    "deactivate":           set(),
+}
+
+
+class PrunedFieldRecord(BaseModel):
+    """One field-scrub record kept on `ExtractedStep.pruned_fields`.
+
+    The pruner only fires on non-null fields outside the action's keep
+    set, so every record represents an LLM-filled value that the action
+    doesn't consume. Preserved for later analysis (state-log dumps,
+    extraction-quality metrics) — not surfaced to the user.
+    """
+    field_name: str = Field(..., description=(
+        "Which `ExtractedStep` field was scrubbed (e.g. 'destination', "
+        "'volume'). Matches the attribute name on the model exactly."
+    ))
+    value: Any = Field(..., description=(
+        "The original value the LLM filled, before pruning. Sub-models "
+        "(LocationRef, ProvenancedVolume, ...) serialize via pydantic; "
+        "primitives pass through. Used as audit data, never re-applied."
+    ))
+
+
 class ExtractedStep(BaseModel):
     """One logical step in the protocol."""
     order: int = Field(..., ge=1)
@@ -671,6 +735,53 @@ class ExtractedStep(BaseModel):
     note: Optional[str] = Field(None, description=(
         "Additional context from the instruction, verbatim. Do not summarize or paraphrase."
     ))
+    pruned_fields: List[PrunedFieldRecord] = Field(default_factory=list, description=(
+        "Append-only audit log of fields the pruner scrubbed because the "
+        "action does not consume them (per ADR-0015's _ACTION_KEEPS matrix). "
+        "Populated automatically by `prune_irrelevant_fields_by_action`. "
+        "Empty list for clean LLM output; non-empty when the LLM filled a "
+        "field outside the action's keep-set. Preserved in state-log dumps "
+        "for later extraction-quality analysis; not surfaced to the user."
+    ))
+
+    @model_validator(mode='after')
+    def prune_irrelevant_fields_by_action(self) -> 'ExtractedStep':
+        """Null any field the action does not consume; record the scrub on
+        `self.pruned_fields`. Single source of truth for the per-action
+        keep-set is the module-level `_ACTION_KEEPS` dict (per ADR-0015).
+
+        Pre:    ExtractedStep instance with all fields populated by Pydantic.
+                `self.action` is a member of `ActionType`. `self.pruned_fields`
+                is an empty list (the default — callers must not pre-populate it).
+        Post:   For every field name in `_PRUNABLE_FIELDS` that is NOT in
+                `_ACTION_KEEPS[self.action]`: if the current value is not
+                None / not an empty list, a `PrunedFieldRecord(field_name,
+                value)` is appended to `self.pruned_fields` and the attr
+                is set to None. Fields in the keep-set are untouched. The
+                method returns `self`. Other fields (order, action,
+                composition_provenance, tip_strategy, pipette_hint) are
+                never pruned because they aren't in `_PRUNABLE_FIELDS`.
+        Side effects: Mutates the step instance (nulls scrubbed fields,
+                appends to `pruned_fields`). Re-running on an already-
+                pruned step is a no-op (every scrubbed field is None,
+                falls through the non-null guard).
+        Raises: Never. Unknown actions (shouldn't happen post-Literal
+                validation) fall through with no scrub.
+        """
+        keep = _ACTION_KEEPS.get(self.action)
+        if keep is None:
+            return self
+        for field_name in _PRUNABLE_FIELDS:
+            if field_name in keep:
+                continue
+            value = getattr(self, field_name, None)
+            if value is None or value == []:
+                continue
+            self.pruned_fields.append(
+                PrunedFieldRecord(field_name=field_name, value=value)
+            )
+            setattr(self, field_name, None)
+        return self
 
 
 
