@@ -480,11 +480,13 @@
   }
   pre.code .code-line[data-script-step]:hover,
   pre.code .code-line.is-script-linked {
-    background: rgba(184, 68, 79, 0.10);
+    background: color-mix(in srgb, var(--col-instruction) 10%, transparent);
   }
-  /* Validated-spec block highlight when matching code lines are hovered. */
+  /* Validated-spec block highlight when matching code lines are hovered.
+     Same blue mix as .step.step-active below — the script-linked and
+     step-trigger hover paths share one visual language. */
   .col-validated-spec .step.is-script-linked {
-    background: rgba(184, 68, 79, 0.06);
+    background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     border-left-color: var(--col-instruction);
   }
 
@@ -1585,6 +1587,16 @@
   // selector for whitespace-separated tokens.
   const sel = (attr, token) => `[${attr}~="${CSS.escape(token)}"]`;
 
+  // Straight-line path from the right-midheight of `srcRect` to the
+  // left-midheight of `dstRect`. Used for the col 2 → col 3 step→code
+  // arrows where the parent/child relationship is short-range and a
+  // bezier curve adds visual weight without information.
+  function linePath(srcRect, dstRect) {
+    const x1 = srcRect.right, y1 = srcRect.top + srcRect.height / 2;
+    const x2 = dstRect.left,  y2 = dstRect.top + dstRect.height / 2;
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
   function bezierPath(srcRect, dstRect) {
     // |dy| term in dx prevents tall vertical sweeps from kinking — without
     // it the curve flicks horizontally then sweeps wildly. Clamp at 220
@@ -2244,7 +2256,11 @@
       const srcRect = stepEl.getBoundingClientRect();
       const dstRect = bracket.getBoundingClientRect();
       if (!srcRect.width || !dstRect.height) return;
-      const d = bezierPath(srcRect, dstRect);
+      // Straight line, not bezier — parent→child step→code linkage is
+      // short-range and a curve here reads as visual noise. Source =
+      // step block's right-midheight; target = bracket bar's left edge
+      // at its vertical midpoint (the bar is 2px wide so left ≈ middle).
+      const d = linePath(srcRect, dstRect);
       let path = stepCodeArrowPathMap.get(sid);
       if (path && path.parentNode === group) {
         path.setAttribute("d", d);
@@ -2330,8 +2346,25 @@
       if (el.dataset.linkageBound === "1") return;
       el.dataset.linkageBound = "1";
       const stepId = el.dataset.scriptStep;
-      el.addEventListener("mouseenter", () => setLinkageActive(stepId, true));
-      el.addEventListener("mouseleave", () => setLinkageActive(stepId, false));
+      // stepId here is the bare "s{idx}" form on data-script-step.
+      // The step block in col 2 carries data-prov-id="s{idx}-step-trigger",
+      // and setPairActive keys arrows + cite spans + atom colorization
+      // off that suffix. Firing setPairActive with the trigger id from
+      // a code-line hover propagates the highlight chain upstream:
+      // col 2 step block lights up (.step-active), col 1 instruction
+      // cite spans colorize (.cite-active), col 3 sibling atoms in the
+      // same step colorize (.prov-active via the prefix walk added in
+      // the atomic-hover commit), and both 1→2 and 2→3 arrows brighten
+      // (.arrow-active). One direction, two highlight systems stacked.
+      const triggerId = stepId + "-step-trigger";
+      el.addEventListener("mouseenter", () => {
+        setLinkageActive(stepId, true);
+        setPairActive(triggerId, true);
+      });
+      el.addEventListener("mouseleave", () => {
+        setLinkageActive(stepId, false);
+        setPairActive(triggerId, false);
+      });
     });
   }
 
