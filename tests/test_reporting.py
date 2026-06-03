@@ -1177,32 +1177,43 @@ class TestADR0011NullFieldPlaceholders:
         # No tracked-field placeholders for pause's empty volume/source/etc.
         assert "✗" not in joined
 
-    def test_value_cell_hover_color_rules_present(self, tmp_path):
-        # The hover/active rules paint TEXT (not background) on value
-        # cells, gated on .prov-active / .cite-active / direct hover.
-        # Background fills were removed: the visual language is
-        # text-color-only, with the neutral currentColor outline
-        # supplying the affordance box.
+    def test_value_cell_color_and_outline_rules_present(self, tmp_path):
+        # Locks in the two-axis visual encoding for value cells:
+        #   COLOR is reserved for palette-driven cite matching. .palette-N
+        #   text color is state-gated (.prov-active / .cite-active /
+        #   direct hover) so it only surfaces when the parent step is
+        #   being explored.
+        #
+        #   SHAPE (always-on outline rectangle) signals non-instruction
+        #   sources (config / domain_default / inferred). No source-kind
+        #   text colors anywhere.
         from nl2protocol.reporting import HTMLReporter
         out_path = tmp_path / "report.html"
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # Per-palette: state-gated text color, palette-0 as canary.
+        # Palette: state-gated text color, palette-0 as canary.
         assert ".palette-0.prov-active" in rendered
         assert "color: var(--palette-0)" in rendered
-        # Per-source: state-gated text color, inferred as canary.
-        assert "span.prov-inferred.prov-active" in rendered
-        assert "color: var(--col-inferred)" in rendered
-        # No hover-flip background rules on value cells. The old rules
-        # had the shape `span.palette-N.prov-active { background: ...; }`
-        # and `.cite-marker.cite-atomic-color.palette-N.cite-active
-        # { background: ...; }`; both deleted. The standalone color
-        # variables still appear in legend swatches (line ~1091),
-        # so the assertion has to target the specific hover-flip rule
-        # signatures, not the variable usage in isolation.
+        # Non-instruction sources share one always-on outline rule;
+        # the grouped selector is the stable signature.
+        assert ".prov-config,\n  .prov-domain_default,\n  .prov-inferred" in rendered
+        assert "outline: 1px solid var(--dim)" in rendered
+        # No source-kind hover color rules. The Commit 1 versions
+        # (`span.prov-inferred.prov-active { color: var(--col-inferred) }`
+        # and siblings) are gone; only .palette-N drives color.
+        assert "span.prov-inferred.prov-active" not in rendered
+        assert "span.prov-config.prov-active" not in rendered
+        assert "span.prov-domain_default.prov-active" not in rendered
+        # No hover-flip background rules. Earlier shape was
+        # `span.palette-N.prov-active { background: ...; }` and
+        # `.cite-marker.cite-atomic-color.palette-N.cite-active
+        # { background: ...; }`; both deleted.
         assert "span.palette-0.prov-active, span.palette-0.prov-spotlight" not in rendered
         assert ".cite-marker.cite-atomic-color.palette-0.cite-active" not in rendered
+        # Empty-cell styling still defined (separate affordance for
+        # null-field placeholders, intentionally retained).
+        assert ".cell-empty" in rendered
         # Empty-cell styling still defined (separate affordance for
         # null-field placeholders, intentionally retained).
         assert ".cell-empty" in rendered

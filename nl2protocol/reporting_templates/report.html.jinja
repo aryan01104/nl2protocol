@@ -191,10 +191,21 @@
                               by source kind. The underline tells readers
                               "this isn't a literal lift from the user."
        - arrow              → composite (step-existence) grounding only. */
-  .prov-instruction    { font-weight: 500; cursor: help; /* hue comes from .palette-N */ }
-  .prov-config         { color: var(--col-config);      font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
-  .prov-domain_default { color: var(--col-domain);      font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
-  .prov-inferred       { color: var(--col-inferred);    font-weight: 500; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  /* Source-kind base classes. Color is reserved for palette-driven
+     cite matching (one hue per unique cited substring, via .palette-N);
+     source kind is communicated by SHAPE instead — non-instruction
+     values carry an always-on outline rectangle. Two visual axes
+     carrying one signal each, no overlap. */
+  .prov-instruction    { font-weight: 500; cursor: help; /* hue comes from .palette-N when cite is recoverable */ }
+  .prov-config,
+  .prov-domain_default,
+  .prov-inferred {
+    font-weight: 500;
+    cursor: help;
+    outline: 1px solid var(--dim);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
 
   /* ───────── Step detail grid ─────────
      Each step renders its parameter rows as a 3-column CSS grid:
@@ -588,13 +599,11 @@
     font-size: 11px;
   }
   .validated-summary-warnings li { margin: 1px 0; }
-  span[data-prov-id]:hover,
-  span[data-prov-id].prov-active,
-  span[data-prov-id].prov-spotlight {
-    outline: 1px solid currentColor;
-    outline-offset: 1px;
-    border-radius: 2px;
-  }
+  /* Hover/active/spotlight on value cells deliberately does NOT add a
+     state outline. Non-instruction values already carry an always-on
+     outline (see .prov-config / .prov-domain_default / .prov-inferred
+     above); instruction-sourced values stay unboxed in every state.
+     Color, when it changes on hover, comes from .palette-N alone. */
 
   /* ───────── Phase 3j (#73): gap modal attach arrows ─────────
      Dotted SVG paths from the gap-prompt modal to each cell the gap
@@ -775,22 +784,13 @@
      from .prov-active so hover-leave handlers don't accidentally clear
      the spotlight while the user is exploring other cells. */
 
-  /* ───────── Hover/active styling on value cells (text-only) ─────────
-     Per the UX directive: parent-step hover (and direct atom hover, and
-     the modal-driven .prov-spotlight) paints text in the source's hue;
-     no background fill, no contrast flip. The neutral `currentColor`
-     outline from the rule above (~ line 577) supplies the hover/active
-     affordance box; here we just supply the text hue per source kind.
-     Palette spans already get their hue from the .palette-N rules above. */
-  span.prov-config.prov-active,         span.prov-config.prov-spotlight,         span.prov-config[data-prov-id]:hover         { color: var(--col-config); }
-  span.prov-domain_default.prov-active, span.prov-domain_default.prov-spotlight, span.prov-domain_default[data-prov-id]:hover { color: var(--col-domain); }
-  span.prov-inferred.prov-active,       span.prov-inferred.prov-spotlight,       span.prov-inferred[data-prov-id]:hover       { color: var(--col-inferred); }
-
-  /* Instruction-sourced spans WITHOUT a palette (cite not recoverable):
-     fall back to instruction-red text. Spans WITH a palette take the
-     palette rules above (same specificity; palette declarations come
-     first in cascade so this rule loses for palette spans). */
-  span.prov-instruction.prov-active,    span.prov-instruction.prov-spotlight,    span.prov-instruction[data-prov-id]:hover    { color: var(--col-instruction); }
+  /* No source-kind hover color rules. Hover-state color overrides are
+     reserved for palette-driven cite matching (see the .palette-N
+     rules higher up). Values without a recoverable cite — whether
+     instruction-sourced with a broken cite, or filled by config /
+     domain default / inferred — stay ink in every state. Source kind
+     for non-instruction is communicated via the always-on outline on
+     .prov-config / .prov-domain_default / .prov-inferred. */
 
   /* ───────── ADR-0011 Phase 2b/4 polish: ✗ placeholder cells ─────────
      For action-expected fields that are null on the step, the renderer
@@ -1292,13 +1292,14 @@
   {# Legend is the decoder ring for the report's visual encoding. Grouped
      into logical concepts (instruction-sourced atoms, model-filled atoms,
      review markers, step-block grounding) so a reader can scan one group
-     at a time. Model-filled atoms are communicated via dotted underline +
-     categorical color (the legacy ▴ marker was removed — two cues for one
-     fact is sufficient). #}
+     at a time. Color is reserved for cite matching (one hue per unique
+     cited substring, surfaces on hover). Source kind for model-filled
+     atoms is communicated by SHAPE — an always-on outline rectangle —
+     so the two visual axes don't overlap. #}
   <div class="legend">
-    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition · instruction-sourced atoms get per-citation hue (cite ↔ value)</span>
+    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition · instruction-sourced atoms get per-citation hue on hover (cite ↔ value)</span>
 
-    <span><span style="text-decoration: underline dotted; text-underline-offset: 2px;">value</span> = model-filled atom (dotted underline + categorical color):<span class="swatch" style="background: var(--col-config); margin-left: 8px;"></span>config ·<span class="swatch" style="background: var(--col-domain);"></span>domain ·<span class="swatch" style="background: var(--col-inferred);"></span>inferred</span>
+    <span><span style="outline: 1px solid var(--dim); outline-offset: 1px; border-radius: 2px; padding: 0 3px;">value</span> = model-filled atom (config, domain default, or inferred — outlined box, no color)</span>
 
     <span><span style="color: var(--status-error-fg); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
@@ -1780,19 +1781,16 @@
   }
 
   function setPairActive(id, active) {
-    // Toggle highlight on every cite-segment, prov-target, and arrow sharing one id.
-    // Step-trigger pair: a segment that lies INSIDE both the step's
-    // composite cite AND an atomic-color cite (e.g. "sample tube"
-    // inside "Add 5uL of 4X Laemmli buffer to each sample tube")
-    // carries both ids. Toggling cite-active on the atomic-color
-    // segment would flash its palette-N solid background (per the
-    // .cite-marker.cite-atomic-color.palette-N.cite-active rule),
-    // which reads as a noisy secondary highlight unrelated to the
-    // step hover. Restrict step-trigger activation to segments that
-    // aren't also atomic-color so only the composite cite lights up.
+    // Toggle highlight on every cite-segment, prov-target, and arrow
+    // sharing one id. An atomic-color cite segment that lies inside
+    // a composite step cite carries both ids; on step hover, the
+    // atomic segment activates too so its palette text color shows.
+    // (Earlier the palette class flipped to a solid background which
+    // read as noisy under a step hover, so this branch used to skip
+    // atomic segments — that background-flip rule is gone, so the
+    // skip is gone with it.)
     const isStepTrigger = id.endsWith("-step-trigger");
     document.querySelectorAll(sel("data-cite-id", id)).forEach((e) => {
-      if (isStepTrigger && e.classList.contains("cite-atomic-color")) return;
       e.classList.toggle("cite-active", active);
     });
     document.querySelectorAll(sel("data-prov-id", id)).forEach((e) => {
