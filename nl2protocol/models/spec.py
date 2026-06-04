@@ -558,6 +558,46 @@ class LocationRef(BaseModel):
             )
         return v
 
+    @model_validator(mode='before')
+    @classmethod
+    def _strip_sentinel_well_strings(cls, data):
+        """Normalize sentinel strings on `well` / `wells` to None before regex validation.
+
+        Pre:    `data` is the raw input passed to LocationRef construction
+                (dict from JSON, or already-constructed model on revalidation).
+
+        Post:   When `data` is a dict: any `well` value whose case-folded /
+                whitespace-stripped form is in the sentinel set
+                {"unknown", "unspecified", "n/a", "na", "none", "null",
+                "?", ""} is replaced with None. For `wells` (a list),
+                sentinel entries are filtered out; an empty filtered list
+                becomes None. `well_range`, `description`, and every
+                provenance field are untouched. Non-dict input is returned
+                unchanged so revalidation passes through.
+
+        Why: The extractor LLM occasionally emits "unknown" as a well
+        fallback when uncertain. Without this normalization the regex
+        rejects it with a ValidationError; with it, the field becomes
+        null and the downstream gap-resolution stage surfaces a missing-
+        value gap (the desired behavior). Runs in mode='before' so the
+        sentinel never reaches the pattern check.
+        """
+        if not isinstance(data, dict):
+            return data
+        sentinels = {"unknown", "unspecified", "n/a", "na", "none", "null", "?", ""}
+
+        def _is_sentinel(v):
+            return isinstance(v, str) and v.strip().lower() in sentinels
+
+        well = data.get("well")
+        if _is_sentinel(well):
+            data["well"] = None
+        wells = data.get("wells")
+        if isinstance(wells, list):
+            filtered = [w for w in wells if not _is_sentinel(w)]
+            data["wells"] = filtered if filtered else None
+        return data
+
     @model_validator(mode='after')
     def require_wells_provenance_when_wells_present(self) -> 'LocationRef':
         """Wells must carry provenance when any well/wells/well_range is set.

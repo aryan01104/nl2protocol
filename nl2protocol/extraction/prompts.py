@@ -277,6 +277,10 @@ STEP SOURCE LOCATIONS — only populate the "source" LocationRef when the instru
     BSA step → source: {{"description": "tube rack", "well": "B1"}} (instruction says "Tube rack B1 contains BSA stock")
     Water step → source: null (instruction never says where water is)
 
+WELL COORDINATES — if you cannot determine a specific well, set the field to null.
+Never write "unknown", "n/a", "none", or any sentinel string in well / wells / well_range.
+The downstream gap-resolution stage will fill missing wells; sentinel strings break validation.
+
 TEMPERATURE STEPS (set_temperature, wait_for_temperature):
 - Put the temperature value in the "temperature" field, NOT in "volume" or "note".
   Example: "Set temperature module to 42°C" →

@@ -453,3 +453,55 @@ class TestCompactInstruction:
                 f"Expected volume {required} to appear in extracted spec; "
                 f"got {sorted(extracted_volumes)}"
             )
+
+
+class TestLocationRefSentinelNormalization:
+    """Deterministic tests for LocationRef._strip_sentinel_well_strings.
+
+    The extractor LLM occasionally returns out-of-grammar strings like
+    "unknown" for a well coordinate. The pre-validator normalizes them to
+    None before pattern validation so the schema doesn't raise; downstream
+    gap resolution then handles the missing value.
+    """
+
+    def _provenance(self, source="instruction", cited="x"):
+        if source == "instruction":
+            return Provenance(
+                source="instruction", cited_text=[cited], confidence=1.0
+            )
+        return Provenance(
+            source="inferred", positive_reasoning="probe", confidence=0.7
+        )
+
+    def test_well_unknown_normalizes_to_none(self):
+        ref = LocationRef(
+            description="tube rack",
+            well="unknown",
+            description_provenance=self._provenance(cited="tube rack"),
+        )
+        assert ref.well is None
+
+    def test_well_sentinel_case_insensitive(self):
+        ref = LocationRef(
+            description="tube rack",
+            well="UNKNOWN",
+            description_provenance=self._provenance(cited="tube rack"),
+        )
+        assert ref.well is None
+
+    def test_wells_filters_sentinels(self):
+        ref = LocationRef(
+            description="plate",
+            wells=["A1", "unknown", "A3"],
+            description_provenance=self._provenance(cited="plate"),
+            wells_provenance=self._provenance(cited="A1, A3"),
+        )
+        assert ref.wells == ["A1", "A3"]
+
+    def test_wells_all_sentinel_becomes_none(self):
+        ref = LocationRef(
+            description="plate",
+            wells=["unknown", "n/a"],
+            description_provenance=self._provenance(cited="plate"),
+        )
+        assert ref.wells is None
