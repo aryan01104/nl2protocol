@@ -24,11 +24,12 @@ import asyncio
 import json
 import os
 import queue
+import shutil
 import tempfile
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -361,12 +362,33 @@ class LiveModeApp:
             project_root = Path(__file__).resolve().parents[2]
             examples_path = project_root / examples_dir
         self._examples_dir = examples_path
+        # Eval-mode routing: when the operator points --examples-dir at the
+        # evals/ tree, treat every dropdown-picked run as a graded eval
+        # case. Each run's artifacts (HTML report, metrics, pipeline state,
+        # generated script) land in evals/runs/<case>/run_<ts>/ alongside
+        # copies of the case fixtures + a result.json with hand_grade=TODO.
+        # The per-case grouping means every run of "01_lotterhos_magbead"
+        # — across server restarts, across days, across code versions —
+        # sits in one folder ordered by timestamp, so a grader can scan
+        # the case's history without juggling batch IDs. git_sha on
+        # result.json carries the code-version dimension. Default
+        # examples_dir (test_cases/examples) keeps the legacy flat
+        # output/ behavior.
+        self._eval_mode: bool = (examples_path.name == "evals")
+        project_root = Path(__file__).resolve().parents[2]
+        self._eval_runs_root: Path = project_root / "evals" / "runs"
         self._html_report_path: Optional[str] = None
         # Per-request inputs (set by POST /start, cleared between runs).
         # _config_path points at a temp file written from the uploaded JSON.
         self._instruction: str = ""
         self._config_path: Optional[str] = None
         self._api_key: str = ""
+        # Eval-mode: which dropdown case the browser picked. None when
+        # the user uploaded their own files (no case_name flows). Set by
+        # POST /start, read by _run_pipeline + the post-finalize hook.
+        self._case_name: Optional[str] = None
+        self._case_run_dir: Optional[Path] = None
+        self._run_started_utc: Optional[str] = None
         # Phase 3b-1: track the most recent raw_instruction text so spec
         # events can be enriched with pre-rendered step dicts (which need
         # the instruction for cite-recoverability decisions).
@@ -545,6 +567,126 @@ class LiveModeApp:
             return None
         return path
 
+    def _provision_eval_run_dir(self, case_name: str) -> Path:
+        """Pick and create the per-run dir for an eval case.
+
+        Pre:    Eval mode is on (`self._eval_mode` True) and `case_name`
+                is the dropdown-selected case the browser sent.
+
+        Post:   Returns an existing, writable directory at
+                `evals/runs/<case_name>/run_<ts>/`, where `<ts>` is the
+                local timestamp captured at provision time
+                (YYYYMMDD_HHMMSS). The case dir is created on the first
+                run of that case (lazy); the per-run subdir is created
+                every call. On the unlikely sub-second collision (the
+                global single-pipeline lock makes this effectively
+                impossible during normal serve operation, but possible
+                if the runs root is mutated externally), a numeric
+                suffix `_2`, `_3`, … is appended.
+
+        Side effects: Creates `evals/runs/<case_name>/` (one-time per
+        case) and the per-run subdir (every call).
+
+        Raises: OSError on directory creation failure (disk full, perms).
+        """
+        case_dir = self._eval_runs_root / case_name
+        case_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        candidate = case_dir / f"run_{ts}"
+        if not candidate.exists():
+            candidate.mkdir()
+            return candidate
+        n = 2
+        while True:
+            collision = case_dir / f"run_{ts}_{n}"
+            if not collision.exists():
+                collision.mkdir()
+                return collision
+            n += 1
+
+    def _write_eval_run_artifacts(
+        self,
+        *,
+        case_name: str,
+        run_dir: Path,
+        started_utc: Optional[str],
+        run_meter: Any,
+        error: Optional[Dict[str, Any]],
+    ) -> None:
+        """Finalize an eval-mode run: copy fixtures + write result.json.
+
+        Pre:    `run_dir` is the per-case dir from _provision_eval_run_dir
+                (already exists). `case_name` matches a directory in
+                `self._examples_dir`. `started_utc` is the ISO-8601 start
+                timestamp captured at run-kickoff (may be None on degenerate
+                control flow). `run_meter` is the RunMeter the metering
+                client recorded against during this run. `error` is None
+                on success or {"type":..., "message":...} when the pipeline
+                raised.
+
+        Post:   Each of `instruction.txt`, `config.json`, `expected.md`,
+                `source.md` that exists under the case dir is copied into
+                `run_dir`. A `result.json` is written in `run_dir` with:
+                  - case, run_dir (relative to project root)
+                  - started_utc, finished_utc, duration_s
+                  - git_sha (short)
+                  - pipeline_returned (bool: ran without exception)
+                  - error (None on success, dict on failure)
+                  - hand_grade = "TODO"  ← grader fills
+                  - notes = ""           ← grader fills
+                Matches the on-disk shape produced by evals/run.py so a
+                grader walking evals/runs/<batch>/ can't tell visual from
+                headless runs apart.
+
+        Side effects: Writes up to 5 files in `run_dir`.
+
+        Raises: Best-effort: logs swallow on copy errors (missing source
+                file is normal — only instruction + config are mandatory).
+                JSON write may raise OSError on disk failure.
+        """
+        case_dir = self._examples_dir / case_name
+        for fname in ("instruction.txt", "config.json", "expected.md", "source.md"):
+            src = case_dir / fname
+            if src.exists():
+                try:
+                    shutil.copy(src, run_dir / fname)
+                except OSError:
+                    pass
+        finished_utc = datetime.now(timezone.utc).isoformat()
+        duration_s: Optional[float] = None
+        if started_utc:
+            try:
+                duration_s = (
+                    datetime.fromisoformat(finished_utc)
+                    - datetime.fromisoformat(started_utc)
+                ).total_seconds()
+            except ValueError:
+                duration_s = None
+        result = {
+            "case": case_name,
+            "run_dir": str(run_dir.relative_to(Path(__file__).resolve().parents[2])),
+            "started_utc": started_utc,
+            "finished_utc": finished_utc,
+            "duration_s": duration_s,
+            "git_sha": _git_sha_short(),
+            "pipeline_returned": error is None,
+            "error": error,
+            "hand_grade": "TODO",
+            "notes": "",
+        }
+        (run_dir / "result.json").write_text(json.dumps(result, indent=2))
+        # In-flow grading hint. Server stdout reaches the operator's
+        # terminal (where they launched `nl2protocol --serve`); putting
+        # the path here keeps "what next?" inside their tmux/iTerm view
+        # without forcing them to remember the convention.
+        rel_run = result["run_dir"]
+        print(
+            f"\n[eval] Run artifacts: {rel_run}/"
+            f"\n[eval] Grade with:    edit evals/{case_name}/actual.md"
+            f"\n[eval] Skeleton:      evals/README.md (Per-case skeleton)\n",
+            flush=True,
+        )
+
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
@@ -597,6 +739,15 @@ class LiveModeApp:
             instruction = (body.get("instruction") or "").strip()
             config = body.get("config")
             api_key = (body.get("api_key") or "").strip()
+            # Eval-mode: browser sends case_name when the user picked from
+            # the dropdown. None / missing on uploads. Sanitized to a safe
+            # single-component dir name; the path-traversal guard mirrors
+            # _example_path's so an attacker can't escape evals/runs/.
+            raw_case = body.get("case_name") or ""
+            raw_case = raw_case.strip() if isinstance(raw_case, str) else ""
+            case_name: Optional[str] = None
+            if raw_case and "/" not in raw_case and "\\" not in raw_case and ".." not in raw_case:
+                case_name = raw_case
 
             # Local-dev fallback: when the operator opted in via env flag AND
             # the request didn't carry a key, use the server's env key. Never
@@ -630,6 +781,7 @@ class LiveModeApp:
             self._instruction = instruction
             self._config_path = tmp.name
             self._api_key = api_key
+            self._case_name = case_name
             self._reset_per_run_state()
 
             # Record the rate-limit attempt now that all checks have passed
@@ -953,10 +1105,23 @@ class LiveModeApp:
         instruction = self._instruction
         config_path = self._config_path
         api_key = self._api_key
+        case_name = self._case_name
 
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        Path(self._output_dir).mkdir(parents=True, exist_ok=True)
-        self._html_report_path = f"{self._output_dir}/report_{ts}.html"
+        self._run_started_utc = datetime.now(timezone.utc).isoformat()
+        # Eval mode + a dropdown-selected case: route this run's artifacts
+        # into evals/runs/<batch>/<case>__runN/. Other live-mode paths
+        # (uploaded files, test_cases/examples, non-eval examples_dir) keep
+        # the legacy flat output/ behavior so existing workflows don't
+        # silently change destination.
+        if self._eval_mode and case_name:
+            self._case_run_dir = self._provision_eval_run_dir(case_name)
+            effective_output_dir = str(self._case_run_dir)
+        else:
+            self._case_run_dir = None
+            effective_output_dir = self._output_dir
+        Path(effective_output_dir).mkdir(parents=True, exist_ok=True)
+        self._html_report_path = f"{effective_output_dir}/report_{ts}.html"
 
         # Per-run meter: shared between MeteredClient (which records on
         # every messages.create) and MetricsReporter (which records
@@ -968,7 +1133,7 @@ class LiveModeApp:
         html_reporter = HTMLReporter(self._html_report_path)
         metrics_reporter = MetricsReporter(
             meter=run_meter,
-            output_dir=self._output_dir,
+            output_dir=effective_output_dir,
             run_ts=ts,
         )
         composite = CompositeReporter(
@@ -1006,6 +1171,7 @@ class LiveModeApp:
             timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         )
 
+        run_error: Optional[Dict[str, Any]] = None
         try:
             agent = ProtocolAgent(
                 api_key=api_key,
@@ -1035,11 +1201,24 @@ class LiveModeApp:
             # PIPELINE_DONE_SENTINEL that follows can't paint over it.
             # run_pipeline's own crash handler saves a rich state log
             # with accumulated spec snapshots before re-raising.
+            run_error = {"type": type(e).__name__, "message": str(e)}
             self._event_queue.put_nowait(_make_error_event(
                 f"Pipeline error: {e}",
             ))
         finally:
             composite.finalize()
+            # Eval mode: copy the case fixtures into the run dir + write a
+            # result.json with grading slots set to TODO. Mirrors evals/run.py's
+            # per-run artifact bundle so visual + headless eval batches grade
+            # the same way. No-op when not in eval mode.
+            if self._eval_mode and self._case_run_dir is not None and case_name:
+                self._write_eval_run_artifacts(
+                    case_name=case_name,
+                    run_dir=self._case_run_dir,
+                    started_utc=self._run_started_utc,
+                    run_meter=run_meter,
+                    error=run_error,
+                )
             # Clean up the per-request temp config file.
             if config_path and config_path.startswith(tempfile.gettempdir()):
                 try:
@@ -1053,6 +1232,21 @@ def _make_error_event(message: str):
     browser via the event stream."""
     from nl2protocol.reporting import StageEvent
     return StageEvent(kind="error", data={"message": message})
+
+
+def _git_sha_short() -> str:
+    """Return the short HEAD SHA, or "nogit" if git is unavailable or this
+    isn't a repo. Stamped into eval-mode result.json so each run is
+    traceable back to a commit."""
+    import subprocess
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        return "nogit"
 
 
 def run_serve(host: str = "127.0.0.1", port: int = 8000,

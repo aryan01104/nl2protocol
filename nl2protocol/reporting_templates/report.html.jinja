@@ -3970,10 +3970,17 @@
       startBtn.disabled = true;
       setStatus("starting...", "warn");
       try {
+        // case_name is sent when the user picked from the dropdown
+        // (not on uploads). In eval mode the server routes the run's
+        // artifacts into evals/runs/<batch>/<case>__runN/; in non-eval
+        // mode the server ignores it.
+        const caseName = (!uploadMode && exampleSelect && exampleSelect.value)
+          ? exampleSelect.value
+          : null;
         const r = await fetch("/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instruction, config, api_key: apiKey }),
+          body: JSON.stringify({ instruction, config, api_key: apiKey, case_name: caseName }),
         });
         const j = await r.json();
         if (j.status === "started") {

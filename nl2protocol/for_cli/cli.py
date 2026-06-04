@@ -184,6 +184,13 @@ Files:
         action='store_true',
         help='Do not auto-open a browser tab when --serve starts (CI / headless mode).'
     )
+    parser.add_argument(
+        '--examples-dir',
+        default='test_cases/examples',
+        help='Directory whose subfolders (each with instruction.txt + config.json) '
+             'are exposed as the --serve example dropdown. Pass "evals" to drive the '
+             'eval suite visually instead of via evals/run.py. Default: test_cases/examples.'
+    )
 
     return parser
 
@@ -548,6 +555,7 @@ def main(argv: list = None) -> int:
                 host=args.serve_host,
                 port=args.serve_port,
                 open_browser=not args.no_open_browser,
+                examples_dir=args.examples_dir,
             )
         except KeyboardInterrupt:
             print("\n  Server stopped.")
