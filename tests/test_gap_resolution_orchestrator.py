@@ -959,6 +959,89 @@ class TestDefaultApplyStampsUserAction:
         # Description provenance is untouched — the user didn't edit description.
         assert spec.steps[0].destination.description_provenance.review_status == "original"
 
+    def test_cited_suggestion_on_fabrication_path_stamps_instruction_source(self):
+        """When the orchestrator accepts a Suggestion with provenance_source='cited'
+        on a fabrication-shaped gap (path ends in '.provenance'), the new
+        Provenance on the spec field is source='instruction' with cited_text
+        carrying the substring the LLM identified — NOT source='inferred'.
+
+        Closes the seam between the suggester-internal 'cited' label and the
+        spec-level Provenance.source so cited values render in the report
+        the same way as extractor-sourced citations (col-1 cite span hue
+        linked to col-3 value)."""
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        # Fabrication-shaped gap: the provenance slot is broken, not the value.
+        g = gap("g1", field_path="steps[0].volume.provenance")
+        suggestion = Suggestion(
+            value=75.0,
+            provenance_source="cited",
+            positive_reasoning="LLM identified 75uL in instruction",
+            why_not_in_instruction=None,
+            confidence=0.95,
+            cited_text="75uL of buffer",
+        )
+        res = Resolution(action="accept_suggestion", new_value=None,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=suggestion)
+
+        prov = spec.steps[0].volume.provenance
+        assert prov.source == "instruction"
+        assert prov.cited_text == ["75uL of buffer"]
+        assert prov.review_status == "user_accepted_suggestion"
+        # Value-field also written (the bridge path writes both).
+        assert spec.steps[0].volume.value == 75.0
+
+    def test_uncited_suggestion_on_fabrication_path_still_stamps_inferred(self):
+        """Regression guard: when Suggestion.provenance_source != 'cited',
+        the apply path's behavior is unchanged — source='inferred' with the
+        suggester's reasoning is stamped onto the new Provenance."""
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        g = gap("g1", field_path="steps[0].volume.provenance")
+        suggestion = Suggestion(
+            value=75.0,
+            provenance_source="inferred",
+            positive_reasoning="standard SDS-PAGE loading volume",
+            why_not_in_instruction="instruction omits the per-lane volume",
+            confidence=0.7,
+            cited_text=None,
+        )
+        res = Resolution(action="accept_suggestion", new_value=None,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=suggestion)
+
+        prov = spec.steps[0].volume.provenance
+        assert prov.source == "inferred"
+        assert prov.positive_reasoning == "standard SDS-PAGE loading volume"
+        assert prov.cited_text is None
+
+    def test_cited_suggestion_on_subfield_path_stamps_instruction_source(self):
+        """Same bridge, exercised through the subfield path
+        (steps[N].<field>.<subfield>). When the user accepts a cited
+        suggestion for a wells edit, the resulting wells_provenance is
+        source='instruction' with the LLM's cited substring."""
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        new_wells = ["C1", "C2"]
+        g = gap("g1", field_path="steps[0].destination.wells")
+        suggestion = Suggestion(
+            value=new_wells,
+            provenance_source="cited",
+            positive_reasoning="wells C1 and C2 named in instruction",
+            why_not_in_instruction=None,
+            confidence=0.9,
+            cited_text="transfer to wells C1 and C2",
+        )
+        res = Resolution(action="accept_suggestion", new_value=new_wells,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=suggestion)
+
+        wprov = spec.steps[0].destination.wells_provenance
+        assert wprov.source == "instruction"
+        assert wprov.cited_text == ["transfer to wells C1 and C2"]
+        assert spec.steps[0].destination.wells == new_wells
+
     def test_initial_contents_volume_writes_float_no_provenance_changes(self):
         # initial_contents.volume_ul has no Provenance — the apply just
         # writes a float and returns. Nothing else mutated.

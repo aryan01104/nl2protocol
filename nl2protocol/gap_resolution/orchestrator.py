@@ -774,6 +774,49 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
     })
 
 
+def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
+    """Construct the Provenance to stamp on a spec field when accepting a Suggestion.
+
+    Pre:    `suggestion` is the Suggestion being accepted; `review_status`
+            is a valid `Provenance.review_status` literal capturing the
+            user (or auto) action that drove acceptance.
+
+    Post:   When `suggestion.provenance_source == "cited"` AND
+            `suggestion.cited_text` is non-empty → returns a Provenance
+            with `source="instruction"`, `cited_text=[suggestion.cited_text]`,
+            `confidence=suggestion.confidence`, and `review_status` as
+            given. positive_reasoning + why_not_in_instruction are LEFT
+            NULL because Provenance.require_appropriate_field_for_source
+            forbids them when source="instruction".
+            Otherwise → returns a Provenance with `source="inferred"`,
+            `positive_reasoning=suggestion.positive_reasoning`,
+            `why_not_in_instruction=suggestion.why_not_in_instruction`,
+            same confidence + review_status.
+
+    Why: bridges the suggester-internal "cited" label into the spec-level
+    Provenance.source = "instruction". Without this, an LLM-identified
+    citation showed up as `(cited)` in the modal but landed in the spec
+    as `inferred` after acceptance, losing the colored cite/value linkage
+    in the report.
+    """
+    from nl2protocol.models.spec import Provenance
+    cited_text = getattr(suggestion, "cited_text", None)
+    if suggestion.provenance_source == "cited" and cited_text:
+        return Provenance(
+            source="instruction",
+            cited_text=[cited_text],
+            review_status=review_status,
+            confidence=suggestion.confidence,
+        )
+    return Provenance(
+        source="inferred",
+        positive_reasoning=suggestion.positive_reasoning,
+        why_not_in_instruction=suggestion.why_not_in_instruction,
+        review_status=review_status,
+        confidence=suggestion.confidence,
+    )
+
+
 def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
                               suggestion: Optional[Suggestion]) -> None:
     """Write a Resolution's value into the spec at the gap's field_path AND
@@ -894,12 +937,8 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             # callers / tests passing a Provenance directly as new_value),
             # fall back to using new_value as the provenance.
             if suggestion is not None:
-                new_prov = Provenance(
-                    source="inferred",
-                    positive_reasoning=suggestion.positive_reasoning,
-                    why_not_in_instruction=suggestion.why_not_in_instruction,
-                    confidence=suggestion.confidence,
-                    review_status="user_accepted_suggestion",
+                new_prov = _build_suggested_provenance(
+                    suggestion, review_status="user_accepted_suggestion",
                 )
                 proposed_value = suggestion.value
             else:
@@ -1051,13 +1090,8 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 new_prov = None
                 if (resolution.action == "accept_suggestion"
                         and suggestion is not None):
-                    new_prov = Provenance(
-                        source="inferred",
-                        positive_reasoning=getattr(suggestion, "positive_reasoning", None)
-                            or "Accepted suggester proposal during gap resolution.",
-                        why_not_in_instruction=getattr(suggestion, "why_not_in_instruction", None),
-                        review_status=user_action,
-                        confidence=getattr(suggestion, "confidence", 1.0),
+                    new_prov = _build_suggested_provenance(
+                        suggestion, review_status=user_action,
                     )
                 elif resolution.action == "edit":
                     new_prov = Provenance(

@@ -584,9 +584,17 @@ proposing), return confidence < 0.5 and say so in positive_reasoning
 rather than inventing a justification that requires changing something
 else.
 
+CITATION CHECK — if the value you're proposing appears verbatim in the
+INSTRUCTION block above (case-insensitive, whitespace-normalized), set
+`cited_text` to the substring containing it; the suggestion will be
+labeled "(cited)" in the UI. Otherwise set `cited_text` to null. Do NOT
+invent cited_text — only set it when the substring literally exists in
+the instruction.
+
 Your task: produce ONE JSON object with this exact shape:
 {{
   "value": <the proposed value, in the same shape the spec field expects>,
+  "cited_text": <null OR the verbatim substring from the instruction that grounds this value>,
   "positive_reasoning": "<one sentence: why THIS field's value is right, given the existing values of other fields on this step>",
   "why_not_in_instruction": "<one sentence: name the specific element the instruction lacks; do not write 'not specified' generically — state what you would have expected to find>",
   "confidence": <0.0-1.0>
@@ -613,12 +621,15 @@ Output ONLY the JSON object, no preamble.
             return None
         if data is None:
             return None
+        cited_text = data.get("cited_text")
+        provenance_source = "cited" if cited_text else "inferred"
         return Suggestion(
             value=data["value"],
-            provenance_source="inferred",
+            provenance_source=provenance_source,
             positive_reasoning=data["positive_reasoning"],
             why_not_in_instruction=data.get("why_not_in_instruction"),
             confidence=float(data.get("confidence", 0.6)),
+            cited_text=cited_text,
         )
 
     def _build_prompt(self, gap: Gap, spec, context: dict) -> str:
