@@ -107,6 +107,11 @@ class Suggestion:
         prior step, regex from note text. Correct-or-empty.
       - "domain_default" — LLM proposed based on standard practice.
       - "inferred" — LLM proposed based on context-specific reasoning.
+      - "cited" — LLM identified the proposed value as appearing verbatim
+        (case-insensitive, whitespace-normalized) in the instruction.
+        Distinguishes "the LLM made it up but it happens to match the
+        instruction" from "the LLM reasoned to a value with no instruction
+        grounding"; surfaced in the gap-modal badge as `(cited)`.
 
     `confidence` is the suggester's self-assessment. The orchestrator uses
     it (combined with gap kind) to decide auto-accept vs user confirmation.
@@ -119,10 +124,11 @@ class Suggestion:
     """
 
     value: Any
-    provenance_source: Literal["inferred", "domain_default", "deterministic"]
+    provenance_source: Literal["inferred", "domain_default", "deterministic", "cited"]
     positive_reasoning: str
     why_not_in_instruction: Optional[str]   # may be None for "deterministic" sources where it's tautological
     confidence: float                       # 0.0–1.0
+    cited_text: Optional[str] = None        # required when provenance_source == "cited"; the verbatim substring from the instruction grounding the value. Threaded into Provenance.cited_text by the apply path so accepted cited suggestions land in the spec as source="instruction".
 
     def __post_init__(self):
         if not (0.0 <= self.confidence <= 1.0):

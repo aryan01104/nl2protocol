@@ -703,3 +703,121 @@ class TestLLMSpotSuggesterPromptScope:
         # the value without implying a change elsewhere — confidence < 0.5
         # is the signal, not an invented justification.
         assert "confidence < 0.5" in prompt
+
+
+class TestLLMSpotSuggesterCitedBranching:
+    """Suggestion.provenance_source = "cited" iff the LLM returned a
+    non-null cited_text. Drives the gap-modal badge text: a value the
+    LLM identified as verbatim-present in the instruction shows up as
+    "(cited)" instead of "(inferred)"."""
+
+    @staticmethod
+    def _stub_client(response_json: str):
+        """Build a stub client that returns the given JSON body once."""
+        class _Stub:
+            def __init__(self):
+                self.messages = self
+            def create(self, **kwargs):
+                class _R:
+                    content = [type("C", (), {"text": response_json})()]
+                return _R()
+        return _Stub()
+
+    def _spec(self):
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        step = ExtractedStep(
+            order=1, action="transfer", composition_provenance=comp,
+            destination=LocationRef(
+                description="rack", well="A1",
+                description_provenance=_instr_prov("A1"),
+                wells_provenance=_instr_prov("A1"),
+            ),
+        )
+        return ProtocolSpec(summary="t", steps=[step])
+
+    def _gap(self):
+        return Gap(
+            id="g1", step_order=1, field_path="steps[0].destination.well",
+            kind="missing", current_value=None,
+            description="well missing", severity="blocker", metadata={},
+        )
+
+    def test_cited_text_present_labels_as_cited(self):
+        client = self._stub_client(
+            '{"value": "A1", "cited_text": "well A1", '
+            '"positive_reasoning": "ok", "why_not_in_instruction": "ok", '
+            '"confidence": 0.8}'
+        )
+        result = LLMSpotSuggester(client=client, model_name="x").suggest(
+            self._gap(), self._spec(),
+            context={"instruction": "...well A1...", "config": {}},
+        )
+        assert result is not None
+        assert result.provenance_source == "cited"
+
+    def test_cited_text_null_labels_as_inferred(self):
+        client = self._stub_client(
+            '{"value": "A1", "cited_text": null, '
+            '"positive_reasoning": "ok", "why_not_in_instruction": "ok", '
+            '"confidence": 0.6}'
+        )
+        result = LLMSpotSuggester(client=client, model_name="x").suggest(
+            self._gap(), self._spec(),
+            context={"instruction": "x", "config": {}},
+        )
+        assert result is not None
+        assert result.provenance_source == "inferred"
+
+    def test_cited_text_field_omitted_labels_as_inferred(self):
+        client = self._stub_client(
+            '{"value": "A1", "positive_reasoning": "ok", '
+            '"why_not_in_instruction": "ok", "confidence": 0.6}'
+        )
+        result = LLMSpotSuggester(client=client, model_name="x").suggest(
+            self._gap(), self._spec(),
+            context={"instruction": "x", "config": {}},
+        )
+        assert result is not None
+        assert result.provenance_source == "inferred"
+
+    def test_cited_text_propagates_onto_suggestion(self):
+        """When the LLM returns cited_text, Suggestion.cited_text carries
+        the substring through — not just the label. The apply path reads
+        this to stamp Provenance(source="instruction", cited_text=[...])
+        on the spec field, so the value renders in the report with the
+        same encoding as an extractor-sourced citation."""
+        client = self._stub_client(
+            '{"value": "95", "cited_text": "Set temperature to 95°C", '
+            '"positive_reasoning": "ok", "why_not_in_instruction": "ok", '
+            '"confidence": 0.9}'
+        )
+        result = LLMSpotSuggester(client=client, model_name="x").suggest(
+            self._gap(), self._spec(),
+            context={"instruction": "Set temperature to 95°C", "config": {}},
+        )
+        assert result is not None
+        assert result.cited_text == "Set temperature to 95°C"
+
+    def test_prompt_includes_cited_text_instruction(self):
+        client = self._stub_client(
+            '{"value": "A1", "cited_text": null, '
+            '"positive_reasoning": "ok", "why_not_in_instruction": "ok", '
+            '"confidence": 0.6}'
+        )
+        # Stash the call args so we can inspect the prompt.
+        calls = []
+        orig_create = client.create
+        def _capture(**kwargs):
+            calls.append(kwargs)
+            return orig_create(**kwargs)
+        client.create = _capture
+        LLMSpotSuggester(client=client, model_name="x").suggest(
+            self._gap(), self._spec(),
+            context={"instruction": "x", "config": {}},
+        )
+        prompt = calls[0]["messages"][0]["content"]
+        assert "cited_text" in prompt
+        assert "CITATION CHECK" in prompt
