@@ -817,6 +817,36 @@ def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
     )
 
 
+def _expected_field_type_for_step(step, fname: str):
+    """Return the underlying type expected at `step.<fname>`.
+
+    Pre:    `step` is a Pydantic model instance (e.g. ExtractedStep);
+            `fname` is a candidate field name.
+    Post:   - When the field exists with an `Optional[X]` (i.e. `X | None`)
+              annotation where X is a single concrete class, returns X.
+            - When the field exists with a plain class annotation,
+              returns that class.
+            - Otherwise returns None (field not found, Union with >1 non-None
+              arm, generic alias, etc.). Caller treats None as "no type
+              guard available — skip the isinstance check."
+    Side effects: None.
+    """
+    from typing import Union, get_args, get_origin
+    import types as _types
+    field_info = type(step).model_fields.get(fname)
+    if field_info is None:
+        return None
+    ann = field_info.annotation
+    origin = get_origin(ann)
+    union_origin = getattr(_types, "UnionType", None)
+    if origin is Union or (union_origin is not None and origin is union_origin):
+        non_none = [a for a in get_args(ann) if a is not type(None)]
+        if len(non_none) == 1:
+            return non_none[0]
+        return None
+    return ann
+
+
 def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
                               suggestion: Optional[Suggestion]) -> None:
     """Write a Resolution's value into the spec at the gap's field_path AND
@@ -1021,6 +1051,24 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
         idx, fname = int(m.group(1)), m.group(2)
         if resolution.action == "accept_suggestion":
             # new_value is a Provenance-bearing model from the suggester.
+            # Contract guard: the suggester must already have built the
+            # typed Pydantic model. A raw dict/str/int here means a
+            # suggester violated its contract (see ConfigLookupSuggester
+            # and LLMSpotSuggester's structured path for canonical
+            # patterns). Raise loudly so the bug surfaces at the source
+            # rather than silently poisoning the spec.
+            expected = _expected_field_type_for_step(spec.steps[idx], fname)
+            if (expected is not None
+                    and isinstance(expected, type)
+                    and not isinstance(new_value, expected)):
+                raise TypeError(
+                    f"Suggester contract violation at {path!r}: "
+                    f"expected {expected.__name__} instance, got "
+                    f"{type(new_value).__name__} ({new_value!r:.80}). "
+                    f"Suggesters must construct the typed Pydantic "
+                    f"model (see ConfigLookupSuggester for the "
+                    f"canonical pattern)."
+                )
             # Preserve the OLD field's chain by transferring it onto the
             # new instance before the swap; otherwise the old field's
             # history would be dropped on the floor.

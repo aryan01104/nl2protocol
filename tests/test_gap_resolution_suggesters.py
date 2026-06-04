@@ -821,3 +821,156 @@ class TestLLMSpotSuggesterCitedBranching:
         prompt = calls[0]["messages"][0]["content"]
         assert "cited_text" in prompt
         assert "CITATION CHECK" in prompt
+
+
+# ============================================================================
+# LLMSpotSuggester structured tool-use path (form-aware suggester)
+# ============================================================================
+
+
+class TestLLMSpotSuggesterStructured:
+    """For top-level Provenanced/LocationRef gap paths, the suggester
+    must call Anthropic with tool-use so the API enforces shape, then
+    return a Suggestion whose value is a properly-typed Pydantic model
+    instance — never a raw dict/int/string. This is the structural
+    fix for the boundary bug that crashed eval 01."""
+
+    @staticmethod
+    def _tool_use_client(tool_input: dict):
+        """Stub that returns one Anthropic-style response carrying a
+        single tool_use block with `input` set to the given dict."""
+        class _Block:
+            def __init__(self, payload: dict):
+                self.type = "tool_use"
+                self.input = payload
+        class _Resp:
+            def __init__(self, payload: dict):
+                self.content = [_Block(payload)]
+        class _Stub:
+            def __init__(self):
+                self.messages = self
+                self.create_calls = []
+            def create(self, **kwargs):
+                self.create_calls.append(kwargs)
+                return _Resp(tool_input)
+        return _Stub()
+
+    def _spec_with_missing_source(self) -> ProtocolSpec:
+        step = ExtractedStep(order=1, action="transfer", composition_provenance=_comp())
+        return ProtocolSpec(summary="t", steps=[step])
+
+    def _gap_at(self, field_path: str) -> Gap:
+        return Gap(
+            id=f"g.{field_path}", step_order=1, field_path=field_path,
+            kind="missing", current_value=None,
+            description=f"missing {field_path}", severity="blocker",
+            metadata={},
+        )
+
+    def test_source_path_invokes_tool_use(self):
+        client = self._tool_use_client({
+            "description": "reagent_rack",
+            "well": "A1",
+            "positive_reasoning": "rack hosts the substance",
+            "why_not_in_instruction": "instruction names no well",
+            "cited_text": None,
+            "confidence": 0.7,
+        })
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        result = sug.suggest(
+            self._gap_at("steps[0].source"),
+            self._spec_with_missing_source(),
+            context={"instruction": "x", "config": {"labware": {}}},
+        )
+        # Tool-use was invoked with the LocationRef schema.
+        assert len(client.create_calls) == 1
+        call = client.create_calls[0]
+        assert "tools" in call and len(call["tools"]) == 1
+        assert call["tools"][0]["name"] == "propose_location_ref"
+        assert call["tool_choice"] == {"type": "tool", "name": "propose_location_ref"}
+        # The returned Suggestion.value is a real LocationRef, not a dict.
+        assert result is not None
+        assert isinstance(result.value, LocationRef)
+        assert result.value.description == "reagent_rack"
+        assert result.value.well == "A1"
+        # Inner Provenance is well-formed.
+        assert result.value.description_provenance.source == "inferred"
+        assert result.value.wells_provenance.source == "inferred"
+
+    def test_volume_path_returns_provenanced_volume_instance(self):
+        client = self._tool_use_client({
+            "value": 100,
+            "unit": "uL",
+            "exact": True,
+            "positive_reasoning": "instruction names 100 uL",
+            "why_not_in_instruction": None,
+            "cited_text": "100 uL",
+            "confidence": 0.95,
+        })
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        result = sug.suggest(
+            self._gap_at("steps[0].volume"),
+            self._spec_with_missing_source(),
+            context={"instruction": "Add 100 uL ...", "config": {}},
+        )
+        assert result is not None
+        assert isinstance(result.value, ProvenancedVolume)
+        assert result.value.value == 100.0
+        assert result.value.unit == "uL"
+        # Inner Provenance was built as instruction-cited (cited_text non-null).
+        assert result.value.provenance.source == "instruction"
+        assert result.value.provenance.cited_text == ["100 uL"]
+        # Suggestion-level provenance_source reflects the cite branch.
+        assert result.provenance_source == "cited"
+        assert result.cited_text == "100 uL"
+
+    def test_subfield_path_uses_freeform_path(self):
+        """A gap on a subfield (e.g. `.source.well`) targets a primitive,
+        not a Pydantic model. The structured dispatch must NOT match —
+        the legacy free-form text-JSON path keeps handling it so the
+        existing prompt-scope tests (which fire on `.destination.well`)
+        stay valid."""
+        class _Text:
+            def __init__(self):
+                self.messages = self
+                self.kwargs = None
+            def create(self, **kwargs):
+                self.kwargs = kwargs
+                class _C:
+                    text = ('{"value": "A1", '
+                            '"positive_reasoning": "ok", '
+                            '"why_not_in_instruction": "ok", '
+                            '"confidence": 0.6, "cited_text": null}')
+                class _R:
+                    content = [_C()]
+                return _R()
+        client = _Text()
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        sug.suggest(
+            self._gap_at("steps[0].destination.well"),
+            self._spec_with_missing_source(),
+            context={"instruction": "x", "config": {}},
+        )
+        # Free-form path: NO tools key in the call.
+        assert "tools" not in client.kwargs
+
+    def test_builder_validation_failure_returns_none(self):
+        """If the LLM emits a value that fails Pydantic validation
+        (e.g. negative volume), the suggester returns None — the gap
+        propagates to the user, no spec corruption."""
+        client = self._tool_use_client({
+            "value": -5,  # gt=0 constraint on ProvenancedVolume.value
+            "unit": "uL",
+            "exact": True,
+            "positive_reasoning": "bad",
+            "why_not_in_instruction": "n/a",
+            "cited_text": None,
+            "confidence": 0.5,
+        })
+        sug = LLMSpotSuggester(client=client, model_name="x")
+        result = sug.suggest(
+            self._gap_at("steps[0].volume"),
+            self._spec_with_missing_source(),
+            context={"instruction": "x", "config": {}},
+        )
+        assert result is None

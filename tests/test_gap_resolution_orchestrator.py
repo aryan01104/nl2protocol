@@ -1859,3 +1859,97 @@ class TestOrchestratorRunGapFilter:
         outcome = orch.run(spec, context={})
         assert outcome.converged
         assert ("g1", "filled") in spec["applied"]
+
+
+# ============================================================================
+# default_apply_resolution: contract guard on suggester output shape
+# ============================================================================
+
+
+class TestApplyResolutionContractGuard:
+    """When `accept_suggestion` is applied to a top-level step field
+    (e.g. step.source, step.volume), the new_value MUST be a Pydantic
+    instance of the expected type. Suggesters that return raw dicts /
+    ints / strings violate the contract documented at
+    orchestrator.default_apply_resolution; the apply layer surfaces
+    the violation as a TypeError naming the path, expected type, and
+    got type — instead of silently writing a malformed value into the
+    spec and crashing two stages later (the bug that motivated the
+    structured tool-use path on LLMSpotSuggester)."""
+
+    def _spec(self):
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, ProtocolSpec,
+        )
+        comp = CompositionProvenance(
+            step_cited_text="t", parameters_cited_texts=["t"],
+            parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
+        )
+        return ProtocolSpec(
+            summary="t",
+            steps=[ExtractedStep(order=1, action="transfer", composition_provenance=comp)],
+        )
+
+    def _real_gap_and_resolution(self, field_path: str, new_value):
+        from nl2protocol.gap_resolution.types import Gap, Resolution
+        gap_obj = Gap(
+            id=f"g.{field_path}", step_order=1, field_path=field_path,
+            kind="missing", current_value=None,
+            description="missing", severity="blocker", metadata={},
+        )
+        res = Resolution(
+            action="accept_suggestion",
+            new_value=new_value,
+            user_action_provenance="user_accepted_suggestion",
+        )
+        return gap_obj, res
+
+    def test_raw_dict_for_source_raises_typeerror(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec()
+        gap_obj, res = self._real_gap_and_resolution(
+            "steps[0].source", {"labware": "reagent_rack", "well": "A1"},
+        )
+        with pytest.raises(TypeError) as exc:
+            default_apply_resolution(spec, gap_obj, res, suggestion=None)
+        msg = str(exc.value)
+        assert "steps[0].source" in msg
+        assert "LocationRef" in msg
+        assert "dict" in msg
+
+    def test_raw_int_for_volume_raises_typeerror(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = self._spec()
+        gap_obj, res = self._real_gap_and_resolution("steps[0].volume", 100)
+        with pytest.raises(TypeError) as exc:
+            default_apply_resolution(spec, gap_obj, res, suggestion=None)
+        msg = str(exc.value)
+        assert "ProvenancedVolume" in msg
+        assert "int" in msg
+
+    def test_correctly_typed_location_ref_does_not_raise(self):
+        """Fast-path: when the suggester correctly returns a LocationRef,
+        the apply layer writes it and does not raise."""
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.models.spec import LocationRef, Provenance
+        loc = LocationRef(
+            description="reagent_rack",
+            well="A1",
+            description_provenance=Provenance(
+                source="inferred",
+                positive_reasoning="r",
+                why_not_in_instruction="n",
+                confidence=0.8,
+            ),
+            wells_provenance=Provenance(
+                source="inferred",
+                positive_reasoning="r",
+                why_not_in_instruction="n",
+                confidence=0.8,
+            ),
+        )
+        spec = self._spec()
+        gap_obj, res = self._real_gap_and_resolution("steps[0].source", loc)
+        default_apply_resolution(spec, gap_obj, res, suggestion=None)
+        assert isinstance(spec.steps[0].source, LocationRef)
+        assert spec.steps[0].source.description == "reagent_rack"
