@@ -1615,7 +1615,8 @@ class ProtocolAgent:
             from .gap_resolution import (
                 Orchestrator, CLIConfirmationHandler, default_apply_resolution,
                 MissingFieldsDetector, ProvenanceWarningDetector,
-                InitialContentsVolumeDetector, ConstraintViolationDetector,
+                InitialContentsVolumeDetector, InitialContentsWellDetector,
+                ConstraintViolationDetector,
                 LabwareAmbiguityDetector,
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
@@ -1848,6 +1849,7 @@ class ProtocolAgent:
                     MissingFieldsDetector(),
                     ProvenanceWarningDetector(),  # only fabrications surface as Gaps
                     InitialContentsVolumeDetector(),
+                    InitialContentsWellDetector(),
                     ConstraintViolationDetector(),
                     LabwareAmbiguityDetector(),
                 ],

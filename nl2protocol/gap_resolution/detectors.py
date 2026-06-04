@@ -285,6 +285,58 @@ class InitialContentsVolumeDetector:
 
 
 # ============================================================================
+# InitialContentsWellDetector — emits Gaps for null well entries
+# ============================================================================
+
+class InitialContentsWellDetector:
+    """Emits one Gap per `WellContents` entry whose `well` is null.
+
+    Symmetric with `InitialContentsVolumeDetector`: when the LLM
+    extracts an initial-contents entry but the instruction doesn't
+    name a well coordinate (e.g. "the 100uL fragmented DNA sample"
+    with no well address), the extractor leaves `well` null and this
+    detector surfaces the hole for gap-resolution.
+
+    Pre:    `spec` is a ProtocolSpec; `spec.initial_contents` may have
+            entries with null `well`. `context` is unused.
+    Post:   Returns one Gap per null-well entry, with:
+              * `id`          = f"initial_contents[{N}].well" (stable
+                                handle so re-detect across iterations
+                                matches).
+              * `field_path`  = f"initial_contents[{N}].well" (matches
+                                default_apply_resolution's path-shape).
+              * `step_order`  = None (this is a spec-level gap, not tied
+                                to any step).
+              * `kind`        = "missing".
+              * `severity`    = "blocker" — codegen needs the well for
+                                initial-state tracking, and the
+                                constraint-checker reads ic.well to seed
+                                its WellState map.
+            Entries whose well is set are skipped silently.
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        gaps: List[Gap] = []
+        for idx, ic in enumerate(spec.initial_contents):
+            if ic.well is not None:
+                continue
+            gaps.append(Gap(
+                id=f"initial_contents[{idx}].well",
+                step_order=None,
+                field_path=f"initial_contents[{idx}].well",
+                kind="missing",
+                current_value=None,
+                description=(
+                    f"Initial contents entry {idx}: '{ic.labware}' "
+                    f"contains '{ic.substance}' but no well is stated."
+                ),
+                severity="blocker",
+            ))
+        return gaps
+
+
+# ============================================================================
 # ConstraintViolationDetector — wraps ConstraintChecker
 # ============================================================================
 
@@ -678,6 +730,7 @@ def default_spec_detectors() -> List:
     threads it through automatically."""
     return [
         InitialContentsVolumeDetector(),
+        InitialContentsWellDetector(),
         ConstraintViolationDetector(),
         LabwareAmbiguityDetector(),
         NamespaceSplitDetector(),

@@ -831,8 +831,14 @@ class WellContents(BaseModel):
         "How the user referred to this labware. Copy their wording exactly. "
         "Do not translate to config labels or load names."
     ))
-    well: WellName = Field(..., description=(
-        "Well position matching pattern [A-P][1-24]. Examples: 'A1', 'B2', 'H12'."
+    well: Optional[WellName] = Field(None, description=(
+        "Well position matching pattern [A-P][1-24]. Leave null when the "
+        "instruction names a labware containing a substance but does not "
+        "name the well (e.g. 'the 100uL fragmented DNA sample' with no "
+        "well coordinate). The InitialContentsWellDetector flags null "
+        "entries as gaps and gap-resolution prompts the user (or, when a "
+        "suggester is later added, proposes the first vacant well). "
+        "Symmetric with WellContents.volume_ul. Examples: 'A1', 'B2', 'H12'."
     ))
     substance: str = Field(..., description=(
         "Copy the substance name as the user wrote it. Do not normalize or abbreviate."
