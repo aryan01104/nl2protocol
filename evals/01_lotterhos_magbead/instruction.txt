@@ -1,37 +1,41 @@
-CLEANUP OF FRAGMENTED DNA
+CLEANUP OF FRAGMENTED DNA (single-sample run on sample_plate)
 
-2.1 Ensure that KAPA Pure Beads has been equilibrated to room temperature and that the beads are fully resuspended before proceeding.
+Setup: sample_plate A1 contains 100 µL of fragmented DNA sample; the sample_plate sits on the magnetic module. reagent_rack A1 contains KAPA Pure Beads (already equilibrated to room temperature and fully resuspended). reagent_rack A2 contains elution buffer (10 mM Tris-HCl, pH 8.0–8.5). ethanol_reservoir A1 contains freshly-prepared 80% ethanol. The purified eluate will be transferred into elution_plate A1.
 
-2.2 Add 80 μL of KAPA Pure Beads to the 100 μL fragmented DNA sample.
+Protocol:
 
-2.3 Mix thoroughly by vortexing and/or pipetting up and down multiple times.
+1. Add 80 µL of KAPA Pure Beads from reagent_rack A1 to the 100 µL fragmented DNA sample in sample_plate A1.
 
-2.4 Incubate the plate/tube(s) at room temperature for 5 – 15 min to bind the DNA to the beads.
+2. Mix thoroughly by pipetting up and down 10 times at 100 µL.
 
-2.5 Place the plate/tube(s) on a magnet to capture the beads. Incubate until the liquid is clear.
+3. Incubate at room temperature for 5 – 15 min to bind the DNA to the beads.
 
-2.6 Carefully remove and discard the supernatant.
+4. Engage the magnetic module; wait until the liquid is clear.
 
-2.7 Keeping the plate/tube(s) on the magnet, add 200 μL of 80% ethanol.
+5. Carefully remove and discard the supernatant from sample_plate A1.
 
-2.8 Incubate the plate/tube(s) on the magnet at room temperature for ≥30 sec.
+6. Keeping the plate on the magnet, add 200 µL of 80% ethanol from ethanol_reservoir A1 to sample_plate A1.
 
-2.9 Carefully remove and discard the ethanol.
+7. Incubate on the magnet at room temperature for ≥30 sec.
 
-2.10 Keeping the plate/tube(s) on the magnet, add 200 μL of 80% ethanol.
+8. Carefully remove and discard the ethanol from sample_plate A1.
 
-2.11 Incubate the plate/tube(s) on the magnet at room temperature for ≥30 sec.
+9. Keeping the plate on the magnet, add a second 200 µL of 80% ethanol from ethanol_reservoir A1 to sample_plate A1.
 
-2.12 Carefully remove and discard the ethanol. Try to remove all residual ethanol without disturbing the beads.
+10. Incubate on the magnet at room temperature for ≥30 sec.
 
-2.13 Dry the beads at room temperature for 3 – 5 min, or until all of the ethanol has evaporated. Caution: over-drying the beads may result in reduced yield.
+11. Carefully remove and discard the ethanol from sample_plate A1. Try to remove all residual ethanol without disturbing the beads.
 
-2.14 Remove the plate/tube(s) from the magnet.
+12. Dry the beads at room temperature for 3 – 5 min, or until all of the ethanol has evaporated. Caution: over-drying the beads may result in reduced yield.
 
-2.15 Resuspend the beads in an appropriate volume of elution buffer (10 mM Tris-HCl, pH 8.0 – 8.5) or PCR-grade water, depending on the downstream application.
+13. Disengage the magnetic module.
 
-2.16 Incubate the plate/tube(s) at room temperature for 2 min to elute the DNA off the beads. The elution time may be extended up to 10 min if necessary to improve DNA recovery.
+14. Resuspend the beads in an appropriate volume of elution buffer from reagent_rack A2.
 
-2.17 Place the plate/tube(s) on a magnet to capture the beads. Incubate until the liquid is clear.
+15. Incubate at room temperature for 2 min to elute the DNA off the beads. The elution time may be extended up to 10 min if necessary to improve DNA recovery.
 
-2.18 Transfer the clear supernatant to a new plate/ tube(s). Proceed with your downstream application, or store DNA at 4ºC for 1 – 2 weeks, or at -20ºC.
+16. Engage the magnetic module; wait until the liquid is clear.
+
+17. Transfer the clear supernatant from sample_plate A1 to elution_plate A1.
+
+Tip strategy: use a fresh tip for each clean-reagent addition (beads, ethanol, elution buffer). Reuse a single tip across the supernatant- and ethanol-removal steps for the same well.
