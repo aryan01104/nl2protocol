@@ -46,7 +46,7 @@ pdf = [
 ]
 
 [project.scripts]
-nl2protocol = "nl2protocol.cli:main"
+nl2protocol = "nl2protocol.for_cli.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/aryan01104/nl2protocol"
