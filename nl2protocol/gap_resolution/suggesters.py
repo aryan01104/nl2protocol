@@ -20,7 +20,7 @@ returned Suggestion's `provenance_source` field) so the report's ▴ marker
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from nl2protocol.gap_resolution.protocols import Suggester
 from nl2protocol.gap_resolution.types import Gap, Suggestion
@@ -523,6 +523,257 @@ class WellRangeClipSuggester:
 # `LabwareMatcher` (extraction/resolver.py) now produces physically-pre-
 # filtered candidates upstream, making the token-overlap fallback obsolete.
 
+# ----------------------------------------------------------------------------
+# Structured-mode plumbing for LLMSpotSuggester.
+#
+# When the gap targets a top-level Provenanced/LocationRef field on a step
+# (e.g. steps[3].source, steps[3].volume), the LLM is constrained via
+# Anthropic tool-use with a per-type input_schema. The API enforces the
+# shape structurally — the LLM cannot return a raw dict where a LocationRef
+# is required. Subfield gaps (e.g. steps[3].source.well, a primitive) keep
+# the legacy free-form JSON path because there is no model to wrap.
+# ----------------------------------------------------------------------------
+
+# Common metadata block embedded in every structured schema. Keeps the
+# suggestion-level provenance fields (positive_reasoning, why_not_in_instruction,
+# cited_text, confidence) co-located with the value so the LLM emits one
+# structured object, and the builder splits it into the inner Provenance
+# (carried inside the typed model) and the outer Suggestion fields.
+_SUGGESTION_META_FIELDS = {
+    "positive_reasoning": {
+        "type": "string",
+        "description": (
+            "One sentence: why THIS value is right for THIS field given the "
+            "existing values of other fields on this step."
+        ),
+    },
+    "why_not_in_instruction": {
+        "type": ["string", "null"],
+        "description": (
+            "One sentence naming the specific element the instruction lacks; "
+            "do not write 'not specified' generically. Null only if the "
+            "instruction does in fact name this exact value."
+        ),
+    },
+    "cited_text": {
+        "type": ["string", "null"],
+        "description": (
+            "Verbatim substring from the INSTRUCTION block that grounds this "
+            "value (case-insensitive, whitespace-normalized match), or null. "
+            "Do NOT invent — only set when the substring literally appears."
+        ),
+    },
+    "confidence": {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "description": "Self-assessed confidence in this value, in [0.0, 1.0].",
+    },
+}
+
+_LOCATION_REF_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "description": {
+            "type": "string",
+            "description": (
+                "How the user would refer to this labware. Prefer the "
+                "verbatim wording from the instruction; if absent, use a "
+                "config labware key. Examples: 'reservoir', 'PCR plate', "
+                "'reagent_rack'."
+            ),
+        },
+        "well": {
+            "type": ["string", "null"],
+            "pattern": r"^[A-P]([1-9]|1[0-9]|2[0-4])$",
+            "description": (
+                "A single well address like 'A1' or 'H12'. Set ONE of "
+                "well, wells, or well_range; null the others."
+            ),
+        },
+        "wells": {
+            "type": ["array", "null"],
+            "items": {"type": "string", "pattern": r"^[A-P]([1-9]|1[0-9]|2[0-4])$"},
+            "description": (
+                "Explicit list of well addresses for non-contiguous picks "
+                "like ['A1','C3','E5']. Mutually exclusive with well/well_range."
+            ),
+        },
+        "well_range": {
+            "type": ["string", "null"],
+            "description": (
+                "Contiguous range or region description: 'A1-A12', "
+                "'column 1'. Mutually exclusive with well/wells."
+            ),
+        },
+        **_SUGGESTION_META_FIELDS,
+    },
+    "required": ["description", "positive_reasoning", "confidence"],
+}
+
+_VOLUME_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Numeric volume (strictly positive).",
+        },
+        "unit": {
+            "type": "string",
+            "enum": ["uL", "mL"],
+            "description": "Pipetting unit; required.",
+        },
+        "exact": {
+            "type": "boolean",
+            "description": (
+                "True if the value is from the instruction verbatim or a "
+                "precise default; false if approximate / inferred."
+            ),
+        },
+        **_SUGGESTION_META_FIELDS,
+    },
+    "required": ["value", "unit", "exact", "positive_reasoning", "confidence"],
+}
+
+_DURATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Numeric duration (strictly positive).",
+        },
+        "unit": {
+            "type": "string",
+            "enum": ["seconds", "minutes", "hours"],
+        },
+        **_SUGGESTION_META_FIELDS,
+    },
+    "required": ["value", "unit", "positive_reasoning", "confidence"],
+}
+
+_TEMPERATURE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "number",
+            "description": "Temperature in degrees Celsius.",
+        },
+        **_SUGGESTION_META_FIELDS,
+    },
+    "required": ["value", "positive_reasoning", "confidence"],
+}
+
+_SUBSTANCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "value": {
+            "type": "string",
+            "description": "Substance name as the user would write it.",
+        },
+        **_SUGGESTION_META_FIELDS,
+    },
+    "required": ["value", "positive_reasoning", "confidence"],
+}
+
+
+def _build_inner_provenance(data: dict):
+    """Construct the Provenance carried *inside* a value model from the
+    metadata fields the LLM emitted alongside the value.
+
+    cited_text non-null → source="instruction" + cited_text=[t], confidence.
+    cited_text null     → source="inferred"   + positive_reasoning +
+                          why_not_in_instruction + confidence.
+    """
+    from nl2protocol.models.spec import Provenance
+    cited = data.get("cited_text")
+    confidence = float(data.get("confidence", 0.6))
+    if cited:
+        return Provenance(
+            source="instruction",
+            cited_text=[cited],
+            confidence=confidence,
+        )
+    return Provenance(
+        source="inferred",
+        positive_reasoning=data["positive_reasoning"],
+        why_not_in_instruction=data.get("why_not_in_instruction"),
+        confidence=confidence,
+    )
+
+
+def _build_location_ref(data: dict, gap: Gap):
+    """LocationRef from LLM-emitted {description, well|wells|well_range, ...meta}."""
+    from nl2protocol.models.spec import LocationRef
+    well = data.get("well")
+    wells = data.get("wells")
+    well_range = data.get("well_range")
+    inner_prov = _build_inner_provenance(data)
+    wells_prov = inner_prov if (well or wells or well_range) else None
+    return LocationRef(
+        description=data["description"],
+        well=well,
+        wells=wells,
+        well_range=well_range,
+        description_provenance=inner_prov,
+        wells_provenance=wells_prov,
+    )
+
+
+def _build_volume(data: dict, gap: Gap):
+    from nl2protocol.models.spec import ProvenancedVolume
+    return ProvenancedVolume(
+        value=float(data["value"]),
+        unit=data["unit"],
+        exact=bool(data.get("exact", True)),
+        provenance=_build_inner_provenance(data),
+    )
+
+
+def _build_duration(data: dict, gap: Gap):
+    from nl2protocol.models.spec import ProvenancedDuration
+    return ProvenancedDuration(
+        value=float(data["value"]),
+        unit=data["unit"],
+        provenance=_build_inner_provenance(data),
+    )
+
+
+def _build_temperature(data: dict, gap: Gap):
+    from nl2protocol.models.spec import ProvenancedTemperature
+    return ProvenancedTemperature(
+        value=float(data["value"]),
+        provenance=_build_inner_provenance(data),
+    )
+
+
+def _build_substance(data: dict, gap: Gap):
+    from nl2protocol.models.spec import ProvenancedString
+    return ProvenancedString(
+        value=str(data["value"]),
+        provenance=_build_inner_provenance(data),
+    )
+
+
+# Field-path patterns → (tool_label, JSON schema, model builder).
+# First match wins. Gaps whose path matches none of these fall through to
+# LLMSpotSuggester's legacy free-form text-JSON path — kept for subfield
+# gaps (.well, .description, etc.) whose target is a primitive.
+_STRUCTURED_TARGETS: "list[tuple[re.Pattern[str], str, dict, Callable[[dict, Gap], Any]]]" = [
+    (re.compile(r"^steps\[\d+\]\.(?:source|destination)$"),
+        "location_ref", _LOCATION_REF_SCHEMA, _build_location_ref),
+    (re.compile(r"^steps\[\d+\]\.volume$"),
+        "volume", _VOLUME_SCHEMA, _build_volume),
+    (re.compile(r"^steps\[\d+\]\.duration$"),
+        "duration", _DURATION_SCHEMA, _build_duration),
+    (re.compile(r"^steps\[\d+\]\.temperature$"),
+        "temperature", _TEMPERATURE_SCHEMA, _build_temperature),
+    (re.compile(r"^steps\[\d+\]\.substance$"),
+        "substance", _SUBSTANCE_SCHEMA, _build_substance),
+]
+
+
 class LLMSpotSuggester:
     """For Gaps no deterministic suggester resolved, ask the LLM with
     focused context (just the relevant instruction snippet, config slice,
@@ -603,11 +854,155 @@ Your task: produce ONE JSON object with this exact shape:
 Output ONLY the JSON object, no preamble.
 """
 
+    _STRUCTURED_PROMPT_TEMPLATE = """You are filling ONE missing value in a protocol spec.
+
+INSTRUCTION (relevant fragment):
+{instruction_snippet}
+
+CONFIG (relevant slice):
+{config_slice}
+
+NEIGHBORING STEPS:
+{neighbors}
+
+THE GAP:
+- field: {field_path}
+- step: {step_order}
+- description: {description}
+- current value: {current_value}
+
+SCOPE — read carefully:
+Your reasoning MUST justify ONLY the value of THIS field. Do not propose
+or imply changes to other fields on the same step or anywhere else in
+the spec. The apply path writes ONLY the field named above; reasoning
+that argues for additional changes will be misleading because those
+changes will not actually happen.
+
+If you can't justify the value WITHIN the constraints of the other
+existing fields (e.g. the resolved labware can't host the well you're
+proposing), set confidence < 0.5 and say so in positive_reasoning
+rather than inventing a justification that requires changing something
+else.
+
+CITATION CHECK — if the value you're proposing appears verbatim in the
+INSTRUCTION block above (case-insensitive, whitespace-normalized), set
+`cited_text` to the substring containing it; the suggestion will be
+labeled "(cited)" in the UI. Otherwise set `cited_text` to null. Do NOT
+invent cited_text — only set it when the substring literally exists in
+the instruction.
+
+Your task: call the `{tool_name}` tool exactly once. The tool's input
+schema enforces the shape of the value; emit fields that match it.
+"""
+
     def __init__(self, client, model_name: str):
         self._client = client
         self._model_name = model_name
 
     def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
+        """Dispatch on gap.field_path. Top-level Provenanced/LocationRef
+        targets go through the structured tool-use path (the API enforces
+        shape so the returned Suggestion.value is guaranteed-typed); all
+        other paths use the legacy free-form text-JSON path.
+
+        Pre:    `gap.field_path` is a dotted spec address. `spec` is a
+                ProtocolSpec. `context` carries the instruction + config.
+        Post:   On success returns a Suggestion whose `value` is the
+                correctly-typed Pydantic model for structured targets, or
+                whatever the LLM returned for free-form targets. Returns
+                None on any API/parse/validation failure (graceful degrade).
+        Side effects: One Anthropic API call.
+        """
+        for pattern, tool_label, schema, builder in _STRUCTURED_TARGETS:
+            if pattern.match(gap.field_path):
+                return self._suggest_structured(
+                    gap, spec, context,
+                    tool_name=f"propose_{tool_label}",
+                    input_schema=schema,
+                    build_model=builder,
+                )
+        return self._suggest_freeform(gap, spec, context)
+
+    def _suggest_structured(
+        self,
+        gap: Gap,
+        spec,
+        context: dict,
+        *,
+        tool_name: str,
+        input_schema: dict,
+        build_model: Callable[[dict, Gap], Any],
+    ) -> Optional[Suggestion]:
+        """Ask the LLM via Anthropic tool-use so the API structurally
+        enforces the response shape. The LLM cannot return a raw dict
+        where a LocationRef is expected — the input_schema rejects it.
+
+        Pre:    `tool_name` is a stable identifier; `input_schema` is a
+                JSON Schema object matching the target model's value-
+                fields plus the common metadata block; `build_model`
+                takes the schema-validated dict and returns the typed
+                Pydantic instance with a synthesized inner Provenance.
+        Post:   On success returns a Suggestion whose `value` is the
+                build_model output (a Pydantic instance). Returns None
+                on API failure, missing tool_use block, or builder error.
+        """
+        from pydantic import ValidationError
+        prompt = self._build_structured_prompt(gap, spec, context, tool_name)
+        try:
+            response = self._client.messages.create(
+                model=self._model_name,
+                max_tokens=600,
+                tools=[{
+                    "name": tool_name,
+                    "description": (
+                        f"Emit the proposed value for the gap field at "
+                        f"{gap.field_path}. The input schema enforces "
+                        f"the value's shape."
+                    ),
+                    "input_schema": input_schema,
+                }],
+                tool_choice={"type": "tool", "name": tool_name},
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception:
+            return None
+        data: Optional[dict] = None
+        for block in getattr(response, "content", None) or []:
+            block_type = getattr(block, "type", None)
+            block_input = getattr(block, "input", None)
+            if block_type == "tool_use" and isinstance(block_input, dict):
+                data = block_input
+                break
+            # Some SDK versions / stubs expose `.input` without `.type`.
+            if isinstance(block_input, dict):
+                data = block_input
+                break
+        if data is None:
+            return None
+        try:
+            value = build_model(data, gap)
+        except (ValidationError, KeyError, TypeError, ValueError):
+            return None
+        cited_text = data.get("cited_text")
+        provenance_source = "cited" if cited_text else "inferred"
+        return Suggestion(
+            value=value,
+            provenance_source=provenance_source,
+            positive_reasoning=data["positive_reasoning"],
+            why_not_in_instruction=data.get("why_not_in_instruction"),
+            confidence=float(data.get("confidence", 0.6)),
+            cited_text=cited_text,
+        )
+
+    def _suggest_freeform(
+        self, gap: Gap, spec, context: dict,
+    ) -> Optional[Suggestion]:
+        """Free-form text-JSON path for subfield gaps whose target is a
+        primitive (well address, description string, etc.). No structural
+        guarantee; the caller (orchestrator apply layer) writes whatever
+        we return straight into the slot — which is fine when the slot
+        is `str` but exactly the bug that motivated `_suggest_structured`
+        for Pydantic-model slots."""
         prompt = self._build_prompt(gap, spec, context)
         try:
             response = self._client.messages.create(
@@ -655,6 +1050,34 @@ Output ONLY the JSON object, no preamble.
             step_order=gap.step_order or "(spec-level)",
             description=gap.description,
             current_value=repr(gap.current_value),
+        )
+
+    def _build_structured_prompt(
+        self, gap: Gap, spec, context: dict, tool_name: str,
+    ) -> str:
+        """Prompt for the tool-use path. Reuses the same scope guidance
+        and citation rule as the free-form prompt but replaces the
+        'produce ONE JSON object with this exact shape' block with a
+        directive to call the named tool — the tool's input_schema
+        carries the shape, so the prompt doesn't need to re-spec it.
+        """
+        instruction = context.get("instruction", "")
+        config = context.get("config", {})
+        instruction_snippet = instruction[:4000]
+        import json as _json
+        config_slice = _json.dumps(
+            {"labware": config.get("labware", {})}, indent=2
+        )[:800]
+        neighbors = self._neighbors_text(gap, spec)
+        return self._STRUCTURED_PROMPT_TEMPLATE.format(
+            instruction_snippet=instruction_snippet,
+            config_slice=config_slice,
+            neighbors=neighbors,
+            field_path=gap.field_path,
+            step_order=gap.step_order or "(spec-level)",
+            description=gap.description,
+            current_value=repr(gap.current_value),
+            tool_name=tool_name,
         )
 
     def _neighbors_text(self, gap: Gap, spec) -> str:

@@ -1168,13 +1168,15 @@
       <label style="font-size: 12px; color: var(--ink);">Config (.json): <input type="file" id="live-config-file" accept=".json,application/json" style="font-size: 12px;"></label>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      {% if not local_dev_mode %}
       <label for="live-api-key" style="font-size: 13px; color: var(--ink);">Anthropic key:</label>
-      <input type="password" id="live-api-key" placeholder="{% if local_dev_mode %}(local dev — leave empty to use env key){% else %}sk-ant-…{% endif %}" autocomplete="off" style="font: 13px var(--font-mono); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 280px;">
+      <input type="password" id="live-api-key" placeholder="sk-ant-…" autocomplete="off" style="font: 13px var(--font-mono); padding: 5px 8px; border: 1px solid var(--btn-secondary-border); border-radius: 4px; min-width: 280px;">
+      {% endif %}
       <button id="live-start-btn" style="font: 14px var(--font-body); padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); cursor: pointer; border-radius: 4px;">▶ Start pipeline</button>
       <span id="live-status" style="display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: var(--status-success-bg); color: var(--status-success-fg);">idle</span>
     </div>
     <div style="color: var(--dim); font-size: 11px; line-height: 1.5;">
-      Your key is used only for this request and never stored. Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.
+      {% if local_dev_mode %}Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.{% else %}Your key is used only for this request and never stored. Events stream as the pipeline runs; a static report is archived to <code>output/</code> at end-of-run.{% endif %}
     </div>
   </div>
   <!-- ADR-0013 Phase 3e: small Y/N modal for stand-alone binary
@@ -3931,7 +3933,8 @@
     const LOCAL_DEV_MODE = {{ local_dev_mode|tojson if local_dev_mode is defined else 'false' }};
 
     startBtn.addEventListener("click", async () => {
-      const apiKey = (document.getElementById("live-api-key").value || "").trim();
+      const keyInput = document.getElementById("live-api-key");
+      const apiKey = ((keyInput && keyInput.value) || "").trim();
       if (!apiKey && !LOCAL_DEV_MODE) {
         setStatus("API key required", "error");
         return;
@@ -3986,7 +3989,7 @@
         if (j.status === "started") {
           setStatus("running", "warn");
         } else if (j.status === "already_running") {
-          setStatus("demo busy — try again in a few minutes", "warn");
+          setStatus("another run in progress — try again in a few minutes", "warn");
           startBtn.disabled = false;
         } else {
           setStatus("error: " + (j.message || "start failed"), "error");

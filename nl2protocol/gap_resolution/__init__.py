@@ -25,6 +25,7 @@ from nl2protocol.gap_resolution.protocols import (
 from nl2protocol.gap_resolution.detectors import (
     ConstraintViolationDetector,
     InitialContentsVolumeDetector,
+    InitialContentsWellDetector,
     LabwareAmbiguityDetector,
     MissingFieldsDetector,
     NamespaceSplitDetector,
@@ -69,6 +70,7 @@ __all__ = [
     "ConfirmationHandler",
     "ConstraintViolationDetector",
     "InitialContentsVolumeDetector",
+    "InitialContentsWellDetector",
     "LabwareAmbiguityDetector",
     "MissingFieldsDetector",
     "NamespaceSplitDetector",

@@ -57,6 +57,13 @@ def _missing_field_to_path(action: str, description: str) -> str:
     desc_lower = description.lower()
     if "missing volume" in desc_lower:
         return ".volume"
+    # Well-specific clauses come before the broader source/destination
+    # checks so "missing source well(s)" routes to the LocationRef subfield
+    # apply branch instead of the top-level source one.
+    if "source well" in desc_lower:
+        return ".source.wells"
+    if "destination well" in desc_lower:
+        return ".destination.wells"
     if "missing destination" in desc_lower or "destination location" in desc_lower:
         return ".destination"
     if "no source for" in desc_lower or "missing source" in desc_lower:
@@ -278,6 +285,58 @@ class InitialContentsVolumeDetector:
                     f"Initial contents entry {idx}: well {ic.well} of "
                     f"'{ic.labware}' contains '{ic.substance}' but no "
                     f"volume is stated."
+                ),
+                severity="blocker",
+            ))
+        return gaps
+
+
+# ============================================================================
+# InitialContentsWellDetector — emits Gaps for null well entries
+# ============================================================================
+
+class InitialContentsWellDetector:
+    """Emits one Gap per `WellContents` entry whose `well` is null.
+
+    Symmetric with `InitialContentsVolumeDetector`: when the LLM
+    extracts an initial-contents entry but the instruction doesn't
+    name a well coordinate (e.g. "the 100uL fragmented DNA sample"
+    with no well address), the extractor leaves `well` null and this
+    detector surfaces the hole for gap-resolution.
+
+    Pre:    `spec` is a ProtocolSpec; `spec.initial_contents` may have
+            entries with null `well`. `context` is unused.
+    Post:   Returns one Gap per null-well entry, with:
+              * `id`          = f"initial_contents[{N}].well" (stable
+                                handle so re-detect across iterations
+                                matches).
+              * `field_path`  = f"initial_contents[{N}].well" (matches
+                                default_apply_resolution's path-shape).
+              * `step_order`  = None (this is a spec-level gap, not tied
+                                to any step).
+              * `kind`        = "missing".
+              * `severity`    = "blocker" — codegen needs the well for
+                                initial-state tracking, and the
+                                constraint-checker reads ic.well to seed
+                                its WellState map.
+            Entries whose well is set are skipped silently.
+    Side effects: None (read-only).
+    """
+
+    def detect(self, spec, context: dict) -> List[Gap]:
+        gaps: List[Gap] = []
+        for idx, ic in enumerate(spec.initial_contents):
+            if ic.well is not None:
+                continue
+            gaps.append(Gap(
+                id=f"initial_contents[{idx}].well",
+                step_order=None,
+                field_path=f"initial_contents[{idx}].well",
+                kind="missing",
+                current_value=None,
+                description=(
+                    f"Initial contents entry {idx}: '{ic.labware}' "
+                    f"contains '{ic.substance}' but no well is stated."
                 ),
                 severity="blocker",
             ))
@@ -678,6 +737,7 @@ def default_spec_detectors() -> List:
     threads it through automatically."""
     return [
         InitialContentsVolumeDetector(),
+        InitialContentsWellDetector(),
         ConstraintViolationDetector(),
         LabwareAmbiguityDetector(),
         NamespaceSplitDetector(),
