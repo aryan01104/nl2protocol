@@ -57,6 +57,13 @@ def _missing_field_to_path(action: str, description: str) -> str:
     desc_lower = description.lower()
     if "missing volume" in desc_lower:
         return ".volume"
+    # Well-specific clauses come before the broader source/destination
+    # checks so "missing source well(s)" routes to the LocationRef subfield
+    # apply branch instead of the top-level source one.
+    if "source well" in desc_lower:
+        return ".source.wells"
+    if "destination well" in desc_lower:
+        return ".destination.wells"
     if "missing destination" in desc_lower or "destination location" in desc_lower:
         return ".destination"
     if "no source for" in desc_lower or "missing source" in desc_lower:

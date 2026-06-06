@@ -298,6 +298,35 @@ class TestValidateCompleteness:
             ])
         assert "for 'buffer'" in str(exc_info.value)
 
+    # Post: transfer action with source LocationRef that has description but
+    # no well/wells/well_range raises with "missing source well(s)".
+    # Closes the coverage hole where the constraint checker can't catch
+    # absent wells and the spec passed completeness with a half-specified ref.
+    def test_transfer_with_empty_source_locationref_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([
+                _step(
+                    order=1, action="transfer",
+                    volume=_vol(100.0),
+                    source=LocationRef(description="reservoir", description_provenance=_prov()),
+                    destination=LocationRef(description="dst", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+                ),
+            ])
+        assert "missing source well(s)" in str(exc_info.value)
+
+    # Post: same coverage for destination side.
+    def test_transfer_with_empty_destination_locationref_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([
+                _step(
+                    order=1, action="transfer",
+                    volume=_vol(100.0),
+                    source=LocationRef(description="src", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+                    destination=LocationRef(description="plate", description_provenance=_prov()),
+                ),
+            ])
+        assert "missing destination well(s)" in str(exc_info.value)
+
 
 # ============================================================================
 # LocationRef provenance split — description_provenance required;

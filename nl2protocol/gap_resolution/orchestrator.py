@@ -1045,6 +1045,17 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
         push_revision(wc, volume_ul=float(new_value))
         return
 
+    # initial_contents[N].well — symmetric with volume_ul. Detector
+    # (InitialContentsWellDetector) fires when WellContents.well is null;
+    # without this branch the apply path silently no-ops and the orchestrator
+    # re-detects the same gap each iteration until MAX_ITERATIONS.
+    m = re.match(r"initial_contents\[(\d+)\]\.well$", path)
+    if m:
+        idx = int(m.group(1))
+        wc = spec.initial_contents[idx]
+        push_revision(wc, well=str(new_value))
+        return
+
     # steps[N].<field>
     m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
     if m:

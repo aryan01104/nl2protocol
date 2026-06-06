@@ -1029,6 +1029,16 @@ class CompleteProtocolSpec(ProtocolSpec):
                     errors.append(f"{prefix}: no source for '{step.substance.value}' — add it to your config" if step.substance else f"{prefix}: missing source location")
                 if step.destination is None:
                     errors.append(f"{prefix}: missing destination location{substance_hint}")
+                # A populated LocationRef with no well/wells/well_range is
+                # half-specified — the constraint checker can't validate
+                # absent wells (only out-of-range ones), so without this
+                # check the spec passes completeness with an unusable
+                # location and the user is never asked to fill it.
+                for role in ("source", "destination"):
+                    ref = getattr(step, role, None)
+                    if (ref is not None and ref.well is None
+                            and not ref.wells and ref.well_range is None):
+                        errors.append(f"{prefix}: missing {role} well(s){substance_hint}")
 
             if step.action in temperature_actions and step.temperature is None:
                 errors.append(f"{prefix}: missing temperature target")

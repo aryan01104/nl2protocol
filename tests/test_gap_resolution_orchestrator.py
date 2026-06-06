@@ -1072,6 +1072,39 @@ class TestDefaultApplyStampsUserAction:
         default_apply_resolution(spec, g, res, suggestion=None)
         assert spec.initial_contents[0].volume_ul == 200.0
 
+    def test_initial_contents_well_writes_str_and_pushes_revision(self):
+        # Symmetric with volume_ul: writing initial_contents[N].well sets
+        # the well string and snapshots the prior state onto prior_revisions.
+        # Without this branch the apply path silently no-ops and the
+        # InitialContentsWellDetector re-detects the same gap forever.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.models.spec import (
+            CompositionProvenance, ExtractedStep, ProtocolSpec, WellContents,
+        )
+        spec = ProtocolSpec(
+            summary="t",
+            steps=[ExtractedStep(
+                order=1, action="comment", note="placeholder",
+                composition_provenance=CompositionProvenance(
+                    step_cited_text="t", parameters_cited_texts=["t"],
+                    parameters_reasoning="t", grounding=["instruction"],
+                    confidence=1.0,
+                ),
+            )],
+            initial_contents=[
+                WellContents(labware="rack", well=None, substance="x",
+                              volume_ul=None),
+            ],
+        )
+        g = gap("g1", field_path="initial_contents[0].well")
+        res = Resolution(action="accept_suggestion", new_value="A1",
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        wc = spec.initial_contents[0]
+        assert wc.well == "A1"
+        assert len(wc.prior_revisions) == 1
+        assert wc.prior_revisions[0].well is None
+
 
 # ============================================================================
 # PR3a step 3: resolved_label routing in apply + reviewer + claim collection
