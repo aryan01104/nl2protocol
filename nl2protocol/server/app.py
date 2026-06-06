@@ -448,6 +448,13 @@ class LiveModeApp:
         self._rate_limit_window_s: int = 3600
         self._rate_limit_max: int = 5
         self._rate_limit_history: Dict[str, deque] = defaultdict(deque)
+        # Pre-render the live page once at boot so GET / serves a cached
+        # string instead of re-compiling + re-rendering the 3.9k-line
+        # template per request (~500ms saved per visitor). Embedded
+        # timestamp is frozen to boot time — the WebSocket events that
+        # follow carry their own per-event timestamps, so this is
+        # display-only metadata. Restart the server to refresh it.
+        self._cached_live_page: str = self._render_live_page()
         self._setup_routes()
 
     @staticmethod
@@ -690,7 +697,7 @@ class LiveModeApp:
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
-            return HTMLResponse(self._render_live_page())
+            return HTMLResponse(self._cached_live_page)
 
         @self.app.get("/examples")
         async def list_examples():
