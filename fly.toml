@@ -8,9 +8,12 @@
 #   4. Deploy:        `fly deploy`
 #
 # This config assumes the container runs `nl2protocol --serve` on port
-# 8080 (matches the Dockerfile CMD). auto_stop_machines puts the
-# machine to sleep when idle to keep the demo free-tier-cheap; the next
-# request takes ~1s to wake it.
+# 8080 (matches the Dockerfile CMD). auto_stop_machines = 'off' is the
+# always-warm switch: Fly's proxy never stops the machine, so first-click
+# latency stays sub-second. min_machines_running has no effect when
+# auto_stop is off — kept at 0 for clarity. Scale stays at 1 machine.
+# (min_machines_running is passive: floors the autostop loop, never
+# starts a stopped machine. Don't use it as a warm-up mechanism.)
 
 app = 'nl2protocol-aryan'
 primary_region = 'iad'    # us-east; change to your closest region
@@ -20,7 +23,7 @@ primary_region = 'iad'    # us-east; change to your closest region
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 0
   processes = ['app']
