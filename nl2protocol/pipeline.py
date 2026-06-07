@@ -646,6 +646,7 @@ class ProtocolAgent:
         # the same first-non-None pattern the orchestrator uses. We
         # synthesize a Gap per row so suggesters get the shape they
         # expect; the synthetic gap doesn't go anywhere else.
+        from nl2protocol.gap_resolution.targets import InitialVolume
         from nl2protocol.gap_resolution.types import Gap
         table = []
         for idx, ic in enumerate(ic_list):
@@ -666,6 +667,7 @@ class ProtocolAgent:
                     description=f"volume for {ic.labware} well {ic.well}",
                     severity="blocker",
                     metadata={},
+                    targets=[InitialVolume(well_idx=idx)],
                 )
                 for s in suggesters:
                     try:
