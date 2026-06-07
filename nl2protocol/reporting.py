@@ -1012,46 +1012,67 @@ _PROV_ID_RENDERABLE_FIELDS = {
 }
 
 
+def _target_to_prov_id(target) -> Optional[str]:
+    """Map a typed GapTarget to its matching `data-prov-id` in the
+    rendered spec columns, or None if the target doesn't correspond to
+    a prov-id-bearing cell.
+
+    Pre:    `target` is any GapTarget variant (Phase 5 of the typed-
+            targets refactor).
+
+    Post:   Returns `s{N}-{field}` only when:
+              * variant is StepField, StepSubfield, or StepProvenance, AND
+              * `target.field` is in `_PROV_ID_RENDERABLE_FIELDS` (the
+                six fields the spec-column renderer emits data-prov-id
+                on: volume, duration, temperature, substance, source,
+                destination).
+            Special-case: StepProvenance(field=source|destination,
+            slot=wells_provenance) returns `s{N}-{field}-wells` to anchor
+            on the split wells sub-row rather than the parent labware row.
+            Returns None for InitialVolume / InitialWell (no prov-id
+            cell), ConstraintPlaceholder / NamespaceSplit / UnknownTarget
+            (not addressable cells), or any field outside the renderable
+            set.
+
+    Side effects: None.
+    """
+    from nl2protocol.gap_resolution.targets import (
+        StepField, StepProvenance, StepSubfield,
+    )
+    match target:
+        case StepField(step_idx=i, field=f) if f in _PROV_ID_RENDERABLE_FIELDS:
+            return f"s{i}-{f}"
+        case StepSubfield(step_idx=i, field=f) if f in _PROV_ID_RENDERABLE_FIELDS:
+            return f"s{i}-{f}"
+        case StepProvenance(step_idx=i, field=f, slot=slot) if f in _PROV_ID_RENDERABLE_FIELDS:
+            if f in ("source", "destination") and slot == "wells_provenance":
+                return f"s{i}-{f}-wells"
+            return f"s{i}-{f}"
+        case _:
+            return None
+
+
 def _field_path_to_prov_id(field_path: str) -> Optional[str]:
-    """Map a Gap.field_path to the matching `data-prov-id` used in the
-    rendered spec columns — but only for fields the renderer actually
-    emits as prov-id-bearing cells.
+    """Map a Gap.field_path string to the matching `data-prov-id`.
+
+    Legacy bridge: parses the string into a typed GapTarget and
+    delegates to `_target_to_prov_id`. Kept for callers that only have
+    a path string (e.g. StageEvent payloads where field_path is
+    serialized for transport). New code with a typed target should
+    call `_target_to_prov_id` directly.
 
     Pre:    `field_path` is a dotted path like `steps[N].volume`,
             `steps[N].source`, `steps[N].source.resolved_label`,
             `initial_contents[N].volume_ul`, or `steps[N].constraint`.
 
-    Post:   Returns `s{N}-{field}` only when:
-              * The path matches `steps[N].<field>` or
-                `steps[N].<field>.<subfield>` (subfield writes update
-                the parent ref's primary cell — same prov_id as the
-                top-level write).
-              * `<field>` is in `_PROV_ID_RENDERABLE_FIELDS` — the six
-                fields the spec-column renderer attaches data-prov-id
-                to (volume, duration, temperature, substance, source,
-                destination).
-            Returns None otherwise — `initial_contents[N].volume_ul`
-            (no prov-id-bearing cell), `steps[N].constraint` (placeholder
-            field; not rendered as a cell), unknown shapes. Callers
-            downstream skip None paths since they can't anchor an arrow.
+    Post:   Returns the same value `_target_to_prov_id` would return for
+            `path_to_target(field_path)`. See that function's contract
+            for the full mapping.
 
     Side effects: None.
     """
-    import re
-    m = re.match(r"steps\[(\d+)\]\.(\w+)(?:\.(\w+))?$", field_path)
-    if m and m.group(2) in _PROV_ID_RENDERABLE_FIELDS:
-        field = m.group(2)
-        subfield = m.group(3)
-        # LocationRef subfields point at the specific sub-row in the
-        # split rendering: `wells_provenance` lands on the wells row
-        # (its own prov_id), description_provenance + resolved_label*
-        # land on the labware row (the parent prov_id). This lets
-        # resolution arrows and cite-marker spans target the correct
-        # visual row without ambiguity.
-        if field in ("source", "destination") and subfield == "wells_provenance":
-            return f"s{m.group(1)}-{field}-wells"
-        return f"s{m.group(1)}-{field}"
-    return None
+    from nl2protocol.gap_resolution.targets import path_to_target
+    return _target_to_prov_id(path_to_target(field_path))
 
 
 def _collect_resolution_arrows(events) -> list:

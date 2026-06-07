@@ -659,6 +659,39 @@ class TestADR0011Phase2bResolutionArrows:
         assert _field_path_to_prov_id("steps[0].constraint") is None
         assert _field_path_to_prov_id("garbage") is None
 
+    def test_target_to_prov_id_dispatches_on_typed_variant(self):
+        """Phase 5: _target_to_prov_id is the typed counterpart of
+        _field_path_to_prov_id. Callers with a GapTarget (not a string)
+        can dispatch directly without round-tripping through the bridge.
+        """
+        from nl2protocol.gap_resolution.targets import (
+            ConstraintPlaceholder, InitialVolume, NamespaceSplit, StepField,
+            StepProvenance, StepSubfield, UnknownTarget,
+        )
+        from nl2protocol.reporting import _target_to_prov_id
+        # Renderable step fields → s{N}-{field}.
+        assert _target_to_prov_id(StepField(step_idx=0, field="volume")) == "s0-volume"
+        assert _target_to_prov_id(StepField(step_idx=5, field="source")) == "s5-source"
+        # Subfield writes collapse to parent prov_id.
+        assert (_target_to_prov_id(StepSubfield(step_idx=0, field="source",
+                                                subfield="resolved_label"))
+                == "s0-source")
+        # wells_provenance slot anchors on the split wells sub-row.
+        assert (_target_to_prov_id(StepProvenance(step_idx=2, field="destination",
+                                                   slot="wells_provenance"))
+                == "s2-destination-wells")
+        # Provenance on atomic fields uses the parent prov_id.
+        assert (_target_to_prov_id(StepProvenance(step_idx=0, field="volume",
+                                                   slot="provenance"))
+                == "s0-volume")
+        # Non-rendered variants and sentinels return None.
+        assert _target_to_prov_id(InitialVolume(well_idx=0)) is None
+        assert _target_to_prov_id(ConstraintPlaceholder(step_idx=3)) is None
+        assert _target_to_prov_id(NamespaceSplit(description="x")) is None
+        assert _target_to_prov_id(UnknownTarget(raw="garbage")) is None
+        # Renderable-field allowlist excludes fields like "action".
+        assert _target_to_prov_id(StepField(step_idx=0, field="action")) is None
+
     def test_collect_resolution_arrows_filters_undrawable_kinds(self):
         from nl2protocol.reporting import _collect_resolution_arrows, StageEvent
         events = [
