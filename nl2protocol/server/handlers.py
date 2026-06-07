@@ -589,12 +589,21 @@ def _coerce_edit_value(gap: Gap, raw: str) -> Any:
     raw = raw.strip()
     cur = gap.current_value
     cur_value_attr = getattr(cur, "value", None) if cur is not None else None
-    looks_numeric = isinstance(cur_value_attr, (int, float)) or (
-        # When current_value is None, infer from field name.
-        cur is None and any(tok in gap.field_path.lower()
-                            for tok in ("volume", "duration", "temperature",
-                                          "celsius", "minutes", "seconds"))
+    # When current_value is None, infer numeric-ness from the typed target's
+    # field name (Phase 5d migration: replaces substring search in field_path).
+    # Phase 2 post-init guarantees gap.targets is non-empty.
+    from nl2protocol.gap_resolution.targets import (
+        StepField, StepSubfield, StepProvenance, InitialVolume,
     )
+    _NUMERIC_FIELDS = {"volume", "duration", "temperature"}
+    target_is_numeric = False
+    if cur is None and gap.targets:
+        t = gap.targets[0]
+        if isinstance(t, InitialVolume):
+            target_is_numeric = True
+        elif isinstance(t, (StepField, StepSubfield, StepProvenance)):
+            target_is_numeric = t.field in _NUMERIC_FIELDS
+    looks_numeric = isinstance(cur_value_attr, (int, float)) or target_is_numeric
     if looks_numeric:
         try:
             return float(raw)
