@@ -23,22 +23,64 @@ import re
 from typing import Any, Callable, Optional
 
 from nl2protocol.gap_resolution.protocols import Suggester
+from nl2protocol.gap_resolution.targets import (
+    ConstraintPlaceholder,
+    InitialVolume,
+    InitialWell,
+    StepField,
+    StepProvenance,
+    StepSubfield,
+)
 from nl2protocol.gap_resolution.types import Gap, Suggestion
 
 
 # ============================================================================
-# Helpers — extract step index from a Gap.field_path
+# Helpers — extract step index from a Gap's targets
 # ============================================================================
-
-_STEP_INDEX_PATTERN = re.compile(r"steps\[(\d+)\]")
 
 
 def _step_index(gap: Gap) -> Optional[int]:
-    """Pull the 0-indexed step from a `steps[N].field` Gap.field_path."""
+    """Pull the 0-indexed step from a Gap.
+
+    Pre:    `gap` is a Gap whose targets are populated (Phase 2 post-init
+            guarantees this for every Gap construction path).
+
+    Post:   Returns:
+              * `gap.step_order - 1` when `step_order` is set (fast path
+                — matches the legacy regex semantics).
+              * Otherwise `gap.targets[0].step_idx` when that target is a
+                step-addressed variant (StepField, StepSubfield,
+                StepProvenance, or ConstraintPlaceholder).
+              * None when the gap has no step anchor (InitialVolume,
+                InitialWell, NamespaceSplit, UnknownTarget, or empty
+                targets list).
+
+    Side effects: None.
+    """
     if gap.step_order is not None:
         return gap.step_order - 1
-    m = _STEP_INDEX_PATTERN.search(gap.field_path)
-    return int(m.group(1)) if m else None
+    if gap.targets:
+        t = gap.targets[0]
+        if isinstance(t, (StepField, StepSubfield, StepProvenance, ConstraintPlaceholder)):
+            return t.step_idx
+    return None
+
+
+def _is_step_field(gap: Gap, field_name: str) -> bool:
+    """True iff the gap's primary target is a `StepField` (top-level
+    step attribute) with the matching `field` name. Replaces
+    `gap.field_path.endswith(f".{field_name}")` for callers that want
+    to dispatch on the typed variant.
+
+    Pre:    `gap.targets` populated (Phase 2 post-init guarantee).
+    Post:   Returns True when the first target is `StepField` and its
+            `.field` equals `field_name`; else False.
+    Side effects: None.
+    """
+    if not gap.targets:
+        return False
+    t = gap.targets[0]
+    return isinstance(t, StepField) and t.field == field_name
 
 
 # ============================================================================
@@ -62,7 +104,7 @@ class ConfigLookupSuggester:
     """
 
     def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
-        if not gap.field_path.endswith(".source"):
+        if not _is_step_field(gap, "source"):
             return None
         if gap.kind != "missing":
             return None
@@ -176,7 +218,7 @@ class CarryoverSuggester:
     """
 
     def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
-        if not gap.field_path.endswith(".temperature"):
+        if not _is_step_field(gap, "temperature"):
             return None
         idx = _step_index(gap)
         if idx is None or idx >= len(spec.steps):
@@ -267,13 +309,11 @@ class WellCapacitySuggester:
             always surfaces to the user).
     """
 
-    _PATH_PATTERN = re.compile(r"initial_contents\[(\d+)\]\.volume_ul")
-
     def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
-        m = self._PATH_PATTERN.match(gap.field_path)
-        if not m:
+        # Phase 5b: dispatch on typed target instead of parsing field_path.
+        if not gap.targets or not isinstance(gap.targets[0], InitialVolume):
             return None
-        idx = int(m.group(1))
+        idx = gap.targets[0].well_idx
         if idx >= len(spec.initial_contents):
             return None
         ic = spec.initial_contents[idx]
@@ -397,7 +437,7 @@ class RegexFromNoteSuggester:
     }
 
     def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
-        if not gap.field_path.endswith(".duration"):
+        if not _is_step_field(gap, "duration"):
             return None
         idx = _step_index(gap)
         if idx is None or idx >= len(spec.steps):
