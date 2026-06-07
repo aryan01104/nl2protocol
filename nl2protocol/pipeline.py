@@ -661,7 +661,6 @@ class ProtocolAgent:
                 synthetic_gap = Gap(
                     id=f"ic{idx}",
                     step_order=None,
-                    field_path=f"initial_contents[{idx}].volume_ul",
                     kind="missing",
                     current_value=None,
                     description=f"volume for {ic.labware} well {ic.well}",

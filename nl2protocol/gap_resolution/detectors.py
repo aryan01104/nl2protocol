@@ -130,7 +130,6 @@ class MissingFieldsDetector:
                 gaps.append(Gap(
                     id=gap_id,
                     step_order=step_order,
-                    field_path=field_path,
                     kind=kind,
                     current_value=None,
                     description=msg,
@@ -145,7 +144,6 @@ class MissingFieldsDetector:
                 gaps.append(Gap(
                     id=f"unparseable:{hash(msg) & 0xffffffff:08x}",
                     step_order=None,
-                    field_path="unknown",
                     kind="missing",
                     current_value=None,
                     description=msg,
@@ -241,7 +239,6 @@ class ProvenanceWarningDetector:
             gaps.append(Gap(
                 id=_warning_id(w),
                 step_order=w.get("step") if w.get("step", 0) > 0 else None,
-                field_path=field_path,
                 kind=kind,
                 current_value=w.get("value"),
                 description=w.get("message", ""),
@@ -296,7 +293,6 @@ class InitialContentsVolumeDetector:
             gaps.append(Gap(
                 id=f"initial_contents[{idx}]",
                 step_order=None,
-                field_path=f"initial_contents[{idx}].volume_ul",
                 kind="missing",
                 current_value=None,
                 description=(
@@ -350,7 +346,6 @@ class InitialContentsWellDetector:
             gaps.append(Gap(
                 id=f"initial_contents[{idx}].well",
                 step_order=None,
-                field_path=f"initial_contents[{idx}].well",
                 kind="missing",
                 current_value=None,
                 description=(
@@ -456,7 +451,6 @@ class ConstraintViolationDetector:
             gaps.append(Gap(
                 id=gap_id,
                 step_order=v0.step,
-                field_path=affected_paths[0],
                 kind="constraint_violation",
                 current_value=None,
                 description=description,
@@ -627,7 +621,6 @@ class LabwareAmbiguityDetector:
                 gaps.append(Gap(
                     id=f"labware.step{step.order}.{role}",
                     step_order=step.order,
-                    field_path=f"steps[{idx}].{role}.resolved_label",
                     kind="ambiguous",
                     current_value=None,
                     description=(
@@ -737,7 +730,6 @@ class NamespaceSplitDetector:
             gaps.append(Gap(
                 id=f"labware.namespace_split.{slug}",
                 step_order=None,
-                field_path=f"labware.namespace_split:{desc}",
                 kind="ambiguous",
                 current_value=None,
                 description=(

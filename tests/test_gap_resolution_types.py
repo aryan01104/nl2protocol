@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.gap_resolution import (
     Gap,
     Resolution,
@@ -32,7 +33,7 @@ class TestGap:
         g = Gap(
             id="step3.source",
             step_order=3,
-            field_path="steps[2].source",
+            targets=[path_to_target("steps[2].source")],
             kind="missing",
             current_value=None,
             description="missing source location",
@@ -45,23 +46,23 @@ class TestGap:
 
     def test_metadata_dict_is_per_instance_default(self):
         # Default factory pattern — two Gaps must not share the same dict.
-        g1 = Gap(id="a", step_order=1, field_path="x", kind="missing",
+        g1 = Gap(id="a", step_order=1, targets=[path_to_target("x")], kind="missing",
                  current_value=None, description="d", severity="blocker")
-        g2 = Gap(id="b", step_order=2, field_path="y", kind="missing",
+        g2 = Gap(id="b", step_order=2, targets=[path_to_target("y")], kind="missing",
                  current_value=None, description="d", severity="blocker")
         assert g1.metadata is not g2.metadata
 
     def test_step_order_can_be_none_for_spec_level_gaps(self):
         # Initial-contents and cross-check warnings have no step.
         g = Gap(id="initial.A1.volume", step_order=None,
-                field_path="initial_contents[0].volume_ul",
+                targets=[path_to_target("initial_contents[0].volume_ul")],
                 kind="missing", current_value=None,
                 description="initial volume null",
                 severity="suggestion")
         assert g.step_order is None
 
     def test_gap_is_frozen(self):
-        g = Gap(id="a", step_order=1, field_path="x", kind="missing",
+        g = Gap(id="a", step_order=1, targets=[path_to_target("x")], kind="missing",
                 current_value=None, description="d", severity="blocker")
         with pytest.raises(Exception):  # FrozenInstanceError
             g.id = "changed"  # type: ignore
@@ -127,32 +128,32 @@ class TestReviewResult:
     """ReviewResult enforces the objection-iff-disagreement invariant."""
 
     def test_both_confirmed_no_objection_constructs_cleanly(self):
-        r = ReviewResult(field_path="step1.volume",
+        r = ReviewResult(target=path_to_target("step1.volume"),
                          confirms_positive=True, confirms_negative=True,
                          objection=None)
         assert r.objection is None
 
     def test_disagreement_requires_objection(self):
         with pytest.raises(ValueError, match="objection"):
-            ReviewResult(field_path="step1.volume",
+            ReviewResult(target=path_to_target("step1.volume"),
                          confirms_positive=False, confirms_negative=True,
                          objection=None)
 
     def test_partial_disagreement_requires_objection(self):
         with pytest.raises(ValueError, match="objection"):
-            ReviewResult(field_path="step1.volume",
+            ReviewResult(target=path_to_target("step1.volume"),
                          confirms_positive=True, confirms_negative=False,
                          objection=None)
 
     def test_objection_with_full_agreement_raises(self):
         # Objection on a fully-confirmed claim is internally inconsistent.
         with pytest.raises(ValueError, match="objection"):
-            ReviewResult(field_path="step1.volume",
+            ReviewResult(target=path_to_target("step1.volume"),
                          confirms_positive=True, confirms_negative=True,
                          objection="something")
 
     def test_disagreement_with_objection_constructs(self):
-        r = ReviewResult(field_path="step1.volume",
+        r = ReviewResult(target=path_to_target("step1.volume"),
                          confirms_positive=False, confirms_negative=True,
                          objection="instruction line 5 names the source explicitly")
         assert r.objection == "instruction line 5 names the source explicitly"

@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from nl2protocol.gap_resolution import Gap
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.gap_resolution.suggesters import (
     CarryoverSuggester,
     ConfigLookupSuggester,
@@ -58,7 +59,7 @@ def _gap(field_path: str, kind: str = "missing", step_order: int = 1,
     return Gap(
         id=f"step{step_order}.{field_path.split('.')[-1]}",
         step_order=step_order,
-        field_path=field_path,
+        targets=[path_to_target(field_path)],
         kind=kind,
         current_value=current_value,
         description=description,
@@ -327,7 +328,7 @@ class TestWellCapacitySuggester:
             "load_name": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
         }}}
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="initial volume null", severity="suggestion")
         s = WellCapacitySuggester().suggest(spec=spec, gap=gap,
@@ -350,7 +351,7 @@ class TestWellCapacitySuggester:
             "load_name": "corning_96_wellplate_360ul_flat",
         }}}
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="x", severity="suggestion")
         s = WellCapacitySuggester().suggest(spec=spec, gap=gap,
@@ -390,7 +391,7 @@ class TestWellCapacitySuggester:
         labware_suggestions = {"tube rack": _FakeSug("reagent_rack")}
 
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="x", severity="suggestion")
         s = WellCapacitySuggester().suggest(
@@ -421,7 +422,7 @@ class TestWellCapacitySuggester:
                                              volume_ul=None)
                             ])
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="x", severity="suggestion")
         s = WellCapacitySuggester().suggest(
@@ -457,7 +458,7 @@ class TestWellCapacitySuggester:
         labware_suggestions = {"sample_rack": _FakeSug()}
 
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="x", severity="suggestion")
         s = WellCapacitySuggester().suggest(
@@ -496,7 +497,7 @@ class TestWellCapacitySuggester:
         labware_suggestions = {"sample_rack": _FakeSug()}
 
         gap = Gap(id="ic0.volume_ul", step_order=None,
-                  field_path="initial_contents[0].volume_ul",
+                  targets=[path_to_target("initial_contents[0].volume_ul")],
                   kind="missing", current_value=None,
                   description="x", severity="suggestion")
         s = WellCapacitySuggester().suggest(
@@ -577,7 +578,7 @@ class TestWellRangeClipSuggester:
         gap = Gap(
             id="step1.constraint",
             step_order=1,
-            field_path="steps[0].destination.wells",
+            targets=[path_to_target("steps[0].destination.wells")],
             kind="constraint_violation",
             current_value=["A7", "A8"],
             description=(
@@ -608,7 +609,7 @@ class TestWellRangeClipSuggester:
             ExtractedStep(order=1, action="comment", note="x",
                           composition_provenance=_comp())
         ])
-        gap = Gap(id="x", step_order=1, field_path="x",
+        gap = Gap(id="x", step_order=1, targets=[path_to_target("x")],
                   kind="constraint_violation", current_value=None,
                   description="some other constraint problem",
                   severity="blocker")
@@ -662,7 +663,7 @@ class TestLLMSpotSuggesterPromptScope:
 
     def _gap(self):
         return Gap(
-            id="g1", step_order=1, field_path="steps[0].destination.well",
+            id="g1", step_order=1, targets=[path_to_target("steps[0].destination.well")],
             kind="missing", current_value=None,
             description="well missing", severity="blocker", metadata={},
         )
@@ -740,7 +741,7 @@ class TestLLMSpotSuggesterCitedBranching:
 
     def _gap(self):
         return Gap(
-            id="g1", step_order=1, field_path="steps[0].destination.well",
+            id="g1", step_order=1, targets=[path_to_target("steps[0].destination.well")],
             kind="missing", current_value=None,
             description="well missing", severity="blocker", metadata={},
         )
@@ -861,7 +862,7 @@ class TestLLMSpotSuggesterStructured:
 
     def _gap_at(self, field_path: str) -> Gap:
         return Gap(
-            id=f"g.{field_path}", step_order=1, field_path=field_path,
+            id=f"g.{field_path}", step_order=1, targets=[path_to_target(field_path)],
             kind="missing", current_value=None,
             description=f"missing {field_path}", severity="blocker",
             metadata={},

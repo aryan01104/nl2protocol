@@ -30,6 +30,7 @@ from nl2protocol.gap_resolution.targets import (
     StepField,
     StepProvenance,
     StepSubfield,
+    path_to_target,
 )
 from nl2protocol.gap_resolution.types import Gap, Suggestion
 
@@ -1297,7 +1298,7 @@ Output a JSON ARRAY of these objects, one per claim, in the same order. No pream
                 if not (cp and cn) and not objection:
                     objection = "(reviewer disagreed but provided no objection text)"
                 results[fp] = ReviewResult(
-                    field_path=fp,
+                    target=path_to_target(fp),
                     confirms_positive=cp,
                     confirms_negative=cn,
                     objection=objection,

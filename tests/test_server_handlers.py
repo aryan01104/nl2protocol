@@ -19,6 +19,7 @@ from typing import Any, Dict, List
 
 import pytest
 
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.gap_resolution.types import Gap, Resolution, Suggestion
 from nl2protocol.server.handlers import (
     AssignmentsConfirmation,
@@ -40,7 +41,7 @@ def _make_gap(kind: str = "missing_required",
     return Gap(
         id="step0.volume",
         step_order=0,
-        field_path="steps[0].volume",
+        targets=[path_to_target("steps[0].volume")],
         kind=kind,
         current_value=current_value,
         description="volume missing on step 0",
@@ -150,7 +151,7 @@ class TestPendingRequestActionMapping:
         gap = Gap(
             id="step0.substance",
             step_order=0,
-            field_path="steps[0].substance",
+            targets=[path_to_target("steps[0].substance")],
             kind="missing",
             current_value=None,
             description="substance missing on step 0",
