@@ -1060,6 +1060,15 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
     m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
     if m:
         idx, fname = int(m.group(1)), m.group(2)
+        # Placeholder-path guard: ConstraintViolationDetector emits paths
+        # like `steps[N].constraint` for violations with no field-
+        # attributable target (TIP_INSUFFICIENT, SLOT_CONFLICT, MODULE_*,
+        # VOLUME_EXCEEDS_WELL, LABWARE_NOT_FOUND without a role). The
+        # step index is real; the field name is a sentinel meaning
+        # "informational — user resolves by editing config offline."
+        # Silent no-op rather than crash on Pydantic strict-field rejection.
+        if fname not in spec.steps[idx].__class__.model_fields:
+            return
         if resolution.action == "accept_suggestion":
             # new_value is a Provenance-bearing model from the suggester.
             # Contract guard: the suggester must already have built the
