@@ -136,7 +136,7 @@ class TestPendingRequestActionMapping:
 
     def test_edit_with_numeric_field_path_coerces_to_float(self):
         # Edit on a volume gap should produce a float new_value so the
-        # orchestrator's _apply_at_path can write `existing.value =
+        # orchestrator's _apply_at_target can write `existing.value =
         # <float>` against a ProvenancedVolume.
         gap = _make_gap()  # field_path = "steps[0].volume" → numeric
         pr = PendingRequest(gap=gap, suggestion=None)

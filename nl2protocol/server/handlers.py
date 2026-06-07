@@ -74,7 +74,7 @@ class PendingRequest:
         Post:   `self.response` is populated with a Resolution whose
                 action and user_action_provenance match the token. For
                 "edit", `new_value` is the coerced scalar — the
-                orchestrator's _apply_at_path mutates `existing.value`
+                orchestrator's _apply_at_target mutates `existing.value`
                 with it, so the field's Provenanced* shape stays intact.
                 `self.event` is set last so the waiting thread sees a
                 fully-populated `response`.
