@@ -30,7 +30,9 @@ Design notes:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional
+
+from nl2protocol.gap_resolution.targets import GapTarget, path_to_target
 
 
 # ============================================================================
@@ -87,6 +89,41 @@ class Gap:
     description: str                     # human-readable
     severity: GapSeverity
     metadata: dict = field(default_factory=dict)  # detector-specific extras (e.g. config_match_candidates)
+    # Typed address(es) — populated alongside field_path for Phase 2 bridge.
+    # Always a list: length-1 for the common case, length-N for deduped
+    # constraint-violation gaps that previously stored extra paths in
+    # metadata["affected_paths"]. Detectors that construct Gaps without
+    # passing `targets` get auto-derivation in __post_init__.
+    targets: List[GapTarget] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Derive `targets` from `field_path` + `metadata["affected_paths"]`
+        when the caller didn't pass an explicit list.
+
+        Pre:    Gap fields populated by dataclass __init__.
+
+        Post:   If `self.targets` is empty (the common case in Phase 2 — no
+                producer passes it explicitly yet), `self.targets` is set to:
+                  * `[path_to_target(p) for p in metadata["affected_paths"]]`
+                    when that key is present and non-empty (deduped constraint
+                    gaps), OR
+                  * `[path_to_target(self.field_path)]` otherwise.
+                If `self.targets` is already non-empty (Phase 4+ producers
+                passing typed values directly), it is left unchanged — the
+                explicit value wins over derivation.
+
+        Side effects: Mutates `self.targets` via `object.__setattr__` (allowed
+                on frozen dataclasses).
+        Raises: Never. `path_to_target` is total over any string input.
+        """
+        if self.targets:
+            return
+        affected = (self.metadata or {}).get("affected_paths")
+        if affected:
+            derived = [path_to_target(p) for p in affected]
+        else:
+            derived = [path_to_target(self.field_path)]
+        object.__setattr__(self, "targets", derived)
 
 
 # ============================================================================
@@ -164,6 +201,9 @@ class ReviewResult:
     confirms_positive: bool          # is positive_reasoning sound (domain knowledge check)?
     confirms_negative: bool          # is why_not_in_instruction correct (text-grounding check)?
     objection: Optional[str]         # specific text only when either is False
+    # Typed address — Phase 2 bridge. Always non-None after __post_init__:
+    # if the caller didn't pass an explicit value, derives it from field_path.
+    target: Optional[GapTarget] = None
 
     def __post_init__(self):
         either_disconfirmed = not (self.confirms_positive and self.confirms_negative)
@@ -176,6 +216,11 @@ class ReviewResult:
             raise ValueError(
                 "ReviewResult must NOT set `objection` when both claims are confirmed"
             )
+        # Auto-derive `target` from `field_path` when omitted. Mirrors the
+        # Gap.targets bridge: Phase 2 producers don't change; Phase 5+ ones
+        # pass `target=` directly and skip derivation.
+        if self.target is None:
+            object.__setattr__(self, "target", path_to_target(self.field_path))
 
 
 # ============================================================================

@@ -192,3 +192,117 @@ class TestDiscrimination:
         t = path_to_target("constraints.pipette_capacity")
         assert isinstance(t, UnknownTarget)
         assert t.raw == "constraints.pipette_capacity"
+
+
+class TestAutoDerivation:
+    """Phase 2 — Gap and ReviewResult must auto-derive typed targets from
+    `field_path` (and `metadata['affected_paths']` for Gap) when callers
+    don't pass an explicit value. The bridge must be invisible to every
+    existing producer; explicit values must win over derivation.
+    """
+
+    def _gap_kwargs(self, **overrides):
+        from nl2protocol.gap_resolution.types import Gap  # noqa: F401
+        base = dict(
+            id="test-id",
+            step_order=1,
+            field_path="steps[3].volume",
+            kind="missing",
+            current_value=None,
+            description="test",
+            severity="blocker",
+        )
+        base.update(overrides)
+        return base
+
+    def test_gap_derives_targets_from_field_path(self) -> None:
+        """A Gap constructed without `targets=` must have
+        `targets == [path_to_target(field_path)]`.
+        """
+        from nl2protocol.gap_resolution.types import Gap
+        g = Gap(**self._gap_kwargs(field_path="steps[3].volume"))
+        assert g.targets == [StepField(step_idx=3, field="volume")]
+
+    def test_gap_preserves_explicit_targets(self) -> None:
+        """When `targets=` is passed explicitly, the post-init must NOT
+        overwrite it from `field_path`. Phase 4+ detectors will rely on
+        this to bypass derivation when they produce typed targets natively.
+        """
+        from nl2protocol.gap_resolution.types import Gap
+        explicit = [StepSubfield(step_idx=0, field="source", subfield="well")]
+        g = Gap(**self._gap_kwargs(field_path="ignored-by-derivation",
+                                    targets=explicit))
+        assert g.targets == explicit
+
+    def test_gap_expands_affected_paths_to_multiple_targets(self) -> None:
+        """Deduped constraint-violation gaps put extra paths in
+        `metadata['affected_paths']`. The bridge must turn that list into
+        N typed targets, not just one.
+        """
+        from nl2protocol.gap_resolution.types import Gap
+        g = Gap(**self._gap_kwargs(
+            field_path="steps[0].volume",
+            kind="constraint_violation",
+            metadata={"affected_paths": [
+                "steps[0].volume",
+                "steps[1].volume",
+                "steps[2].volume",
+            ]},
+        ))
+        assert g.targets == [
+            StepField(step_idx=0, field="volume"),
+            StepField(step_idx=1, field="volume"),
+            StepField(step_idx=2, field="volume"),
+        ]
+
+    def test_gap_empty_affected_paths_falls_back_to_field_path(self) -> None:
+        """An empty `affected_paths` list must NOT mask the derivation —
+        falls back to deriving from `field_path` as if the key weren't there.
+        """
+        from nl2protocol.gap_resolution.types import Gap
+        g = Gap(**self._gap_kwargs(
+            field_path="steps[7].source",
+            metadata={"affected_paths": []},
+        ))
+        assert g.targets == [StepField(step_idx=7, field="source")]
+
+    def test_review_result_derives_target_from_field_path(self) -> None:
+        """ReviewResult auto-derivation mirrors Gap's, but for a singular
+        `target` (not a list — review verdicts are per-Provenance, not
+        per-deduped-group).
+        """
+        from nl2protocol.gap_resolution.types import ReviewResult
+        r = ReviewResult(
+            field_path="steps[2].source.well",
+            confirms_positive=True,
+            confirms_negative=True,
+            objection=None,
+        )
+        assert r.target == StepSubfield(step_idx=2, field="source", subfield="well")
+
+    def test_review_result_preserves_explicit_target(self) -> None:
+        from nl2protocol.gap_resolution.types import ReviewResult
+        explicit = InitialVolume(well_idx=4)
+        r = ReviewResult(
+            field_path="ignored",
+            confirms_positive=True,
+            confirms_negative=True,
+            objection=None,
+            target=explicit,
+        )
+        assert r.target == explicit
+
+    def test_review_result_validation_still_fires_with_target(self) -> None:
+        """The auto-derivation must not bypass ReviewResult's pre-existing
+        objection/confirms invariant. A disconfirmed review with no
+        objection text still raises.
+        """
+        import pytest as _pytest
+        from nl2protocol.gap_resolution.types import ReviewResult
+        with _pytest.raises(ValueError, match="objection"):
+            ReviewResult(
+                field_path="steps[0].volume",
+                confirms_positive=False,
+                confirms_negative=True,
+                objection=None,    # ← invalid: must be set when disconfirmed
+            )
