@@ -30,7 +30,9 @@ Design notes:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional
+
+from nl2protocol.gap_resolution.targets import GapTarget, path_to_target, target_to_path
 
 
 # ============================================================================
@@ -72,21 +74,35 @@ class Gap:
     orchestrator can tell "the same gap that wasn't resolved last round" from
     "a new gap that just appeared."
 
-    Pre:    All required fields populated. `field_path` uses dotted notation
-            matching the renderer's addressing scheme. `severity` matches the
-            kind (blockers for missing/fabricated/constraint_violation;
-            quality for low_confidence/ambiguous; etc.).
+    Pre:    All required fields populated. `targets` is non-empty (at least
+            one spec-address variant). `severity` matches the kind (blockers
+            for missing/fabricated/constraint_violation; quality for
+            low_confidence/ambiguous; etc.).
     Post:   Immutable record consumed by Suggesters and ConfirmationHandlers.
+            `field_path` is a derived read-only view of the first target's
+            string form (kept for the HTML template's JS, which parses
+            dotted paths, and for legacy event payloads).
     """
 
     id: str                              # stable handle, e.g. "step3.source"
     step_order: Optional[int]            # None for spec-level gaps (e.g. initial_contents)
-    field_path: str                      # dotted, e.g. "steps[3].source"
     kind: GapKind
     current_value: Any                   # what the field currently holds (often None)
     description: str                     # human-readable
     severity: GapSeverity
-    metadata: dict = field(default_factory=dict)  # detector-specific extras (e.g. config_match_candidates)
+    targets: List[GapTarget]             # typed address(es); length-1 common, length-N for deduped constraint gaps
+    metadata: dict = field(default_factory=dict)  # detector-specific extras
+
+    @property
+    def field_path(self) -> str:
+        """Derived view: string form of the first target. Kept so the JS
+        template (which still does `parseFieldName(gap.field_path)`) and
+        legacy event payloads keep working without churn. Empty string
+        when `targets` is empty (defensive — Phase 6 producers always
+        pass at least one target)."""
+        if not self.targets:
+            return ""
+        return target_to_path(self.targets[0])
 
 
 # ============================================================================
@@ -160,10 +176,17 @@ class ReviewResult:
               either False → escalate to user with `objection` surfaced
     """
 
-    field_path: str
+    target: GapTarget                # typed spec-address the reviewed Suggestion is for
     confirms_positive: bool          # is positive_reasoning sound (domain knowledge check)?
     confirms_negative: bool          # is why_not_in_instruction correct (text-grounding check)?
     objection: Optional[str]         # specific text only when either is False
+
+    @property
+    def field_path(self) -> str:
+        """Derived view: string form of `target`. Kept so callers that
+        key reviews by field_path string (e.g. orchestrator's reviews
+        dict, JSON event payloads) keep working without churn."""
+        return target_to_path(self.target)
 
     def __post_init__(self):
         either_disconfirmed = not (self.confirms_positive and self.confirms_negative)

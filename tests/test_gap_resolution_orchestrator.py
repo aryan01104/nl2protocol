@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.gap_resolution import (
     Gap,
     GapResolutionRecord,
@@ -97,11 +98,11 @@ def make_spec():
     return {"applied": []}
 
 
-def gap(gid, kind="missing", severity="blocker", field_path=None):
+def gap(gid, kind="missing", severity="blocker", targets=None):
     return Gap(
         id=gid,
         step_order=1,
-        field_path=field_path or f"steps[0].{gid}",
+        targets=targets or [path_to_target(f"steps[0].{gid}")],
         kind=kind,
         current_value=None,
         description=f"gap {gid}",
@@ -130,8 +131,8 @@ class TestTopoSortGaps:
         # Temperature has priority 0; source has priority 1; topological
         # order puts temperature first.
         gaps = [
-            gap("a", field_path="steps[0].source"),
-            gap("b", field_path="steps[0].temperature"),
+            gap("a", targets=[path_to_target("steps[0].source")]),
+            gap("b", targets=[path_to_target("steps[0].temperature")]),
         ]
         sorted_gaps = topo_sort_gaps(gaps)
         assert sorted_gaps[0].id == "b"
@@ -139,8 +140,8 @@ class TestTopoSortGaps:
 
     def test_substance_before_source(self):
         gaps = [
-            gap("a", field_path="steps[0].source"),
-            gap("b", field_path="steps[0].substance"),
+            gap("a", targets=[path_to_target("steps[0].source")]),
+            gap("b", targets=[path_to_target("steps[0].substance")]),
         ]
         sorted_gaps = topo_sort_gaps(gaps)
         assert sorted_gaps[0].id == "b"
@@ -148,8 +149,8 @@ class TestTopoSortGaps:
     def test_stable_within_priority_bucket(self):
         # Two .source gaps: same priority, original order preserved.
         gaps = [
-            gap("first", field_path="steps[0].source"),
-            gap("second", field_path="steps[1].source"),
+            gap("first", targets=[path_to_target("steps[0].source")]),
+            gap("second", targets=[path_to_target("steps[1].source")]),
         ]
         sorted_gaps = topo_sort_gaps(gaps)
         assert [g.id for g in sorted_gaps] == ["first", "second"]
@@ -223,7 +224,7 @@ class TestAutoAccept:
         gaps = [gap("g1")]
         sug = good_suggestion(confidence=0.95)
         review = ReviewResult(
-            field_path=gaps[0].field_path,
+            target=path_to_target(gaps[0].field_path),
             confirms_positive=False, confirms_negative=True,
             objection="instruction line 5 says X",
         )
@@ -250,7 +251,7 @@ class TestAutoAccept:
         gaps = [gap("g1")]
         sug = good_suggestion(confidence=0.95)
         review = ReviewResult(
-            field_path=gaps[0].field_path,
+            target=path_to_target(gaps[0].field_path),
             confirms_positive=False, confirms_negative=True,
             objection="instruction line 5 says X",
         )
@@ -279,7 +280,7 @@ class TestAutoAccept:
         gaps = [gap("g1")]
         sug = good_suggestion(confidence=0.5)  # below auto-accept threshold
         review = ReviewResult(
-            field_path=gaps[0].field_path,
+            target=path_to_target(gaps[0].field_path),
             confirms_positive=True, confirms_negative=True,
             objection=None,
         )
@@ -324,7 +325,7 @@ class TestAutoAccept:
         )
         g = Gap(
             id="ic0", step_order=None,
-            field_path="initial_contents[0].volume_ul",
+            targets=[path_to_target("initial_contents[0].volume_ul")],
             kind="missing", current_value=None,
             description="vol missing", severity="blocker", metadata={},
         )
@@ -341,7 +342,7 @@ class TestAutoAccept:
         spec = _NS(initial_contents=[], steps=[])
         g = Gap(
             id="s0v", step_order=0,
-            field_path="steps[0].volume",
+            targets=[path_to_target("steps[0].volume")],
             kind="missing", current_value=None,
             description="vol missing", severity="blocker", metadata={},
         )
@@ -359,7 +360,7 @@ class TestAutoAccept:
         spec = _NS(initial_contents=[], steps=[])
         g = Gap(
             id="cap", step_order=None,
-            field_path="constraints.pipette_capacity",
+            targets=[path_to_target("constraints.pipette_capacity")],
             kind="constraint_violation", current_value=None,
             description="exceeds capacity", severity="blocker",
             metadata={"affected_paths": [
@@ -381,7 +382,7 @@ class TestAutoAccept:
         spec = _NS(initial_contents=[], steps=[])
         g = Gap(
             id="s0a", step_order=0,
-            field_path="steps[0].action",
+            targets=[path_to_target("steps[0].action")],
             kind="missing", current_value=None,
             description="action missing", severity="blocker", metadata={},
         )
@@ -397,7 +398,7 @@ class TestAutoAccept:
         spec = _NS(initial_contents=[], steps=[])
         g = Gap(
             id="ic9", step_order=None,
-            field_path="initial_contents[9].volume_ul",
+            targets=[path_to_target("initial_contents[9].volume_ul")],
             kind="missing", current_value=None,
             description="vol missing", severity="blocker", metadata={},
         )
@@ -661,7 +662,7 @@ class TestStampReviewerVerdicts:
         spec = _real_spec()
         reviews = {
             "steps[0].volume": ReviewResult(
-                field_path="steps[0].volume",
+                target=path_to_target("steps[0].volume"),
                 confirms_positive=True, confirms_negative=True,
                 objection=None,
             ),
@@ -675,7 +676,7 @@ class TestStampReviewerVerdicts:
         spec = _real_spec()
         reviews = {
             "steps[0].source": ReviewResult(
-                field_path="steps[0].source",
+                target=path_to_target("steps[0].source"),
                 confirms_positive=True, confirms_negative=False,
                 objection="instruction line 3 names this source verbatim",
             ),
@@ -692,7 +693,7 @@ class TestStampReviewerVerdicts:
         spec = _real_spec()
         reviews = {
             "steps[0].volume": ReviewResult(
-                field_path="steps[0].volume",
+                target=path_to_target("steps[0].volume"),
                 confirms_positive=False, confirms_negative=True,
                 objection="50uL is not standard for this protocol",
             ),
@@ -705,7 +706,7 @@ class TestStampReviewerVerdicts:
         # Only stamp volume; source + destination should keep their original status.
         reviews = {
             "steps[0].volume": ReviewResult(
-                field_path="steps[0].volume",
+                target=path_to_target("steps[0].volume"),
                 confirms_positive=True, confirms_negative=True,
                 objection=None,
             ),
@@ -748,7 +749,7 @@ class TestStampReviewerVerdicts:
             })
             reviews = {
                 "steps[0].volume": ReviewResult(
-                    field_path="steps[0].volume",
+                    target=path_to_target("steps[0].volume"),
                     confirms_positive=False, confirms_negative=False,
                     objection="reviewer disagrees",
                 ),
@@ -796,7 +797,7 @@ class TestStampReviewerVerdicts:
         spec = ProtocolSpec(summary="t", steps=[step])
         reviews = {
             "steps[0].source": ReviewResult(
-                field_path="steps[0].source",
+                target=path_to_target("steps[0].source"),
                 confirms_positive=True, confirms_negative=True,
                 objection=None,
             ),
@@ -814,13 +815,13 @@ class TestStampReviewerVerdicts:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         review = ReviewResult(
-            field_path="steps[0].volume",
+            target=path_to_target("steps[0].volume"),
             confirms_positive=False, confirms_negative=True,
             objection="re-check needed",
         )
         # Suggester returns None (so no auto-accept path); user skips the gap.
         # The stamp happens regardless of how the gap is resolved.
-        gaps = [gap("g1", field_path="steps[0].volume")]
+        gaps = [gap("g1", targets=[path_to_target("steps[0].volume")])]
         handler = FakeHandler([
             Resolution(action="skip", new_value=None,
                        user_action_provenance="user_skipped"),
@@ -880,7 +881,7 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         new_volume = self._suggested_volume(value=75.0)
-        g = gap("g1", field_path="steps[0].volume")
+        g = gap("g1", targets=[path_to_target("steps[0].volume")])
         res = Resolution(action="accept_suggestion", new_value=new_volume,
                          user_action_provenance="user_accepted_suggestion")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -897,7 +898,7 @@ class TestDefaultApplyStampsUserAction:
         # Capture the model identity so we can prove .value was mutated
         # rather than the whole object replaced.
         original_volume_obj = spec.steps[0].volume
-        g = gap("g1", field_path="steps[0].volume")
+        g = gap("g1", targets=[path_to_target("steps[0].volume")])
         res = Resolution(action="edit", new_value=42.0,
                          user_action_provenance="user_edited")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -918,7 +919,7 @@ class TestDefaultApplyStampsUserAction:
         # First simulate the reviewer disagreeing with the volume.
         stamp_reviewer_verdicts(spec, {
             "steps[0].volume": ReviewResult(
-                field_path="steps[0].volume",
+                target=path_to_target("steps[0].volume"),
                 confirms_positive=False, confirms_negative=True,
                 objection="value seems off",
             ),
@@ -929,7 +930,7 @@ class TestDefaultApplyStampsUserAction:
         res = Resolution(action="accept_suggestion", new_value=new_volume,
                          user_action_provenance="user_accepted_suggestion")
         default_apply_resolution(
-            spec, gap("g1", field_path="steps[0].volume"), res, suggestion=None,
+            spec, gap("g1", targets=[path_to_target("steps[0].volume")]), res, suggestion=None,
         )
         prov = spec.steps[0].volume.provenance
         assert prov.review_status == "user_accepted_suggestion"
@@ -948,7 +949,7 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         new_wells = ["B2", "B3"]
-        g = gap("g1", field_path="steps[0].destination.wells")
+        g = gap("g1", targets=[path_to_target("steps[0].destination.wells")])
         res = Resolution(action="edit", new_value=new_wells,
                          user_action_provenance="user_edited")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -972,7 +973,7 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         # Fabrication-shaped gap: the provenance slot is broken, not the value.
-        g = gap("g1", field_path="steps[0].volume.provenance")
+        g = gap("g1", targets=[path_to_target("steps[0].volume.provenance")])
         suggestion = Suggestion(
             value=75.0,
             provenance_source="cited",
@@ -998,7 +999,7 @@ class TestDefaultApplyStampsUserAction:
         suggester's reasoning is stamped onto the new Provenance."""
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
-        g = gap("g1", field_path="steps[0].volume.provenance")
+        g = gap("g1", targets=[path_to_target("steps[0].volume.provenance")])
         suggestion = Suggestion(
             value=75.0,
             provenance_source="inferred",
@@ -1024,7 +1025,7 @@ class TestDefaultApplyStampsUserAction:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()
         new_wells = ["C1", "C2"]
-        g = gap("g1", field_path="steps[0].destination.wells")
+        g = gap("g1", targets=[path_to_target("steps[0].destination.wells")])
         suggestion = Suggestion(
             value=new_wells,
             provenance_source="cited",
@@ -1064,7 +1065,7 @@ class TestDefaultApplyStampsUserAction:
                 WellContents(labware="rack", well="A1", substance="x", volume_ul=None),
             ],
         )
-        g = gap("g1", field_path="initial_contents[0].volume_ul")
+        g = gap("g1", targets=[path_to_target("initial_contents[0].volume_ul")])
         res = Resolution(action="edit", new_value=200.0,
                          user_action_provenance="user_edited")
         # Should not raise (even though there's no Provenance to stamp).
@@ -1096,7 +1097,7 @@ class TestDefaultApplyStampsUserAction:
                               volume_ul=None),
             ],
         )
-        g = gap("g1", field_path="initial_contents[0].well")
+        g = gap("g1", targets=[path_to_target("initial_contents[0].well")])
         res = Resolution(action="accept_suggestion", new_value="A1",
                          user_action_provenance="user_accepted_suggestion")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -1161,7 +1162,7 @@ class TestApplyResolutionForResolvedLabel:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec_with_resolution_provenance()
         # User picked a different config label than what the resolver had.
-        g = gap("g1", field_path="steps[0].source.resolved_label")
+        g = gap("g1", targets=[path_to_target("steps[0].source.resolved_label")])
         res = Resolution(action="accept_suggestion",
                          new_value="reagent_reservoir",
                          user_action_provenance="user_accepted_suggestion")
@@ -1197,7 +1198,7 @@ class TestApplyResolutionForResolvedLabel:
                                      description_provenance=instr_prov, wells_provenance=instr_prov),
             composition_provenance=comp,
         )])
-        g = gap("g1", field_path="steps[0].source.resolved_label")
+        g = gap("g1", targets=[path_to_target("steps[0].source.resolved_label")])
         res = Resolution(action="accept_suggestion",
                          new_value="sample_rack",
                          user_action_provenance="user_accepted_suggestion")
@@ -1216,7 +1217,7 @@ class TestStampReviewerVerdictsForResolvedLabel:
         spec = _real_spec_with_resolution_provenance()
         reviews = {
             "steps[0].source.resolved_label": ReviewResult(
-                field_path="steps[0].source.resolved_label",
+                target=path_to_target("steps[0].source.resolved_label"),
                 confirms_positive=True, confirms_negative=True,
                 objection=None,
             ),
@@ -1231,7 +1232,7 @@ class TestStampReviewerVerdictsForResolvedLabel:
         spec = _real_spec_with_resolution_provenance()
         reviews = {
             "steps[0].destination.resolved_label": ReviewResult(
-                field_path="steps[0].destination.resolved_label",
+                target=path_to_target("steps[0].destination.resolved_label"),
                 confirms_positive=True, confirms_negative=False,
                 objection="config has both sample_rack and bsa_rack — ambiguous",
             ),
@@ -1281,8 +1282,8 @@ class TestOrchestratorEmitsStorytellingEvents:
         # Two gaps; topo_sort_gaps puts .temperature (priority 0) before
         # .source (priority 1). Detected order should reflect topo order.
         gaps = [
-            gap("a", field_path="steps[0].source"),
-            gap("b", field_path="steps[0].temperature"),
+            gap("a", targets=[path_to_target("steps[0].source")]),
+            gap("b", targets=[path_to_target("steps[0].temperature")]),
         ]
         orch = Orchestrator(
             detectors=[FakeDetector([gaps, []])],
@@ -1538,7 +1539,7 @@ class TestADR0012FabricationOverride:
         spec = self._spec_with_fabricated_volume()
         original_volume_obj = spec.steps[0].volume
         original_value = spec.steps[0].volume.value
-        g = gap("g1", field_path="steps[0].volume", kind="fabricated")
+        g = gap("g1", targets=[path_to_target("steps[0].volume")], kind="fabricated")
         res = Resolution(action="override", new_value=None,
                          user_action_provenance="user_overrode_fabrication")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -1549,7 +1550,7 @@ class TestADR0012FabricationOverride:
     def test_override_action_stamps_user_overrode_fabrication(self):
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = self._spec_with_fabricated_volume()
-        g = gap("g1", field_path="steps[0].volume", kind="fabricated")
+        g = gap("g1", targets=[path_to_target("steps[0].volume")], kind="fabricated")
         res = Resolution(action="override", new_value=None,
                          user_action_provenance="user_overrode_fabrication")
         default_apply_resolution(spec, g, res, suggestion=None)
@@ -1595,7 +1596,7 @@ class TestCLIConfirmationHandlerOverride:
 
     def _gap(self, kind="fabricated"):
         return Gap(
-            id="g1", step_order=1, field_path="steps[0].volume",
+            id="g1", step_order=1, targets=[path_to_target("steps[0].volume")],
             kind=kind, current_value="50uL",
             description="claims '50uL of sample' but not in instruction",
             severity="blocker",
@@ -1722,7 +1723,7 @@ class TestFabricationAcceptWritesNewValue:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = self._spec_with_fabricated_locationref()
         g = gap("g1",
-                field_path="steps[0].source.description_provenance",
+                targets=[path_to_target("steps[0].source.description_provenance")],
                 kind="fabricated")
         sug = Suggestion(
             value="fresh tubes in C1-C6",
@@ -1751,7 +1752,7 @@ class TestFabricationAcceptWritesNewValue:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = self._spec_with_fabricated_locationref()
         g = gap("g1",
-                field_path="steps[0].source.description_provenance",
+                targets=[path_to_target("steps[0].source.description_provenance")],
                 kind="fabricated")
         sug = Suggestion(
             value="fresh tubes in C1-C6",
@@ -1773,7 +1774,7 @@ class TestFabricationAcceptWritesNewValue:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = self._spec_with_fabricated_atom()
         g = gap("g1",
-                field_path="steps[0].volume.provenance",
+                targets=[path_to_target("steps[0].volume.provenance")],
                 kind="fabricated")
         sug = Suggestion(
             value=100.0,
@@ -1801,7 +1802,7 @@ class TestFabricationAcceptWritesNewValue:
         spec = self._spec_with_fabricated_locationref()
         original_desc = spec.steps[0].source.description
         g = gap("g1",
-                field_path="steps[0].source.description_provenance",
+                targets=[path_to_target("steps[0].source.description_provenance")],
                 kind="fabricated")
         sug = Suggestion(
             value=None,
@@ -1835,9 +1836,9 @@ class TestOrchestratorRunGapFilter:
         # presented, not applied, and not counted in the iteration.
         spec = make_spec()
         kept = gap("g_kept", kind="missing",
-                   field_path="steps[0].source.description_provenance")
+                   targets=[path_to_target("steps[0].source.description_provenance")])
         dropped = gap("g_drop", kind="missing",
-                      field_path="steps[0].volume")
+                      targets=[path_to_target("steps[0].volume")])
         sug = good_suggestion(confidence=0.9)
         orch = Orchestrator(
             detectors=[FakeDetector([[kept, dropped], []])],
@@ -1861,7 +1862,7 @@ class TestOrchestratorRunGapFilter:
         # (converged, no records, no applies).
         spec = make_spec()
         dropped = gap("g_drop", kind="missing",
-                      field_path="steps[0].volume")
+                      targets=[path_to_target("steps[0].volume")])
         orch = Orchestrator(
             detectors=[FakeDetector([[dropped], []])],
             suggesters=[FakeSuggester({"g_drop": good_suggestion()})],
@@ -1926,7 +1927,7 @@ class TestApplyResolutionContractGuard:
     def _real_gap_and_resolution(self, field_path: str, new_value):
         from nl2protocol.gap_resolution.types import Gap, Resolution
         gap_obj = Gap(
-            id=f"g.{field_path}", step_order=1, field_path=field_path,
+            id=f"g.{field_path}", step_order=1, targets=[path_to_target(field_path)],
             kind="missing", current_value=None,
             description="missing", severity="blocker", metadata={},
         )

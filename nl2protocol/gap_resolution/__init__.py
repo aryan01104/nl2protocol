@@ -30,6 +30,7 @@ from nl2protocol.gap_resolution.detectors import (
     MissingFieldsDetector,
     NamespaceSplitDetector,
     ProvenanceWarningDetector,
+    apply_namespace_split,
     default_extractor_detectors,
     default_spec_detectors,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "MissingFieldsDetector",
     "NamespaceSplitDetector",
     "ProvenanceWarningDetector",
+    "apply_namespace_split",
     "default_extractor_detectors",
     "default_spec_detectors",
     "detect_all",

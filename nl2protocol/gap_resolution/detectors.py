@@ -26,6 +26,18 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
+from nl2protocol.gap_resolution.targets import (
+    ConstraintPlaceholder,
+    GapTarget,
+    InitialVolume,
+    InitialWell,
+    NamespaceSplit,
+    StepField,
+    StepSubfield,
+    UnknownTarget,
+    path_to_target,
+    target_to_path,
+)
 from nl2protocol.gap_resolution.types import Gap, GapKind, GapSeverity
 
 
@@ -114,27 +126,29 @@ class MissingFieldsDetector:
                 field_path_suffix = _missing_field_to_path(action, description)
                 kind, severity = _missing_field_kind_and_severity(description)
                 gap_id = f"step{step_order}{field_path_suffix}"
+                field_path = f"steps[{step_order - 1}]{field_path_suffix}"
                 gaps.append(Gap(
                     id=gap_id,
                     step_order=step_order,
-                    field_path=f"steps[{step_order - 1}]{field_path_suffix}",
                     kind=kind,
                     current_value=None,
                     description=msg,
                     severity=severity,
+                    targets=[path_to_target(field_path)],
                 ))
             else:
                 # Unparseable error — emit as a spec-level gap so it isn't
                 # silently dropped. id needs to be unique-enough that
-                # iteration matching works.
+                # iteration matching works. UnknownTarget preserves the
+                # "unknown" sentinel raw so the bridge round-trips it.
                 gaps.append(Gap(
                     id=f"unparseable:{hash(msg) & 0xffffffff:08x}",
                     step_order=None,
-                    field_path="unknown",
                     kind="missing",
                     current_value=None,
                     description=msg,
                     severity="blocker",
+                    targets=[UnknownTarget(raw="unknown")],
                 ))
         return gaps
 
@@ -221,10 +235,10 @@ class ProvenanceWarningDetector:
                 # is the orchestrator's job at classify time.
                 continue
             kind, gap_severity = mapped
+            field_path = _warning_to_field_path(w)
             gaps.append(Gap(
                 id=_warning_id(w),
                 step_order=w.get("step") if w.get("step", 0) > 0 else None,
-                field_path=_warning_to_field_path(w),
                 kind=kind,
                 current_value=w.get("value"),
                 description=w.get("message", ""),
@@ -233,6 +247,7 @@ class ProvenanceWarningDetector:
                     "claimed_source": w.get("claimed_source"),
                     "underlying_severity": severity_str,
                 },
+                targets=[path_to_target(field_path)],
             ))
         return gaps
 
@@ -278,7 +293,6 @@ class InitialContentsVolumeDetector:
             gaps.append(Gap(
                 id=f"initial_contents[{idx}]",
                 step_order=None,
-                field_path=f"initial_contents[{idx}].volume_ul",
                 kind="missing",
                 current_value=None,
                 description=(
@@ -287,6 +301,7 @@ class InitialContentsVolumeDetector:
                     f"volume is stated."
                 ),
                 severity="blocker",
+                targets=[InitialVolume(well_idx=idx)],
             ))
         return gaps
 
@@ -331,7 +346,6 @@ class InitialContentsWellDetector:
             gaps.append(Gap(
                 id=f"initial_contents[{idx}].well",
                 step_order=None,
-                field_path=f"initial_contents[{idx}].well",
                 kind="missing",
                 current_value=None,
                 description=(
@@ -339,6 +353,7 @@ class InitialContentsWellDetector:
                     f"contains '{ic.substance}' but no well is stated."
                 ),
                 severity="blocker",
+                targets=[InitialWell(well_idx=idx)],
             ))
         return gaps
 
@@ -418,7 +433,10 @@ class ConstraintViolationDetector:
         gaps: List[Gap] = []
         for (vt, key), vs in groups.items():
             v0 = vs[0]
-            affected_paths = [self._field_path_for(v, spec) for v in vs]
+            # Phase 4: build typed targets directly; derive strings from
+            # them for backwards-compatible field_path / affected_paths.
+            affected_targets = [self._target_for(v, spec) for v in vs]
+            affected_paths = [target_to_path(t) for t in affected_targets]
             affected_steps = [v.step for v in vs]
             description = f"{v0.what}. {v0.suggestion}"
             if len(vs) > 1:
@@ -433,7 +451,6 @@ class ConstraintViolationDetector:
             gaps.append(Gap(
                 id=gap_id,
                 step_order=v0.step,
-                field_path=affected_paths[0],
                 kind="constraint_violation",
                 current_value=None,
                 description=description,
@@ -444,6 +461,7 @@ class ConstraintViolationDetector:
                     "affected_steps": affected_steps,
                     "affected_paths": affected_paths,
                 },
+                targets=affected_targets,
             ))
         return gaps
 
@@ -487,39 +505,58 @@ class ConstraintViolationDetector:
         return ("instance", id(v))
 
     @staticmethod
-    def _field_path_for(v, spec) -> str:
-        """Best-effort dotted path for a ConstraintViolation. Used by
-        `default_apply_resolution` to land the value when a Suggestion
-        is accepted; for violation types with no suggester, the path is
-        just informational (the user reads the description, edits config,
-        and re-runs)."""
+    def _target_for(v, spec) -> GapTarget:
+        """Typed spec-address for a ConstraintViolation.
+
+        Pre:    `v` is a ConstraintViolation with `step` (1-indexed; 0 for
+                protocol-level) and a `violation_type` from ViolationType.
+
+        Post:   Returns a GapTarget variant matching the violation's
+                addressability:
+                  * Out-of-bounds step or no field-attributable target
+                    → ConstraintPlaceholder(step_idx=idx) — informational
+                    only; the apply layer no-ops these structurally.
+                  * WELL_INVALID with a single offending well
+                    → StepSubfield(step_idx, "source"/"destination", "well")
+                    picking the ref that carries the offending well.
+                  * WELL_INVALID with a list
+                    → StepSubfield(step_idx, "source"/"destination", "wells")
+                    picking the ref whose wells intersect the invalid set.
+                  * LABWARE_NOT_FOUND with role in {"source","destination"}
+                    → StepField(step_idx, role).
+                  * PIPETTE_CAPACITY
+                    → StepField(step_idx, "volume").
+                  * Anything else → ConstraintPlaceholder(step_idx=idx).
+        Side effects: None.
+        Raises: Never.
+        """
         from nl2protocol.validation.constraints import ViolationType
         idx = max(0, v.step - 1)
         if idx >= len(spec.steps):
-            return f"steps[{idx}].constraint"
+            return ConstraintPlaceholder(step_idx=idx)
         step = spec.steps[idx]
         if v.violation_type == ViolationType.WELL_INVALID:
             invalid = set(v.values.get("invalid_wells", []))
             single = v.values.get("well")
-            # Single-well violation: target the .well subfield.
             if single is not None:
                 if step.source and step.source.well == single:
-                    return f"steps[{idx}].source.well"
+                    return StepSubfield(step_idx=idx, field="source", subfield="well")
                 if step.destination and step.destination.well == single:
-                    return f"steps[{idx}].destination.well"
-                return f"steps[{idx}].source.well"
-            # List-well violation: locate which ref carries the offending wells.
+                    return StepSubfield(step_idx=idx, field="destination", subfield="well")
+                return StepSubfield(step_idx=idx, field="source", subfield="well")
             if step.source and step.source.wells and any(w in invalid for w in step.source.wells):
-                return f"steps[{idx}].source.wells"
+                return StepSubfield(step_idx=idx, field="source", subfield="wells")
             if step.destination and step.destination.wells and any(w in invalid for w in step.destination.wells):
-                return f"steps[{idx}].destination.wells"
-            return f"steps[{idx}].source.wells"
+                return StepSubfield(step_idx=idx, field="destination", subfield="wells")
+            return StepSubfield(step_idx=idx, field="source", subfield="wells")
         if v.violation_type == ViolationType.LABWARE_NOT_FOUND:
             role = v.values.get("role")
-            return f"steps[{idx}].{role}" if role in ("source", "destination") else f"steps[{idx}].constraint"
+            if role in ("source", "destination"):
+                return StepField(step_idx=idx, field=role)
+            return ConstraintPlaceholder(step_idx=idx)
         if v.violation_type == ViolationType.PIPETTE_CAPACITY:
-            return f"steps[{idx}].volume"
-        return f"steps[{idx}].constraint"
+            return StepField(step_idx=idx, field="volume")
+        return ConstraintPlaceholder(step_idx=idx)
 
 
 # ============================================================================
@@ -584,7 +621,6 @@ class LabwareAmbiguityDetector:
                 gaps.append(Gap(
                     id=f"labware.step{step.order}.{role}",
                     step_order=step.order,
-                    field_path=f"steps[{idx}].{role}.resolved_label",
                     kind="ambiguous",
                     current_value=None,
                     description=(
@@ -597,6 +633,9 @@ class LabwareAmbiguityDetector:
                         "description": ref.description,
                         "role": role,
                     },
+                    targets=[StepSubfield(
+                        step_idx=idx, field=role, subfield="resolved_label",
+                    )],
                 ))
         return gaps
 
@@ -691,7 +730,6 @@ class NamespaceSplitDetector:
             gaps.append(Gap(
                 id=f"labware.namespace_split.{slug}",
                 step_order=None,
-                field_path=f"labware.namespace_split:{desc}",
                 kind="ambiguous",
                 current_value=None,
                 description=(
@@ -707,8 +745,58 @@ class NamespaceSplitDetector:
                     "partition": partition,
                     "candidate_pairs": candidate_pairs,
                 },
+                targets=[NamespaceSplit(description=desc)],
             ))
         return gaps
+
+
+# ============================================================================
+# Appliers — sit next to the detector that produces the gap they resolve
+# ============================================================================
+
+def apply_namespace_split(spec, description: str, mappings: dict) -> None:
+    """Rewrite every LocationRef whose description matches and whose
+    well falls in one of the partition's prefix groups — replacing
+    the description with a per-prefix tag.
+
+    Pre:    `spec` is a `ProtocolSpec`. `description` is the original
+            user wording (e.g. "tube rack") that `NamespaceSplitDetector`
+            flagged. `mappings` is `{prefix_letter: config_label}` — the
+            user's modal response. Refs whose wells don't match any
+            mapped prefix are left untouched.
+    Post:   For every ref whose description == `description`, computes
+            the set of prefix letters across its wells. If exactly one
+            prefix matches `mappings`, the ref's `description` is
+            replaced with `f"{description} [{prefix}]"`. Refs with
+            ambiguous prefix sets stay unchanged. Wells themselves are
+            never modified.
+    Side effects: Mutates `spec.steps[*].source/destination.description`
+                  in place.
+
+    Naming convention: "tube rack" + prefix "A" → "tube rack [A]". Stays
+    human-readable; downstream resolver sees each tagged description as
+    a distinct labware to match. See `NamespaceSplitDetector` for the
+    detection side.
+    """
+    from nl2protocol.extraction.schema_builder import expand_well_range
+    for step in spec.steps:
+        for ref in (step.source, step.destination):
+            if ref is None or ref.description != description:
+                continue
+            wells: set = set()
+            if ref.well:
+                wells.add(ref.well)
+            if ref.wells:
+                wells.update(ref.wells)
+            if ref.well_range:
+                wells.update(expand_well_range(ref.well_range))
+            prefixes = {
+                w[0] for w in wells
+                if w and w[0].isalpha() and w[0] in mappings
+            }
+            if len(prefixes) == 1:
+                prefix = next(iter(prefixes))
+                ref.description = f"{description} [{prefix}]"
 
 
 # ============================================================================

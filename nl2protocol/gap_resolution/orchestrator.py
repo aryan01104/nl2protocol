@@ -33,6 +33,17 @@ from nl2protocol.gap_resolution.protocols import (
     GapDetector,
     Suggester,
 )
+from nl2protocol.gap_resolution.targets import (
+    ConstraintPlaceholder,
+    GapTarget,
+    InitialVolume,
+    InitialWell,
+    NamespaceSplit,
+    StepField,
+    StepProvenance,
+    StepSubfield,
+    UnknownTarget,
+)
 from nl2protocol.gap_resolution.types import (
     Gap,
     Resolution,
@@ -849,56 +860,51 @@ def _expected_field_type_for_step(step, fname: str):
 
 def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
                               suggestion: Optional[Suggestion]) -> None:
-    """Write a Resolution's value into the spec at the gap's field_path AND
-    stamp the user's action onto the resulting Provenance (ADR-0009).
+    """Write a Resolution's value into the spec at every target in
+    `gap.targets` AND stamp the user's action onto the resulting Provenance
+    (ADR-0009).
 
-    Path-shape coverage (PR2 gap kinds):
-      * `initial_contents[N].volume_ul`     — primitive float write; no Provenance.
-      * `steps[N].<field>`                  — top-level step field; Provenance stamped.
-      * `steps[N].<field>.<subfield>`       — nested write under a parent model
-                                              (e.g. steps[0].destination.wells);
-                                              parent's Provenance stamped.
+    Pre:    `gap.targets` is non-empty (Phase 2 post-init guarantees this:
+            it auto-derives from `field_path` and/or
+            `metadata["affected_paths"]` when the caller didn't pass an
+            explicit list).
+            `resolution.action` is "accept_suggestion", "edit", or
+            "override"; skip and abort are short-circuited by the
+            orchestrator before calling this.
+            For "accept_suggestion", `resolution.new_value` is the same
+            shape as the field (a Provenance-bearing model for Provenanced
+            fields, a primitive for initial_contents.volume_ul). For
+            "edit", `resolution.new_value` is the user-typed scalar.
 
-    Pre:    `resolution.action` is "accept_suggestion" or "edit"; skip and
-            abort are short-circuited by the orchestrator before calling this.
-            For "accept_suggestion", `resolution.new_value` is the same shape
-            as the field (a Provenance-bearing model for Provenanced fields,
-            a primitive for initial_contents.volume_ul).
-            For "edit", `resolution.new_value` is the user-typed scalar
-            already coerced by the handler's coerce_value callback.
+    Post:   The spec is mutated in place. For each target in `gap.targets`,
+            the write semantics match the variant:
+              * StepField  — accept_suggestion REPLACES the field via
+                `replace_with_history_preserved`; edit mutates `.value`;
+                override stamps prov on the existing value.
+              * StepSubfield — mutates the subfield, stamps the parent's
+                provenance (or `resolved_label_provenance` when the
+                subfield is `resolved_label`).
+              * StepProvenance — writes the fabrication-shaped slot;
+                accept_suggestion rebuilds the Provenance from the
+                suggester's reasoning.
+              * InitialVolume / InitialWell — pushes a revision on the
+                WellContents primitive.
+              * ConstraintPlaceholder — no-op; informational gaps the
+                user resolves by editing config offline.
+              * NamespaceSplit / UnknownTarget — no-op; not addressable
+                spec slots.
+            Deduped constraint-violation gaps (`gap.targets` length > 1)
+            apply the resolution to EVERY target — the user answered once,
+            and the answer propagates to every affected step.
 
-    Post:   The spec is mutated in place:
-              * accept_suggestion + Provenanced field:
-                  the field is REPLACED with `new_value`; new_value's
-                  provenance is stamped with review_status = user_accepted_suggestion.
-              * edit + Provenanced field:
-                  the field's `.value` attribute is mutated (preserving the
-                  surrounding model + its provenance type/shape); provenance
-                  is stamped with review_status = user_edited.
-              * subfield write:
-                  the subfield is set; parent's provenance is stamped.
-              * initial_contents.volume_ul:
-                  the float is written; no Provenance to stamp.
-            In all stamping cases, `reviewer_objection` is cleared because
-            the user's action terminates the review lifecycle for that value.
-
-    Side effects: Mutates the spec in place. Replaces or mutates Pydantic
-            sub-models on the spec.
-
-    Raises: pydantic.ValidationError on invariant violation in the resulting
-            Provenance.
+    Side effects: Mutates the spec in place.
+    Raises: pydantic.ValidationError on invariant violation; TypeError if
+            a suggester delivers a value whose type doesn't match the
+            target field's declared type (contract guard at the StepField
+            arm).
     """
-    # Bug-2 (PR3b follow-up): when a Gap's metadata carries
-    # `affected_paths` (deduped constraint-violation Gap covering N steps),
-    # apply the resolution to ALL affected paths, not just the
-    # representative gap.field_path. The user answered once; their answer
-    # propagates to every step the same logical problem hit.
-    affected_paths = (gap.metadata or {}).get("affected_paths") if hasattr(gap, "metadata") else None
-    if affected_paths and len(affected_paths) > 1:
-        for path in affected_paths:
-            _apply_at_path(spec, path, resolution, suggestion)
-        return
-    _apply_at_path(spec, gap.field_path, resolution, suggestion)
+    for target in gap.targets:
+        _apply_at_target(spec, target, resolution, suggestion)
 
 
 # LocationRef value sub-fields → their provenance slot. When an apply
@@ -914,236 +920,176 @@ _LOCATIONREF_VALUE_SUBFIELDS = {
 }
 
 
-def _apply_at_path(spec, path: str, resolution: Resolution,
-                   suggestion: Optional[Suggestion] = None) -> None:
-    """Single-path apply — extracted from default_apply_resolution so
-    deduped Gaps can call it once per affected path.
+def _apply_at_target(spec, target: GapTarget, resolution: Resolution,
+                     suggestion: Optional[Suggestion] = None) -> None:
+    """Apply a single Resolution to one typed GapTarget.
 
-    Revision-history contract: each branch performs exactly ONE logical
-    write per call. For fields that carry a `prior_revisions` chain
-    (Provenanced* / LocationRef / WellContents), the pre-write state is
-    captured as a snapshot in `prior_revisions` BEFORE the head fields
-    are mutated. `_stamp_user_action` and `_stamp_resolution_action`
-    operate on the head AFTER the snapshot is pushed, so the head's
-    final state reflects every part of the logical write while the
-    chain captures one revision per call.
+    Replaces the regex-based `_apply_at_path` (Phase 3 of the typed-
+    targets refactor). Dispatches on `target` variant with `match` rather
+    than parsing a dotted path; each arm preserves the exact write
+    semantics of its old regex-branch counterpart.
+
+    Revision-history contract: each variant arm performs exactly ONE
+    logical write per call. For fields that carry a `prior_revisions`
+    chain (Provenanced* / LocationRef / WellContents), the pre-write
+    state is snapshotted into `prior_revisions` BEFORE the head fields
+    are mutated. Stamping (`_stamp_user_action` /
+    `_stamp_resolution_action`) operates on the head AFTER the snapshot.
+
+    Pre:    `target` is any GapTarget variant. For spec-addressable
+            variants (StepField, StepSubfield, StepProvenance, Initial*),
+            the referenced spec index must exist; for sentinel variants
+            (ConstraintPlaceholder, NamespaceSplit, UnknownTarget) the
+            call is a no-op regardless of state.
+
+    Post:   The spec is mutated in place per the per-variant semantics
+            documented under `default_apply_resolution`. Sentinel
+            variants leave the spec unchanged.
+
+    Side effects: Mutates Pydantic sub-models on the spec; may push
+            revisions onto `prior_revisions` chains.
+
+    Raises: pydantic.ValidationError on invariant violation; TypeError
+            from the StepField/accept_suggestion contract guard if a
+            suggester delivered a value whose type doesn't match the
+            target field's declared type.
     """
-    import re
-    from nl2protocol.models.spec import push_revision, replace_with_history_preserved
+    from nl2protocol.models.spec import (
+        Provenance,
+        push_revision,
+        replace_with_history_preserved,
+    )
 
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
 
-    # steps[N].<field>.<...provenance> — fabrication-shaped path. The
-    # verifier produces this when a cited_text fails the substring
-    # check; the broken slot is the provenance itself, not the value.
-    # Resolutions:
-    #   accept_suggestion → build a fresh inferred+user_accepted_suggestion
-    #     Provenance from `suggestion`. If suggestion.value is not None
-    #     AND the slot has a known value-field counterpart (atom `.value`,
-    #     LocationRef `.description`), write BOTH the value and the new
-    #     provenance — one push_revision snapshot per call. Otherwise
-    #     (suggestion.value is None, or slot is wells/resolved_label),
-    #     write provenance only (the citation-only fix case).
-    #   override          → keep value AND existing provenance object,
-    #     but stamp review_status=user_overrode_fabrication (the user
-    #     accepted responsibility for the fabricated cite).
-    #   edit              → for atomic Provenanced* fields (volume,
-    #     substance, duration, temperature) where the parent has a
-    #     `.value` slot, write the typed value AND replace the
-    #     provenance slot with a fresh inferred+user_edited Provenance.
-    #     LocationRef edits (description, wells) deferred — silent
-    #     no-op until we add list/range parsing.
-    m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w*provenance)$", path)
-    if m:
-        idx, fname, slot = int(m.group(1)), m.group(2), m.group(3)
-        parent = getattr(spec.steps[idx], fname, None)
-        if parent is None:
-            return
-        from nl2protocol.models.spec import Provenance
-        if resolution.action == "accept_suggestion":
-            # Build the new Provenance from the suggester's reasoning.
-            # Defensive: if no suggestion was threaded through (legacy
-            # callers / tests passing a Provenance directly as new_value),
-            # fall back to using new_value as the provenance.
-            if suggestion is not None:
-                new_prov = _build_suggested_provenance(
-                    suggestion, review_status="user_accepted_suggestion",
-                )
-                proposed_value = suggestion.value
-            else:
-                new_prov = new_value if isinstance(new_value, Provenance) else None
-                proposed_value = None
-            if new_prov is None:
+    match target:
+        # --- StepProvenance — fabrication-shaped slot (parent has a
+        # `.<slot>provenance` attribute the verifier flagged as malformed).
+        case StepProvenance(step_idx=idx, field=fname, slot=slot):
+            parent = getattr(spec.steps[idx], fname, None)
+            if parent is None:
                 return
-            # Map slot → value-field name. Only slots with a known
-            # counterpart trigger a value write; others stay prov-only.
-            value_field = None
-            if proposed_value is not None:
-                if slot == "provenance" and hasattr(parent, "value"):
-                    value_field = "value"
-                elif slot == "description_provenance" and hasattr(parent, "description"):
-                    value_field = "description"
-            if hasattr(parent, "prior_revisions"):
-                push_revision(parent)
-            if value_field is not None:
-                setattr(parent, value_field, proposed_value)
-            setattr(parent, slot, new_prov)
-            return
-        if resolution.action == "override":
-            existing_prov = getattr(parent, slot, None)
-            if existing_prov is not None:
+            if resolution.action == "accept_suggestion":
+                if suggestion is not None:
+                    new_prov = _build_suggested_provenance(
+                        suggestion, review_status="user_accepted_suggestion",
+                    )
+                    proposed_value = suggestion.value
+                else:
+                    new_prov = new_value if isinstance(new_value, Provenance) else None
+                    proposed_value = None
+                if new_prov is None:
+                    return
+                value_field = None
+                if proposed_value is not None:
+                    if slot == "provenance" and hasattr(parent, "value"):
+                        value_field = "value"
+                    elif slot == "description_provenance" and hasattr(parent, "description"):
+                        value_field = "description"
                 if hasattr(parent, "prior_revisions"):
                     push_revision(parent)
-                setattr(parent, slot, Provenance.model_validate({
-                    **existing_prov.model_dump(),
-                    "review_status": "user_overrode_fabrication",
-                    "reviewer_objection": None,
-                }))
+                if value_field is not None:
+                    setattr(parent, value_field, proposed_value)
+                setattr(parent, slot, new_prov)
+                return
+            if resolution.action == "override":
+                existing_prov = getattr(parent, slot, None)
+                if existing_prov is not None:
+                    if hasattr(parent, "prior_revisions"):
+                        push_revision(parent)
+                    setattr(parent, slot, Provenance.model_validate({
+                        **existing_prov.model_dump(),
+                        "review_status": "user_overrode_fabrication",
+                        "reviewer_objection": None,
+                    }))
+                return
+            if resolution.action == "edit" and hasattr(parent, "value"):
+                if hasattr(parent, "prior_revisions"):
+                    push_revision(parent)
+                parent.value = new_value
+                setattr(parent, slot, Provenance(
+                    source="inferred",
+                    positive_reasoning=(
+                        "User-typed value during fabrication resolution."
+                    ),
+                    why_not_in_instruction=(
+                        "User edited the value; original citation was malformed."
+                    ),
+                    confidence=1.0,
+                    review_status="user_edited",
+                ))
+                return
+            # Edit on LocationRef sub-slots, or unknown action: silent
+            # no-op.
             return
-        if resolution.action == "edit" and hasattr(parent, "value"):
+
+        # --- StepField — top-level step attribute (volume, source, ...)
+        case StepField(step_idx=idx, field=fname):
+            if resolution.action == "override":
+                # ADR-0012: user kept the value, just stamped the prov.
+                existing = getattr(spec.steps[idx], fname, None)
+                if existing is not None and hasattr(existing, "prior_revisions"):
+                    push_revision(existing)
+                _stamp_user_action(existing, user_action)
+                return
+            if resolution.action == "accept_suggestion":
+                # Contract guard: suggester must deliver the typed model,
+                # not a raw dict/str/int. Surfaces suggester bugs at the
+                # source rather than poisoning the spec downstream.
+                expected = _expected_field_type_for_step(spec.steps[idx], fname)
+                if (expected is not None
+                        and isinstance(expected, type)
+                        and not isinstance(new_value, expected)):
+                    raise TypeError(
+                        f"Suggester contract violation at "
+                        f"steps[{idx}].{fname}: expected "
+                        f"{expected.__name__} instance, got "
+                        f"{type(new_value).__name__} ({new_value!r:.80}). "
+                        f"Suggesters must construct the typed Pydantic "
+                        f"model (see ConfigLookupSuggester for the "
+                        f"canonical pattern)."
+                    )
+                old = getattr(spec.steps[idx], fname, None)
+                transferred = (
+                    replace_with_history_preserved(old, new_value)
+                    if old is not None
+                    else new_value
+                )
+                setattr(spec.steps[idx], fname, transferred)
+                _stamp_user_action(transferred, user_action)
+                return
+            if resolution.action == "edit":
+                existing = getattr(spec.steps[idx], fname, None)
+                if existing is not None and hasattr(existing, "value"):
+                    if hasattr(existing, "prior_revisions"):
+                        push_revision(existing)
+                    existing.value = new_value
+                    _stamp_user_action(existing, user_action)
+                else:
+                    setattr(spec.steps[idx], fname, new_value)
+                    _stamp_user_action(new_value, user_action)
+                return
+            # Defensive: any other action writes raw.
+            setattr(spec.steps[idx], fname, new_value)
+            return
+
+        # --- StepSubfield — nested LocationRef slot
+        # (steps[N].source.wells, steps[N].destination.resolved_label, ...)
+        case StepSubfield(step_idx=idx, field=fname, subfield=subfield):
+            parent = getattr(spec.steps[idx], fname)
+            if parent is None:
+                return
             if hasattr(parent, "prior_revisions"):
                 push_revision(parent)
-            parent.value = new_value
-            setattr(parent, slot, Provenance(
-                source="inferred",
-                positive_reasoning=(
-                    "User-typed value during fabrication resolution."
-                ),
-                why_not_in_instruction=(
-                    "User edited the value; original citation was malformed."
-                ),
-                confidence=1.0,
-                review_status="user_edited",
-            ))
-            return
-        # edit on LocationRef sub-slots, or unknown action: silent
-        # no-op (better than crashing). Follow-up: parse list/range
-        # input from the modal so edits land cleanly.
-        return
-
-    # ADR-0012: action="override" means the user kept the existing value
-    # AS-IS but committed to it despite a fabrication flag. Don't write
-    # the value (it's already correct from the user's perspective); just
-    # stamp the existing field's provenance with the override marker.
-    if resolution.action == "override":
-        m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
-        if m:
-            idx, fname = int(m.group(1)), m.group(2)
-            existing = getattr(spec.steps[idx], fname, None)
-            if existing is not None and hasattr(existing, "prior_revisions"):
-                push_revision(existing)
-            _stamp_user_action(existing, user_action)
-        return
-
-    # initial_contents[N].volume_ul (primitive — no Provenance to stamp,
-    # but WellContents itself carries a prior_revisions chain.)
-    m = re.match(r"initial_contents\[(\d+)\]\.volume_ul$", path)
-    if m:
-        idx = int(m.group(1))
-        wc = spec.initial_contents[idx]
-        push_revision(wc, volume_ul=float(new_value))
-        return
-
-    # initial_contents[N].well — symmetric with volume_ul. Detector
-    # (InitialContentsWellDetector) fires when WellContents.well is null;
-    # without this branch the apply path silently no-ops and the orchestrator
-    # re-detects the same gap each iteration until MAX_ITERATIONS.
-    m = re.match(r"initial_contents\[(\d+)\]\.well$", path)
-    if m:
-        idx = int(m.group(1))
-        wc = spec.initial_contents[idx]
-        push_revision(wc, well=str(new_value))
-        return
-
-    # steps[N].<field>
-    m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
-    if m:
-        idx, fname = int(m.group(1)), m.group(2)
-        if resolution.action == "accept_suggestion":
-            # new_value is a Provenance-bearing model from the suggester.
-            # Contract guard: the suggester must already have built the
-            # typed Pydantic model. A raw dict/str/int here means a
-            # suggester violated its contract (see ConfigLookupSuggester
-            # and LLMSpotSuggester's structured path for canonical
-            # patterns). Raise loudly so the bug surfaces at the source
-            # rather than silently poisoning the spec.
-            expected = _expected_field_type_for_step(spec.steps[idx], fname)
-            if (expected is not None
-                    and isinstance(expected, type)
-                    and not isinstance(new_value, expected)):
-                raise TypeError(
-                    f"Suggester contract violation at {path!r}: "
-                    f"expected {expected.__name__} instance, got "
-                    f"{type(new_value).__name__} ({new_value!r:.80}). "
-                    f"Suggesters must construct the typed Pydantic "
-                    f"model (see ConfigLookupSuggester for the "
-                    f"canonical pattern)."
-                )
-            # Preserve the OLD field's chain by transferring it onto the
-            # new instance before the swap; otherwise the old field's
-            # history would be dropped on the floor.
-            old = getattr(spec.steps[idx], fname, None)
-            transferred = (
-                replace_with_history_preserved(old, new_value)
-                if old is not None
-                else new_value
-            )
-            setattr(spec.steps[idx], fname, transferred)
-            _stamp_user_action(transferred, user_action)
-        elif resolution.action == "edit":
-            # new_value is a user-typed scalar. Mutate the existing model's
-            # `.value` (preserving its type + provenance shape) so the field
-            # stays a well-formed Provenanced* / LocationRef.
-            existing = getattr(spec.steps[idx], fname, None)
-            if existing is not None and hasattr(existing, "value"):
-                if hasattr(existing, "prior_revisions"):
-                    push_revision(existing)
-                existing.value = new_value
-                _stamp_user_action(existing, user_action)
-            else:
-                # Fall through to raw setattr (LocationRef edits without a
-                # .value attribute, or fields that don't exist yet). Stamp
-                # only if the new_value carries provenance.
-                setattr(spec.steps[idx], fname, new_value)
-                _stamp_user_action(new_value, user_action)
-        else:
-            # Defensive: any other action just writes raw.
-            setattr(spec.steps[idx], fname, new_value)
-        return
-
-    # steps[N].<field>.<subfield> (e.g. steps[0].destination.wells,
-    # steps[0].source.resolved_label)
-    m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w+)$", path)
-    if m:
-        idx, fname, subfield = int(m.group(1)), m.group(2), m.group(3)
-        target = getattr(spec.steps[idx], fname)
-        if target is not None:
-            # Snapshot the pre-write state of the LocationRef (or
-            # whatever parent carries `prior_revisions`). The subfield
-            # mutation AND the subsequent provenance update both act on
-            # the head under this one revision.
-            if hasattr(target, "prior_revisions"):
-                push_revision(target)
-            setattr(target, subfield, new_value)
-            # PR3a step 3: when the subfield IS resolved_label, the
-            # provenance for that decision lives in resolved_label_provenance,
-            # not the LocationRef's primary provenance (which describes the
-            # location/wells). Stamp the right slot so the audit trail
-            # captures the resolution action, not the location reading.
+            setattr(parent, subfield, new_value)
+            # resolved_label has its own provenance slot (resolution-time
+            # decision, distinct from the location-reading provenance).
             if subfield == "resolved_label":
-                _stamp_resolution_action(target, user_action, new_value)
+                _stamp_resolution_action(parent, user_action, new_value)
                 return
-            # Phase 3c fix-2: when the subfield is a VALUE field on a
-            # LocationRef (description / well / wells / well_range), the
-            # original provenance's cited_text grounded the OLD value
-            # and is no longer truthful after this write. Replace the
-            # provenance slot with one that honestly attributes the new
-            # value — carry the suggester's reasoning when available, or
-            # a generic "user edited" reasoning when the user typed it.
-            # The stale instruction citation isn't lost; it lives on in
-            # prior_revisions[0]'s provenance for that slot.
-            from nl2protocol.models.spec import Provenance
+            # Other LocationRef value subfields: replace the matching
+            # *_provenance with one that honestly attributes the new value.
             prov_slot = _LOCATIONREF_VALUE_SUBFIELDS.get(subfield)
             if prov_slot is not None:
                 new_prov = None
@@ -1167,14 +1113,36 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                         confidence=1.0,
                     )
                 if new_prov is not None:
-                    setattr(target, prov_slot, new_prov)
+                    setattr(parent, prov_slot, new_prov)
                     return
-            # Fall-through: subfields without a value→prov mapping (or
-            # actions other than accept_suggestion / edit) still get
-            # the legacy review_status stamp so the audit trail captures
-            # that a user action terminated the lifecycle.
-            _stamp_user_action(target, user_action)
-        return
+            _stamp_user_action(parent, user_action)
+            return
 
-    # Unknown path shape: silently no-op (defensive — better than crashing).
-    # Future: raise to surface unhandled gap kinds.
+        # --- InitialVolume — primitive write on WellContents.
+        case InitialVolume(well_idx=idx):
+            wc = spec.initial_contents[idx]
+            push_revision(wc, volume_ul=float(new_value))
+            return
+
+        # --- InitialWell — symmetric primitive write.
+        case InitialWell(well_idx=idx):
+            wc = spec.initial_contents[idx]
+            push_revision(wc, well=str(new_value))
+            return
+
+        # --- Sentinel variants — no spec slot, no write.
+        # ConstraintPlaceholder: informational constraint flag (tip count,
+        # slot conflict, etc.). User resolves by editing config and re-
+        # running. This is the structural fix to the BCA-style crash —
+        # the variant explicitly says "no spec target" so we never
+        # setattr a fictional field.
+        # NamespaceSplit / UnknownTarget: not addressable spec slots;
+        # surface elsewhere if at all.
+        case ConstraintPlaceholder() | NamespaceSplit() | UnknownTarget():
+            return
+
+        case _:
+            # Exhaustiveness backstop. Should be unreachable given the
+            # GapTarget Union is closed; if it fires, a new variant was
+            # added without updating this dispatch.
+            return

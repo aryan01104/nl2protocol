@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.gap_resolution import (
     ConstraintViolationDetector,
     InitialContentsVolumeDetector,
@@ -814,13 +815,13 @@ class TestDetectAllRegistry:
 
         class FakeDetectorA:
             def detect(self, spec, context):
-                return [Gap(id="a1", step_order=None, field_path="a",
+                return [Gap(id="a1", step_order=None, targets=[path_to_target("a")],
                             kind="missing", current_value=None,
                             description="fake A", severity="quality")]
 
         class FakeDetectorB:
             def detect(self, spec, context):
-                return [Gap(id="b1", step_order=None, field_path="b",
+                return [Gap(id="b1", step_order=None, targets=[path_to_target("b")],
                             kind="missing", current_value=None,
                             description="fake B", severity="quality")]
 

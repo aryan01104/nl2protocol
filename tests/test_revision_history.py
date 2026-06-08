@@ -13,6 +13,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from nl2protocol.gap_resolution.targets import path_to_target
 from nl2protocol.models.spec import (
     LocationRef,
     Provenance,
@@ -259,7 +260,7 @@ class TestApplyPathPushesRevisions:
         gap = Gap(
             id="test_gap",
             step_order=1,
-            field_path="steps[0].destination.wells",
+            targets=[path_to_target("steps[0].destination.wells")],
             kind="constraint_violation",
             severity="blocker",
             description="wells C7 out of range",
@@ -296,7 +297,7 @@ class TestApplyPathPushesRevisions:
         gap = Gap(
             id="test_gap",
             step_order=1,
-            field_path="steps[0].destination.wells",
+            targets=[path_to_target("steps[0].destination.wells")],
             kind="constraint_violation",
             severity="blocker",
             description="wells C7 out of range",
@@ -347,7 +348,7 @@ class TestApplyPathPushesRevisions:
         gap = Gap(
             id="test_gap",
             step_order=1,
-            field_path="steps[0].destination.wells",
+            targets=[path_to_target("steps[0].destination.wells")],
             kind="constraint_violation",
             severity="blocker",
             description="wells out of range",
@@ -376,7 +377,7 @@ class TestApplyPathPushesRevisions:
         gap = Gap(
             id="test_gap",
             step_order=1,
-            field_path="steps[0].volume.provenance",
+            targets=[path_to_target("steps[0].volume.provenance")],
             kind="fabricated",
             severity="blocker",
             description="cited_text not in instruction",
