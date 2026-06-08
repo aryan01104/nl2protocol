@@ -93,7 +93,7 @@
           if you don&rsquo;t have one. Your key stays in the request and is never stored.</p>
       </li>
       <li>
-        <p>Click <strong>▶ Start pipeline</strong>. The five-column visual
+        <p>Click <strong>▶ Start pipeline</strong>. The three-column visual
           surface fills in as each stage runs. Modals appear when the
           system needs your input.</p>
       </li>
@@ -242,7 +242,7 @@ Steps:
       <p>
         <strong>Tip:</strong> copy one of the
         <a href="https://github.com/aryan01104/nl2protocol/tree/main/test_cases/examples" target="_blank" rel="noopener">example configs in the repo</a>
-        and modify. There are 11 working configs covering common
+        and modify. There are 13 worked examples covering common
         setups (transfers, PCR, magnetic-bead cleanup, ELISA, etc.).
       </p>
     </div>
@@ -255,23 +255,22 @@ Steps:
   <section class="section docs-class" id="surface">
     <h2 class="section-label">04 &middot; Reading the visual surface</h2>
     <p class="class-lede">
-      The page that fills in as the pipeline runs. Five columns, left
+      The page that fills in as the pipeline runs. Three columns, left
       to right, plus modals when the system needs you.
     </p>
 
-    <h3 class="docs-h3">The five columns</h3>
+    <h3 class="docs-h3">The three columns</h3>
     <ol class="docs-list docs-list-spaced">
       <li><strong>Instruction.</strong> Your input text. Phrases that became citations have colored underlines &mdash; the hue tells you what kind of value they grounded.</li>
-      <li><strong>Extracted spec.</strong> The structured representation after Stage 2. Each value is colored by its provenance source: blue for <em>from instruction</em>, yellow for <em>domain default</em>, orange for <em>inferred</em>. Hover any value to highlight its citation in column 1.</li>
-      <li><strong>Resolved spec.</strong> After Stage 3 (labware resolver maps your descriptions to config labels) and Stage 5 (gap-resolution loop fills missing fields). Any reviewer verdicts show as a tiny tag.</li>
-      <li><strong>Validated spec.</strong> Same content as column 3, after the constraint checker (Stage 6) confirms hardware physics. If there were violations, they&rsquo;re flagged inline.</li>
-      <li><strong>Generated script.</strong> The Opentrons Python that goes to the robot. Hover any line to highlight the spec field it came from.</li>
+      <li><strong>Protocol steps.</strong> The live spec. It starts as the extracted state (Stage 2) and is mutated in place as labware resolves (Stage 3), gaps fill (Stage 5), and constraints are checked (Stage 6) &mdash; so what used to be separate <em>extracted</em>, <em>resolved</em>, and <em>validated</em> views are now one column that accrues content. Each value is encoded on two axes: <em>color</em> is its citation hue, <em>outline</em> is its provenance source (from instruction, domain default, or inferred). Per-field revision chains and any reviewer verdicts show inline. Hover any value to highlight its citation in column 1.</li>
+      <li><strong>Generated script.</strong> The Opentrons Python that goes to the robot. Hover any line to highlight the step it came from; step blocks link to the lines they produced.</li>
     </ol>
 
     <h3 class="docs-h3">Cross-column arrows</h3>
     <p class="docs-para">
-      When you hover a value in any spec column, the system draws an
-      arrow back to its citation in the instruction column. Lets you
+      When you hover a value in the protocol-steps column, the system
+      draws an arrow back to its citation in the instruction column, and
+      step blocks point to the script lines they generated. Lets you
       verify the grounding visually.
     </p>
 
@@ -289,9 +288,10 @@ Steps:
 
     <h3 class="docs-h3">What to check before the pipeline proceeds</h3>
     <p class="docs-para">
-      Column 2 (extracted spec) is your single most-important review
-      point. The downstream pipeline trusts that the extraction is
-      faithful to your instruction. Specifically:
+      The protocol-steps column is your single most-important review
+      point &mdash; especially the extracted state right after Stage 2.
+      The downstream pipeline trusts that the extraction is faithful to
+      your instruction. Specifically:
     </p>
     <ul class="docs-list">
       <li>Step count matches your instruction</li>

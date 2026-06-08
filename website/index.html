@@ -84,15 +84,15 @@
     <dl class="stats-bar" aria-label="By the numbers">
       <div class="stat">
         <dt class="stat-label">pipeline stages</dt>
-        <dd class="stat-value">9</dd>
+        <dd class="stat-value">7</dd>
       </div>
       <div class="stat">
         <dt class="stat-label">gap detectors + suggesters</dt>
-        <dd class="stat-value">12</dd>
+        <dd class="stat-value">13</dd>
       </div>
       <div class="stat">
         <dt class="stat-label">worked example protocols</dt>
-        <dd class="stat-value">11</dd>
+        <dd class="stat-value">13</dd>
       </div>
       <div class="stat">
         <dt class="stat-label">typical run cost</dt>
@@ -124,7 +124,7 @@
         </p>
         <footer class="how-meta">
           <span class="how-meta-key">model</span>
-          <code class="how-meta-val">claude-sonnet-4</code>
+          <code class="how-meta-val">claude-sonnet-4-20250514</code>
         </footer>
       </li>
 
@@ -141,7 +141,7 @@
         </p>
         <footer class="how-meta">
           <span class="how-meta-key">reviewer</span>
-          <code class="how-meta-val">claude-haiku-4</code>
+          <code class="how-meta-val">claude-haiku-4-5</code>
         </footer>
       </li>
 
@@ -184,11 +184,13 @@
       </li>
 
       <li class="diff-item">
-        <h3 class="diff-title">An independent reviewer audits the LLM.</h3>
+        <h3 class="diff-title">A separate reviewer pass audits the LLM&rsquo;s guesses.</h3>
         <p class="diff-body">
-          A smaller, separate model verifies every non-cited claim against
-          your instruction. If it disagrees, you see the objection in the
-          UI before deciding &mdash; not after the protocol fails on the robot.
+          A second Claude call checks the values the system inferred &mdash;
+          rather than quoted from your instruction &mdash; and can object
+          before you decide, not after the protocol fails on the robot.
+          (It runs in the same model family, so it&rsquo;s a check, not a
+          guarantee &mdash; see <a href="/limitations/">limitations</a>.)
         </p>
       </li>
 
@@ -212,7 +214,7 @@
       <div class="screenshot-frame">
         <img
           src="/static/demo-screenshot.png"
-          alt="The live-mode visual surface showing five columns from instruction to script, with cross-column resolution arrows"
+          alt="The live-mode visual surface showing three columns from instruction to script, with hover arrows linking each value to its citation"
           loading="lazy">
         <!-- Placeholder caption while the real screenshot isn't wired -->
         <div class="screenshot-placeholder" aria-hidden="true">
@@ -222,10 +224,10 @@
       </div>
       <figcaption>
         <span class="fig-num">Figure 1.</span>
-        The live-mode visual surface &mdash; five columns from instruction
-        to generated script, with cross-column resolution arrows
-        connecting each extracted value to its citation in the original
-        instruction.
+        The live-mode visual surface &mdash; three columns (instruction,
+        the live protocol spec, and the generated Opentrons script), with
+        hover arrows connecting each extracted value to its citation in the
+        original instruction and each step to the code it produced.
       </figcaption>
     </figure>
   </section>
