@@ -15,6 +15,7 @@ from .stage_7_post_validation import generate_python_script, simulate_script
 LINE_WIDTH = 60  # Same as the ===== separator
 
 from .for_cli import colors as C
+from .for_cli.labware_confirm import cli_labware_loop
 
 def _log(msg: str = ""):
     """Print progress/status to stderr (keeps stdout clean for data output)."""
@@ -634,112 +635,6 @@ class ProtocolAgent:
             return False
         return True
 
-    def _confirm_labware_assignments(
-        self, spec, labware_suggestions: dict,
-    ) -> Optional[dict]:
-        """Interactive confirmation of labware description → config label assignments.
-
-        Shows all assignments at once. User picks a number to change any mapping,
-        or presses Enter to confirm all. Unresolved refs show as '???' and must
-        be assigned before confirming.
-
-        Pre:    `labware_suggestions` is the dict returned by
-                `LabwareResolver.suggest()`. Drives the initial
-                description→suggested_label display; user can override
-                any row.
-        Post:   Returns dict of {description: confirmed_label} or None
-                if aborted.
-        """
-        # Collect unique descriptions from the spec; pair each with the
-        # resolver's suggestion (or None if the resolver couldn't pick).
-        assignments = []
-        seen = set()
-        for step in spec.steps:
-            for ref in [step.source, step.destination]:
-                if ref and ref.description not in seen:
-                    seen.add(ref.description)
-                    suggestion = labware_suggestions.get(ref.description)
-                    suggested = (
-                        suggestion.suggested_label
-                        if suggestion is not None else None
-                    )
-                    assignments.append({
-                        "description": ref.description,
-                        "resolved_label": suggested,
-                    })
-
-        if not assignments:
-            return {}
-
-        available_labels = list(self.config_loader.config.get("labware", {}).keys())
-        # Start with resolver suggestions as current assignments
-        current = {a["description"]: a["resolved_label"] for a in assignments}
-
-        while True:
-            # Display all assignments
-            _log(f"\n  {C.label('Labware assignments')}:")
-            all_resolved = True
-            for i, a in enumerate(assignments, 1):
-                desc = a["description"]
-                label = current.get(desc)
-                if label:
-                    load_name = self.config_loader.config["labware"][label].get("load_name", "")
-                    _log(f"    [{i}] \"{desc}\" → {C.success(label)} ({C.dim(load_name)})")
-                else:
-                    _log(f"    [{i}] \"{desc}\" → {C.warning('??? (no match)')}")
-                    all_resolved = False
-
-            # Prompt
-            if all_resolved:
-                response = self.cm.prompt("Pick a number to change, or Enter to confirm all (q=quit): ").lower()
-            else:
-                _log(f"  {C.dim('Assign all ??? items before confirming. If your config is missing')}")
-                _log(f"  {C.dim('labware, quit (q) and add it to your config.json, then re-run.')}")
-                response = self.cm.prompt("Pick a number to assign (q=quit): ").lower()
-
-            if response == 'q':
-                _log("  Aborted.")
-                return None
-            elif response == '':
-                if all_resolved:
-                    # Warn if multiple descriptions map to the same label
-                    label_counts = {}
-                    for desc, label in current.items():
-                        label_counts.setdefault(label, []).append(desc)
-                    for label, descs in label_counts.items():
-                        if len(descs) > 1:
-                            _log(f"  {C.warning('Note:')} \"{descs[0]}\" and \"{descs[1]}\" "
-                                 f"both map to {label} — is this the same labware?")
-                    return current
-                else:
-                    unresolved = [a["description"] for a in assignments if not current.get(a["description"])]
-                    _log(f"  Cannot confirm — unresolved: {unresolved}")
-                    continue
-            elif response.isdigit():
-                idx = int(response) - 1
-                if 0 <= idx < len(assignments):
-                    desc = assignments[idx]["description"]
-                    _log(f"\n    Reassigning \"{desc}\":")
-                    for j, label in enumerate(available_labels, 1):
-                        load_name = self.config_loader.config["labware"][label].get("load_name", "")
-                        marker = " ←" if label == current.get(desc) else ""
-                        _log(f"      {j}. {label} ({C.dim(load_name)}){marker}")
-                    pick = self.cm.prompt(f"Pick label (1-{len(available_labels)}), or Enter to cancel: ")
-                    if pick.isdigit():
-                        pick_idx = int(pick) - 1
-                        if 0 <= pick_idx < len(available_labels):
-                            current[desc] = available_labels[pick_idx]
-                        else:
-                            _log(f"    Invalid number.")
-                    elif pick == '':
-                        pass  # cancelled
-                    else:
-                        _log(f"    Invalid input.")
-                else:
-                    _log(f"  Invalid number. Pick 1-{len(assignments)}.")
-            else:
-                _log(f"  Invalid input. Pick a number, Enter, or q.")
-
     def _apply_labware_assignments(
         self, spec, labware_suggestions: dict, confirmed: dict,
     ) -> None:
@@ -1299,8 +1194,9 @@ class ProtocolAgent:
                         reviewer_objections=labware_reviewer_objections,
                     )
                 elif sys.stdin.isatty():
-                    confirmed = self._confirm_labware_assignments(
+                    confirmed = cli_labware_loop(
                         spec, labware_suggestions,
+                        self.config_loader.config, self.cm,
                     )
                 if confirmed is None and (self.assignments_handler is not None
                                             or sys.stdin.isatty()):
