@@ -194,12 +194,10 @@ class ConsoleReporter:
 class stage_block:
     """Context manager that brackets a pipeline stage with start/end events.
 
-    Replaces the pre-ADR-0017 pattern of paired `_stage(...)` (CLI banner)
-    + `self._emit_stage_started(...)` (browser event) + trailing
-    `_log(C.success(...))` / `_log(C.error(...))` calls with a single
-    `with` block. Every output channel (CLI, browser, HTML, metrics) is
-    fed by the same event stream the block emits — no parallel direct
-    prints.
+    Replaces the pre-ADR-0017 pattern of paired CLI banner / browser
+    event / trailing success/error _log calls with a single `with` block.
+    Every output channel (CLI, browser, HTML, metrics) is fed by the
+    same event stream the block emits — no parallel direct prints.
 
     Pre:    `reporter` satisfies the Reporter Protocol. `number` is 1-based
             and `total` is the pipeline's total stage count (typically

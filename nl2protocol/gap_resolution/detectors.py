@@ -751,6 +751,55 @@ class NamespaceSplitDetector:
 
 
 # ============================================================================
+# Appliers — sit next to the detector that produces the gap they resolve
+# ============================================================================
+
+def apply_namespace_split(spec, description: str, mappings: dict) -> None:
+    """Rewrite every LocationRef whose description matches and whose
+    well falls in one of the partition's prefix groups — replacing
+    the description with a per-prefix tag.
+
+    Pre:    `spec` is a `ProtocolSpec`. `description` is the original
+            user wording (e.g. "tube rack") that `NamespaceSplitDetector`
+            flagged. `mappings` is `{prefix_letter: config_label}` — the
+            user's modal response. Refs whose wells don't match any
+            mapped prefix are left untouched.
+    Post:   For every ref whose description == `description`, computes
+            the set of prefix letters across its wells. If exactly one
+            prefix matches `mappings`, the ref's `description` is
+            replaced with `f"{description} [{prefix}]"`. Refs with
+            ambiguous prefix sets stay unchanged. Wells themselves are
+            never modified.
+    Side effects: Mutates `spec.steps[*].source/destination.description`
+                  in place.
+
+    Naming convention: "tube rack" + prefix "A" → "tube rack [A]". Stays
+    human-readable; downstream resolver sees each tagged description as
+    a distinct labware to match. See `NamespaceSplitDetector` for the
+    detection side.
+    """
+    from nl2protocol.extraction.schema_builder import expand_well_range
+    for step in spec.steps:
+        for ref in (step.source, step.destination):
+            if ref is None or ref.description != description:
+                continue
+            wells: set = set()
+            if ref.well:
+                wells.add(ref.well)
+            if ref.wells:
+                wells.update(ref.wells)
+            if ref.well_range:
+                wells.update(expand_well_range(ref.well_range))
+            prefixes = {
+                w[0] for w in wells
+                if w and w[0].isalpha() and w[0] in mappings
+            }
+            if len(prefixes) == 1:
+                prefix = next(iter(prefixes))
+                ref.description = f"{description} [{prefix}]"
+
+
+# ============================================================================
 # Adapter list for the registry
 # ============================================================================
 

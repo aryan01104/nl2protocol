@@ -1,10 +1,6 @@
-import io
 import sys
 import json
 import os
-import logging
-import warnings
-from contextlib import redirect_stderr
 from dataclasses import dataclass
 from typing import Optional
 
@@ -12,10 +8,8 @@ from anthropic import Anthropic
 
 from .models import ProtocolSchema
 from .config import ConfigLoader
-
-# Suppress opentrons simulator warnings
-logging.getLogger("opentrons").setLevel(logging.ERROR)
-warnings.filterwarnings("ignore", module="opentrons")
+from .spec_analysis import infer_source_containers
+from .stage_7_post_validation import generate_python_script, simulate_script
 
 
 LINE_WIDTH = 60  # Same as the ===== separator
@@ -35,9 +29,8 @@ def _wrap(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> str:
 
 
 # _stage() removed — stage banners now flow from stage_start events
-# emitted by stage_block (or the legacy _emit_stage_started calls for
-# stages still pending full migration) through ConsoleReporter.
-# See ADR-0017 for the Observer-pattern completion rationale.
+# emitted by stage_block through ConsoleReporter. See ADR-0017 for the
+# Observer-pattern completion rationale.
 
 
 # Phase 3g (Group B): user-facing stage labels for the live-mode indicator.
@@ -122,9 +115,6 @@ PIPELINE_STAGES = [
 ]
 
 
-from opentrons import simulate
-
-
 @dataclass
 class PipelineResult:
     """Result from a successful protocol generation pipeline run."""
@@ -133,378 +123,6 @@ class PipelineResult:
     protocol_schema: ProtocolSchema
     runlog: list
     config: dict
-
-
-def generate_python_script(protocol: ProtocolSchema, step_summaries: Optional[list] = None):
-    """Generates a valid Opentrons Python script from the Pydantic schema.
-
-    Pre:    `protocol` is a Pydantic-validated ProtocolSchema.
-            `step_summaries`, when provided, is the list returned by
-            `spec_to_schema` carrying `commands_generated` per spec step
-            in the same order they emit. When omitted, the function
-            returns just the script string (legacy single-return shape).
-    Post:   When `step_summaries` is None: returns the script as a
-            single \\n-joined string (back-compat).
-            When provided: returns `(script_str, step_line_map)` where
-            step_line_map is `{step_idx: [line_idx_0, line_idx_1, ...]}`
-            covering ONLY the lines produced by each step's commands.
-            Prelude lines (module/labware/pipette loads) aren't mapped to
-            any step and don't appear in the map.
-
-    Used by the live mode + the static report's spec→code linkage hover
-    pair: each script line tagged with its step's id, hovering a
-    Validated Spec block highlights all matching script lines, hovering
-    a script line highlights its source step block.
-    """
-
-    lines = [
-        "from opentrons import protocol_api",
-        "",
-        f"metadata = {{'protocolName': '{protocol.protocol_name}', 'author': '{protocol.author}', 'apiLevel': '2.15'}}",
-        "",
-        "def run(protocol: protocol_api.ProtocolContext):",
-    ]
-
-    # Protocol has objects and actions: labware, pipettes, modules, and commands
-    # Order matters: Modules first, then labware (some may load onto modules), then pipettes
-
-    # Load Modules first (labware may need to load onto them)
-    module_map = {}
-    if protocol.modules:
-        for mod in protocol.modules:
-            var_name = f"mod_{mod.slot.replace('-', '_')}"
-            module_type_map = {
-                "temperature": "temperature module gen2",
-                "magnetic": "magnetic module gen2",
-                "heater_shaker": "heaterShakerModuleV1",
-                "thermocycler": "thermocyclerModuleV2",
-            }
-            api_name = module_type_map.get(mod.module_type, mod.module_type)
-            lines.append(f"    {var_name} = protocol.load_module('{api_name}', '{mod.slot}')")
-            module_map[mod.slot] = var_name
-            if mod.label:
-                module_map[mod.label] = var_name
-        lines.append("")
-
-    # Load Labware (either directly on deck or onto modules)
-    labware_map = {}
-    for lw in protocol.labware:
-        var_name = f"lw_{lw.slot}"
-        label_arg = f", label='{lw.label}'" if lw.label else ""
-
-        if lw.on_module:
-            # Load labware onto a module
-            mod_var = module_map.get(lw.on_module)
-            if not mod_var:
-                raise ValueError(f"Module '{lw.on_module}' not found for labware '{lw.label or lw.slot}'")
-            lines.append(f"    {var_name} = {mod_var}.load_labware('{lw.load_name}'{label_arg})")
-        else:
-            # Load labware directly on deck slot
-            lines.append(f"    {var_name} = protocol.load_labware('{lw.load_name}', '{lw.slot}'{label_arg})")
-
-        labware_map[lw.slot] = var_name
-        if lw.label:
-            labware_map[lw.label] = var_name
-    lines.append("")
-
-    # Load Pipettes
-    for pip in protocol.pipettes:
-        tiprack_vars = [labware_map.get(tr) for tr in pip.tipracks if labware_map.get(tr)]
-        tiprack_str = f", tip_racks=[{', '.join(tiprack_vars)}]" if tiprack_vars else ""
-        lines.append(f"    pip_{pip.mount} = protocol.load_instrument('{pip.model}', '{pip.mount}'{tiprack_str})")
-    lines.append("")
-
-    # Execute Commands. Track per-step line ranges so the live + static
-    # surfaces can highlight (Step block ↔ script lines) on hover. The
-    # mapping is built by walking step_summaries in order and consuming
-    # commands_generated commands from the protocol.commands list.
-    step_line_map: dict = {}   # {step_idx_0_based: [line_idx, ...]}
-    cmd_to_step_idx: dict = {}
-    if step_summaries:
-        running_cmd_idx = 0
-        for s in step_summaries:
-            n = int(s.get("commands_generated", 0) or 0)
-            step_idx = (s.get("step", 1) or 1) - 1   # spec uses 1-based step.order
-            for _ in range(n):
-                cmd_to_step_idx[running_cmd_idx] = step_idx
-                running_cmd_idx += 1
-
-    for cmd_idx, cmd in enumerate(protocol.commands):
-        # Record the line index BEFORE emitting this command's lines —
-        # most commands emit exactly 1 line; a couple emit 2 (e.g.
-        # blow_out + drop_tip). We capture the start, then assign every
-        # appended line up to the next iteration to this step.
-        step_idx = cmd_to_step_idx.get(cmd_idx)
-        line_start = len(lines)
-        pip = f"pip_{cmd.pipette}"
-
-        if cmd.command_type == "aspirate":
-            lw = labware_map.get(cmd.labware)
-            if not lw:
-                raise ValueError(f"Labware '{cmd.labware}' not found")
-            lines.append(f"    {pip}.aspirate({cmd.volume}, {lw}['{cmd.well}'])")
-
-        elif cmd.command_type == "dispense":
-            lw = labware_map.get(cmd.labware)
-            if not lw:
-                raise ValueError(f"Labware '{cmd.labware}' not found")
-            lines.append(f"    {pip}.dispense({cmd.volume}, {lw}['{cmd.well}'])")
-
-        elif cmd.command_type == "mix":
-            lw = labware_map.get(cmd.labware)
-            if not lw:
-                raise ValueError(f"Labware '{cmd.labware}' not found")
-            lines.append(f"    {pip}.mix({cmd.repetitions}, {cmd.volume}, {lw}['{cmd.well}'])")
-
-        elif cmd.command_type == "blow_out":
-            if cmd.labware and cmd.well:
-                lw = labware_map.get(cmd.labware)
-                if not lw:
-                    raise ValueError(f"Labware '{cmd.labware}' not found")
-                lines.append(f"    {pip}.blow_out({lw}['{cmd.well}'])")
-            else:
-                lines.append(f"    {pip}.blow_out()")
-
-        elif cmd.command_type == "touch_tip":
-            lw = labware_map.get(cmd.labware)
-            if not lw:
-                raise ValueError(f"Labware '{cmd.labware}' not found")
-            lines.append(f"    {pip}.touch_tip({lw}['{cmd.well}'])")
-
-        elif cmd.command_type == "air_gap":
-            lines.append(f"    {pip}.air_gap({cmd.volume})")
-
-        elif cmd.command_type == "pick_up_tip":
-            if cmd.labware and cmd.well:
-                lw = labware_map.get(cmd.labware)
-                if not lw:
-                    raise ValueError(f"Labware '{cmd.labware}' not found")
-                lines.append(f"    {pip}.pick_up_tip({lw}['{cmd.well}'])")
-            else:
-                lines.append(f"    {pip}.pick_up_tip()")
-
-        elif cmd.command_type == "drop_tip":
-            if cmd.labware and cmd.well:
-                lw = labware_map.get(cmd.labware)
-                if not lw:
-                    raise ValueError(f"Labware '{cmd.labware}' not found")
-                lines.append(f"    {pip}.drop_tip({lw}['{cmd.well}'])")
-            else:
-                lines.append(f"    {pip}.drop_tip()")
-
-        elif cmd.command_type == "return_tip":
-            lines.append(f"    {pip}.return_tip()")
-
-        # Flow control commands
-        elif cmd.command_type == "pause":
-            # Escape single quotes in message
-            msg = cmd.message.replace("'", "\\'")
-            lines.append(f"    protocol.pause('{msg}')")
-
-        elif cmd.command_type == "delay":
-            if cmd.minutes:
-                lines.append(f"    protocol.delay(minutes={cmd.minutes})")
-            elif cmd.seconds:
-                lines.append(f"    protocol.delay(seconds={cmd.seconds})")
-
-        elif cmd.command_type == "comment":
-            # Escape single quotes in message
-            msg = cmd.message.replace("'", "\\'")
-            lines.append(f"    protocol.comment('{msg}')")
-
-        elif cmd.command_type == "transfer":
-            src_lw = labware_map.get(cmd.source_labware)
-            dst_lw = labware_map.get(cmd.dest_labware)
-            if not src_lw or not dst_lw:
-                raise ValueError(f"Labware '{cmd.source_labware}' or '{cmd.dest_labware}' not found")
-
-            args = [
-                str(cmd.volume),
-                f"{src_lw}['{cmd.source_well}']",
-                f"{dst_lw}['{cmd.dest_well}']",
-            ]
-            kwargs = []
-            if cmd.new_tip != "always":
-                kwargs.append(f"new_tip='{cmd.new_tip}'")
-            if cmd.mix_before:
-                # Ensure tuple format (reps, volume) for Opentrons API
-                kwargs.append(f"mix_before=({cmd.mix_before[0]}, {cmd.mix_before[1]})")
-            if cmd.mix_after:
-                # Ensure tuple format (reps, volume) for Opentrons API
-                kwargs.append(f"mix_after=({cmd.mix_after[0]}, {cmd.mix_after[1]})")
-
-            all_args = ", ".join(args + kwargs)
-            lines.append(f"    {pip}.transfer({all_args})")
-
-        elif cmd.command_type == "distribute":
-            src_lw = labware_map.get(cmd.source_labware)
-            dst_lw = labware_map.get(cmd.dest_labware)
-            if not src_lw or not dst_lw:
-                raise ValueError(f"Labware '{cmd.source_labware}' or '{cmd.dest_labware}' not found")
-
-            dest_wells_str = ", ".join([f"{dst_lw}['{w}']" for w in cmd.dest_wells])
-            args = [
-                str(cmd.volume),
-                f"{src_lw}['{cmd.source_well}']",
-                f"[{dest_wells_str}]",
-            ]
-            kwargs = []
-            if cmd.new_tip != "once":
-                kwargs.append(f"new_tip='{cmd.new_tip}'")
-
-            all_args = ", ".join(args + kwargs)
-            lines.append(f"    {pip}.distribute({all_args})")
-
-        elif cmd.command_type == "consolidate":
-            src_lw = labware_map.get(cmd.source_labware)
-            dst_lw = labware_map.get(cmd.dest_labware)
-            if not src_lw or not dst_lw:
-                raise ValueError(f"Labware '{cmd.source_labware}' or '{cmd.dest_labware}' not found")
-
-            source_wells_str = ", ".join([f"{src_lw}['{w}']" for w in cmd.source_wells])
-            args = [
-                str(cmd.volume),
-                f"[{source_wells_str}]",
-                f"{dst_lw}['{cmd.dest_well}']",
-            ]
-            kwargs = []
-            if cmd.new_tip != "once":
-                kwargs.append(f"new_tip='{cmd.new_tip}'")
-
-            all_args = ", ".join(args + kwargs)
-            lines.append(f"    {pip}.consolidate({all_args})")
-
-        # Module commands
-        elif cmd.command_type == "set_temperature":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.set_temperature({cmd.celsius})")
-
-        elif cmd.command_type == "wait_for_temperature":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.await_temperature({cmd.celsius})")
-
-        elif cmd.command_type == "deactivate":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.deactivate()")
-
-        elif cmd.command_type == "engage_magnets":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            if cmd.height:
-                lines.append(f"    {mod}.engage(height_from_base={cmd.height})")
-            else:
-                lines.append(f"    {mod}.engage()")
-
-        elif cmd.command_type == "disengage_magnets":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.disengage()")
-
-        elif cmd.command_type == "set_shake_speed":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            if cmd.rpm == 0:
-                lines.append(f"    {mod}.stop_shaking()")
-            else:
-                lines.append(f"    {mod}.set_and_wait_for_shake_speed({cmd.rpm})")
-
-        elif cmd.command_type == "open_latch":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.open_labware_latch()")
-
-        elif cmd.command_type == "close_latch":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.close_labware_latch()")
-
-        elif cmd.command_type == "open_lid":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.open_lid()")
-
-        elif cmd.command_type == "close_lid":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.close_lid()")
-
-        elif cmd.command_type == "set_block_temperature":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            args = [str(cmd.celsius)]
-            if cmd.hold_time_seconds:
-                args.append(f"hold_time_seconds={cmd.hold_time_seconds}")
-            if cmd.hold_time_minutes:
-                args.append(f"hold_time_minutes={cmd.hold_time_minutes}")
-            lines.append(f"    {mod}.set_block_temperature({', '.join(args)})")
-
-        elif cmd.command_type == "set_lid_temperature":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            lines.append(f"    {mod}.set_lid_temperature({cmd.celsius})")
-
-        elif cmd.command_type == "run_profile":
-            mod = module_map.get(cmd.module)
-            if not mod:
-                raise ValueError(f"Module '{cmd.module}' not found")
-            steps_str = str(cmd.steps)
-            lines.append(f"    {mod}.execute_profile(steps={steps_str}, repetitions={cmd.repetitions})")
-
-        else:
-            raise ValueError(f"Unknown command type: {cmd.command_type}")
-
-        # Map every line emitted by this command to its source step.
-        if step_idx is not None:
-            for li in range(line_start, len(lines)):
-                step_line_map.setdefault(step_idx, []).append(li)
-
-    script = "\n".join(lines)
-    if step_summaries:
-        return script, step_line_map
-    return script
-
-
-def simulate_script(script_code: str) -> tuple[bool, str, list]:
-    """Runs the script through the Opentrons simulator.
-
-    Returns:
-        Tuple of (success, formatted_log, raw_runlog)
-        - success: True if simulation passed
-        - formatted_log: Human-readable simulation log or error message
-        - raw_runlog: List of command dicts from simulator (empty on failure)
-    """
-    protocol_file = io.StringIO(script_code)
-    try:
-        # Suppress simulator stderr output (deck calibration warnings, etc.)
-        stderr_capture = io.StringIO()
-        with redirect_stderr(stderr_capture):
-            runlog, _ = simulate.simulate(protocol_file)
-        # Format the run log into readable output
-        log_lines = ["Simulation completed successfully.", "", "Run Log:"]
-        for entry in runlog:
-            if isinstance(entry, dict):
-                msg = entry.get('payload', {}).get('text', str(entry))
-                log_lines.append(f"  {msg}")
-            else:
-                log_lines.append(f"  {entry}")
-        return True, "\n".join(log_lines), runlog
-    except Exception as e:
-        return False, f"Simulation failed: {str(e)}", []
 
 
 class ProtocolAgent:
@@ -577,41 +195,6 @@ class ProtocolAgent:
         # assignments confirm so the partition is settled first.
         self.namespace_split_handler = namespace_split_handler
 
-    def _emit_stage_started(self, number: int, name: str) -> None:
-        """Emit a structured stage_started event for the live-mode indicator.
-
-        Pre:    `number` is 1..PIPELINE_STAGE_TOTAL; `name` is the
-                user-facing label from PIPELINE_STAGES.
-        Post:   Reporter receives a StageEvent with kind="stage_started"
-                carrying {number, total, name}. Console-only reporters
-                no-op silently. Live-mode browser updates the top-right
-                indicator's main line.
-        """
-        from .reporting import StageEvent
-        self.reporter.emit(StageEvent(
-            kind="stage_started",
-            data={"number": number, "total": PIPELINE_STAGE_TOTAL, "name": name},
-            stage_name=f"stage_{number}",
-        ))
-
-    def _emit_progress(self, message: str, stage_name: str = "") -> None:
-        """Emit a pipeline_progress event for the indicator's sub-line.
-
-        Pre:    `message` is a short plain-language description of the
-                micro-action currently running ("Sonnet extracting",
-                "matching 'tube rack'", etc.). `stage_name` (optional)
-                tags the event for reporter routing/debug.
-        Post:   Reporter receives a StageEvent with kind="pipeline_progress"
-                carrying {message}. Live-mode browser swaps the indicator's
-                sub-line to this text and clears any catalog-cycle timer.
-        """
-        from .reporting import StageEvent
-        self.reporter.emit(StageEvent(
-            kind="pipeline_progress",
-            data={"message": message},
-            stage_name=stage_name or "",
-        ))
-
     def _run_stage(self, number: int, name: str, fn) -> bool:
         """Run a stage closure inside a stage_block and translate its
         StageResult into events.
@@ -655,71 +238,6 @@ class ProtocolAgent:
             # Unknown return shape — coerce to success silently to avoid
             # blocking the pipeline on a stage we haven't migrated yet.
             return True
-
-    @staticmethod
-    def _infer_source_containers(spec) -> list:
-        """Identify labware wells that are only aspirated from, never dispensed into.
-
-        These are source containers (reservoirs, tube racks) that the scientist
-        fills before running the protocol. Returns list of (labware, well, substance).
-        """
-        # Track which wells are sources vs destinations
-        source_wells = {}   # (labware, well) → substance
-        dest_wells = set()  # (labware, well)
-
-        liquid_actions = {"transfer", "distribute", "consolidate",
-                          "serial_dilution", "aspirate"}
-
-        for step in spec.steps:
-            if step.action not in liquid_actions:
-                continue
-
-            # Source side
-            if step.source:
-                desc = step.source.description
-                wells = []
-                if step.source.well:
-                    wells = [step.source.well]
-                elif step.source.wells:
-                    wells = step.source.wells
-                for w in wells:
-                    key = (desc, w)
-                    if key not in source_wells:
-                        source_wells[key] = step.substance.value if step.substance else None
-
-            # Destination side
-            if step.destination:
-                desc = step.destination.description
-                wells = []
-                if step.destination.well:
-                    wells = [step.destination.well]
-                elif step.destination.wells:
-                    wells = step.destination.wells
-                # For well ranges, just mark the description as having destinations
-                if step.destination.well_range:
-                    dest_wells.add((desc, "__range__"))
-                for w in wells:
-                    dest_wells.add((desc, w))
-
-        # Source-only wells: aspirated from but never dispensed into
-        # Also exclude wells whose labware appears as a destination anywhere
-        #  (e.g., serial dilution where the same plate is both source and dest)
-        dest_labware = {lw for lw, _ in dest_wells}
-        already_tracked = {(ic.labware, ic.well) for ic in spec.initial_contents}
-
-        results = []
-        seen = set()
-        for (labware, well), substance in source_wells.items():
-            if labware in dest_labware:
-                continue  # Same labware used as dest elsewhere — not a pure source
-            if (labware, well) in already_tracked:
-                continue  # Already in initial_contents from LLM extraction
-            if (labware, well) in seen:
-                continue
-            seen.add((labware, well))
-            results.append((labware, well, substance))
-
-        return results
 
     def _confirm_initial_contents_via_handler(self, spec, suggesters,
                                                   context) -> Optional[bool]:
@@ -875,7 +393,7 @@ class ProtocolAgent:
         """
         if self.namespace_split_handler is None:
             return None
-        from .gap_resolution import NamespaceSplitDetector
+        from .gap_resolution import NamespaceSplitDetector, apply_namespace_split
         gaps = NamespaceSplitDetector().detect(
             spec, {"config": self.config_loader.config})
         ns_gaps = [g for g in gaps
@@ -906,40 +424,9 @@ class ProtocolAgent:
                 return False
             if not confirmed:
                 continue
-            self._apply_namespace_split(spec, description, confirmed)
+            apply_namespace_split(spec, description, confirmed)
             applied_any = True
         return applied_any if applied_any else None
-
-    def _apply_namespace_split(self, spec, description: str,
-                                mappings: dict) -> None:
-        """Rewrite every LocationRef whose description matches and
-        whose well falls in one of the partition's prefix groups —
-        replacing the description with a per-prefix tag.
-
-        Naming convention: original "tube rack" + prefix "A" becomes
-        "tube rack [A]". This stays human-readable while making the
-        downstream resolver see each rack as a distinct description.
-        Wells stay unchanged — the user wrote "A1", "A2", etc. and
-        their positional meaning carries over to the per-rack labware.
-        """
-        for step in spec.steps:
-            for ref in (step.source, step.destination):
-                if ref is None or ref.description != description:
-                    continue
-                # Determine which prefix the ref belongs to.
-                wells = set()
-                if ref.well:
-                    wells.add(ref.well)
-                if ref.wells:
-                    wells.update(ref.wells)
-                if ref.well_range:
-                    from .extraction.schema_builder import expand_well_range
-                    wells.update(expand_well_range(ref.well_range))
-                prefixes = {w[0] for w in wells
-                            if w and w[0].isalpha() and w[0] in mappings}
-                if len(prefixes) == 1:
-                    prefix = next(iter(prefixes))
-                    ref.description = f"{description} [{prefix}]"
 
     def _confirm_labware_assignments_via_handler(
         self, spec, labware_suggestions: dict,
@@ -1762,7 +1249,7 @@ class ProtocolAgent:
                 # 2. Source-container inference + Y/n ack.
                 if self.binary_confirm_handler is not None or sys.stdin.isatty():
                     s.progress("step 2 of 3 — source containers")
-                source_only = self._infer_source_containers(spec)
+                source_only = infer_source_containers(spec)
                 if source_only:
                     items = [
                         f"{lw} well {w}{f' ({sub})' if sub else ''}"
