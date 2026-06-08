@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, Tuple
 # Output kinds an event may carry. Keep this list closed — adding a new kind
 # means every Reporter implementation must decide how to render it.
 EventKind = Literal[
-    "stage_start",          # data = {"stage": "Stage 2/7", "label": "Reasoning through ..."}
+    "stage_started",          # data = {"stage": "Stage 2/7", "label": "Reasoning through ..."}
     "stage_complete",       # data = {"stage": "Stage 2/7", "summary": "..."}
     "stage_failed",         # data = {"stage": "Stage 2/7", "reason": "..."}
     "raw_instruction",      # data = {"instruction": "..."}
@@ -110,7 +110,7 @@ class ConsoleReporter:
             separator length; pulled from `for_cli.colors` at render time
             so colour helpers stay in one place.
     Post:   `emit` translates the event to stderr text for the kinds the
-            console surface cares about (stage_start, stage_complete,
+            console surface cares about (stage_started, stage_complete,
             stage_failed, pipeline_progress, info, error, warning).
             Other kinds are silently dropped — they're for buffering
             sinks (HTMLReporter, CapturingReporter) not the live console.
@@ -132,7 +132,7 @@ class ConsoleReporter:
         kind = event.kind
         data = event.data or {}
 
-        if kind == "stage_start":
+        if kind == "stage_started":
             # data carries {number, total, name} from stage_block.
             number = data.get("number")
             total = data.get("total")
@@ -204,7 +204,7 @@ class stage_block:
             PIPELINE_STAGE_TOTAL). `name` is the short human label
             ("Validating input"); the console derives "[Stage N/total] {name}"
             from it.
-    Post:   On enter: emits `stage_start` with {number, total, name}.
+    Post:   On enter: emits `stage_started` with {number, total, name}.
             Returns self so the body can call `.progress(msg)`,
             `.success(msg)`, `.fail(msg)`.
             On normal exit: emits `stage_complete` with the most recent
@@ -243,7 +243,7 @@ class stage_block:
 
     def __enter__(self) -> "stage_block":
         self._reporter.emit(StageEvent(
-            kind="stage_start",
+            kind="stage_started",
             data={
                 "number": self._number,
                 "total": self._total,
@@ -429,7 +429,7 @@ class MetricsReporter:
 
     Holds a reference to a `RunMeter` that an externally-wired
     `MeteredClient` has been populating with token + call data. On
-    `stage_start`, sets the `current_stage` contextvar so subsequent
+    `stage_started`, sets the `current_stage` contextvar so subsequent
     LLM calls in the pipeline thread attribute their tokens to this
     stage; on `stage_complete`, records the stage's wall-clock duration.
     `gap_detected` / `gap_resolved` tally counts by kind +
@@ -467,7 +467,7 @@ class MetricsReporter:
         self.model_name = model_name
         self._run_started_at = _time.perf_counter()
         self._run_ended_at: Optional[float] = None
-        self._stage_started_at: Dict[str, float] = {}
+        self._stage_starteded_at: Dict[str, float] = {}
         self._stage_order: List[str] = []
         self._gaps_detected_by_kind: Dict[str, int] = _dd(int)
         self._gaps_resolved_by_kind: Dict[str, int] = _dd(int)
@@ -482,14 +482,14 @@ class MetricsReporter:
         stage = event.stage_name or ""
         data = event.data or {}
 
-        if kind == "stage_start":
+        if kind == "stage_started":
             if stage:
                 current_stage.set(stage)
-                self._stage_started_at[stage] = _time.perf_counter()
+                self._stage_starteded_at[stage] = _time.perf_counter()
                 if stage not in self._stage_order:
                     self._stage_order.append(stage)
         elif kind == "stage_complete":
-            t0 = self._stage_started_at.get(stage)
+            t0 = self._stage_starteded_at.get(stage)
             if t0 is not None:
                 # Use the same per_stage StageStats slot the meter writes
                 # to; wall_clock_s is the field the meter never touches.

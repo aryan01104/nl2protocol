@@ -29,7 +29,7 @@ def _wrap(text: str, indent: str = "  ", width: int = LINE_WIDTH) -> str:
                          subsequent_indent=indent)
 
 
-# _stage() removed — stage banners now flow from stage_start events
+# _stage() removed — stage banners now flow from stage_started events
 # emitted by stage_block through ConsoleReporter. See ADR-0017 for the
 # Observer-pattern completion rationale.
 

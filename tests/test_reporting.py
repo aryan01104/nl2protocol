@@ -56,9 +56,9 @@ class TestConsoleReporter:
     buffering reporters and are intentionally not rendered to the console.
     """
 
-    def test_stage_start_renders_header_with_number_and_name(self, capsys):
+    def test_stage_started_renders_header_with_number_and_name(self, capsys):
         ConsoleReporter().emit(StageEvent(
-            kind="stage_start",
+            kind="stage_started",
             data={"number": 1, "total": 7, "name": "Validating input"},
         ))
         err = capsys.readouterr().err

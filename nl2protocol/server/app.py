@@ -1143,8 +1143,15 @@ class LiveModeApp:
             output_dir=effective_output_dir,
             run_ts=ts,
         )
+        # ConsoleReporter restores the terminal banners that the worker
+        # thread used to print directly via _log/_stage. After the
+        # ADR-0017 Observer-pattern completion, banners flow through the
+        # reporter; live mode must include the console reporter to keep
+        # the terminal informed during a browser-driven run.
+        from nl2protocol.reporting import ConsoleReporter
+        console_reporter = ConsoleReporter()
         composite = CompositeReporter(
-            ws_reporter, html_reporter, metrics_reporter,
+            ws_reporter, html_reporter, metrics_reporter, console_reporter,
         )
 
         # Phase 3c: gap-resolver prompts route through the browser.
