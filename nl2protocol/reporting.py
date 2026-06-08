@@ -104,25 +104,288 @@ class Reporter(Protocol):
 # ============================================================================
 
 class ConsoleReporter:
-    """Default reporter — silent on all events.
+    """Default reporter — renders the structured event stream to stderr.
 
-    Rationale: the CLI already prints stage banners, progress messages, spec
-    summaries etc. via the existing `_log` / `_stage` helpers in pipeline.py.
-    ConsoleReporter exists as the default `Reporter` so the type is satisfied;
-    it does NOT print anything itself, because doing so would duplicate the
-    CLI output. The CLI flow stays exactly as today.
+    Pre:    Constructed with no args. `LINE_WIDTH` (60) drives the
+            separator length; pulled from `for_cli.colors` at render time
+            so colour helpers stay in one place.
+    Post:   `emit` translates the event to stderr text for the kinds the
+            console surface cares about (stage_start, stage_complete,
+            stage_failed, pipeline_progress, info, error, warning).
+            Other kinds are silently dropped — they're for buffering
+            sinks (HTMLReporter, CapturingReporter) not the live console.
 
-    Future text-renderers (e.g., a SilentReporter for tests, a JSONReporter
-    for log aggregation) can implement Reporter without colliding with the
-    CLI output. The HTMLReporter (Phase 2) buffers events via
-    CapturingReporter and renders one HTML file at finalize().
+    History: this used to be silent (run_pipeline printed CLI banners
+    directly via _log/_stage). ADR-0017 named that as a leaky-abstraction
+    symptom of incomplete Observer pattern adoption; this class now
+    completes the pattern. The stage_block context manager in this
+    module is the matching producer side.
     """
 
     def emit(self, event: StageEvent) -> None:
-        pass  # silent — see class docstring
+        # Lazy import so the reporting module stays free of for_cli
+        # import-time dependencies (tests construct CapturingReporter
+        # without a TTY).
+        from .for_cli import colors as C
+        import sys
+
+        kind = event.kind
+        data = event.data or {}
+
+        if kind == "stage_start":
+            # data carries {number, total, name} from stage_block.
+            number = data.get("number")
+            total = data.get("total")
+            name = data.get("name", "")
+            header = (
+                f"[Stage {number}/{total}] {name}" if number and total
+                else name
+            )
+            print("", file=sys.stderr)
+            print(C.separator(60), file=sys.stderr)
+            print(C.header(header), file=sys.stderr)
+            return
+
+        if kind == "pipeline_progress":
+            # data carries {message} — the sub-action narration.
+            message = data.get("message", "")
+            if message:
+                print(f"  {C.dim(message)}", file=sys.stderr)
+            return
+
+        if kind == "stage_complete":
+            # data carries {summary} — the success line.
+            summary = data.get("summary")
+            if summary:
+                print(f"  {C.success(summary)}", file=sys.stderr)
+            return
+
+        if kind == "stage_failed":
+            # data carries {reason} — the error description.
+            reason = data.get("reason", "")
+            print(f"  {C.error(reason)}", file=sys.stderr)
+            return
+
+        if kind == "info":
+            print(f"  {data.get('message', '')}", file=sys.stderr)
+            return
+
+        if kind == "warning":
+            print(f"  {C.warning(data.get('message', ''))}", file=sys.stderr)
+            return
+
+        if kind == "error":
+            print(f"  {C.error(data.get('message', ''))}", file=sys.stderr)
+            return
+
+        # Other event kinds (extracted_spec, generated_script,
+        # labware_resolution_done, etc.) carry load-bearing data for
+        # buffering reporters; the console doesn't render them.
+        return
 
     def finalize(self) -> None:
         pass
+
+
+# ============================================================================
+# stage_block — context manager for the start/end event pair
+# ============================================================================
+
+class stage_block:
+    """Context manager that brackets a pipeline stage with start/end events.
+
+    Replaces the pre-ADR-0017 pattern of paired `_stage(...)` (CLI banner)
+    + `self._emit_stage_started(...)` (browser event) + trailing
+    `_log(C.success(...))` / `_log(C.error(...))` calls with a single
+    `with` block. Every output channel (CLI, browser, HTML, metrics) is
+    fed by the same event stream the block emits — no parallel direct
+    prints.
+
+    Pre:    `reporter` satisfies the Reporter Protocol. `number` is 1-based
+            and `total` is the pipeline's total stage count (typically
+            PIPELINE_STAGE_TOTAL). `name` is the short human label
+            ("Validating input"); the console derives "[Stage N/total] {name}"
+            from it.
+    Post:   On enter: emits `stage_start` with {number, total, name}.
+            Returns self so the body can call `.progress(msg)`,
+            `.success(msg)`, `.fail(msg)`.
+            On normal exit: emits `stage_complete` with the most recent
+            `.success(msg)` summary (or no summary if none was set).
+            On exception: emits `stage_failed` with `.fail(...)`'s reason,
+            or the str of the exception if `.fail` wasn't called. The
+            exception always re-raises — the block records the failure;
+            it does not swallow it.
+
+    Side effects: emits events through `reporter`. No direct stderr writes.
+
+    Usage:
+        with stage_block(self.reporter, 1, total=7,
+                         name="Validating input") as stage:
+            stage.progress("loading config")
+            self.config_loader.load_config()
+            stage.success("Config validated.")
+    """
+
+    def __init__(self, reporter, number: int, total: int, name: str,
+                 stage_name: Optional[str] = None):
+        self._reporter = reporter
+        self._number = number
+        self._total = total
+        self._name = name
+        # `stage_name` is the routing tag carried on every event for
+        # downstream filtering (e.g. MetricsReporter buckets timing by
+        # stage_name). Default mirrors the legacy "stage_N_label" pattern.
+        self._stage_name = stage_name or f"stage_{number}"
+        self._success_summary: Optional[str] = None
+        self._fail_reason: Optional[str] = None
+        # Set True by error() or by an exception bubbling out of the
+        # block. Suppresses the stage_complete emission in __exit__ so
+        # one stage never produces both stage_failed and stage_complete.
+        self._terminated: bool = False
+
+    def __enter__(self) -> "stage_block":
+        self._reporter.emit(StageEvent(
+            kind="stage_start",
+            data={
+                "number": self._number,
+                "total": self._total,
+                "name": self._name,
+            },
+            stage_name=self._stage_name,
+        ))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        # Three closing paths:
+        #   1. Exception bubbled out → emit stage_failed (unless error()
+        #      already emitted) and propagate.
+        #   2. error() already emitted stage_failed in-block → close
+        #      silently, the stage has been marked failed.
+        #   3. fail() was called without error() → emit stage_failed
+        #      with the stored reason. This is the "logical abort"
+        #      path (return None after deciding the stage failed).
+        #   4. Default: emit stage_complete with the success summary
+        #      (or no summary if success() wasn't called).
+        if exc_type is not None:
+            if not self._terminated:
+                reason = self._fail_reason or str(exc_val) or exc_type.__name__
+                self._reporter.emit(StageEvent(
+                    kind="stage_failed",
+                    data={"reason": reason},
+                    stage_name=self._stage_name,
+                ))
+            return False  # propagate the exception
+        if self._terminated:
+            # error() already emitted stage_failed in-block.
+            return False
+        if self._fail_reason is not None:
+            self._reporter.emit(StageEvent(
+                kind="stage_failed",
+                data={"reason": self._fail_reason},
+                stage_name=self._stage_name,
+            ))
+            return False
+        self._reporter.emit(StageEvent(
+            kind="stage_complete",
+            data={"summary": self._success_summary} if self._success_summary
+                 else {},
+            stage_name=self._stage_name,
+        ))
+        return False
+
+    def progress(self, message: str) -> None:
+        """Emit a pipeline_progress event for the current sub-action."""
+        self._reporter.emit(StageEvent(
+            kind="pipeline_progress",
+            data={"message": message},
+            stage_name=self._stage_name,
+        ))
+
+    def success(self, summary: str) -> None:
+        """Record a success summary that will be emitted as part of the
+        stage_complete event on normal exit. Calling success() multiple
+        times keeps the last value — typically called once at end-of-stage.
+        """
+        self._success_summary = summary
+
+    def fail(self, reason: str) -> None:
+        """Record a failure reason. Use BEFORE raising or BEFORE returning
+        None from the stage so the stage_failed event carries an
+        intent-level explanation, not just the bare exception text.
+
+        Calling this without raising still works — useful for "the stage
+        decided to abort" paths that return None instead of raising. In
+        that case the caller follows fail() with `return None` and the
+        __exit__'s normal path records the failure summary as
+        stage_complete (because no exception bubbled). For stages that
+        want stage_failed without raising, see info()/error() below.
+        """
+        self._fail_reason = reason
+
+    def info(self, message: str) -> None:
+        """Emit a standalone info note (rendered as a dim line on CLI)."""
+        self._reporter.emit(StageEvent(
+            kind="info",
+            data={"message": message},
+            stage_name=self._stage_name,
+        ))
+
+    def warning(self, message: str) -> None:
+        """Emit a standalone warning note (rendered with ⚠ on CLI)."""
+        self._reporter.emit(StageEvent(
+            kind="warning",
+            data={"message": message},
+            stage_name=self._stage_name,
+        ))
+
+    def error(self, message: str) -> None:
+        """Emit a stage_failed event with the given message and mark
+        the block terminated. Use this for stages that abort without
+        raising — the caller follows error() with `return None`. Unlike
+        fail(), this emits stage_failed immediately rather than waiting
+        for __exit__, so the order on the console is "error line, then
+        end of stage."
+        """
+        self._fail_reason = message
+        self._terminated = True
+        self._reporter.emit(StageEvent(
+            kind="stage_failed",
+            data={"reason": message},
+            stage_name=self._stage_name,
+        ))
+
+
+# ============================================================================
+# StageResult — what a stage body returns to the wrapper
+# ============================================================================
+
+@dataclass
+class StageOk:
+    """Stage completed successfully. `summary` becomes the stage_complete
+    event's text (rendered green on CLI, set as the stage indicator's
+    final sub-line in live mode)."""
+    summary: str = ""
+
+
+@dataclass
+class StageAborted:
+    """Stage decided to abort (logical failure — not an exception).
+
+    Pre:    `reason` is a short stage-level explanation rendered as the
+            stage_failed event's text. `help` is a list of human-help
+            lines emitted as `info` events BEFORE the stage_failed.
+            `suggestion` is an optional one-line suggestion appended
+            after `help` with a "Suggestion: " prefix.
+    Post:   Wrapper translates each field to a separate event so every
+            output surface (CLI / browser / HTML) presents them
+            consistently.
+    """
+    reason: str
+    help: List[str] = field(default_factory=list)
+    suggestion: Optional[str] = None
+
+
+StageResult = "StageOk | StageAborted"  # documentation alias; runtime is duck-typed
 
 
 # ============================================================================

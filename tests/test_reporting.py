@@ -47,17 +47,63 @@ class TestStageEvent:
 # ============================================================================
 
 class TestConsoleReporter:
-    """ConsoleReporter is silent on every event by design — CLI output is
-    handled by the existing _log/_stage helpers, not by the reporter."""
+    """ConsoleReporter renders the structured event stream to stderr.
+
+    The set of kinds it handles is a superset of what stage_block emits
+    (stage_start, stage_complete, stage_failed, pipeline_progress) plus
+    standalone info/warning/error notices. Other kinds (extracted_spec,
+    generated_script, labware_resolution_done, etc.) carry payloads for
+    buffering reporters and are intentionally not rendered to the console.
+    """
+
+    def test_stage_start_renders_header_with_number_and_name(self, capsys):
+        ConsoleReporter().emit(StageEvent(
+            kind="stage_start",
+            data={"number": 1, "total": 7, "name": "Validating input"},
+        ))
+        err = capsys.readouterr().err
+        # Header carries both the stage number and the human name.
+        assert "1/7" in err
+        assert "Validating input" in err
+
+    def test_pipeline_progress_renders_dim_sub_line(self, capsys):
+        ConsoleReporter().emit(StageEvent(
+            kind="pipeline_progress",
+            data={"message": "loading config"},
+        ))
+        assert "loading config" in capsys.readouterr().err
+
+    def test_stage_complete_renders_summary_when_present(self, capsys):
+        ConsoleReporter().emit(StageEvent(
+            kind="stage_complete",
+            data={"summary": "Config validated."},
+        ))
+        assert "Config validated." in capsys.readouterr().err
+
+    def test_stage_complete_silent_when_no_summary(self, capsys):
+        # No summary text → no spurious line. Matches the old behavior of
+        # stages that complete without an explicit success message.
+        ConsoleReporter().emit(StageEvent(kind="stage_complete", data={}))
+        assert capsys.readouterr().err == ""
+
+    def test_stage_failed_renders_reason(self, capsys):
+        ConsoleReporter().emit(StageEvent(
+            kind="stage_failed",
+            data={"reason": "Config validation failed: bad path"},
+        ))
+        assert "Config validation failed" in capsys.readouterr().err
 
     @pytest.mark.parametrize("kind", [
-        "stage_start", "stage_complete", "stage_failed",
-        "raw_instruction", "extracted_spec", "completed_spec",
-        "generated_script", "warning", "error", "info",
+        "raw_instruction", "extracted_spec", "resolved_spec",
+        "completed_spec", "generated_script", "gap_iteration_start",
+        "gap_detected", "labware_resolution_done",
     ])
-    def test_emit_produces_no_output(self, kind, capsys):
-        cr = ConsoleReporter()
-        cr.emit(StageEvent(kind=kind, data={"message": "anything", "stage": "Test"}))
+    def test_payload_carrying_kinds_are_silent_on_console(self, kind, capsys):
+        # These kinds exist so buffering reporters (HTMLReporter,
+        # CapturingReporter, MetricsReporter) can consume structured
+        # data. The console doesn't render them — duplicating the spec
+        # / script payload as stderr text would be noise.
+        ConsoleReporter().emit(StageEvent(kind=kind, data={"spec": "x"}))
         captured = capsys.readouterr()
         assert captured.out == ""
         assert captured.err == ""
