@@ -233,6 +233,16 @@ main > section,
   margin: 0 0.1em;
 }
 
+.hero-deck {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0 0 1.5rem;
+  max-width: 56ch;
+}
+
 /* ---------- Cited text — the visual signature ---------- */
 
 .cite {

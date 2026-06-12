@@ -43,16 +43,6 @@
        ============================================================ -->
   <section class="hero">
 
-    <p class="meta">
-      <span class="live-indicator"><span class="live-dot" aria-hidden="true"></span>live</span>
-      <span class="sep">·</span>
-      <span>v0.3</span>
-      <span class="sep">·</span>
-      <span>open source</span>
-      <span class="sep">·</span>
-      <span>alpha</span>
-    </p>
-
     <h1 class="hero-pitch">
       Turn
       <span class="cite cite-instr" tabindex="0" data-prov="from instruction">natural-language lab protocols</span>
@@ -61,6 +51,13 @@
       <span class="dash">&mdash;</span>
       <span class="cite cite-infer" tabindex="0" data-prov="inferred: this is the differentiator and the whole point of the project">with citations for every extracted value</span>.
     </h1>
+
+    <p class="hero-deck">
+      Writing OT-2 protocols by hand means translating an experiment
+      into Python, well by well. This makes it a review job instead
+      &mdash; every value the model picked comes with a citation back
+      to your words.
+    </p>
 
     <p class="hero-aside">
       Hover the marked phrases. Every value in the spec carries a citation
@@ -213,8 +210,8 @@
     <figure class="screenshot">
       <div class="screenshot-frame">
         <img
-          src="/static/demo-screenshot.png"
-          alt="The live-mode visual surface showing three columns from instruction to script, with hover arrows linking each value to its citation"
+          src="/static/demo-screenshot.png?v=2"
+          alt="The live UI mid-pipeline: instruction on the left, extracted spec with inline provenance checks in the middle, and a gap-resolution dialog on the right"
           loading="lazy">
         <!-- Placeholder caption while the real screenshot isn't wired -->
         <div class="screenshot-placeholder" aria-hidden="true">
@@ -224,10 +221,11 @@
       </div>
       <figcaption>
         <span class="fig-num">Figure 1.</span>
-        The live-mode visual surface &mdash; three columns (instruction,
-        the live protocol spec, and the generated Opentrons script), with
-        hover arrows connecting each extracted value to its citation in the
-        original instruction and each step to the code it produced.
+        The live UI mid-pipeline &mdash; instruction on the left, the
+        extracted spec with inline provenance checks in the middle, and a
+        gap-resolution dialog on the right where the model proposes a
+        value for a missing field along with its reasoning. Faint arrows
+        trace each extracted value back to its source in the instruction.
       </figcaption>
     </figure>
   </section>
