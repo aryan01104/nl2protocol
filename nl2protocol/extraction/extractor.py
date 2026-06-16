@@ -27,6 +27,7 @@ values (the 10.5→20.0 bug).
 
 import json
 import re
+import shutil
 import sys
 from typing import Annotated, List, Optional, Literal, Dict
 
@@ -150,19 +151,39 @@ class SemanticExtractor:
 
         try:
             from nl2protocol.for_cli.spinner import Spinner
-            with Spinner("Reasoning through protocol..."):
-                response = self.client.messages.create(
+            # Stream the call so the user sees the model reasoning live (the model
+            # emits <reasoning> before <spec>) and so we can safely raise max_tokens
+            # — streaming is the supported path above ~16K (it sidesteps the SDK's
+            # HTTP-timeout guard). 32000 is well within Sonnet 4.6's 64K ceiling.
+            full_response = ""
+            spec_seen = False
+            with Spinner("Reasoning through protocol...") as spinner:
+                with self.client.messages.stream(
                     model=self.model_name,
-                    max_tokens=16000,
+                    max_tokens=32000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
+                ) as stream:
+                    for delta in stream.text_stream:
+                        full_response += delta
+                        if not spec_seen and "<spec>" in full_response:
+                            # JSON isn't useful to show — switch to an assembling state.
+                            spec_seen = True
+                            spinner.update("Assembling spec…")
+                        elif not spec_seen:
+                            spinner.update(self._compact_reasoning(full_response))
+                    final = stream.get_final_message()
+
+            full_response = full_response.strip()
+
+            # Streaming lets us raise max_tokens, but a truncation can still happen
+            # on very large protocols. Make it an explicit, legible error instead of
+            # an opaque downstream JSON parse failure.
+            if final.stop_reason == "max_tokens":
+                raise ValueError(
+                    "extraction truncated at max_tokens — "
+                    "raise max_tokens or simplify the instruction"
                 )
-
-            full_response = response.content[0].text.strip()
-
-            # Check for truncation (stop_reason != "end_turn")
-            if response.stop_reason != "end_turn":
-                print(f"  Warning: LLM response truncated (stop_reason={response.stop_reason})")
 
             # Parse reasoning and spec from tagged response
             reasoning, spec_json = self._parse_response(full_response)
@@ -185,6 +206,20 @@ class SemanticExtractor:
                 print(f"  Reasoning failed: {e}", file=sys.stderr)
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
+
+    @staticmethod
+    def _compact_reasoning(accumulated: str) -> str:
+        """A one-line live view of the reasoning so far: the latest non-empty
+        line, stripped of the <reasoning> open tag, truncated to terminal width.
+        """
+        text = accumulated.replace("<reasoning>", "")
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        latest = lines[-1] if lines else "Reasoning through protocol..."
+        # Leave a margin for the spinner prefix ("  X ") and a trailing ellipsis.
+        width = max(20, shutil.get_terminal_size((80, 24)).columns - 6)
+        if len(latest) > width:
+            latest = latest[: width - 1] + "…"
+        return latest
 
     @staticmethod
     def _save_debug_output(full_response: Optional[str], spec_json: Optional[str], error: Exception):
