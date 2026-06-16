@@ -1,22 +1,3 @@
-"""
-Suggester implementations (ADR-0008 PR2).
-
-Five deterministic suggesters lifted from existing pipeline logic, plus
-LLMSpotSuggester (focused per-Gap LLM call) and IndependentReviewSuggester
-(batched reviewer pass).
-
-Per ADR-0008 the suggester precedence is fixed in registry order:
-  1. Deterministic    correct-or-empty, no LLM
-  2. LLM spot         per-Gap LLM with focused context
-  3. Last-resort      (deferred — LLMFullRefineSuggester is opt-in only)
-
-The orchestrator runs them in order; first non-None wins for a given Gap.
-
-All suggestions attach `Provenance(source="inferred", ...)` (via the
-returned Suggestion's `provenance_source` field) so the report's ▴ marker
-+ tooltip surfaces every fill with its rationale.
-"""
-
 from __future__ import annotations
 
 import re
@@ -81,24 +62,6 @@ class ConfigLookupSuggester:
             contents = lw.get("contents", {}) or {}
             for well, content_desc in contents.items():
                 if isinstance(content_desc, str) and substance_lower in content_desc.lower():
-                    # Mint a LocationRef value. Schema-correct fill:
-                    #   * description = the bare config key (the suggester
-                    #     fills this honestly — there's no user-wording to
-                    #     preserve since the user never described this ref;
-                    #     the orchestrator writes it in to satisfy the
-                    #     LocationRef contract).
-                    #   * resolved_label = the SAME config key. Setting this
-                    #     directly is what keeps ConstraintChecker quiet
-                    #     downstream (it reads `resolved_label or description`
-                    #     to validate against config keys; we want the first
-                    #     branch to win with a real key).
-                    #   * provenance = describes the description/well decision
-                    #     (low information here — the suggester invented both,
-                    #     so source='inferred' with a brief reasoning).
-                    #   * resolved_label_provenance = describes WHY this
-                    #     particular config label was picked — the substance
-                    #     match. This is what the IndependentReviewSuggester
-                    #     reviews (per ADR-0009).
                     from nl2protocol.models.spec import LocationRef, Provenance
                     _synth_reason = (
                         f"Synthesized by ConfigLookupSuggester from the "

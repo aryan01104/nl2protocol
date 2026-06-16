@@ -1,28 +1,3 @@
-"""
-Orchestrator — the resolver loop (ADR-0008).
-
-Runs DETECT → topological-sort → SUGGEST → REVIEW → CLASSIFY → PRESENT →
-APPLY → RE-DETECT, up to N=3 iterations. Sole post-extraction resolution
-path since PR3b deleted the legacy verify/fill/refine block in pipeline.py.
-
-Per ADR-0008:
-  - Suggesters tried in registry-defined precedence order; first non-None wins.
-  - Reviewer batches all source="inferred"/"domain_default" suggestions.
-  - Auto-accept iff (Suggestion exists)
-                AND (suggestion.confidence >= 0.85)
-                AND (gap.kind not in ALWAYS_CONFIRM)
-                AND (review_status != "reviewed_disagree").
-  - Topological-sorted SUGGEST so dependent gaps see upstream values
-    within the same iteration (set_temp before wait_for_temp; labware
-    before constraints; substance before source).
-  - Re-detect after batch resolution; loop until clean or N reached.
-  - Bounded loop terminates on convergence, abort, or iteration cap.
-
-The orchestrator never reaches into the spec directly except to APPLY
-resolutions. All detection lives in detectors; all suggestion lives in
-suggesters; all UI lives in the ConfirmationHandler.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -180,16 +155,6 @@ class Orchestrator:
 
     def _emit(self, kind: str, data: dict, stage_name: Optional[str] = None) -> None:
         """Emit a storytelling event if a reporter is wired, else no-op.
-
-        Pre:    `kind` is one of the EventKind literals defined in
-                nl2protocol.reporting; `data` is the kind-specific dict.
-        Post:   When `self._reporter is not None`: a `StageEvent` is
-                constructed and passed to `self._reporter.emit(...)`.
-                When None: silent no-op (test fakes that don't pass
-                a reporter run through the loop unchanged).
-        Side effects: Calls reporter.emit which may have I/O (CLI writes,
-                WebSocket sends, in-memory buffering — depends on the
-                Reporter implementation).
         """
         if self._reporter is None:
             return
@@ -200,41 +165,23 @@ class Orchestrator:
             gap_filter: Optional[Callable[[Gap], bool]] = None) -> OrchestratorOutcome:
         """Drive the detect → suggest → review → present → apply loop until
         convergence or iteration cap.
-
-        `gap_filter`, when supplied, narrows the loop to a sub-set of gaps:
-        each iteration's detected gaps are filtered through the predicate
-        before topo-sort, and only matching gaps are presented / applied.
-        Used by the pre-orchestrator description-gap pass in pipeline.py
-        to resolve description-fabrication gaps BEFORE labware matching
-        runs, so labware picks land against finalized descriptions.
-        The full orchestrator at the end of the pipeline uses no filter
-        and sees the remaining gaps (volume, wells, etc.).
         """
         from nl2protocol.gap_resolution.registry import detect_all
 
         iterations: List[IterationResult] = []
         for i in range(1, self._max_iterations + 1):
-            # DETECT first so a clean spec doesn't append an empty iteration
-            # record (would mislead state-log readers about how much work happened).
             gaps = detect_all(spec, context, self._detectors)
             if gap_filter is not None:
                 gaps = [g for g in gaps if gap_filter(g)]
             if not gaps:
-                # Converged. Don't record an empty iteration unless this is
-                # iteration 1 (caller may want to know the spec was already clean).
                 if i == 1:
                     iterations.append(IterationResult(iteration=1))
                 return OrchestratorOutcome(spec=spec, iterations=iterations,
                                             aborted=False, converged=True)
 
-            # ADR-0011 Phase 1: announce iteration start with the gap-set
-            # snapshot the iteration is about to operate on.
             self._emit("gap_iteration_start",
                        {"iteration": i, "gap_count": len(gaps)},
                        stage_name="stage_3_gap_resolver")
-            # Phase 3g (Group B): plain-language sub-line for the live
-            # indicator. "iteration N — detecting gaps" reads as the
-            # micro-action the user sees while we run the loop.
             self._emit("pipeline_progress",
                        {"message": f"iteration {i} — detected {len(gaps)} gaps"},
                        stage_name="stage_3_gap_resolver")
@@ -245,9 +192,6 @@ class Orchestrator:
             # TOPOLOGICAL SORT (so dependent gaps get upstream values in this iteration)
             gaps = topo_sort_gaps(gaps)
 
-            # ADR-0011 Phase 1: per-gap detection event (one per gap, in
-            # topological order — the renderer can reflect priority by
-            # event arrival order).
             for gap in gaps:
                 self._emit("gap_detected", {
                     "gap_id": gap.id,
@@ -258,7 +202,6 @@ class Orchestrator:
                     "severity": gap.severity,
                 }, stage_name="stage_3_gap_resolver")
 
-            # SUGGEST: try suggesters in registry order; first non-None wins.
             self._emit("pipeline_progress",
                        {"message": f"iteration {i} — running suggesters"},
                        stage_name="stage_3_gap_resolver")
@@ -266,11 +209,6 @@ class Orchestrator:
             for gap in gaps:
                 suggestions[gap.id] = self._first_suggestion(gap, spec, context)
 
-            # REVIEW: batched call over inferred/domain_default suggestions.
-            # Stamp the verdicts onto the spec's Provenances so the audit
-            # trail survives past this iteration (ADR-0009). The hasattr
-            # guard lets test fakes pass dict-specs without tripping the
-            # stamp; real ProtocolSpec instances always have `.steps`.
             reviews: dict = {}
             if self._reviewer is not None:
                 review_count = sum(1 for s in suggestions.values()
@@ -306,23 +244,9 @@ class Orchestrator:
                     resolved_in_iteration += 1
                     continue
 
-                # If the reviewer disagreed with the suggestion, surface the
-                # objection text to the user so they have a falsifier in
-                # hand when deciding accept/edit/skip. `Gap` is frozen
-                # but `gap.metadata` is a mutable dict — stamp in place.
-                # Auto-accept already requires both confirms_* to be True,
-                # so a gap that reaches present() is exactly the set where
-                # an objection (if any) is load-bearing for the decision.
                 if review is not None and getattr(review, "objection", None):
                     gap.metadata["reviewer_objection"] = review.objection
 
-                # Phase 3b-3 (Group C): cross-column spotlight. For
-                # initial-contents gaps, look up the underlying labware
-                # + well and stamp the prov-ids of every spec cell that
-                # references them. The HTML modal reads this out of
-                # gap.metadata and pulses those cells while the prompt
-                # is open, anchoring the user's attention to the place
-                # in the spec their decision affects.
                 _stamp_spotlight_prov_ids(gap, spec)
 
                 # Present to user.
@@ -346,11 +270,6 @@ class Orchestrator:
                 if resolution.action == "skip":
                     self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                     continue
-                # accept_suggestion or edit → apply
-                # Note: for fabricated gaps, the apply path builds the new
-                # Provenance directly from `suggestion` (so it can land both
-                # value AND provenance when the suggester proposed a value
-                # rewrite). resolution.new_value stays as suggestion.value.
                 self._apply(spec, gap, resolution, suggestion)
                 self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
                 resolved_in_iteration += 1
@@ -366,8 +285,6 @@ class Orchestrator:
                        {"message": f"iteration {i} — applied {resolved_in_iteration} fixes"},
                        stage_name="stage_3_gap_resolver")
 
-        # Hit iteration cap without converging.
-        # Final detect to know if anything remains.
         from nl2protocol.gap_resolution.registry import detect_all as _detect
         final_gaps = _detect(spec, context, self._detectors)
         return OrchestratorOutcome(
@@ -381,29 +298,11 @@ class Orchestrator:
                             suggestion: Optional[Suggestion], auto_accepted: bool) -> None:
         """Emit a gap_resolved event with resolution_kind matching the
         Provenance.review_status taxonomy.
-
-        Pre:    `gap` is the Gap that was just resolved, skipped, or aborted;
-                `resolution` is the Resolution returned by the handler (or
-                synthesized for auto-accept); `suggestion` is the matching
-                Suggestion when one existed; `auto_accepted` distinguishes
-                orchestrator auto-accept from handler-driven resolution.
-        Post:   Emits a "gap_resolved" StageEvent whose data carries the
-                gap id + the resolution_kind:
-                  * "auto_accepted" when auto_accepted=True
-                  * else mirrors resolution.user_action_provenance
-                    ("user_accepted_suggestion" / "user_edited" /
-                    "user_skipped" / "user_aborted" / "user_confirmed")
-                Plus field_path / step_order for the renderer's spec
-                cell-anchoring, and a value_repr for compact display.
-        Side effects: Same as `_emit` — reporter.emit may do I/O.
         """
         if auto_accepted:
             kind = "auto_accepted"
         else:
             kind = resolution.user_action_provenance
-        # Compact value display: prefer the suggestion's value (deterministic
-        # case) or the user's typed value; fall back to current_value or
-        # placeholder for skip/abort.
         value = resolution.new_value if resolution.new_value is not None else gap.current_value
         try:
             value_repr = repr(value) if value is not None else ""
@@ -424,8 +323,6 @@ class Orchestrator:
             try:
                 result = s.suggest(gap, spec, context)
             except Exception:
-                # Suggesters that crash should not break the loop.
-                # (Production: log this; for now, swallow.)
                 continue
             if result is not None:
                 return result
@@ -456,50 +353,9 @@ class Orchestrator:
 def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
     """Stamp review_status + reviewer_objection onto every Provenance whose
     field_path appears in `reviews`.
-
-    Pre:    `spec` is a ProtocolSpec; `reviews` maps field_path -> ReviewResult
-            as returned by IndependentReviewSuggester.review(). Every
-            ReviewResult is well-formed (objection set iff disagreed) — that
-            invariant is enforced upstream by ReviewResult.__post_init__.
-
-    Post:   For each Provenance whose field_path appears in `reviews`:
-              * If review.confirms_positive AND review.confirms_negative:
-                  review_status      -> "reviewed_agree"
-                  reviewer_objection -> None
-              * Otherwise:
-                  review_status      -> "reviewed_disagree"
-                  reviewer_objection -> review.objection (verbatim)
-            Two slots are walked:
-              * Per-step value fields (volume / duration / temperature /
-                substance / source / destination) — stamps the field's
-                primary `provenance`.
-              * LocationRef.resolved_label — when the field_path ends in
-                `.resolved_label`, the stamp goes to the LocationRef's
-                `resolved_label_provenance` slot, NOT the primary
-                provenance. This is the same separation
-                `_stamp_resolution_action` enforces on the user-action
-                side (PR3a step 3 + ADR-0009 audit-trail symmetry).
-            Provenances whose field_path isn't in `reviews` are left
-            untouched.
-
-    Side effects: Mutates the spec in place — replaces
-            `field_obj.provenance` (or `loc_ref.resolved_label_provenance`)
-            with a re-validated Provenance carrying the new state.
-            Re-validation re-runs Provenance's invariants
-            (positive_reasoning required for non-instruction sources;
-            reviewer_objection iff reviewed_disagree).
-
-    Raises: pydantic.ValidationError if the resulting Provenance somehow
-            violates schema invariants — should not happen by construction.
     """
     from nl2protocol.models.spec import Provenance
 
-    # User-action statuses are TERMINAL: once the user has acted on a
-    # slot, the reviewer pass MUST NOT overwrite that decision. Without
-    # this guard a reviewer that fires after a pre-orchestrator modal
-    # closes would silently flip the user's decision to a reviewer
-    # verdict (the objection stays in the field but the audit trail
-    # forgets the user ever acted).
     _TERMINAL_USER_STATUSES = frozenset({
         "user_confirmed",
         "user_edited",
@@ -546,13 +402,6 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
                 **prov.model_dump(), **_verdict_updates(review),
             })
 
-        # LocationRef field provenances (two slots: description + wells).
-        # A reviewer verdict on `steps[N].source` covers the field as a
-        # whole, but each slot is gated independently by `_should_stamp`
-        # — an instruction-sourced sibling stays at its original status
-        # rather than picking up a verdict from a slot the model
-        # actually reviewed (mirror of the reviewer's own skip rule
-        # over instruction-sourced provenances).
         for role in ("source", "destination"):
             ref = getattr(step, role, None)
             if ref is None:
@@ -568,7 +417,6 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
                     **prov.model_dump(), **_verdict_updates(review),
                 }))
 
-        # Labware-resolution provenances on LocationRefs (PR3a step 3).
         for role in ("source", "destination"):
             ref = getattr(step, role, None)
             if ref is None:
@@ -594,42 +442,15 @@ def _stamp_spotlight_prov_ids(gap: Gap, spec) -> None:
     reads this and (a) anchors itself near the first target cell with
     dotted arrows to all targets (#73), (b) pulses cells via
     `.prov-spotlight` while the prompt is open.
-
-    Three gap shapes get handled:
-    1. `initial_contents[N].volume_ul` (rare in live mode now that
-       the IC batch handles these) — find every step whose source/
-       destination references that (labware, well) and stamp those
-       step cells.
-    2. `steps[N].<field>` for field in volume/substance/duration/
-       temperature/source/destination — stamp the cell directly
-       ("s{N}-<field>"). Covers missing-field, fabrication, and
-       most constraint-violation gaps.
-    3. `steps[N].<field>.<subfield>` (LocationRef sub-fields like
-       resolved_label) — stamp the parent cell since that's where
-       the value renders.
-
-    Constraint-violation gaps with `metadata.affected_paths` (dedupe)
-    expand to all affected step cells.
-
-    Pre:    `gap` is the gap about to be presented. `gap.metadata` is
-            the mutable dict on the (frozen) gap. `spec` is the current
-            ProtocolSpec.
-    Post:   When at least one cell matches, `gap.metadata["spotlight_prov_ids"]`
-            holds a space-separated string of "s{step_idx}-{field}" prov-ids
-            (deduped, order-preserving). Helper is a silent no-op on
-            shape mismatches — it's a UX hint, not load-bearing.
     """
     import re as _re
     pids: list = []
     field_path = getattr(gap, "field_path", "") or ""
 
-    # Constraint dedupe: affected_paths (a list of dotted field paths)
-    # lets one gap stand for resolutions across many cells. Spotlight
-    # all of them.
+
     affected = (gap.metadata or {}).get("affected_paths") if gap.metadata else None
     paths_to_walk = list(affected) if isinstance(affected, list) else [field_path]
 
-    # Cells the renderer actually exposes as data-prov-id="s{N}-{field}".
     _RENDERABLE_FIELDS = {"volume", "substance", "duration", "temperature",
                             "source", "destination"}
 
@@ -642,8 +463,6 @@ def _stamp_spotlight_prov_ids(gap: Gap, spec) -> None:
             if field in _RENDERABLE_FIELDS:
                 pids.append(f"s{step_idx}-{field}")
 
-    # Initial-contents shape: spotlight every step cell that touches
-    # the same (labware, well).
     ic_match = _re.match(r"initial_contents\[(\d+)\]", field_path)
     if ic_match:
         try:
@@ -672,29 +491,6 @@ def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
     """Stamp review_status=user_action_provenance on every Provenance slot
     of field_obj, clearing reviewer_objection (a user action supersedes
     any prior reviewer state).
-
-    Pre:    `field_obj` is None, or any object that may carry one or more
-            Provenance slots. Atomic Provenanced* types carry `.provenance`;
-            LocationRef carries `.description_provenance` and (optionally)
-            `.wells_provenance`. `user_action_provenance` is one of the
-            user_* values that Provenance.review_status accepts
-            (user_confirmed, user_edited, user_accepted_suggestion,
-            user_skipped).
-
-    Post:   Every populated provenance slot on field_obj is REPLACED with
-            a re-validated copy whose review_status equals the passed
-            user_action_provenance and whose reviewer_objection is None.
-            When `field_obj` is None or carries no provenance slots: no-op.
-            Re-validation re-runs Provenance's per-source invariants and
-            its review_status biconditional.
-
-    Side effects: Mutates provenance slots on field_obj in place.
-
-    Raises: pydantic.ValidationError if a resulting Provenance violates
-            its invariants — should not happen because user_action values
-            are all valid review_status Literals AND reviewer_objection
-            is cleared (so the disagree-iff-objection invariant can't
-            be violated).
     """
     if field_obj is None:
         return
@@ -714,39 +510,6 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
     """Stamp `loc_ref.resolved_label_provenance.review_status` after the
     user picks (or edits) a config labware label for an ambiguous
     LocationRef.
-
-    Why this is separate from `_stamp_user_action`: a LocationRef has
-    TWO Provenance slots — `provenance` (about the location/wells the
-    user described) and `resolved_label_provenance` (about which config
-    labware the description maps to). When the user resolves an
-    ambiguity Gap, the action affects the resolution decision, not the
-    user's location-description. Stamping the wrong slot would corrupt
-    the audit trail.
-
-    Pre:    `loc_ref` is a LocationRef whose `resolved_label` was just
-            written (by `default_apply_resolution`'s subfield branch).
-            `user_action_provenance` is one of the user_* review_status
-            values. `label` is the config-labware string the user
-            picked — used as fallback when the resolver hadn't yet
-            written a resolved_label_provenance (e.g. the resolver
-            skipped this ref because the LLM returned null).
-
-    Post:   When `loc_ref.resolved_label_provenance` exists:
-              * It is REPLACED with a re-validated copy whose
-                review_status equals user_action_provenance and whose
-                reviewer_objection is None.
-            When `loc_ref.resolved_label_provenance` is None (no prior
-            resolver attempt):
-              * A fresh Provenance is constructed with source='inferred',
-                positive_reasoning naming the user's pick, why_not_in_instruction
-                noting the description-vs-config-key gap, review_status set
-                to user_action_provenance, confidence 1.0 (the user is the
-                authority).
-
-    Side effects: Mutates `loc_ref.resolved_label_provenance` in place.
-
-    Raises: pydantic.ValidationError if the resulting Provenance violates
-            its invariants — should not happen by construction.
     """
     from nl2protocol.models.spec import Provenance
     existing = getattr(loc_ref, "resolved_label_provenance", None)
@@ -776,28 +539,6 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
 
 def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
     """Construct the Provenance to stamp on a spec field when accepting a Suggestion.
-
-    Pre:    `suggestion` is the Suggestion being accepted; `review_status`
-            is a valid `Provenance.review_status` literal capturing the
-            user (or auto) action that drove acceptance.
-
-    Post:   When `suggestion.provenance_source == "cited"` AND
-            `suggestion.cited_text` is non-empty → returns a Provenance
-            with `source="instruction"`, `cited_text=[suggestion.cited_text]`,
-            `confidence=suggestion.confidence`, and `review_status` as
-            given. positive_reasoning + why_not_in_instruction are LEFT
-            NULL because Provenance.require_appropriate_field_for_source
-            forbids them when source="instruction".
-            Otherwise → returns a Provenance with `source="inferred"`,
-            `positive_reasoning=suggestion.positive_reasoning`,
-            `why_not_in_instruction=suggestion.why_not_in_instruction`,
-            same confidence + review_status.
-
-    Why: bridges the suggester-internal "cited" label into the spec-level
-    Provenance.source = "instruction". Without this, an LLM-identified
-    citation showed up as `(cited)` in the modal but landed in the spec
-    as `inferred` after acceptance, losing the colored cite/value linkage
-    in the report.
     """
     from nl2protocol.models.spec import Provenance
     cited_text = getattr(suggestion, "cited_text", None)
@@ -819,17 +560,6 @@ def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
 
 def _expected_field_type_for_step(step, fname: str):
     """Return the underlying type expected at `step.<fname>`.
-
-    Pre:    `step` is a Pydantic model instance (e.g. ExtractedStep);
-            `fname` is a candidate field name.
-    Post:   - When the field exists with an `Optional[X]` (i.e. `X | None`)
-              annotation where X is a single concrete class, returns X.
-            - When the field exists with a plain class annotation,
-              returns that class.
-            - Otherwise returns None (field not found, Union with >1 non-None
-              arm, generic alias, etc.). Caller treats None as "no type
-              guard available — skip the isinstance check."
-    Side effects: None.
     """
     from typing import Union, get_args, get_origin
     import types as _types
@@ -851,48 +581,7 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
                               suggestion: Optional[Suggestion]) -> None:
     """Write a Resolution's value into the spec at the gap's field_path AND
     stamp the user's action onto the resulting Provenance (ADR-0009).
-
-    Path-shape coverage (PR2 gap kinds):
-      * `initial_contents[N].volume_ul`     — primitive float write; no Provenance.
-      * `steps[N].<field>`                  — top-level step field; Provenance stamped.
-      * `steps[N].<field>.<subfield>`       — nested write under a parent model
-                                              (e.g. steps[0].destination.wells);
-                                              parent's Provenance stamped.
-
-    Pre:    `resolution.action` is "accept_suggestion" or "edit"; skip and
-            abort are short-circuited by the orchestrator before calling this.
-            For "accept_suggestion", `resolution.new_value` is the same shape
-            as the field (a Provenance-bearing model for Provenanced fields,
-            a primitive for initial_contents.volume_ul).
-            For "edit", `resolution.new_value` is the user-typed scalar
-            already coerced by the handler's coerce_value callback.
-
-    Post:   The spec is mutated in place:
-              * accept_suggestion + Provenanced field:
-                  the field is REPLACED with `new_value`; new_value's
-                  provenance is stamped with review_status = user_accepted_suggestion.
-              * edit + Provenanced field:
-                  the field's `.value` attribute is mutated (preserving the
-                  surrounding model + its provenance type/shape); provenance
-                  is stamped with review_status = user_edited.
-              * subfield write:
-                  the subfield is set; parent's provenance is stamped.
-              * initial_contents.volume_ul:
-                  the float is written; no Provenance to stamp.
-            In all stamping cases, `reviewer_objection` is cleared because
-            the user's action terminates the review lifecycle for that value.
-
-    Side effects: Mutates the spec in place. Replaces or mutates Pydantic
-            sub-models on the spec.
-
-    Raises: pydantic.ValidationError on invariant violation in the resulting
-            Provenance.
     """
-    # Bug-2 (PR3b follow-up): when a Gap's metadata carries
-    # `affected_paths` (deduped constraint-violation Gap covering N steps),
-    # apply the resolution to ALL affected paths, not just the
-    # representative gap.field_path. The user answered once; their answer
-    # propagates to every step the same logical problem hit.
     affected_paths = (gap.metadata or {}).get("affected_paths") if hasattr(gap, "metadata") else None
     if affected_paths and len(affected_paths) > 1:
         for path in affected_paths:
@@ -901,11 +590,6 @@ def default_apply_resolution(spec, gap: Gap, resolution: Resolution,
     _apply_at_path(spec, gap.field_path, resolution, suggestion)
 
 
-# LocationRef value sub-fields → their provenance slot. When an apply
-# path changes one of these via accept_suggestion or edit, we replace
-# the corresponding provenance with one that honestly attributes the
-# new value (instead of leaving the stale instruction-cited provenance
-# in place from the old value).
 _LOCATIONREF_VALUE_SUBFIELDS = {
     "well": "wells_provenance",
     "wells": "wells_provenance",
@@ -918,15 +602,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                    suggestion: Optional[Suggestion] = None) -> None:
     """Single-path apply — extracted from default_apply_resolution so
     deduped Gaps can call it once per affected path.
-
-    Revision-history contract: each branch performs exactly ONE logical
-    write per call. For fields that carry a `prior_revisions` chain
-    (Provenanced* / LocationRef / WellContents), the pre-write state is
-    captured as a snapshot in `prior_revisions` BEFORE the head fields
-    are mutated. `_stamp_user_action` and `_stamp_resolution_action`
-    operate on the head AFTER the snapshot is pushed, so the head's
-    final state reflects every part of the logical write while the
-    chain captures one revision per call.
     """
     import re
     from nl2protocol.models.spec import push_revision, replace_with_history_preserved
@@ -934,26 +609,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
     new_value = resolution.new_value
     user_action = resolution.user_action_provenance
 
-    # steps[N].<field>.<...provenance> — fabrication-shaped path. The
-    # verifier produces this when a cited_text fails the substring
-    # check; the broken slot is the provenance itself, not the value.
-    # Resolutions:
-    #   accept_suggestion → build a fresh inferred+user_accepted_suggestion
-    #     Provenance from `suggestion`. If suggestion.value is not None
-    #     AND the slot has a known value-field counterpart (atom `.value`,
-    #     LocationRef `.description`), write BOTH the value and the new
-    #     provenance — one push_revision snapshot per call. Otherwise
-    #     (suggestion.value is None, or slot is wells/resolved_label),
-    #     write provenance only (the citation-only fix case).
-    #   override          → keep value AND existing provenance object,
-    #     but stamp review_status=user_overrode_fabrication (the user
-    #     accepted responsibility for the fabricated cite).
-    #   edit              → for atomic Provenanced* fields (volume,
-    #     substance, duration, temperature) where the parent has a
-    #     `.value` slot, write the typed value AND replace the
-    #     provenance slot with a fresh inferred+user_edited Provenance.
-    #     LocationRef edits (description, wells) deferred — silent
-    #     no-op until we add list/range parsing.
     m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w*provenance)$", path)
     if m:
         idx, fname, slot = int(m.group(1)), m.group(2), m.group(3)
@@ -962,10 +617,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             return
         from nl2protocol.models.spec import Provenance
         if resolution.action == "accept_suggestion":
-            # Build the new Provenance from the suggester's reasoning.
-            # Defensive: if no suggestion was threaded through (legacy
-            # callers / tests passing a Provenance directly as new_value),
-            # fall back to using new_value as the provenance.
             if suggestion is not None:
                 new_prov = _build_suggested_provenance(
                     suggestion, review_status="user_accepted_suggestion",
@@ -976,8 +627,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 proposed_value = None
             if new_prov is None:
                 return
-            # Map slot → value-field name. Only slots with a known
-            # counterpart trigger a value write; others stay prov-only.
             value_field = None
             if proposed_value is not None:
                 if slot == "provenance" and hasattr(parent, "value"):
@@ -1017,15 +666,8 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 review_status="user_edited",
             ))
             return
-        # edit on LocationRef sub-slots, or unknown action: silent
-        # no-op (better than crashing). Follow-up: parse list/range
-        # input from the modal so edits land cleanly.
         return
 
-    # ADR-0012: action="override" means the user kept the existing value
-    # AS-IS but committed to it despite a fabrication flag. Don't write
-    # the value (it's already correct from the user's perspective); just
-    # stamp the existing field's provenance with the override marker.
     if resolution.action == "override":
         m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
         if m:
@@ -1036,8 +678,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             _stamp_user_action(existing, user_action)
         return
 
-    # initial_contents[N].volume_ul (primitive — no Provenance to stamp,
-    # but WellContents itself carries a prior_revisions chain.)
     m = re.match(r"initial_contents\[(\d+)\]\.volume_ul$", path)
     if m:
         idx = int(m.group(1))
@@ -1045,10 +685,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
         push_revision(wc, volume_ul=float(new_value))
         return
 
-    # initial_contents[N].well — symmetric with volume_ul. Detector
-    # (InitialContentsWellDetector) fires when WellContents.well is null;
-    # without this branch the apply path silently no-ops and the orchestrator
-    # re-detects the same gap each iteration until MAX_ITERATIONS.
     m = re.match(r"initial_contents\[(\d+)\]\.well$", path)
     if m:
         idx = int(m.group(1))
@@ -1061,13 +697,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
     if m:
         idx, fname = int(m.group(1)), m.group(2)
         if resolution.action == "accept_suggestion":
-            # new_value is a Provenance-bearing model from the suggester.
-            # Contract guard: the suggester must already have built the
-            # typed Pydantic model. A raw dict/str/int here means a
-            # suggester violated its contract (see ConfigLookupSuggester
-            # and LLMSpotSuggester's structured path for canonical
-            # patterns). Raise loudly so the bug surfaces at the source
-            # rather than silently poisoning the spec.
             expected = _expected_field_type_for_step(spec.steps[idx], fname)
             if (expected is not None
                     and isinstance(expected, type)
@@ -1080,9 +709,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                     f"model (see ConfigLookupSuggester for the "
                     f"canonical pattern)."
                 )
-            # Preserve the OLD field's chain by transferring it onto the
-            # new instance before the swap; otherwise the old field's
-            # history would be dropped on the floor.
             old = getattr(spec.steps[idx], fname, None)
             transferred = (
                 replace_with_history_preserved(old, new_value)
@@ -1092,9 +718,6 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             setattr(spec.steps[idx], fname, transferred)
             _stamp_user_action(transferred, user_action)
         elif resolution.action == "edit":
-            # new_value is a user-typed scalar. Mutate the existing model's
-            # `.value` (preserving its type + provenance shape) so the field
-            # stays a well-formed Provenanced* / LocationRef.
             existing = getattr(spec.steps[idx], fname, None)
             if existing is not None and hasattr(existing, "value"):
                 if hasattr(existing, "prior_revisions"):
@@ -1102,47 +725,23 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 existing.value = new_value
                 _stamp_user_action(existing, user_action)
             else:
-                # Fall through to raw setattr (LocationRef edits without a
-                # .value attribute, or fields that don't exist yet). Stamp
-                # only if the new_value carries provenance.
                 setattr(spec.steps[idx], fname, new_value)
                 _stamp_user_action(new_value, user_action)
         else:
-            # Defensive: any other action just writes raw.
             setattr(spec.steps[idx], fname, new_value)
         return
 
-    # steps[N].<field>.<subfield> (e.g. steps[0].destination.wells,
-    # steps[0].source.resolved_label)
     m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w+)$", path)
     if m:
         idx, fname, subfield = int(m.group(1)), m.group(2), m.group(3)
         target = getattr(spec.steps[idx], fname)
         if target is not None:
-            # Snapshot the pre-write state of the LocationRef (or
-            # whatever parent carries `prior_revisions`). The subfield
-            # mutation AND the subsequent provenance update both act on
-            # the head under this one revision.
             if hasattr(target, "prior_revisions"):
                 push_revision(target)
             setattr(target, subfield, new_value)
-            # PR3a step 3: when the subfield IS resolved_label, the
-            # provenance for that decision lives in resolved_label_provenance,
-            # not the LocationRef's primary provenance (which describes the
-            # location/wells). Stamp the right slot so the audit trail
-            # captures the resolution action, not the location reading.
             if subfield == "resolved_label":
                 _stamp_resolution_action(target, user_action, new_value)
                 return
-            # Phase 3c fix-2: when the subfield is a VALUE field on a
-            # LocationRef (description / well / wells / well_range), the
-            # original provenance's cited_text grounded the OLD value
-            # and is no longer truthful after this write. Replace the
-            # provenance slot with one that honestly attributes the new
-            # value — carry the suggester's reasoning when available, or
-            # a generic "user edited" reasoning when the user typed it.
-            # The stale instruction citation isn't lost; it lives on in
-            # prior_revisions[0]'s provenance for that slot.
             from nl2protocol.models.spec import Provenance
             prov_slot = _LOCATIONREF_VALUE_SUBFIELDS.get(subfield)
             if prov_slot is not None:
@@ -1169,12 +768,5 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 if new_prov is not None:
                     setattr(target, prov_slot, new_prov)
                     return
-            # Fall-through: subfields without a value→prov mapping (or
-            # actions other than accept_suggestion / edit) still get
-            # the legacy review_status stamp so the audit trail captures
-            # that a user action terminated the lifecycle.
             _stamp_user_action(target, user_action)
         return
-
-    # Unknown path shape: silently no-op (defensive — better than crashing).
-    # Future: raise to surface unhandled gap kinds.
