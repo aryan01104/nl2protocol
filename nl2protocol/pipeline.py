@@ -129,14 +129,25 @@ def generate_python_script(protocol: ProtocolSchema, step_summaries: Optional[li
         var_name = f"lw_{lw.slot}"
         label_arg = f", label='{lw.label}'" if lw.label else ""
 
+        # A labware either sits directly on a deck slot or on top of a module.
+        # Prefer the explicit on_module link, but also INFER it when the
+        # labware's slot is already occupied by a module: a deck slot holds
+        # exactly one object, so a labware sharing a module's slot must be on
+        # that module. Without this inference we'd emit
+        # protocol.load_labware(slot) for an occupied slot and Opentrons raises
+        # LocationIsOccupiedError at load time.
         if lw.on_module:
-            # Load labware onto a module
             mod_var = module_map.get(lw.on_module)
             if not mod_var:
                 raise ValueError(f"Module '{lw.on_module}' not found for labware '{lw.label or lw.slot}'")
+        else:
+            mod_var = module_map.get(lw.slot)   # None unless a module occupies this slot
+
+        if mod_var:
+            # Load labware onto the module (it inherits the module's slot)
             lines.append(f"    {var_name} = {mod_var}.load_labware('{lw.load_name}'{label_arg})")
         else:
-            # Load labware directly on deck slot
+            # Load labware directly on the deck slot
             lines.append(f"    {var_name} = protocol.load_labware('{lw.load_name}', '{lw.slot}'{label_arg})")
 
         labware_map[lw.slot] = var_name

@@ -29,6 +29,9 @@ import pytest
 
 from nl2protocol.extraction.extractor import SemanticExtractor
 from nl2protocol.extraction.schema_builder import spec_to_schema
+from nl2protocol.models.schema import (
+    Labware, Module, Pipette, ProtocolSchema, Transfer,
+)
 from nl2protocol.pipeline import generate_python_script
 from nl2protocol.validation.constraints import (
     PhysicalConstraintsChecker, Severity, ViolationType,
@@ -256,3 +259,49 @@ class TestPipelineMultiStep:
         script = generate_python_script(schema)
         assert script.count(".transfer(") == 2
         assert "delay" in script.lower()
+
+
+class TestGeneratorModuleInference:
+    """generate_python_script: labware sharing a module's slot loads onto the module.
+
+    Regression for a magnetic-bead crash. The config placed `sample_plate` on the
+    same deck slot as the magnetic module but never set `on_module`, so the
+    generator emitted `protocol.load_labware(..., '4')` onto a slot the module
+    already occupied. Opentrons rejected it with LocationIsOccupiedError. A deck
+    slot holds exactly one object, so the generator now infers the module from
+    the shared slot and loads the labware onto it.
+    """
+
+    def _magbead_schema(self):
+        """A schema reproducing the bug: labware on slot 4 with on_module unset,
+        while a magnetic module also occupies slot 4."""
+        return ProtocolSchema(
+            protocol_name="magbead_regression",
+            author="test",
+            modules=[Module(module_type="magnetic", slot="4", label="mag_mod")],
+            labware=[
+                Labware(slot="1", load_name="opentrons_96_tiprack_300ul", label="tiprack_300"),
+                Labware(slot="2", load_name="opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+                        label="reagent_rack"),
+                # on_module deliberately unset — this is the bug condition.
+                Labware(slot="4", load_name="nest_96_wellplate_2ml_deep", label="sample_plate"),
+            ],
+            pipettes=[Pipette(mount="left", model="p300_single_gen2", tipracks=["tiprack_300"])],
+            commands=[Transfer(pipette="left", source_labware="reagent_rack", source_well="A1",
+                               dest_labware="sample_plate", dest_well="A1", volume=80.0)],
+        )
+
+    def test_labware_on_module_slot_loads_through_module(self):
+        script = generate_python_script(self._magbead_schema())
+        # The sample plate must load THROUGH the module, not onto the deck slot.
+        assert "mod_4.load_labware('nest_96_wellplate_2ml_deep'" in script
+        # And it must NOT try to claim the occupied deck slot directly.
+        assert "protocol.load_labware('nest_96_wellplate_2ml_deep', '4'" not in script
+
+    def test_generated_script_simulates_without_slot_collision(self):
+        import io
+        from opentrons import simulate
+
+        script = generate_python_script(self._magbead_schema())
+        # Raises ProtocolEngineExecuteError (LocationIsOccupiedError) before the fix.
+        simulate.simulate(io.StringIO(script))
