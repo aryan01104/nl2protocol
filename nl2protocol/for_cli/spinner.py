@@ -31,6 +31,7 @@ class Spinner:
         self.stream = stream or sys.stderr
         self._active = False
         self._thread = None
+        self._lock = threading.Lock()
 
         # Determine if we can animate
         self._is_tty = hasattr(self.stream, 'isatty') and self.stream.isatty()
@@ -67,10 +68,26 @@ class Spinner:
             self.stream.flush()
         return False  # Don't suppress exceptions
 
+    def update(self, message: str):
+        """Swap the animated message mid-run (thread-safe).
+
+        No-op on non-TTY streams, matching __enter__ (no animation thread runs).
+        The _spin loop re-reads self.message each tick, so the change surfaces
+        on the next frame.
+        """
+        if not self._is_tty:
+            return
+        with self._lock:
+            self.message = message
+
     def _spin(self):
         for char in itertools.cycle(self._chars):
             if not self._active:
                 break
-            self.stream.write(f"\r  {char} {self.message}")
+            with self._lock:
+                message = self.message
+            # \033[K clears from the cursor to end of line, so a shorter message
+            # replacing a longer one doesn't leave stale tail characters.
+            self.stream.write(f"\r\033[K  {char} {message}")
             self.stream.flush()
             time.sleep(0.08)

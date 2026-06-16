@@ -61,11 +61,30 @@ def _make_mock_response(spec_json: dict, reasoning: str = "test reasoning"):
     return response
 
 
+def _make_mock_stream(response):
+    """A context manager mimicking client.messages.stream(...): yields an object
+    exposing text_stream (an iterable of string chunks) and get_final_message()."""
+    text = response.content[0].text
+    # Split into a few pieces so the accumulation loop exercises real concatenation.
+    mid = len(text) // 2
+    chunks = [text[:mid], text[mid:]]
+
+    stream_obj = MagicMock()
+    stream_obj.text_stream = iter(chunks)
+    stream_obj.get_final_message.return_value = response
+
+    ctx = MagicMock()
+    ctx.__enter__.return_value = stream_obj
+    ctx.__exit__.return_value = False
+    return ctx
+
+
 def _make_mock_extractor(spec_json: dict, reasoning: str = "test reasoning"):
     """Construct a SemanticExtractor with a mocked Anthropic client that
-    returns the given spec_json on .messages.create()."""
+    delivers the given spec_json through .messages.stream()."""
     mock_client = MagicMock()
-    mock_client.messages.create.return_value = _make_mock_response(spec_json, reasoning)
+    response = _make_mock_response(spec_json, reasoning)
+    mock_client.messages.stream.return_value = _make_mock_stream(response)
     return SemanticExtractor(client=mock_client)
 
 
