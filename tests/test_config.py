@@ -11,6 +11,7 @@ import pytest
 from nl2protocol.config import (
     normalize_config, enrich_config_with_wells, ConfigLoader,
 )
+from nl2protocol.constants import DEFAULT_MODEL
 from nl2protocol.errors import APIKeyError, ConfigFileError
 
 
@@ -140,7 +141,7 @@ class TestConfigLoaderInit:
     def test_constructs_with_default_model(self, stub_api_key):
         loader = ConfigLoader(api_key=stub_api_key, config_path="some_path.json")
         assert loader.config_path == "some_path.json"
-        assert loader.model_name == "claude-sonnet-4-20250514"  # default
+        assert loader.model_name == DEFAULT_MODEL  # centralized default
         assert loader.config is None
         assert loader.client is not None
 

@@ -22,6 +22,7 @@ import json
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+from nl2protocol.constants import DEFAULT_MODEL
 from nl2protocol.models.spec import LocationRef, ProtocolSpec
 
 
@@ -304,7 +305,7 @@ class LabwareMatcher:
     `resolved_label_provenance`.
     """
 
-    def __init__(self, config: dict, client=None, model_name: str = "claude-sonnet-4-20250514"):
+    def __init__(self, config: dict, client=None, model_name: str = DEFAULT_MODEL):
         self.config = config
         self.labware_labels = list(config.get("labware", {}).keys())
         self.client = client

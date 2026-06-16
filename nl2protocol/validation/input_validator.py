@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Literal, Optional
 from anthropic import Anthropic
 from dotenv import find_dotenv, load_dotenv
+from nl2protocol.constants import DEFAULT_MODEL
 from nl2protocol.errors import APIKeyError
 
 
@@ -106,7 +107,7 @@ Input to classify:
 class InputValidator:
     """Validates user inputs before protocol generation using LLM classification."""
 
-    def __init__(self, api_key: str, model_name: str = "claude-sonnet-4-20250514"):
+    def __init__(self, api_key: str, model_name: str = DEFAULT_MODEL):
         """Construct an InputValidator with an explicit API key.
 
         Pre:    `api_key` is a non-empty Anthropic API key supplied by the

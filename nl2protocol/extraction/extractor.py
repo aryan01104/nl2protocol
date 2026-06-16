@@ -34,6 +34,7 @@ from anthropic import Anthropic
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from nl2protocol.citing import cite_covers_well
+from nl2protocol.constants import DEFAULT_MODEL
 
 
 # Import spec models from their canonical location
@@ -129,7 +130,7 @@ class SemanticExtractor:
     ("do the Bradford assay") — the reasoning adapts to complexity.
     """
 
-    def __init__(self, client: Anthropic, model_name: str = "claude-sonnet-4-20250514"):
+    def __init__(self, client: Anthropic, model_name: str = DEFAULT_MODEL):
         self.client = client
         self.model_name = model_name
 
@@ -152,7 +153,7 @@ class SemanticExtractor:
             with Spinner("Reasoning through protocol..."):
                 response = self.client.messages.create(
                     model=self.model_name,
-                    max_tokens=8192,
+                    max_tokens=16000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
                 )

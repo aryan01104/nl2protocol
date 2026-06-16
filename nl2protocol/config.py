@@ -12,6 +12,7 @@ from typing import Dict, Any
 from anthropic import Anthropic
 from dotenv import find_dotenv, load_dotenv
 
+from .constants import DEFAULT_MODEL
 from .errors import APIKeyError, ConfigFileError
 from .models.labware import get_well_info
 
@@ -93,7 +94,7 @@ class ConfigLoader:
     """
 
     def __init__(self, api_key: str, config_path: str = "lab_config.json",
-                 model_name: str = "claude-sonnet-4-20250514"):
+                 model_name: str = DEFAULT_MODEL):
         """Construct a ConfigLoader with an explicit API key, config path, and model name.
 
         Pre:    `api_key` is a non-empty Anthropic API key string supplied by

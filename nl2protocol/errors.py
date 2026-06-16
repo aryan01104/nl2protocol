@@ -201,9 +201,12 @@ def format_api_error(e: Exception) -> str:
                 Check your ANTHROPIC_API_KEY is valid and not expired."
               * `anthropic.RateLimitError` → "Rate limited by the API.
                 Wait 30-60 seconds and try again."
-              * `anthropic.APIStatusError` → message depends on str(e).lower():
+              * `anthropic.APIStatusError` → message depends on status_code /
+                str(e).lower():
                   - contains "credit" OR "balance" → credit-balance message
                   - contains "overloaded" → overloaded message
+                  - status_code 404 OR contains "not_found" → model-not-found
+                    message (permanent, points at DEFAULT_MODEL)
                   - otherwise → "API error (status {e.status_code}). ..."
               * `anthropic.APITimeoutError` → timeout message
               * `anthropic.APIConnectionError` → connection message
@@ -228,6 +231,11 @@ def format_api_error(e: Exception) -> str:
             return "Anthropic API credit balance is too low. Add credits at console.anthropic.com"
         elif "overloaded" in msg:
             return "The API is temporarily overloaded. Try again in a few minutes."
+        elif e.status_code == 404 or "not_found" in msg:
+            # A 404 from the messages API means the model id doesn't exist —
+            # permanent, NOT transient. Usually a retired/mistyped model.
+            return ("Model not found (status 404): the configured model id is invalid or "
+                    "retired. Update DEFAULT_MODEL in nl2protocol/constants.py to a current model.")
         return f"API error (status {e.status_code}). This is usually transient — retry in a moment."
     elif isinstance(e, anthropic.APITimeoutError):
         return "API request timed out. Check your network connection and try again."
