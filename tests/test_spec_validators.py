@@ -217,10 +217,14 @@ class TestValidateCompleteness:
     def _complete(self, steps, **kwargs):
         return CompleteProtocolSpec(summary="test", steps=steps, **kwargs)
 
-    # Post: liquid action with volume is OK
+    # Post: liquid action with volume (and, for in-place actions, a located
+    # well) is OK
     def test_liquid_action_with_volume_ok(self):
         self._complete([
-            _step(order=1, action="mix", volume=_vol(50.0)),
+            _step(
+                order=1, action="mix", volume=_vol(50.0),
+                destination=LocationRef(description="plate", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+            ),
         ])
 
     # Post: liquid action without volume raises with "missing volume"
@@ -326,6 +330,62 @@ class TestValidateCompleteness:
                 ),
             ])
         assert "missing destination well(s)" in str(exc_info.value)
+
+    # Post: single-location action (mix) with neither source nor destination
+    # raises with "missing location".
+    def test_mix_without_location_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([_step(order=1, action="mix", volume=_vol(50.0))])
+        assert "missing location" in str(exc_info.value)
+
+    # Post: same for aspirate.
+    def test_aspirate_without_location_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([_step(order=1, action="aspirate", volume=_vol(50.0))])
+        assert "missing location" in str(exc_info.value)
+
+    # Post: same for dispense.
+    def test_dispense_without_location_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([_step(order=1, action="dispense", volume=_vol(50.0))])
+        assert "missing location" in str(exc_info.value)
+
+    # Post: same for touch_tip (which needs no volume).
+    def test_touch_tip_without_location_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([_step(order=1, action="touch_tip")])
+        assert "missing location" in str(exc_info.value)
+
+    # Post: single-location action with a present location but no well/wells/
+    # well_range raises with "missing well(s)" (mirrors codegen's "A1" fallback).
+    def test_single_location_action_with_location_but_no_well_raises(self):
+        with pytest.raises(ValidationError) as exc_info:
+            self._complete([
+                _step(
+                    order=1, action="mix", volume=_vol(50.0),
+                    destination=LocationRef(description="plate", description_provenance=_prov()),
+                ),
+            ])
+        assert "missing well(s)" in str(exc_info.value)
+
+    # Post: single-location action with one located+welled side is OK
+    # (in-place — only one of source/destination is needed).
+    def test_single_location_action_with_one_located_side_ok(self):
+        self._complete([
+            _step(
+                order=1, action="aspirate", volume=_vol(50.0),
+                source=LocationRef(description="plate", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+            ),
+        ])
+
+    # Post: touch_tip with a location + well is OK and needs no volume.
+    def test_touch_tip_with_location_and_well_ok(self):
+        self._complete([
+            _step(
+                order=1, action="touch_tip",
+                destination=LocationRef(description="plate", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
+            ),
+        ])
 
 
 # ============================================================================

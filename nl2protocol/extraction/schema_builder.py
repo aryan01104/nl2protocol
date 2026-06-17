@@ -685,6 +685,8 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         elif step.action == "mix":
             target = dst_label or src_label
+            if target is None:
+                raise ValueError(f"Step {step.order} (mix): no labware location resolved")
             reps = 3
             if step.post_actions:
                 for pa in step.post_actions:
@@ -738,6 +740,8 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         elif step.action == "aspirate":
             target = src_label or dst_label
+            if target is None:
+                raise ValueError(f"Step {step.order} (aspirate): no labware location resolved")
             wells = src_wells or dst_wells or ["A1"]
             # New tip per well — each well has unique contents
             for well in wells:
@@ -749,6 +753,8 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         elif step.action == "dispense":
             target = dst_label or src_label
+            if target is None:
+                raise ValueError(f"Step {step.order} (dispense): no labware location resolved")
             wells = dst_wells or src_wells or ["A1"]
             # New tip per well
             for well in wells:
@@ -771,6 +777,8 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         elif step.action == "touch_tip":
             target = dst_label or src_label
+            if target is None:
+                raise ValueError(f"Step {step.order} (touch_tip): no labware location resolved")
             wells = dst_wells or src_wells or ["A1"]
             for well in wells:
                 commands.append(TouchTip(
