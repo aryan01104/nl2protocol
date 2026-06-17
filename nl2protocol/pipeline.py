@@ -1559,7 +1559,8 @@ class ProtocolAgent:
                                  stage_name="stage_2_extraction")
             extractor = SemanticExtractor(
                 client=self.config_loader.client,
-                model_name=self.config_loader.model_name
+                model_name=self.config_loader.model_name,
+                reporter=self.reporter,
             )
             spec = extractor.extract(prompt)
 

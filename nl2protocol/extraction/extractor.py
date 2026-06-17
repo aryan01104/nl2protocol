@@ -131,9 +131,16 @@ class SemanticExtractor:
     ("do the Bradford assay") — the reasoning adapts to complexity.
     """
 
-    def __init__(self, client: Anthropic, model_name: str = DEFAULT_MODEL):
+    def __init__(self, client: Anthropic, model_name: str = DEFAULT_MODEL,
+                 reporter=None):
         self.client = client
         self.model_name = model_name
+        # Optional reporter (nl2protocol.reporting.Reporter). When the pipeline
+        # runs in live/web mode this is the WebSocketReporter, so the streamed
+        # reasoning reaches the browser as reasoning_delta events. In the CLI
+        # it's the silent ConsoleReporter (the Spinner drives the terminal),
+        # so emitting is a harmless no-op there.
+        self.reporter = reporter
 
     def extract(self, instruction: str) -> Optional[ProtocolSpec]:
         """Reason through the instruction and produce a ProtocolSpec.
@@ -157,6 +164,7 @@ class SemanticExtractor:
             # HTTP-timeout guard). 32000 is well within Sonnet 4.6's 64K ceiling.
             full_response = ""
             spec_seen = False
+            last_emit_len = 0   # accumulated length at the last reasoning_delta emit
             with Spinner("Reasoning through protocol...") as spinner:
                 with self.client.messages.stream(
                     model=self.model_name,
@@ -170,8 +178,16 @@ class SemanticExtractor:
                             # JSON isn't useful to show — switch to an assembling state.
                             spec_seen = True
                             spinner.update("Assembling spec…")
+                            self._emit_reasoning("Assembling spec…")
                         elif not spec_seen:
-                            spinner.update(self._compact_reasoning(full_response))
+                            compact = self._compact_reasoning(full_response)
+                            spinner.update(compact)
+                            # Throttle browser events by accumulated length so we
+                            # don't flood the WebSocket queue (CLI uses the spinner
+                            # above, which is fine to update every token).
+                            if len(full_response) - last_emit_len >= 60:
+                                last_emit_len = len(full_response)
+                                self._emit_reasoning(compact)
                     final = stream.get_final_message()
 
             full_response = full_response.strip()
@@ -206,6 +222,25 @@ class SemanticExtractor:
                 print(f"  Reasoning failed: {e}", file=sys.stderr)
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
+
+    def _emit_reasoning(self, text: str) -> None:
+        """Push a one-line reasoning update to the reporter, if one is wired.
+
+        Lands in the browser's live indicator sub-line via a `reasoning_delta`
+        event (same surface as `pipeline_progress`). No-op when no reporter is
+        set (CLI mode) or if emission fails — never blocks extraction.
+        """
+        if self.reporter is None:
+            return
+        try:
+            from nl2protocol.reporting import StageEvent
+            self.reporter.emit(StageEvent(
+                kind="reasoning_delta",
+                data={"text": text},
+                stage_name="stage_2_extraction",
+            ))
+        except Exception:
+            pass
 
     @staticmethod
     def _compact_reasoning(accumulated: str) -> str:
