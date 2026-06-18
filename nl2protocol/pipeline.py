@@ -2028,14 +2028,20 @@ class ProtocolAgent:
             try:
                 from .extraction import CompleteProtocolSpec
                 complete_spec = CompleteProtocolSpec.model_validate(spec.model_dump())
-                # Emit completed spec event for downstream reporters.
-                self.reporter.emit(StageEvent(
-                    kind="completed_spec",
-                    data={"spec": complete_spec},
-                    stage_name="stage_5_spec",
-                ))
-                protocol_schema, well_state_warnings, step_summaries = spec_to_schema(
-                    complete_spec, self.config_loader.config)
+                # spec_to_schema resolves derived (basis) volumes into
+                # complete_spec in place. Emit the completed-spec event AFTER it
+                # so the steps column shows the resolved number, not the deferred
+                # placeholder. `finally` keeps the spec visible even on failure.
+                try:
+                    protocol_schema, well_state_warnings, step_summaries = spec_to_schema(
+                        complete_spec, self.config_loader.config)
+                finally:
+                    self.reporter.emit(StageEvent(
+                        kind="completed_spec",
+                        data={"spec": complete_spec},
+                        stage_name="stage_5_spec",
+                    ))
+                    state_log["stage_5_spec"] = complete_spec.model_dump()
                 _log(f"  {C.dim('Schema generated.')}")
             except Exception as e:
                 err = str(e)
