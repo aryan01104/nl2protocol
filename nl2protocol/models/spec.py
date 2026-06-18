@@ -13,6 +13,8 @@ from typing import Annotated, Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from nl2protocol.constants import TRASH_LABEL, is_discard_description
+
 
 WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 
@@ -1043,7 +1045,16 @@ class CompleteProtocolSpec(ProtocolSpec):
                 # location and the user is never asked to fill it.
                 for role in ("source", "destination"):
                     ref = getattr(step, role, None)
-                    if (ref is not None and ref.well is None
+                    if ref is None:
+                        continue
+                    # A discard destination (waste/trash) needs no well — the
+                    # OT-2 fixed trash is a single-well sink resolved off-config.
+                    if role == "destination" and (
+                        ref.resolved_label == TRASH_LABEL
+                        or is_discard_description(ref.description)
+                    ):
+                        continue
+                    if (ref.well is None
                             and not ref.wells and ref.well_range is None):
                         errors.append(f"{prefix}: missing {role} well(s){substance_hint}")
 

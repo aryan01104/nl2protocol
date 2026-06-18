@@ -22,6 +22,7 @@ from nl2protocol.models import (
     SetTemperature, WaitForTemperature, DeactivateModule,
     EngageMagnets, DisengageMagnets,
 )
+from nl2protocol.constants import TRASH_LABEL, is_discard_description
 from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
 from nl2protocol.validation.constraints import WellStateTracker
 
@@ -235,11 +236,19 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
         """
         if not ref:
             return None
+        if ref.resolved_label == TRASH_LABEL:
+            return TRASH_LABEL
         if ref.resolved_label and ref.resolved_label in cfg.get("labware", {}):
             return ref.resolved_label
         # Fallback: description might already be a config label (legacy specs)
         if ref.description in cfg.get("labware", {}):
             return ref.description
+        # Discard sink: a destination naming waste/trash that resolved to no
+        # real container lowers to the OT-2 fixed trash. Belt-and-suspenders
+        # for the resolver's "discard" branch — the script is correct even if
+        # the assignments flow left resolved_label unset.
+        if is_discard_description(ref.description):
+            return TRASH_LABEL
         return None
 
     def pipette_for_volume(volume: float, cfg: dict) -> Optional[str]:
@@ -519,7 +528,23 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         # ---- map action → commands ----
 
-        if step.action == "transfer":
+        if step.action == "transfer" and dst_label == TRASH_LABEL:
+            # Discard: aspirate the waste into the tip, then drop the tip into
+            # the OT-2 fixed trash (no dispense into a container). This is the
+            # standard supernatant/wash-removal idiom; the fixed trash is always
+            # present, so no labware is loaded for it. One tip per source well.
+            discard_wells = src_wells or (
+                [step.source.well] if step.source and step.source.well else ["A1"]
+            )
+            for sw in discard_wells:
+                commands.append(PickUpTip(pipette=mount))
+                if v and src_label:
+                    commands.append(Aspirate(
+                        pipette=mount, labware=src_label, well=sw, volume=v,
+                    ))
+                commands.append(DropTip(pipette=mount))
+
+        elif step.action == "transfer":
             # Collect all transfers for this step, then apply tip strategy
             step_transfers = []
 

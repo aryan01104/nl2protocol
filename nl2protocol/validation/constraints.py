@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 
+from nl2protocol.constants import TRASH_LABEL, is_discard_description
 from nl2protocol.models.spec import ProtocolSpec, ExtractedStep, ProvenancedVolume
 
 
@@ -512,6 +513,19 @@ class PhysicalConstraintsChecker:
                 continue
             # Check resolved_label, fall back to description for legacy specs
             label = ref.resolved_label or ref.description
+            # Trash sink: a discard destination is resolved by definition (the
+            # OT-2 fixed trash always exists, off-config). Not a "labware not
+            # found" violation.
+            if label == TRASH_LABEL or is_discard_description(label):
+                result._checks.append(CheckResult(
+                    violation_type=ViolationType.LABWARE_NOT_FOUND,
+                    severity=Severity.PASSED,
+                    step=step.order,
+                    what=f"{role} '{ref.description}' → OT-2 fixed trash",
+                    detail_label=f"{role}_labware",
+                    values={"role": role, "label": TRASH_LABEL},
+                ))
+                continue
             if label not in config_labels:
                 # Capability fallback: maybe the description is non-canonical
                 # but the wells uniquely fit a known labware.
