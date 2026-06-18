@@ -27,6 +27,7 @@ values (the 10.5→20.0 bug).
 
 import json
 import re
+import shutil
 import sys
 from typing import Annotated, List, Optional, Literal, Dict
 
@@ -57,6 +58,9 @@ from nl2protocol.models.spec import (
 )
 
 from nl2protocol.extraction.prompts import REASONING_SYSTEM_PROMPT, REASONING_USER_PROMPT
+
+MAX_SPEC_REPAIR_ATTEMPTS = 3
+_REPAIRABLE_CONTAINERS = ("steps", "initial_contents", "prefilled_labware")
 
 def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     """Look up the provenance reason string for a given field on a step."""
@@ -130,9 +134,16 @@ class SemanticExtractor:
     ("do the Bradford assay") — the reasoning adapts to complexity.
     """
 
-    def __init__(self, client: Anthropic, model_name: str = DEFAULT_MODEL):
+    def __init__(self, client: Anthropic, model_name: str = DEFAULT_MODEL,
+                 reporter=None):
         self.client = client
         self.model_name = model_name
+        # Optional reporter (nl2protocol.reporting.Reporter). When the pipeline
+        # runs in live/web mode this is the WebSocketReporter, so the streamed
+        # reasoning reaches the browser as reasoning_delta events. In the CLI
+        # it's the silent ConsoleReporter (the Spinner drives the terminal),
+        # so emitting is a harmless no-op there.
+        self.reporter = reporter
 
     def extract(self, instruction: str) -> Optional[ProtocolSpec]:
         """Reason through the instruction and produce a ProtocolSpec.
@@ -150,26 +161,55 @@ class SemanticExtractor:
 
         try:
             from nl2protocol.for_cli.spinner import Spinner
-            with Spinner("Reasoning through protocol..."):
-                response = self.client.messages.create(
+            # Stream the call so the user sees the model reasoning live (the model
+            # emits <reasoning> before <spec>) and so we can safely raise max_tokens
+            # — streaming is the supported path above ~16K (it sidesteps the SDK's
+            # HTTP-timeout guard). 32000 is well within Sonnet 4.6's 64K ceiling.
+            full_response = ""
+            spec_seen = False
+            last_emit_len = 0   # accumulated length at the last reasoning_delta emit
+            with Spinner("Reasoning through protocol...") as spinner:
+                with self.client.messages.stream(
                     model=self.model_name,
-                    max_tokens=16000,
+                    max_tokens=32000,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}]
+                ) as stream:
+                    for delta in stream.text_stream:
+                        full_response += delta
+                        if not spec_seen and "<spec>" in full_response:
+                            # JSON isn't useful to show — switch to an assembling state.
+                            spec_seen = True
+                            spinner.update("Assembling spec…")
+                            self._emit_reasoning("Assembling spec…")
+                        elif not spec_seen:
+                            compact = self._compact_reasoning(full_response)
+                            spinner.update(compact)
+                            # Throttle browser events by accumulated length so we
+                            # don't flood the WebSocket queue (CLI uses the spinner
+                            # above, which is fine to update every token).
+                            if len(full_response) - last_emit_len >= 60:
+                                last_emit_len = len(full_response)
+                                self._emit_reasoning(compact)
+                    final = stream.get_final_message()
+
+            full_response = full_response.strip()
+
+            # Streaming lets us raise max_tokens, but a truncation can still happen
+            # on very large protocols. Make it an explicit, legible error instead of
+            # an opaque downstream JSON parse failure.
+            if final.stop_reason == "max_tokens":
+                raise ValueError(
+                    "extraction truncated at max_tokens — "
+                    "raise max_tokens or simplify the instruction"
                 )
-
-            full_response = response.content[0].text.strip()
-
-            # Check for truncation (stop_reason != "end_turn")
-            if response.stop_reason != "end_turn":
-                print(f"  Warning: LLM response truncated (stop_reason={response.stop_reason})")
 
             # Parse reasoning and spec from tagged response
             reasoning, spec_json = self._parse_response(full_response)
 
             # Parse and validate the structured spec
             data = json.loads(spec_json)
-            spec = ProtocolSpec.model_validate(data)
+            spec = self._validate_with_repair(data, instruction)
 
             # Store the reasoning chain-of-thought
             spec.reasoning = reasoning
@@ -185,6 +225,124 @@ class SemanticExtractor:
                 print(f"  Reasoning failed: {e}", file=sys.stderr)
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
+
+    def _validate_with_repair(self, data: dict, instruction: str) -> ProtocolSpec:
+        """Validate the extracted spec, repairing model self-consistency slips in place.
+
+        Pre:  `data` is the JSON the model emitted for ProtocolSpec (already
+              parsed — malformed JSON fails earlier); `instruction` is the
+              original natural-language protocol.
+
+        Post: Returns a validated ProtocolSpec. Every rule enforced at this
+              stage governs the model's OWN output consistency (source/grounding
+              tags, citation presence, provenance fields, step ordering) — none
+              can be caused by the instruction, so every ValidationError is a
+              repairable extraction slip. Each failed list element (a step /
+              initial_content / prefilled_labware entry) is re-asked from the
+              model with the exact violated rules, patched in place, and
+              re-validated, up to MAX_SPEC_REPAIR_ATTEMPTS rounds. Step ordering
+              is renumbered deterministically (a value-free relabel). Value gaps
+              (missing volume / location / well) are not enforced here — they
+              belong to CompleteProtocolSpec, after gap resolution.
+
+        Raises: ValidationError if repair does not converge within
+                MAX_SPEC_REPAIR_ATTEMPTS.
+        """
+        for _ in range(MAX_SPEC_REPAIR_ATTEMPTS):
+            try:
+                return ProtocolSpec.model_validate(data)
+            except ValidationError as e:
+                self._repair_round(data, e.errors(), instruction)
+        return ProtocolSpec.model_validate(data)
+
+    def _repair_round(self, data: dict, errors: list, instruction: str) -> None:
+        """Apply one repair pass over `data` in place for the given errors."""
+        steps = data.get("steps")
+        if isinstance(steps, list):
+            for i, step in enumerate(steps, start=1):
+                if isinstance(step, dict):
+                    step["order"] = i
+
+        by_element: Dict[tuple, List[str]] = {}
+        for err in errors:
+            loc = err.get("loc", ())
+            if (len(loc) >= 2 and loc[0] in _REPAIRABLE_CONTAINERS
+                    and isinstance(loc[1], int)):
+                by_element.setdefault((loc[0], loc[1]), []).append(err.get("msg", ""))
+
+        for (container, index), messages in by_element.items():
+            self._reask_element(data, container, index, messages, instruction)
+
+    def _reask_element(self, data: dict, container: str, index: int,
+                       messages: List[str], instruction: str) -> None:
+        """Re-ask the model to correct one offending list entry, patched in place.
+
+        Hands the model the exact violated rules plus the original instruction
+        and asks it to return only the corrected entry. Raises if the reply is
+        not a JSON object, so the caller falls back to the normal
+        extraction-failure path rather than patching in garbage.
+        """
+        entry = data[container][index]
+        violations = "\n".join(f"- {m}" for m in messages)
+        prompt = (
+            f"A lab-protocol extraction produced this `{container}` entry, but it "
+            "violates internal consistency rules of the spec format. These are "
+            "extraction-format mistakes, not problems with the instruction — the "
+            "instruction does not dictate these fields. Correct ONLY this entry "
+            "so it satisfies the rules, keeping every value the instruction "
+            "supports and changing nothing the rules do not force.\n\n"
+            f"Original instruction:\n{instruction}\n\n"
+            f"Rule violations to fix:\n{violations}\n\n"
+            f"Current entry:\n{json.dumps(entry, indent=2)}\n\n"
+            "Return ONLY the corrected entry as a single JSON object — no tags, "
+            "no prose, no code fence."
+        )
+        resp = self.client.messages.create(
+            model=self.model_name,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(
+            b.text for b in resp.content if getattr(b, "type", None) == "text"
+        ).strip()
+        if "```" in text:
+            fence = "```json" if "```json" in text else "```"
+            text = text.split(fence, 1)[1].split("```", 1)[0].strip()
+        data[container][index] = json.loads(text)
+        self._emit_reasoning(f"Repairing {container}[{index}]…")
+
+    def _emit_reasoning(self, text: str) -> None:
+        """Push a one-line reasoning update to the reporter, if one is wired.
+
+        Lands in the browser's live indicator sub-line via a `reasoning_delta`
+        event (same surface as `pipeline_progress`). No-op when no reporter is
+        set (CLI mode) or if emission fails — never blocks extraction.
+        """
+        if self.reporter is None:
+            return
+        try:
+            from nl2protocol.reporting import StageEvent
+            self.reporter.emit(StageEvent(
+                kind="reasoning_delta",
+                data={"text": text},
+                stage_name="stage_2_extraction",
+            ))
+        except Exception:
+            pass
+
+    @staticmethod
+    def _compact_reasoning(accumulated: str) -> str:
+        """A one-line live view of the reasoning so far: the latest non-empty
+        line, stripped of the <reasoning> open tag, truncated to terminal width.
+        """
+        text = accumulated.replace("<reasoning>", "")
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        latest = lines[-1] if lines else "Reasoning through protocol..."
+        # Leave a margin for the spinner prefix ("  X ") and a trailing ellipsis.
+        width = max(20, shutil.get_terminal_size((80, 24)).columns - 6)
+        if len(latest) > width:
+            latest = latest[: width - 1] + "…"
+        return latest
 
     @staticmethod
     def _save_debug_output(full_response: Optional[str], spec_json: Optional[str], error: Exception):

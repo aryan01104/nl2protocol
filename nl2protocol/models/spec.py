@@ -989,6 +989,12 @@ class CompleteProtocolSpec(ProtocolSpec):
                   * Transfer-like actions {transfer, distribute,
                     serial_dilution, consolidate} additionally require
                     BOTH `step.source` and `step.destination` to be non-None.
+                  * Single-location actions {mix, aspirate, dispense,
+                    touch_tip} require at least ONE of `step.source` /
+                    `step.destination` to be non-None (they act in place),
+                    and at least one present ref to carry a
+                    well/wells/well_range. Missing location → "missing
+                    location"; present-but-welless → "missing well(s)".
                   * `set_temperature` and `wait_for_temperature` require
                     `step.temperature` to be non-None.
                   * `delay` requires `step.duration` to be non-None.
@@ -1015,6 +1021,7 @@ class CompleteProtocolSpec(ProtocolSpec):
         liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
                           "dispense", "mix", "serial_dilution"}
         transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
+        single_location_actions = {"mix", "aspirate", "dispense", "touch_tip"}
         temperature_actions = {"set_temperature", "wait_for_temperature"}
 
         for step in self.steps:
@@ -1039,6 +1046,15 @@ class CompleteProtocolSpec(ProtocolSpec):
                     if (ref is not None and ref.well is None
                             and not ref.wells and ref.well_range is None):
                         errors.append(f"{prefix}: missing {role} well(s){substance_hint}")
+
+            if step.action in single_location_actions:
+                if step.source is None and step.destination is None:
+                    errors.append(f"{prefix}: missing location{substance_hint}")
+                elif not any(
+                    ref is not None and (ref.well is not None or ref.wells or ref.well_range is not None)
+                    for ref in (step.source, step.destination)
+                ):
+                    errors.append(f"{prefix}: missing well(s){substance_hint}")
 
             if step.action in temperature_actions and step.temperature is None:
                 errors.append(f"{prefix}: missing temperature target")

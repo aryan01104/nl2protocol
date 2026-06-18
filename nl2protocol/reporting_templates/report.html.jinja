@@ -3740,6 +3740,11 @@
         case "pipeline_progress":
           handlePipelineProgress(e.data);
           break;
+        case "reasoning_delta":
+          // Live Stage-2 reasoning — drive the same indicator sub-line as
+          // pipeline_progress (data carries {text} rather than {message}).
+          handlePipelineProgress({ message: (e.data && e.data.text) || "" });
+          break;
         case "extracted_spec": {
           // Phase 3b: all three spec events feed the SAME unified column.
           // First (extracted_spec) reveals the column + lays out blocks

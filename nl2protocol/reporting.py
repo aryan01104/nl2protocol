@@ -46,6 +46,7 @@ EventKind = Literal[
     "warning",              # data = {"message": "...", "context": "..."}
     "error",                # data = {"message": "...", "stage": "..."}
     "info",                 # data = {"message": "..."}  — short status notes
+    "reasoning_delta",      # data = {"text": "..."}  — live one-line reasoning during Stage 2 extraction
     # ADR-0011 Phase 1 — orchestrator + pipeline storytelling events.
     # The existing HTMLReporter ignores these; Phase 2 renders them. They
     # are emitted by the orchestrator (gap_iteration_*, gap_detected,
