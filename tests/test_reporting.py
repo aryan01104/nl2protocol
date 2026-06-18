@@ -9,6 +9,7 @@ from datetime import datetime
 
 import pytest
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.reporting import (
     CapturingReporter,
     ConsoleReporter,
@@ -170,11 +171,11 @@ class TestHTMLReporterRendering:
         cited_text required for instruction-sourced; structured Q1+Q2
         composite provenance."""
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, LocationRef, Provenance,
-            ProtocolSpec, ProvenancedVolume,
+            CompositionProvenance, ExtractedStep, InstructionProvenance,
+            LocationRef, ProtocolSpec, ProvenancedVolume,
         )
 
-        prov = Provenance(source="instruction", cited_text="user said so", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="user said so", confidence=1.0)
         step = ExtractedStep(
             order=1,
             action="transfer",
@@ -356,9 +357,9 @@ class TestGracefulDegradeNoDataProvId:
 
     def test_unrecoverable_cite_keeps_data_prov_id_drops_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
-        from nl2protocol.models.spec import Provenance
+        from nl2protocol.models.spec import InstructionProvenance
         # cited_text is NOT in the instruction.
-        prov = Provenance(source="instruction", cited_text="absent phrase", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="absent phrase", confidence=1.0)
         out = _render_provenanced_value(
             "100 uL", prov, prov_id="s0-volume",
             instruction="Transfer 100uL from A1 to B1.",
@@ -372,8 +373,8 @@ class TestGracefulDegradeNoDataProvId:
 
     def test_recoverable_cite_emits_data_prov_id_and_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
-        from nl2protocol.models.spec import Provenance
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        from nl2protocol.models.spec import InstructionProvenance
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         out = _render_provenanced_value(
             "100 uL", prov, prov_id="s0-volume",
             instruction="Transfer 100uL from A1 to B1.",
@@ -384,10 +385,10 @@ class TestGracefulDegradeNoDataProvId:
 
     def test_non_instruction_source_emits_data_prov_id_drops_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
-        from nl2protocol.models.spec import Provenance
-        prov = Provenance(
+        from nl2protocol.models.spec import InferredProvenance
+        prov = InferredProvenance(
             source="domain_default",
-            reasoning="standard incubation per Bio-Rad",
+            positive_reasoning="standard incubation per Bio-Rad",
             confidence=0.7,
         )
         out = _render_provenanced_value(
@@ -407,7 +408,7 @@ class TestADR0009Rendering:
     report's value-span data attributes and CSS classes."""
 
     def _inferred_prov(self, **kwargs):
-        from nl2protocol.models.spec import Provenance
+        from nl2protocol.models.spec import validate_provenance
         defaults = dict(
             source="inferred",
             positive_reasoning="config lookup yielded this well",
@@ -415,7 +416,7 @@ class TestADR0009Rendering:
             confidence=0.9,
         )
         defaults.update(kwargs)
-        return Provenance(**defaults)
+        return validate_provenance(defaults)
 
     def test_emits_positive_reasoning_data_attr(self):
         from nl2protocol.reporting import _render_provenanced_value
@@ -532,10 +533,10 @@ class TestUnifiedProtocolStepsColumn:
 
     def _make_minimal_spec(self):
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, Provenance,
+            CompositionProvenance, ExtractedStep, InstructionProvenance,
             ProtocolSpec, ProvenancedVolume, LocationRef,
         )
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"],
@@ -779,11 +780,11 @@ class TestADR0011Phase2cBulkPanels:
 
     def _spec_with_initial_contents_and_labware(self):
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, LabwarePrefill,
-            LocationRef, Provenance, ProtocolSpec, ProvenancedVolume,
+            CompositionProvenance, ExtractedStep, InstructionProvenance,
+            LabwarePrefill, LocationRef, ProtocolSpec, ProvenancedVolume,
             WellContents,
         )
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"],
@@ -913,10 +914,10 @@ class TestADR0011Phase4RowHover:
 
     def _spec_with_known_cells(self):
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, LocationRef,
-            Provenance, ProtocolSpec, ProvenancedVolume, WellContents,
+            CompositionProvenance, ExtractedStep, InstructionProvenance,
+            LocationRef, ProtocolSpec, ProvenancedVolume, WellContents,
         )
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"],
@@ -1037,10 +1038,10 @@ class TestADR0011NullFieldPlaceholders:
 
     def _step_with_null_source(self):
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, LocationRef,
-            Provenance, ProvenancedString, ProvenancedVolume,
+            CompositionProvenance, ExtractedStep, InstructionProvenance,
+            LocationRef, ProvenancedString, ProvenancedVolume,
         )
-        prov = Provenance(source="instruction", cited_text="5uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="5uL", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"],
@@ -1054,7 +1055,7 @@ class TestADR0011NullFieldPlaceholders:
             volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
                                       provenance=prov),
             substance=ProvenancedString(value="water",
-                                         provenance=Provenance(
+                                         provenance=InstructionProvenance(
                                              source="instruction",
                                              cited_text="water",
                                              confidence=1.0)),
@@ -1091,10 +1092,11 @@ class TestADR0011NullFieldPlaceholders:
         # 3b this assertion required >=2 occurrences across two columns.)
         from nl2protocol.reporting import HTMLReporter, StageEvent
         from nl2protocol.models.spec import (
-            CompositionProvenance, ExtractedStep, LocationRef,
-            Provenance, ProtocolSpec, ProvenancedString, ProvenancedVolume,
+            CompositionProvenance, ExtractedStep, InferredProvenance,
+            InstructionProvenance, LocationRef, ProtocolSpec,
+            ProvenancedString, ProvenancedVolume,
         )
-        prov = Provenance(source="instruction", cited_text="5uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="5uL", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"],
@@ -1106,7 +1108,7 @@ class TestADR0011NullFieldPlaceholders:
             volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
                                       provenance=prov),
             substance=ProvenancedString(value="water",
-                                         provenance=Provenance(
+                                         provenance=InstructionProvenance(
                                              source="instruction",
                                              cited_text="water",
                                              confidence=1.0)),
@@ -1121,19 +1123,19 @@ class TestADR0011NullFieldPlaceholders:
             volume=ProvenancedVolume(value=5.0, unit="uL", exact=True,
                                       provenance=prov),
             substance=ProvenancedString(value="water",
-                                         provenance=Provenance(
+                                         provenance=InstructionProvenance(
                                              source="instruction",
                                              cited_text="water",
                                              confidence=1.0)),
             source=LocationRef(
                 description="reagent_reservoir", well="A2",
                 resolved_label="reagent_reservoir",
-                description_provenance=Provenance(
+                description_provenance=InferredProvenance(
                     source="inferred",
                     positive_reasoning="config lookup found water at A2",
                     why_not_in_instruction="instruction omits source",
                     confidence=0.9,
-                ), wells_provenance=Provenance(
+                ), wells_provenance=InferredProvenance(
                     source="inferred",
                     positive_reasoning="config lookup found water at A2",
                     why_not_in_instruction="instruction omits source",
@@ -1321,15 +1323,15 @@ class TestCollectArrowTargets:
             CompositionProvenance, ExtractedStep, LocationRef, Provenance,
             ProtocolSpec, ProvenancedVolume,
         )
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         step = ExtractedStep(
             order=1,
             action="transfer",
             volume=ProvenancedVolume(value=100.0, unit="uL", exact=True, provenance=prov),
             source=LocationRef(description="src", well="A1",
-                               description_provenance=Provenance(source="instruction", cited_text="from A1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="from A1", confidence=1.0)),
+                               description_provenance=InstructionProvenance(source="instruction", cited_text="from A1", confidence=1.0), wells_provenance=InstructionProvenance(source="instruction", cited_text="from A1", confidence=1.0)),
             destination=LocationRef(description="dst", well="B1",
-                                     description_provenance=Provenance(source="instruction", cited_text="to B1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="to B1", confidence=1.0)),
+                                     description_provenance=InstructionProvenance(source="instruction", cited_text="to B1", confidence=1.0), wells_provenance=InstructionProvenance(source="instruction", cited_text="to B1", confidence=1.0)),
             composition_provenance=CompositionProvenance(
                 step_cited_text="Transfer 100uL from A1 to B1",
                 parameters_cited_texts=["Transfer 100uL from A1 to B1"],
@@ -1387,9 +1389,9 @@ class TestCollectArrowTargets:
             action="delay",
             duration=ProvenancedDuration(
                 value=5, unit="minutes",
-                provenance=Provenance(
+                provenance=InferredProvenance(
                     source="domain_default",
-                    reasoning="standard incubation",
+                    positive_reasoning="standard incubation",
                     confidence=0.7,
                 ),
             ),
@@ -1425,7 +1427,7 @@ class TestHTMLReporterArrowsEnd2End:
             CompositionProvenance, ExtractedStep, LocationRef, Provenance,
             ProtocolSpec, ProvenancedVolume,
         )
-        prov = Provenance(source="instruction", cited_text="100uL", confidence=1.0)
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
         step = ExtractedStep(
             order=1,
             action="transfer",
@@ -1459,11 +1461,11 @@ class TestHTMLReporterArrowsEnd2End:
             action="transfer",
             volume=ProvenancedVolume(
                 value=100.0, unit="uL", exact=True,
-                provenance=Provenance(source="instruction", cited_text="100uL", confidence=1.0),
+                provenance=InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0),
             ),
             destination=LocationRef(
                 description="dest_plate", well="B1",
-                description_provenance=Provenance(source="instruction", cited_text="to well B1", confidence=1.0), wells_provenance=Provenance(source="instruction", cited_text="to well B1", confidence=1.0),
+                description_provenance=InstructionProvenance(source="instruction", cited_text="to well B1", confidence=1.0), wells_provenance=InstructionProvenance(source="instruction", cited_text="to well B1", confidence=1.0),
             ),
             composition_provenance=CompositionProvenance(
                 step_cited_text="Add liquid",

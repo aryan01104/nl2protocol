@@ -11,6 +11,7 @@ import json
 import pytest
 from typing import Any, Optional
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.extraction.resolver import (
     LabwareMatcher, LabwareMatchSuggestion,
     _load_name_category, _description_category_filter,
@@ -19,6 +20,7 @@ from nl2protocol.extraction.resolver import (
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
+    InstructionProvenance,
     LocationRef,
     Provenance,
     ProtocolSpec,
@@ -62,7 +64,7 @@ class FakeAnthropic:
 
 def _inst_prov(cite: str = "x") -> Provenance:
     """Minimal instruction-sourced Provenance for fixture construction."""
-    return Provenance(
+    return InstructionProvenance(
         source="instruction",
         cited_text=[cite],
         review_status="original",

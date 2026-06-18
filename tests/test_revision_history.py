@@ -13,9 +13,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.models.spec import (
     LocationRef,
-    Provenance,
+    InstructionProvenance,
+    InferredProvenance,
+    ProvenanceBase,
     ProvenancedDuration,
     ProvenancedString,
     ProvenancedTemperature,
@@ -25,12 +28,12 @@ from nl2protocol.models.spec import (
 )
 
 
-def _instr(text: str) -> Provenance:
-    return Provenance(source="instruction", cited_text=text, confidence=1.0)
+def _instr(text: str) -> ProvenanceBase:
+    return InstructionProvenance(source="instruction", cited_text=text, confidence=1.0)
 
 
-def _inferred(reason: str, status: str = "original") -> Provenance:
-    return Provenance(
+def _inferred(reason: str, status: str = "original") -> ProvenanceBase:
+    return InferredProvenance(
         source="inferred",
         positive_reasoning=reason,
         review_status=status,
@@ -327,7 +330,7 @@ class TestApplyPathPushesRevisions:
         # Head's wells_provenance now reflects the suggester's reasoning
         # — source flipped from instruction to inferred, no stale cite.
         assert dest.wells_provenance.source == "inferred"
-        assert dest.wells_provenance.cited_text is None
+        assert not hasattr(dest.wells_provenance, "cited_text")
         assert "exceed the labware's valid range" in dest.wells_provenance.positive_reasoning
         assert dest.wells_provenance.review_status == "user_accepted_suggestion"
         # Prior chain preserves the original instruction citation —
@@ -362,7 +365,7 @@ class TestApplyPathPushesRevisions:
         dest = spec.steps[0].destination
         assert dest.wells == ["D1"]
         assert dest.wells_provenance.source == "inferred"
-        assert dest.wells_provenance.cited_text is None
+        assert not hasattr(dest.wells_provenance, "cited_text")
         assert dest.wells_provenance.review_status == "user_edited"
         assert "User edited" in dest.wells_provenance.positive_reasoning
 
@@ -382,7 +385,7 @@ class TestApplyPathPushesRevisions:
             description="cited_text not in instruction",
             current_value=10.0,
         )
-        new_prov = Provenance(
+        new_prov = InferredProvenance(
             source="inferred",
             positive_reasoning="resolver picked this",
             review_status="user_accepted_suggestion",

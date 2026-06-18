@@ -62,48 +62,6 @@ from nl2protocol.extraction.prompts import REASONING_SYSTEM_PROMPT, REASONING_US
 MAX_SPEC_REPAIR_ATTEMPTS = 3
 _REPAIRABLE_CONTAINERS = ("steps", "initial_contents", "prefilled_labware")
 
-def _find_provenance_reason(step, field_name: str) -> Optional[str]:
-    """Look up the provenance reason string for a given field on a step."""
-    field_map = {
-        "volume": step.volume,
-        "temperature": step.temperature,
-        "substance": step.substance,
-        "duration": step.duration,
-        "composition": None,
-    }
-    # Direct field match
-    if field_name in field_map:
-        val = field_map[field_name]
-        if val and hasattr(val, 'provenance') and val.provenance:
-            return _provenance_text(val.provenance)
-        if field_name == "composition":
-            return step.composition_provenance.step_cited_text
-        return None
-
-    # Location refs: "source location", "source labware", "source wells", etc.
-    # LocationRef carries two provenances (description + wells); prefer the
-    # wells one when the field name targets wells, else the description one.
-    for prefix, ref in [("source", step.source), ("destination", step.destination), ("dest", step.destination)]:
-        if not (field_name.startswith(prefix) and ref):
-            continue
-        prov = ref.wells_provenance if "well" in field_name else ref.description_provenance
-        if prov:
-            return _provenance_text(prov)
-
-    # Post-action fields: "mix volume", "blow_out volume", etc.
-    if step.post_actions:
-        for pa in step.post_actions:
-            if field_name.startswith(pa.action) and pa.volume and pa.volume.provenance:
-                return _provenance_text(pa.volume.provenance)
-
-    return None
-
-
-def _provenance_text(prov) -> str:
-    """Return the human-readable explanation for a Provenance, picking the
-    field populated by the schema: cited_text for instruction-sourced,
-    positive_reasoning for domain_default/inferred-sourced. See ADR-0005, ADR-0009."""
-    return prov.cited_text or prov.positive_reasoning or ""
 
 
 # Review states that terminate the fabrication-detection lifecycle for a

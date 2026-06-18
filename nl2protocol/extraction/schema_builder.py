@@ -24,7 +24,7 @@ from nl2protocol.models import (
 )
 from nl2protocol.constants import DEFAULT_MIX_REPS, TRASH_LABEL, is_discard_description
 from nl2protocol.models.spec import (
-    ProtocolSpec, CompleteProtocolSpec, Provenance, push_revision,
+    ProtocolSpec, CompleteProtocolSpec, InferredProvenance, push_revision,
 )
 from nl2protocol.validation.constraints import WellStateTracker
 
@@ -504,7 +504,7 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
             if well_state is not None:
                 derived = round(well_state.volume_ul * basis.fraction, 1)
                 if derived > 0:
-                    push_revision(step.volume, value=derived, provenance=Provenance(
+                    push_revision(step.volume, value=derived, provenance=InferredProvenance(
                         source="inferred",
                         positive_reasoning=(
                             f"Derived at build: {basis.fraction:g} × current "

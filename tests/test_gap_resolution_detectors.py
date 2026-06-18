@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.gap_resolution import (
     ConstraintViolationDetector,
     InitialContentsVolumeDetector,
@@ -26,8 +27,10 @@ from nl2protocol.gap_resolution import (
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
+    InferredProvenance,
+    InstructionProvenance,
     LocationRef,
-    Provenance,
+    ProvenanceBase,
     ProtocolSpec,
     ProvenancedString,
     ProvenancedVolume,
@@ -38,8 +41,8 @@ from nl2protocol.models.spec import (
 # FIXTURES
 # ============================================================================
 
-def _instr_prov(text: str = "test") -> Provenance:
-    return Provenance(source="instruction", cited_text=text, confidence=1.0)
+def _instr_prov(text: str = "test") -> ProvenanceBase:
+    return InstructionProvenance(source="instruction", cited_text=text, confidence=1.0)
 
 
 def _comp() -> CompositionProvenance:
@@ -155,7 +158,7 @@ class TestProvenanceWarningDetector:
                 order=1, action="transfer",
                 volume=ProvenancedVolume(
                     value=100.0, unit="uL", exact=True,
-                    provenance=Provenance(source="instruction",
+                    provenance=InstructionProvenance(source="instruction",
                                           cited_text="100uL", confidence=1.0),
                 ),
                 source=LocationRef(
@@ -187,7 +190,7 @@ class TestProvenanceWarningDetector:
                 order=1, action="transfer",
                 volume=ProvenancedVolume(
                     value=999.0, unit="uL", exact=True,
-                    provenance=Provenance(source="instruction",
+                    provenance=InstructionProvenance(source="instruction",
                                           cited_text="999uL", confidence=1.0),
                 ),
                 source=LocationRef(description="tube rack", well="A1",
@@ -219,8 +222,8 @@ class TestProvenanceWarningDetector:
                 order=1, action="mix",
                 volume=ProvenancedVolume(
                     value=50.0, unit="uL", exact=False,
-                    provenance=Provenance(source="inferred",
-                                          reasoning="half of 100uL total",
+                    provenance=InferredProvenance(source="inferred",
+                                          positive_reasoning="half of 100uL total",
                                           confidence=0.6),
                 ),
                 composition_provenance=_comp(),
@@ -253,7 +256,7 @@ class TestProvenanceWarningDetector:
                 order=1, action="transfer",
                 volume=ProvenancedVolume(
                     value=999.0, unit="uL", exact=True,
-                    provenance=Provenance(
+                    provenance=InstructionProvenance(
                         source="instruction",
                         cited_text="999uL",        # not present in the instruction below
                         review_status=terminal_status,
@@ -296,7 +299,7 @@ class TestProvenanceWarningDetector:
                 order=1, action="transfer",
                 volume=ProvenancedVolume(
                     value=999.0, unit="uL", exact=True,
-                    provenance=Provenance(
+                    provenance=InstructionProvenance(
                         source="instruction",
                         cited_text="999uL",
                         review_status="original",
@@ -339,8 +342,8 @@ class TestProvenanceWarningDetector:
                 order=2, action="mix",
                 volume=ProvenancedVolume(
                     value=50.0, unit="uL", exact=False,
-                    provenance=Provenance(source="inferred",
-                                          reasoning="inferred",
+                    provenance=InferredProvenance(source="inferred",
+                                          positive_reasoning="inferred",
                                           confidence=0.5),
                 ),
                 composition_provenance=_comp(),

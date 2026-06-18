@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.gap_resolution import Gap
 from nl2protocol.gap_resolution.suggesters import (
     CarryoverSuggester,
@@ -24,8 +25,9 @@ from nl2protocol.gap_resolution.suggesters import (
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
+    InstructionProvenance,
     LocationRef,
-    Provenance,
+    ProvenanceBase,
     ProtocolSpec,
     ProvenancedDuration,
     ProvenancedString,
@@ -39,8 +41,8 @@ from nl2protocol.models.spec import (
 # FIXTURES
 # ============================================================================
 
-def _instr_prov(text: str = "test") -> Provenance:
-    return Provenance(source="instruction", cited_text=text, confidence=1.0)
+def _instr_prov(text: str = "test") -> ProvenanceBase:
+    return InstructionProvenance(source="instruction", cited_text=text, confidence=1.0)
 
 
 def _comp() -> CompositionProvenance:
@@ -786,7 +788,7 @@ class TestLLMSpotSuggesterCitedBranching:
     def test_cited_text_propagates_onto_suggestion(self):
         """When the LLM returns cited_text, Suggestion.cited_text carries
         the substring through — not just the label. The apply path reads
-        this to stamp Provenance(source="instruction", cited_text=[...])
+        this to stamp InstructionProvenance(source="instruction", cited_text=[...])
         on the spec field, so the value renders in the report with the
         same encoding as an extractor-sourced citation."""
         client = self._stub_client(

@@ -19,6 +19,8 @@ from hypothesis import HealthCheck, assume, given, settings, strategies as st
 from nl2protocol.models.spec import (
     CompositionProvenance,
     ExtractedStep,
+    InstructionProvenance,
+    InferredProvenance,
     LocationRef,
     Provenance,
     ProtocolSpec,
@@ -89,17 +91,15 @@ def provenance():
     """
     return st.one_of(
         st.builds(
-            Provenance,
+            InstructionProvenance,
             source=st.just("instruction"),
             cited_text=st.text(min_size=1, max_size=30),
-            reasoning=st.none(),
             confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
         ),
         st.builds(
-            Provenance,
+            InferredProvenance,
             source=st.sampled_from(["domain_default", "inferred"]),
-            cited_text=st.none(),
-            reasoning=st.text(min_size=1, max_size=30),
+            positive_reasoning=st.text(min_size=1, max_size=30),
             confidence=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
         ),
     )

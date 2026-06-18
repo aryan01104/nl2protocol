@@ -10,6 +10,7 @@ import json
 import pytest
 from pathlib import Path
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.validation.constraints import (
     PhysicalConstraintsChecker, PhysicalConstraintsCheckResult, WellStateTracker, WellState,
     Severity, ViolationType,
@@ -50,10 +51,10 @@ def serial_dilution_config():
 
 def _prov(source="instruction", text="test cited text", confidence=1.0):
     """Shorthand for test provenance. `text` is cited_text for instruction-sourced,
-    reasoning otherwise."""
+    positive_reasoning otherwise."""
     if source == "instruction":
-        return Provenance(source=source, cited_text=text, confidence=confidence)
-    return Provenance(source=source, reasoning=text, confidence=confidence)
+        return InstructionProvenance(source=source, cited_text=text, confidence=confidence)
+    return InferredProvenance(source=source, positive_reasoning=text, confidence=confidence)
 
 
 def _loc(**kwargs):
