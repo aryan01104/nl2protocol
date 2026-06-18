@@ -59,6 +59,9 @@ from nl2protocol.models.spec import (
 
 from nl2protocol.extraction.prompts import REASONING_SYSTEM_PROMPT, REASONING_USER_PROMPT
 
+MAX_SPEC_REPAIR_ATTEMPTS = 3
+_REPAIRABLE_CONTAINERS = ("steps", "initial_contents", "prefilled_labware")
+
 def _find_provenance_reason(step, field_name: str) -> Optional[str]:
     """Look up the provenance reason string for a given field on a step."""
     field_map = {
@@ -206,7 +209,7 @@ class SemanticExtractor:
 
             # Parse and validate the structured spec
             data = json.loads(spec_json)
-            spec = ProtocolSpec.model_validate(data)
+            spec = self._validate_with_repair(data, instruction)
 
             # Store the reasoning chain-of-thought
             spec.reasoning = reasoning
@@ -222,6 +225,91 @@ class SemanticExtractor:
                 print(f"  Reasoning failed: {e}", file=sys.stderr)
             self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
             return None
+
+    def _validate_with_repair(self, data: dict, instruction: str) -> ProtocolSpec:
+        """Validate the extracted spec, repairing model self-consistency slips in place.
+
+        Pre:  `data` is the JSON the model emitted for ProtocolSpec (already
+              parsed — malformed JSON fails earlier); `instruction` is the
+              original natural-language protocol.
+
+        Post: Returns a validated ProtocolSpec. Every rule enforced at this
+              stage governs the model's OWN output consistency (source/grounding
+              tags, citation presence, provenance fields, step ordering) — none
+              can be caused by the instruction, so every ValidationError is a
+              repairable extraction slip. Each failed list element (a step /
+              initial_content / prefilled_labware entry) is re-asked from the
+              model with the exact violated rules, patched in place, and
+              re-validated, up to MAX_SPEC_REPAIR_ATTEMPTS rounds. Step ordering
+              is renumbered deterministically (a value-free relabel). Value gaps
+              (missing volume / location / well) are not enforced here — they
+              belong to CompleteProtocolSpec, after gap resolution.
+
+        Raises: ValidationError if repair does not converge within
+                MAX_SPEC_REPAIR_ATTEMPTS.
+        """
+        for _ in range(MAX_SPEC_REPAIR_ATTEMPTS):
+            try:
+                return ProtocolSpec.model_validate(data)
+            except ValidationError as e:
+                self._repair_round(data, e.errors(), instruction)
+        return ProtocolSpec.model_validate(data)
+
+    def _repair_round(self, data: dict, errors: list, instruction: str) -> None:
+        """Apply one repair pass over `data` in place for the given errors."""
+        steps = data.get("steps")
+        if isinstance(steps, list):
+            for i, step in enumerate(steps, start=1):
+                if isinstance(step, dict):
+                    step["order"] = i
+
+        by_element: Dict[tuple, List[str]] = {}
+        for err in errors:
+            loc = err.get("loc", ())
+            if (len(loc) >= 2 and loc[0] in _REPAIRABLE_CONTAINERS
+                    and isinstance(loc[1], int)):
+                by_element.setdefault((loc[0], loc[1]), []).append(err.get("msg", ""))
+
+        for (container, index), messages in by_element.items():
+            self._reask_element(data, container, index, messages, instruction)
+
+    def _reask_element(self, data: dict, container: str, index: int,
+                       messages: List[str], instruction: str) -> None:
+        """Re-ask the model to correct one offending list entry, patched in place.
+
+        Hands the model the exact violated rules plus the original instruction
+        and asks it to return only the corrected entry. Raises if the reply is
+        not a JSON object, so the caller falls back to the normal
+        extraction-failure path rather than patching in garbage.
+        """
+        entry = data[container][index]
+        violations = "\n".join(f"- {m}" for m in messages)
+        prompt = (
+            f"A lab-protocol extraction produced this `{container}` entry, but it "
+            "violates internal consistency rules of the spec format. These are "
+            "extraction-format mistakes, not problems with the instruction — the "
+            "instruction does not dictate these fields. Correct ONLY this entry "
+            "so it satisfies the rules, keeping every value the instruction "
+            "supports and changing nothing the rules do not force.\n\n"
+            f"Original instruction:\n{instruction}\n\n"
+            f"Rule violations to fix:\n{violations}\n\n"
+            f"Current entry:\n{json.dumps(entry, indent=2)}\n\n"
+            "Return ONLY the corrected entry as a single JSON object — no tags, "
+            "no prose, no code fence."
+        )
+        resp = self.client.messages.create(
+            model=self.model_name,
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(
+            b.text for b in resp.content if getattr(b, "type", None) == "text"
+        ).strip()
+        if "```" in text:
+            fence = "```json" if "```json" in text else "```"
+            text = text.split(fence, 1)[1].split("```", 1)[0].strip()
+        data[container][index] = json.loads(text)
+        self._emit_reasoning(f"Repairing {container}[{index}]…")
 
     def _emit_reasoning(self, text: str) -> None:
         """Push a one-line reasoning update to the reporter, if one is wired.
