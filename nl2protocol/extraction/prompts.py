@@ -293,6 +293,17 @@ TEMPERATURE STEPS (set_temperature, wait_for_temperature):
   NOT put that phrase into source.description or
   destination.description; it is not a LocationRef.
 
+MIX STEPS (standalone "mix" action):
+- A mix that is its own instruction ("Mix by pipetting up and down 10 times at
+  100uL") is its own step with action="mix". Put the cycle count in
+  "repetitions" and the per-cycle volume in "volume".
+  Example: "Mix thoroughly by pipetting up and down 10 times at 100uL" →
+    {{"action": "mix", "repetitions": 10, "volume": {{"value": 100, "provenance": {{...}}}}}}
+- Set "repetitions" ONLY if the instruction states a count; leave it null
+  otherwise (do not invent a default).
+- For a mix that rides along with a transfer ("transfer X, then mix"), do NOT
+  make a separate mix step — attach it to the transfer via post_actions.
+
 INITIAL CONTENTS (two fields — use the right one):
 
 "initial_contents" — for SPECIFIC wells with known contents:

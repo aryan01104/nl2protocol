@@ -22,7 +22,7 @@ from nl2protocol.models import (
     SetTemperature, WaitForTemperature, DeactivateModule,
     EngageMagnets, DisengageMagnets,
 )
-from nl2protocol.constants import TRASH_LABEL, is_discard_description
+from nl2protocol.constants import DEFAULT_MIX_REPS, TRASH_LABEL, is_discard_description
 from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
 from nl2protocol.validation.constraints import WellStateTracker
 
@@ -712,11 +712,15 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
             target = dst_label or src_label
             if target is None:
                 raise ValueError(f"Step {step.order} (mix): no labware location resolved")
-            reps = 3
-            if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.action == "mix" and pa.repetitions:
-                        reps = pa.repetitions
+            # Stated count wins; otherwise fall back to the named default and
+            # surface it (not a silent 3). post_actions is pruned for a mix
+            # action, so a standalone mix carries its count in step.repetitions.
+            if step.repetitions:
+                reps = step.repetitions
+            else:
+                reps = DEFAULT_MIX_REPS
+                print(f"  Note: step {step.order} (mix) has no stated cycle "
+                      f"count; using default {DEFAULT_MIX_REPS}")
             wells = dst_wells or src_wells or ["A1"]
             # New tip per well — mixing touches well contents,
             # reusing would cross-contaminate between wells

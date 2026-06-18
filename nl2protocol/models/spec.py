@@ -664,6 +664,7 @@ ActionType = Literal[
 _PRUNABLE_FIELDS: frozenset = frozenset({
     "substance", "volume", "temperature", "duration",
     "source", "destination", "post_actions", "replicates", "note",
+    "repetitions",
 })
 
 _ACTION_KEEPS: dict = {
@@ -675,7 +676,7 @@ _ACTION_KEEPS: dict = {
                               "post_actions", "replicates"},
     "serial_dilution":      {"volume", "substance", "source", "destination",
                               "post_actions", "replicates"},
-    "mix":                  {"volume", "substance", "destination"},
+    "mix":                  {"volume", "substance", "destination", "repetitions"},
     "aspirate":             {"volume", "substance", "source"},
     "dispense":             {"volume", "substance", "destination"},
     "blow_out":             {"destination"},
@@ -740,6 +741,14 @@ class ExtractedStep(BaseModel):
     source: Optional[LocationRef] = None
     destination: Optional[LocationRef] = None
     post_actions: Optional[List[PostAction]] = None
+    repetitions: Optional[int] = Field(None, description=(
+        "Number of mix cycles for a standalone 'mix' action (one up-and-down "
+        "pipetting pass per cycle). Set ONLY if the user stated a count, e.g. "
+        "'pipette up and down 10 times' → repetitions: 10. Leave null when no "
+        "count is given — do not infer a default. Only consumed by the 'mix' "
+        "action; for a mix attached to a transfer, use PostAction.repetitions "
+        "instead."
+    ))
     replicates: Optional[int] = Field(None, description=(
         "Number of replicate destination columns per source well. Must be >= 2 (1 is not replication). "
         "Set only when the user explicitly says 'in triplicate' (3), 'in duplicate' (2), etc. "

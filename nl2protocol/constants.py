@@ -12,6 +12,12 @@ risking an import cycle.
 # to ConfigLoader / SemanticExtractor / InputValidator / LabwareMatcher.
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
+# Fallback mix-cycle count for a standalone `mix` action when the instruction
+# states no count. A stated count is captured in ExtractedStep.repetitions and
+# always takes precedence; this default is applied (and logged) only when none
+# was given.
+DEFAULT_MIX_REPS = 3
+
 
 # Reserved internal label marking a destination as the OT-2 fixed trash (always
 # present in slot 12, never declared in lab_config.json). A discard step lowers
