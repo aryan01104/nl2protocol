@@ -18,9 +18,9 @@ __version__ = "0.3.0"
 from nl2protocol.pipeline import ProtocolAgent, generate_python_script, simulate_script
 from nl2protocol.config import ConfigLoader
 from nl2protocol.models import ProtocolSchema, Command, Labware, Pipette, Pause, Delay, Comment
-from nl2protocol.validation.validate_config import validate_config, validate_config_file, ConfigValidator
+from nl2protocol.stage_1_pre_extraction.validate_config import validate_config, validate_config_file, ConfigValidator
 from nl2protocol.robot import RobotClient
-from nl2protocol.validation.input_validator import InputValidator, validate_input
+from nl2protocol.stage_1_pre_extraction.input_validator import InputValidator, validate_input
 from nl2protocol.extraction import SemanticExtractor, ProtocolSpec, CompleteProtocolSpec
 from nl2protocol.validation import PhysicalConstraintsChecker, ConstraintViolation, PhysicalConstraintsCheckResult
 

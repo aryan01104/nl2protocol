@@ -178,7 +178,7 @@ class TestConfigLoaderLoadConfig:
     # Raises: ConfigFileError on invalid JSON
     def test_raises_on_invalid_json(self, stub_api_key, tmp_path, monkeypatch):
         # Bypass validate_config_file by stubbing it to always return valid
-        from nl2protocol.validation import validate_config as vc
+        from nl2protocol.stage_1_pre_extraction import validate_config as vc
         from dataclasses import dataclass
 
         @dataclass
@@ -213,7 +213,7 @@ class TestConfigLoaderLoadConfig:
 
     # Raises: ConfigFileError when validation fails
     def test_raises_on_validation_failure(self, stub_api_key, tmp_path, monkeypatch):
-        from nl2protocol.validation import validate_config as vc
+        from nl2protocol.stage_1_pre_extraction import validate_config as vc
         from dataclasses import dataclass
 
         @dataclass

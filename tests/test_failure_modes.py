@@ -25,7 +25,7 @@ from nl2protocol.extraction import (
     Provenance, CompositionProvenance, LocationRef,
     PostAction, WellContents, SemanticExtractor
 )
-from nl2protocol.validation.validate_config import validate_config
+from nl2protocol.stage_1_pre_extraction.validate_config import validate_config
 
 
 # ============================================================================
