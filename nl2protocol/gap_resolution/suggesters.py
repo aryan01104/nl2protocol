@@ -525,7 +525,7 @@ class WellContentsVolumeSuggester:
             why = ("The instruction says to resuspend/mix the well but states "
                    "no mix volume.")
             reasoning = (f"A mix volume is a fraction of the well's current "
-                         f"contents; using {fraction:g}× so it stays below the "
+                         f"contents; using {fraction:g}x so it stays below the "
                          f"meniscus. Resolved to a number at build time.")
         elif (step.action == "transfer" and step.substance is not None
                 and any(k in step.substance.value.lower()
