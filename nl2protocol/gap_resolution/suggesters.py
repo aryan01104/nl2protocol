@@ -478,7 +478,92 @@ class WellRangeClipSuggester:
 
 
 # ============================================================================
-# 6. LLMSpotSuggester — focused per-Gap LLM call
+# 6. WellContentsVolumeSuggester — volumes defined by the well, not a number
+# ============================================================================
+
+# Substance phrases that mean "remove the liquid sitting in the well" rather
+# than a fresh reagent addition. Matched case-insensitively as substrings.
+_REMOVAL_SUBSTANCE_KEYWORDS = (
+    "supernatant", "eluate", "ethanol", "wash", "liquid waste",
+)
+
+
+class WellContentsVolumeSuggester:
+    """For a missing-volume Gap whose amount is defined by the WELL rather than
+    a stated number, fill a ProvenancedVolume carrying a `basis` that defers the
+    number to build time (resolved from the well-state tracker in spec_to_schema).
+
+    Two cases, both deterministic:
+      - a standalone `mix` (resuspend) → basis on the well it stirs, fraction 0.8.
+      - a `transfer` of a removal substance ("supernatant"/"eluate"/"ethanol"/
+        "wash") → basis on the source well, fraction 1.0 (take all of it).
+
+    Runs before LLMSpotSuggester so these never reach the per-step LLM (which
+    would guess an independent number and break coupling). Confidence 0.95 — a
+    well reference is deterministic, not a guess, so it auto-accepts.
+
+    Pre:    `gap.kind == "missing"` and `gap.field_path` ends in `.volume`.
+    Post:   Returns a Suggestion whose value is a ProvenancedVolume with `basis`
+            set (value=1.0 placeholder, overwritten at build), or None when the
+            step is neither a resuspend mix nor a removal transfer.
+    """
+
+    _MIX_FRACTION = 0.8
+    _REMOVAL_FRACTION = 1.0
+
+    def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
+        if gap.kind != "missing" or not gap.field_path.endswith(".volume"):
+            return None
+        idx = _step_index(gap)
+        if idx is None or idx >= len(spec.steps):
+            return None
+        step = spec.steps[idx]
+
+        if step.action == "mix":
+            location = "destination" if step.destination is not None else "source"
+            fraction = self._MIX_FRACTION
+            why = ("The instruction says to resuspend/mix the well but states "
+                   "no mix volume.")
+            reasoning = (f"A mix volume is a fraction of the well's current "
+                         f"contents; using {fraction:g}× so it stays below the "
+                         f"meniscus. Resolved to a number at build time.")
+        elif (step.action == "transfer" and step.substance is not None
+                and any(k in step.substance.value.lower()
+                        for k in _REMOVAL_SUBSTANCE_KEYWORDS)):
+            location = "source"
+            fraction = self._REMOVAL_FRACTION
+            why = (f"The instruction says to remove '{step.substance.value}' "
+                   f"but states no volume — the amount is whatever is in the well.")
+            reasoning = (f"'{step.substance.value}' is the liquid currently in "
+                         f"the source well; removing all of it (fraction "
+                         f"{fraction:g}). Resolved to a number at build time.")
+        else:
+            return None
+
+        from nl2protocol.models.spec import ProvenancedVolume, VolumeBasis, Provenance
+        vol = ProvenancedVolume(
+            value=1.0,  # placeholder; spec_to_schema overwrites from well state
+            unit="uL",
+            exact=False,
+            provenance=Provenance(
+                source="inferred",
+                positive_reasoning=reasoning,
+                why_not_in_instruction=why,
+                confidence=0.95,
+            ),
+            basis=VolumeBasis(kind="well_contents", location=location, fraction=fraction),
+        )
+        return Suggestion(
+            value=vol,
+            provenance_source="deterministic",
+            positive_reasoning=reasoning,
+            why_not_in_instruction=why,
+            confidence=0.95,
+        )
+
+
+# ============================================================================
+# 7. LLMSpotSuggester — focused per-Gap LLM call
 # ============================================================================
 #
 # Note: the former `LabwareSuggester` (token-overlap heuristic for ambiguous

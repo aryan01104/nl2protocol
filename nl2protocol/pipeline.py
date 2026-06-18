@@ -1528,7 +1528,7 @@ class ProtocolAgent:
 
             self._emit_progress("classifying instruction (Haiku)",
                                  stage_name="stage_1_classify")
-            from .validation.input_validator import InputValidator
+            from .stage_1_pre_extraction.input_validator import InputValidator
             validator = InputValidator(api_key=self._api_key)
             try:
                 validation = validator.classify(prompt)
@@ -1632,8 +1632,8 @@ class ProtocolAgent:
                 LabwareAmbiguityDetector,
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
-                WellRangeClipSuggester, LLMSpotSuggester,
-                IndependentReviewSuggester,
+                WellRangeClipSuggester, WellContentsVolumeSuggester,
+                LLMSpotSuggester, IndependentReviewSuggester,
             )
 
             # Build the suggester registry once — used by both the
@@ -1647,6 +1647,7 @@ class ProtocolAgent:
                 WellCapacitySuggester(),
                 RegexFromNoteSuggester(),
                 WellRangeClipSuggester(),
+                WellContentsVolumeSuggester(),
                 LLMSpotSuggester(client=extractor.client,
                                   model_name=extractor.model_name),
             ]

@@ -23,7 +23,9 @@ from nl2protocol.models import (
     EngageMagnets, DisengageMagnets,
 )
 from nl2protocol.constants import DEFAULT_MIX_REPS, TRASH_LABEL, is_discard_description
-from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
+from nl2protocol.models.spec import (
+    ProtocolSpec, CompleteProtocolSpec, Provenance, push_revision,
+)
 from nl2protocol.validation.constraints import WellStateTracker
 
 
@@ -485,6 +487,33 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
         dst_label = resolve_labware(step.destination, config)
         src_wells = wells_from_ref(step.source)
         dst_wells = wells_from_ref(step.destination)
+
+        # Derived volume: a volume marked "= the well's current contents"
+        # ("transfer the supernatant", "resuspend the beads") is resolved here
+        # from the live tracker, which already reflects steps 1..N-1. This is
+        # the user's "render expression to a value" — coupled volumes (add vs.
+        # mix vs. remove) stay consistent because they read the same well. The
+        # literal value is a fallback used only when the well is empty/unknown.
+        if step.volume is not None and step.volume.basis is not None:
+            basis = step.volume.basis
+            b_label = src_label if basis.location == "source" else dst_label
+            b_wells = src_wells if basis.location == "source" else dst_wells
+            b_well = b_wells[0] if b_wells else None
+            well_state = (well_tracker.state.get(b_label, {}).get(b_well)
+                          if b_label and b_well else None)
+            if well_state is not None:
+                derived = round(well_state.volume_ul * basis.fraction, 1)
+                if derived > 0:
+                    push_revision(step.volume, value=derived, provenance=Provenance(
+                        source="inferred",
+                        positive_reasoning=(
+                            f"Derived at build: {basis.fraction:g} × current "
+                            f"contents of {b_label} {b_well} "
+                            f"({well_state.volume_ul:g} µL) = {derived} µL."
+                        ),
+                        confidence=0.9,
+                    ))
+                    v = derived
 
         # Tip strategy is determined deterministically, not by LLM extraction.
         # The algorithm: reuse tips while the source well stays the same and

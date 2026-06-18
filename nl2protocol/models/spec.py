@@ -396,6 +396,32 @@ class CompositionProvenance(BaseModel):
 # PROVENANCED TYPES
 # ============================================================================
 
+class VolumeBasis(BaseModel):
+    """Marks a volume as DERIVED from a well's current contents, resolved to a
+    number at build time rather than guessed independently.
+
+    Set when the instruction defines the amount by the well, not by a figure —
+    "transfer the supernatant" (= all of the source well), "resuspend the beads"
+    (= stir most of the destination well). The literal `value` on the carrying
+    ProvenancedVolume is a fallback; `spec_to_schema` overwrites it with
+    `fraction × (current tracked contents of the step's <location> well)`, which
+    makes physically-coupled volumes consistent by construction.
+    """
+    kind: Literal["well_contents"] = Field("well_contents", description=(
+        "Basis kind. Only 'well_contents' today — a fraction of the well's "
+        "current volume."
+    ))
+    location: Literal["source", "destination"] = Field(..., description=(
+        "Which of the step's LocationRefs names the well to read: 'source' for "
+        "a removal (transfer the supernatant out of it), 'destination' for a "
+        "mix that stirs the well it acts on."
+    ))
+    fraction: float = Field(1.0, gt=0, le=1.0, description=(
+        "Scale on the well's current contents. 1.0 = all of it (removal); "
+        "~0.8 = a resuspend mix that stays below the meniscus."
+    ))
+
+
 class ProvenancedVolume(BaseModel):
     """A volume with provenance tracking."""
     value: float = Field(..., gt=0, description="Numeric volume. Copy the user's number exactly — never round or adjust.")
@@ -406,6 +432,11 @@ class ProvenancedVolume(BaseModel):
         "This is independent of provenance — a value can come from the instruction but still not be exact."
     ))
     provenance: Provenance
+    basis: Optional[VolumeBasis] = Field(None, description=(
+        "When set, this volume is derived at build time from a well's current "
+        "contents (see VolumeBasis); `value` is a fallback used only if the "
+        "well is empty/unknown at resolution time."
+    ))
     prior_revisions: List["ProvenancedVolume"] = Field(default_factory=list, description=(
         "Append-only history of prior states. Each entry is a snapshot of "
         "(value, unit, exact, provenance) taken just before a write replaced "

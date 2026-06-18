@@ -40,6 +40,7 @@ from nl2protocol.gap_resolution.suggesters import (
     LLMSpotSuggester,
     RegexFromNoteSuggester,
     WellCapacitySuggester,
+    WellContentsVolumeSuggester,
     WellRangeClipSuggester,
 )
 from nl2protocol.gap_resolution.handlers import CLIConfirmationHandler
@@ -83,6 +84,7 @@ __all__ = [
     "WellCapacitySuggester",
     "RegexFromNoteSuggester",
     "WellRangeClipSuggester",
+    "WellContentsVolumeSuggester",
     "LLMSpotSuggester",
     "IndependentReviewSuggester",
     "CLIConfirmationHandler",
