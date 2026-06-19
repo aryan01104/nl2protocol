@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.models.spec import (
     CompositionProvenance, ExtractedStep, Provenance, ProtocolSpec,
     WellContents, ProvenancedDuration,
@@ -45,7 +46,7 @@ def simple_config():
 
 
 def _prov():
-    return Provenance(source="instruction", cited_text="test", confidence=1.0)
+    return InstructionProvenance(source="instruction", cited_text="test", confidence=1.0)
 
 
 def _comp():
@@ -139,20 +140,20 @@ class TestProvenanceConfidenceBoundaries:
     """Pydantic confidence constraints (ge=0.0, le=1.0) — exact-edge tests."""
 
     def test_confidence_zero_accepted(self):
-        p = Provenance(source="instruction", cited_text="t", confidence=0.0)
+        p = InstructionProvenance(source="instruction", cited_text="t", confidence=0.0)
         assert p.confidence == 0.0
 
     def test_confidence_one_accepted(self):
-        p = Provenance(source="instruction", cited_text="t", confidence=1.0)
+        p = InstructionProvenance(source="instruction", cited_text="t", confidence=1.0)
         assert p.confidence == 1.0
 
     def test_confidence_just_above_one_rejected(self):
         with pytest.raises(ValidationError):
-            Provenance(source="instruction", cited_text="t", confidence=1.0001)
+            InstructionProvenance(source="instruction", cited_text="t", confidence=1.0001)
 
     def test_confidence_just_below_zero_rejected(self):
         with pytest.raises(ValidationError):
-            Provenance(source="instruction", cited_text="t", confidence=-0.0001)
+            InstructionProvenance(source="instruction", cited_text="t", confidence=-0.0001)
 
 
 # ============================================================================
@@ -190,7 +191,7 @@ class TestWellContentsVolumeProvenance:
 
     def test_volume_ul_provenance_accepts_instruction_provenance(self):
         from nl2protocol.models.spec import Provenance, WellContents
-        prov = Provenance(source="instruction",
+        prov = InstructionProvenance(source="instruction",
                           cited_text=["50uL DNA"], confidence=1.0)
         wc = WellContents(labware="tube rack", well="A1",
                           substance="DNA", volume_ul=50.0,
@@ -205,7 +206,7 @@ class TestWellContentsVolumeProvenance:
         # enforce, so model construction must not raise. Cross-field
         # validation lives in the prompt, not the model.
         from nl2protocol.models.spec import Provenance, WellContents
-        prov = Provenance(source="instruction",
+        prov = InstructionProvenance(source="instruction",
                           cited_text=["unused"], confidence=0.5)
         wc = WellContents(labware="x", well="A1", substance="y",
                           volume_ul=None, volume_ul_provenance=prov)

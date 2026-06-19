@@ -8,6 +8,7 @@ of the validator's docstring contract.
 import pytest
 from pydantic import ValidationError
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.models.spec import (
     ExtractedStep, ProtocolSpec, CompleteProtocolSpec,
     Provenance, CompositionProvenance, ProvenancedVolume, ProvenancedString,
@@ -21,8 +22,8 @@ from nl2protocol.models.spec import (
 
 def _prov(source="instruction", text="test cited text", confidence=1.0):
     if source == "instruction":
-        return Provenance(source=source, cited_text=text, confidence=confidence)
-    return Provenance(source=source, reasoning=text, confidence=confidence)
+        return InstructionProvenance(source=source, cited_text=text, confidence=confidence)
+    return InferredProvenance(source=source, positive_reasoning=text, confidence=confidence)
 
 
 def _comp(grounding=None, label="test step", confidence=1.0):

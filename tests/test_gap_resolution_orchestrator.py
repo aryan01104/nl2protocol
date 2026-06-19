@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.gap_resolution import (
     Gap,
     GapResolutionRecord,
@@ -615,12 +616,12 @@ def _real_spec():
     """
     from nl2protocol.models.spec import (
         CompositionProvenance, ExtractedStep, LocationRef,
-        Provenance, ProtocolSpec, ProvenancedVolume,
+        InferredProvenance, ProtocolSpec, ProvenancedVolume,
     )
 
     def _inferred_prov(reasoning="some reasoning",
                        why_not="instruction omitted this"):
-        return Provenance(
+        return InferredProvenance(
             source="inferred",
             positive_reasoning=reasoning,
             why_not_in_instruction=why_not,
@@ -734,7 +735,7 @@ class TestStampReviewerVerdicts:
         silently flip review_status away from the user-action status,
         masking the user's choice and burying any objection in the
         provenance audit trail only."""
-        from nl2protocol.models.spec import Provenance
+        from nl2protocol.models.spec import validate_provenance
         for terminal in (
             "user_confirmed", "user_edited", "user_accepted_suggestion",
             "user_skipped", "user_overrode_fabrication",
@@ -742,7 +743,7 @@ class TestStampReviewerVerdicts:
             spec = _real_spec()
             # Stamp the user-action status onto volume's provenance.
             existing = spec.steps[0].volume.provenance
-            spec.steps[0].volume.provenance = Provenance.model_validate({
+            spec.steps[0].volume.provenance = validate_provenance({
                 **existing.model_dump(),
                 "review_status": terminal,
             })
@@ -767,7 +768,7 @@ class TestStampReviewerVerdicts:
         no model ever read)."""
         from nl2protocol.models.spec import (
             CompositionProvenance, ExtractedStep, LocationRef,
-            Provenance, ProtocolSpec,
+            InferredProvenance, InstructionProvenance, ProtocolSpec,
         )
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
@@ -779,13 +780,13 @@ class TestStampReviewerVerdicts:
             order=1, action="transfer",
             source=LocationRef(
                 description="src", well="A1",
-                description_provenance=Provenance(
+                description_provenance=InferredProvenance(
                     source="inferred",
                     positive_reasoning="config lookup",
                     why_not_in_instruction="instruction omits source",
                     confidence=0.9,
                 ),
-                wells_provenance=Provenance(
+                wells_provenance=InstructionProvenance(
                     source="instruction",
                     cited_text=["A1"],
                     confidence=1.0,
@@ -848,10 +849,10 @@ class TestDefaultApplyStampsUserAction:
     resulting Provenance, clearing reviewer_objection in the process."""
 
     def _suggested_volume(self, value=75.0):
-        from nl2protocol.models.spec import Provenance, ProvenancedVolume
+        from nl2protocol.models.spec import InferredProvenance, ProvenancedVolume
         return ProvenancedVolume(
             value=value, unit="uL", exact=True,
-            provenance=Provenance(
+            provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning="suggester proposed this",
                 why_not_in_instruction="instruction lacks the volume",
@@ -860,15 +861,15 @@ class TestDefaultApplyStampsUserAction:
         )
 
     def _suggested_location(self, well="C3"):
-        from nl2protocol.models.spec import LocationRef, Provenance
+        from nl2protocol.models.spec import LocationRef, InferredProvenance
         return LocationRef(
             description="config-found", well=well,
-            description_provenance=Provenance(
+            description_provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning="config lookup",
                 why_not_in_instruction="instruction omits source",
                 confidence=0.9,
-            ), wells_provenance=Provenance(
+            ), wells_provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning="config lookup",
                 why_not_in_instruction="instruction omits source",
@@ -1014,7 +1015,7 @@ class TestDefaultApplyStampsUserAction:
         prov = spec.steps[0].volume.provenance
         assert prov.source == "inferred"
         assert prov.positive_reasoning == "standard SDS-PAGE loading volume"
-        assert prov.cited_text is None
+        assert not hasattr(prov, "cited_text")
 
     def test_cited_suggestion_on_subfield_path_stamps_instruction_source(self):
         """Same bridge, exercised through the subfield path
@@ -1117,12 +1118,12 @@ def _real_spec_with_resolution_provenance():
     resolved_label_provenance instead of the LocationRef's primary provenance."""
     from nl2protocol.models.spec import (
         CompositionProvenance, ExtractedStep, LocationRef,
-        Provenance, ProtocolSpec, ProvenancedVolume,
+        InferredProvenance, InstructionProvenance, ProtocolSpec, ProvenancedVolume,
     )
-    instr_prov = Provenance(
+    instr_prov = InstructionProvenance(
         source="instruction", cited_text="A1", confidence=1.0,
     )
-    res_prov = Provenance(
+    res_prov = InferredProvenance(
         source="inferred",
         positive_reasoning="resolver picked sample_rack for description 'rack'",
         why_not_in_instruction="user wrote 'rack' rather than 'sample_rack' literally",
@@ -1180,9 +1181,9 @@ class TestApplyResolutionForResolvedLabel:
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         from nl2protocol.models.spec import (
             CompositionProvenance, ExtractedStep, LocationRef,
-            Provenance, ProtocolSpec, ProvenancedVolume,
+            InstructionProvenance, ProtocolSpec, ProvenancedVolume,
         )
-        instr_prov = Provenance(source="instruction", cited_text="A1", confidence=1.0)
+        instr_prov = InstructionProvenance(source="instruction", cited_text="A1", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
@@ -1461,7 +1462,7 @@ class TestReviewerCollectsResolutionClaims:
             CompositionProvenance, ExtractedStep, LocationRef,
             Provenance, ProtocolSpec, ProvenancedVolume,
         )
-        instr_prov = Provenance(source="instruction", cited_text="A1", confidence=1.0)
+        instr_prov = InstructionProvenance(source="instruction", cited_text="A1", confidence=1.0)
         comp = CompositionProvenance(
             step_cited_text="t", parameters_cited_texts=["t"],
             parameters_reasoning="t", grounding=["instruction"], confidence=1.0,
@@ -1474,7 +1475,7 @@ class TestReviewerCollectsResolutionClaims:
                 description="rack", well="A1",
                 resolved_label="sample_rack",
                 description_provenance=instr_prov, wells_provenance=instr_prov,
-                resolved_label_provenance=Provenance(
+                resolved_label_provenance=InstructionProvenance(
                     source="instruction", cited_text="sample_rack", confidence=1.0,
                 ),
             ),
@@ -1513,7 +1514,7 @@ class TestADR0012FabricationOverride:
         # apply-side test we just construct a Provenanced* whose
         # cited_text IS in the spec but whose review_status will be
         # mutated by the override action.
-        instr_prov = Provenance(
+        instr_prov = InstructionProvenance(
             source="instruction", cited_text="50uL of sample", confidence=1.0,
         )
         comp = CompositionProvenance(
@@ -1559,7 +1560,7 @@ class TestADR0012FabricationOverride:
     def test_review_status_literal_accepts_user_overrode_fabrication(self):
         # Schema-level: Provenance.review_status accepts the new value.
         from nl2protocol.models.spec import Provenance
-        prov = Provenance(
+        prov = InstructionProvenance(
             source="instruction", cited_text="100uL",
             confidence=1.0, review_status="user_overrode_fabrication",
         )
@@ -1655,12 +1656,12 @@ class TestFabricationAcceptWritesNewValue:
             CompositionProvenance, ExtractedStep, LocationRef,
             Provenance, ProtocolSpec, ProvenancedVolume,
         )
-        instr_prov = Provenance(
+        instr_prov = InstructionProvenance(
             source="instruction", cited_text="50uL of sample", confidence=1.0,
         )
         # description_provenance is inferred — the slot the suggester
         # will rewrite when it proposes a new description.
-        inferred_desc_prov = Provenance(
+        inferred_desc_prov = InferredProvenance(
             source="inferred",
             positive_reasoning="old reasoning",
             why_not_in_instruction="instruction is ambiguous",
@@ -1689,12 +1690,12 @@ class TestFabricationAcceptWritesNewValue:
             CompositionProvenance, ExtractedStep, LocationRef,
             Provenance, ProtocolSpec, ProvenancedVolume,
         )
-        instr_prov = Provenance(
+        instr_prov = InstructionProvenance(
             source="instruction", cited_text="t", confidence=1.0,
         )
         # The volume's provenance is inferred and the suggester proposes
         # a new value (e.g. correcting a fabricated volume number).
-        inferred_vol_prov = Provenance(
+        inferred_vol_prov = InferredProvenance(
             source="inferred",
             positive_reasoning="old reasoning",
             why_not_in_instruction="instruction did not specify",
@@ -1968,13 +1969,13 @@ class TestApplyResolutionContractGuard:
         loc = LocationRef(
             description="reagent_rack",
             well="A1",
-            description_provenance=Provenance(
+            description_provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning="r",
                 why_not_in_instruction="n",
                 confidence=0.8,
             ),
-            wells_provenance=Provenance(
+            wells_provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning="r",
                 why_not_in_instruction="n",

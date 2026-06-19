@@ -13,8 +13,9 @@ from pathlib import Path
 from nl2protocol.constants import DEFAULT_MIX_REPS
 from nl2protocol.extraction import (
     CompleteProtocolSpec, ExtractedStep, ProvenancedVolume,
-    Provenance, CompositionProvenance, LocationRef, spec_to_schema,
+    CompositionProvenance, LocationRef, spec_to_schema,
 )
+from nl2protocol.models.spec import InstructionProvenance
 from nl2protocol.models import Mix
 
 
@@ -26,7 +27,7 @@ def config():
 
 
 def _prov():
-    return Provenance(source="instruction", cited_text="x", confidence=1.0)
+    return InstructionProvenance(source="instruction", cited_text="x", confidence=1.0)
 
 
 def _comp():

@@ -62,7 +62,7 @@ class ConfigLookupSuggester:
             contents = lw.get("contents", {}) or {}
             for well, content_desc in contents.items():
                 if isinstance(content_desc, str) and substance_lower in content_desc.lower():
-                    from nl2protocol.models.spec import LocationRef, Provenance
+                    from nl2protocol.models.spec import LocationRef, InferredProvenance
                     _synth_reason = (
                         f"Synthesized by ConfigLookupSuggester from the "
                         f"substance match below; no user wording existed "
@@ -77,19 +77,19 @@ class ConfigLookupSuggester:
                         description=label,
                         well=well,
                         resolved_label=label,
-                        description_provenance=Provenance(
+                        description_provenance=InferredProvenance(
                             source="inferred",
                             positive_reasoning=_synth_reason,
                             why_not_in_instruction=_synth_why_not,
                             confidence=0.9,
                         ),
-                        wells_provenance=Provenance(
+                        wells_provenance=InferredProvenance(
                             source="inferred",
                             positive_reasoning=_synth_reason,
                             why_not_in_instruction=_synth_why_not,
                             confidence=0.9,
                         ),
-                        resolved_label_provenance=Provenance(
+                        resolved_label_provenance=InferredProvenance(
                             source="inferred",
                             positive_reasoning=(
                                 f"Config labware '{label}' lists substance "
@@ -154,10 +154,10 @@ class CarryoverSuggester:
         for prior in reversed(spec.steps[:idx]):
             if prior.action == "set_temperature" and prior.temperature is not None:
                 celsius = prior.temperature.value
-                from nl2protocol.models.spec import Provenance, ProvenancedTemperature
+                from nl2protocol.models.spec import InferredProvenance, ProvenancedTemperature
                 temp = ProvenancedTemperature(
                     value=celsius,
-                    provenance=Provenance(
+                    provenance=InferredProvenance(
                         source="inferred",
                         positive_reasoning=(
                             f"wait_for_temperature inherits from the most "
@@ -376,11 +376,11 @@ class RegexFromNoteSuggester:
         value = float(m.group(1))
         raw_unit = m.group(2).lower()
         unit = self._UNIT_NORMALIZE.get(raw_unit, "seconds")
-        from nl2protocol.models.spec import Provenance, ProvenancedDuration
+        from nl2protocol.models.spec import InferredProvenance, ProvenancedDuration
         dur = ProvenancedDuration(
             value=value,
             unit=unit,
-            provenance=Provenance(
+            provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning=(
                     f"Step note contains a duration phrase '{m.group(0)}'; "
@@ -540,12 +540,12 @@ class WellContentsVolumeSuggester:
         else:
             return None
 
-        from nl2protocol.models.spec import ProvenancedVolume, VolumeBasis, Provenance
+        from nl2protocol.models.spec import ProvenancedVolume, VolumeBasis, InferredProvenance
         vol = ProvenancedVolume(
             value=1.0,  # placeholder; spec_to_schema overwrites from well state
             unit="uL",
             exact=False,
-            provenance=Provenance(
+            provenance=InferredProvenance(
                 source="inferred",
                 positive_reasoning=reasoning,
                 why_not_in_instruction=why,
@@ -734,16 +734,16 @@ def _build_inner_provenance(data: dict):
     cited_text null     → source="inferred"   + positive_reasoning +
                           why_not_in_instruction + confidence.
     """
-    from nl2protocol.models.spec import Provenance
+    from nl2protocol.models.spec import InstructionProvenance, InferredProvenance
     cited = data.get("cited_text")
     confidence = float(data.get("confidence", 0.6))
     if cited:
-        return Provenance(
+        return InstructionProvenance(
             source="instruction",
             cited_text=[cited],
             confidence=confidence,
         )
-    return Provenance(
+    return InferredProvenance(
         source="inferred",
         positive_reasoning=data["positive_reasoning"],
         why_not_in_instruction=data.get("why_not_in_instruction"),

@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import pytest
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.models.spec import (
     CompositionProvenance, ExtractedStep, LocationRef, PostAction,
-    Provenance, ProvenancedDuration, ProvenancedString,
+    InstructionProvenance, ProvenancedDuration, ProvenancedString,
     ProvenancedTemperature, ProvenancedVolume, _ACTION_KEEPS,
     _PRUNABLE_FIELDS,
 )
@@ -31,8 +32,8 @@ from nl2protocol.models.spec import (
 # ---------------------------------------------------------------------------
 
 
-def _instr_prov() -> Provenance:
-    return Provenance(source="instruction", cited_text="t", confidence=1.0)
+def _instr_prov() -> InstructionProvenance:
+    return InstructionProvenance(source="instruction", cited_text="t", confidence=1.0)
 
 
 def _comp() -> CompositionProvenance:

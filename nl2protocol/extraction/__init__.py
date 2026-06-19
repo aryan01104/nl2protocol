@@ -19,7 +19,6 @@ from nl2protocol.extraction.prompts import (
 from nl2protocol.extraction.resolver import LabwareMatcher, LabwareMatchSuggestion
 from nl2protocol.extraction.extractor import (
     SemanticExtractor,
-    _find_provenance_reason,
 )
 # Re-export spec models so `from nl2protocol.extraction import ProtocolSpec` works
 from nl2protocol.models.spec import (

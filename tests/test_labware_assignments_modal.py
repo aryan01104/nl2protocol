@@ -20,9 +20,10 @@ from __future__ import annotations
 from types import MethodType, SimpleNamespace
 from typing import List
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.extraction.resolver import LabwareMatchSuggestion
 from nl2protocol.models.spec import (
-    CompositionProvenance, ExtractedStep, LocationRef, Provenance,
+    CompositionProvenance, ExtractedStep, LocationRef, InstructionProvenance,
     ProtocolSpec,
 )
 from nl2protocol.pipeline import ProtocolAgent
@@ -33,8 +34,8 @@ from nl2protocol.pipeline import ProtocolAgent
 # ---------------------------------------------------------------------------
 
 
-def _instr_prov() -> Provenance:
-    return Provenance(source="instruction", cited_text="t", confidence=1.0)
+def _instr_prov() -> InstructionProvenance:
+    return InstructionProvenance(source="instruction", cited_text="t", confidence=1.0)
 
 
 def _comp_prov() -> CompositionProvenance:

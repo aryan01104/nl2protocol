@@ -12,9 +12,9 @@ from pathlib import Path
 
 from nl2protocol.extraction import (
     CompleteProtocolSpec, ExtractedStep, ProvenancedVolume,
-    Provenance, CompositionProvenance, LocationRef, spec_to_schema,
+    CompositionProvenance, LocationRef, spec_to_schema,
 )
-from nl2protocol.models.spec import VolumeBasis
+from nl2protocol.models.spec import VolumeBasis, InstructionProvenance
 from nl2protocol.models import Transfer, Mix
 from nl2protocol.gap_resolution.suggesters import WellContentsVolumeSuggester
 from nl2protocol.gap_resolution.types import Gap
@@ -28,7 +28,7 @@ def config():
 
 
 def _prov():
-    return Provenance(source="instruction", cited_text="x", confidence=1.0)
+    return InstructionProvenance(source="instruction", cited_text="x", confidence=1.0)
 
 
 def _comp():

@@ -12,9 +12,10 @@ from pathlib import Path
 
 from nl2protocol.extraction import (
     CompleteProtocolSpec, ExtractedStep, ProvenancedVolume,
-    Provenance, CompositionProvenance, LocationRef, PostAction,
+    CompositionProvenance, LocationRef, PostAction,
     spec_to_schema,
 )
+from nl2protocol.models.spec import InstructionProvenance
 from nl2protocol.models import Transfer, PickUpTip, DropTip
 
 
@@ -30,7 +31,7 @@ def config():
 
 
 def _prov():
-    return Provenance(source="instruction", cited_text="test cited text", confidence=1.0)
+    return InstructionProvenance(source="instruction", cited_text="test cited text", confidence=1.0)
 
 
 def _loc(**kwargs):

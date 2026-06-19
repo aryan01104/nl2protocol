@@ -354,7 +354,9 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
     """Stamp review_status + reviewer_objection onto every Provenance whose
     field_path appears in `reviews`.
     """
-    from nl2protocol.models.spec import Provenance
+    from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
 
     _TERMINAL_USER_STATUSES = frozenset({
         "user_confirmed",
@@ -398,7 +400,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             review = reviews.get(f"steps[{step_idx}].{fname}")
             if review is None:
                 continue
-            field_obj.provenance = Provenance.model_validate({
+            field_obj.provenance = validate_provenance({
                 **prov.model_dump(), **_verdict_updates(review),
             })
 
@@ -413,7 +415,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
                 prov = getattr(ref, prov_attr, None)
                 if not _should_stamp(prov):
                     continue
-                setattr(ref, prov_attr, Provenance.model_validate({
+                setattr(ref, prov_attr, validate_provenance({
                     **prov.model_dump(), **_verdict_updates(review),
                 }))
 
@@ -427,7 +429,7 @@ def stamp_reviewer_verdicts(spec, reviews: dict) -> None:
             review = reviews.get(f"steps[{step_idx}].{role}.resolved_label")
             if review is None:
                 continue
-            ref.resolved_label_provenance = Provenance.model_validate({
+            ref.resolved_label_provenance = validate_provenance({
                 **rprov.model_dump(), **_verdict_updates(review),
             })
 
@@ -494,12 +496,14 @@ def _stamp_user_action(field_obj, user_action_provenance: str) -> None:
     """
     if field_obj is None:
         return
-    from nl2protocol.models.spec import Provenance
+    from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
     for prov_attr in ("provenance", "description_provenance", "wells_provenance"):
         prov = getattr(field_obj, prov_attr, None)
         if prov is None:
             continue
-        setattr(field_obj, prov_attr, Provenance.model_validate({
+        setattr(field_obj, prov_attr, validate_provenance({
             **prov.model_dump(),
             "review_status": user_action_provenance,
             "reviewer_objection": None,
@@ -511,11 +515,13 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
     user picks (or edits) a config labware label for an ambiguous
     LocationRef.
     """
-    from nl2protocol.models.spec import Provenance
+    from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
     existing = getattr(loc_ref, "resolved_label_provenance", None)
     description = getattr(loc_ref, "description", "")
     if existing is None:
-        loc_ref.resolved_label_provenance = Provenance(
+        loc_ref.resolved_label_provenance = InferredProvenance(
             source="inferred",
             positive_reasoning=(
                 f"User picked config label '{label}' for description "
@@ -530,7 +536,7 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
             confidence=1.0,
         )
         return
-    loc_ref.resolved_label_provenance = Provenance.model_validate({
+    loc_ref.resolved_label_provenance = validate_provenance({
         **existing.model_dump(),
         "review_status": user_action_provenance,
         "reviewer_objection": None,
@@ -540,16 +546,18 @@ def _stamp_resolution_action(loc_ref, user_action_provenance: str, label) -> Non
 def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
     """Construct the Provenance to stamp on a spec field when accepting a Suggestion.
     """
-    from nl2protocol.models.spec import Provenance
+    from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
     cited_text = getattr(suggestion, "cited_text", None)
     if suggestion.provenance_source == "cited" and cited_text:
-        return Provenance(
+        return InstructionProvenance(
             source="instruction",
             cited_text=[cited_text],
             review_status=review_status,
             confidence=suggestion.confidence,
         )
-    return Provenance(
+    return InferredProvenance(
         source="inferred",
         positive_reasoning=suggestion.positive_reasoning,
         why_not_in_instruction=suggestion.why_not_in_instruction,
@@ -615,7 +623,9 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
         parent = getattr(spec.steps[idx], fname, None)
         if parent is None:
             return
-        from nl2protocol.models.spec import Provenance
+        from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
         if resolution.action == "accept_suggestion":
             if suggestion is not None:
                 new_prov = _build_suggested_provenance(
@@ -623,7 +633,7 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 )
                 proposed_value = suggestion.value
             else:
-                new_prov = new_value if isinstance(new_value, Provenance) else None
+                new_prov = new_value if isinstance(new_value, ProvenanceBase) else None
                 proposed_value = None
             if new_prov is None:
                 return
@@ -644,7 +654,7 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             if existing_prov is not None:
                 if hasattr(parent, "prior_revisions"):
                     push_revision(parent)
-                setattr(parent, slot, Provenance.model_validate({
+                setattr(parent, slot, validate_provenance({
                     **existing_prov.model_dump(),
                     "review_status": "user_overrode_fabrication",
                     "reviewer_objection": None,
@@ -654,7 +664,7 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             if hasattr(parent, "prior_revisions"):
                 push_revision(parent)
             parent.value = new_value
-            setattr(parent, slot, Provenance(
+            setattr(parent, slot, InferredProvenance(
                 source="inferred",
                 positive_reasoning=(
                     "User-typed value during fabrication resolution."
@@ -742,7 +752,9 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
             if subfield == "resolved_label":
                 _stamp_resolution_action(target, user_action, new_value)
                 return
-            from nl2protocol.models.spec import Provenance
+            from nl2protocol.models.spec import (
+        InstructionProvenance, InferredProvenance, ProvenanceBase, validate_provenance,
+    )
             prov_slot = _LOCATIONREF_VALUE_SUBFIELDS.get(subfield)
             if prov_slot is not None:
                 new_prov = None
@@ -752,7 +764,7 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                         suggestion, review_status=user_action,
                     )
                 elif resolution.action == "edit":
-                    new_prov = Provenance(
+                    new_prov = InferredProvenance(
                         source="inferred",
                         positive_reasoning=(
                             "User edited this value directly during gap "

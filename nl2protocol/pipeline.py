@@ -1285,7 +1285,7 @@ class ProtocolAgent:
                     of user/resolver agreement.
         Side effects: None.
         """
-        from nl2protocol.models.spec import Provenance
+        from nl2protocol.models.spec import InferredProvenance
 
         accepted = (
             suggestion is not None
@@ -1327,7 +1327,7 @@ class ProtocolAgent:
             base_positive = f"{base_positive} {mismatch_note}"
             base_conf = min(base_conf, 0.5)
 
-        return Provenance(
+        return InferredProvenance(
             source="inferred",
             positive_reasoning=base_positive,
             why_not_in_instruction=base_why,

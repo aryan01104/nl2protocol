@@ -17,6 +17,7 @@ import os
 import pytest
 from pathlib import Path
 
+from nl2protocol.models.spec import InstructionProvenance, InferredProvenance, validate_provenance
 from nl2protocol.validation.constraints import (
     PhysicalConstraintsChecker, ViolationType, Severity, WellStateTracker
 )
@@ -58,10 +59,10 @@ def make_spec(steps, **kwargs):
 
 def _prov(source="instruction", text="test cited text", confidence=1.0):
     """Shorthand for test provenance. `text` becomes cited_text for instruction-sourced,
-    reasoning for non-instruction-sourced."""
+    positive_reasoning for non-instruction-sourced."""
     if source == "instruction":
-        return Provenance(source=source, cited_text=text, confidence=confidence)
-    return Provenance(source=source, reasoning=text, confidence=confidence)
+        return InstructionProvenance(source=source, cited_text=text, confidence=confidence)
+    return InferredProvenance(source=source, positive_reasoning=text, confidence=confidence)
 
 
 def _loc(**kwargs):
@@ -466,10 +467,10 @@ class TestLocationRefSentinelNormalization:
 
     def _provenance(self, source="instruction", cited="x"):
         if source == "instruction":
-            return Provenance(
+            return InstructionProvenance(
                 source="instruction", cited_text=[cited], confidence=1.0
             )
-        return Provenance(
+        return InferredProvenance(
             source="inferred", positive_reasoning="probe", confidence=0.7
         )
 
