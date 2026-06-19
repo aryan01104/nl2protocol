@@ -10,7 +10,7 @@ import os
 import pytest
 from unittest.mock import MagicMock
 
-from nl2protocol.validation.input_validator import (
+from nl2protocol.stage_1_pre_extraction.input_validator import (
     InputValidator, InputValidationResult, check_input_length,
 )
 

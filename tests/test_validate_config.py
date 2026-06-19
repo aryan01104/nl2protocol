@@ -9,7 +9,7 @@ tested transitively through `validate`.
 import json
 import pytest
 
-from nl2protocol.validation.validate_config import (
+from nl2protocol.stage_1_pre_extraction.validate_config import (
     ConfigValidator, ValidationError, ValidationResult,
     validate_config, validate_config_file,
 )

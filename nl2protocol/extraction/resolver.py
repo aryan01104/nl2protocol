@@ -22,7 +22,9 @@ import json
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from nl2protocol.constants import DEFAULT_MODEL
+from nl2protocol.constants import (
+    DEFAULT_MODEL, TRASH_LABEL, is_discard_description,
+)
 from nl2protocol.models.spec import LocationRef, ProtocolSpec
 
 
@@ -41,6 +43,8 @@ class LabwareMatchSuggestion:
     both capability and type filters — nothing to ask the user) and
     show the right shape for ambiguous / namespace-split / unresolvable
     cases. Values:
+      - "discard":       description names waste/trash; routed to the fixed
+                          trash (TRASH_LABEL), no LLM call.
       - "deterministic": exactly one capability+type survivor; no LLM call.
       - "llm":           2+ survivors after filters; LLM picked among them.
       - "namespace_split": 0 survivors AND wells partition cleanly by
@@ -352,7 +356,29 @@ class LabwareMatcher:
         # branches are recorded.
         llm_branch: dict = {}  # description -> survivors
 
+        has_waste_container = self._config_has_waste_container()
         for desc, payload in per_desc.items():
+            # Discard sink: a description naming waste/trash is not a configured
+            # container — route it to the OT-2 fixed trash deterministically so
+            # the assignments modal shows the correct mapping and the LLM never
+            # mistakes it for a reagent well. Skipped when the config itself
+            # declares a waste container (then normal resolution matches that).
+            if is_discard_description(desc) and not has_waste_container:
+                suggestions[desc] = LabwareMatchSuggestion(
+                    description=desc,
+                    suggested_label=TRASH_LABEL,
+                    positive_reasoning=(
+                        f"'{desc}' names discarded liquid, not a configured "
+                        f"container. Routed to the OT-2 fixed trash (always "
+                        f"present in slot 12): the waste is aspirated into the "
+                        f"tip and the tip is dropped in the trash."
+                    ),
+                    why_not_in_instruction=None,
+                    confidence=0.95,
+                    candidates=[TRASH_LABEL],
+                    branch="discard",
+                )
+                continue
             wells = payload["wells"]
             branch, survivors = self._resolve_one(desc, wells)
             if branch == "deterministic":
@@ -428,6 +454,20 @@ class LabwareMatcher:
                     branch="llm",
                 )
         return suggestions
+
+    def _config_has_waste_container(self) -> bool:
+        """Return True when the lab config declares a dedicated waste container.
+
+        Pre:    `self.config` is the loaded config dict.
+        Post:   Returns True iff any config labware label or load_name names a
+                waste/trash container (per `is_discard_description`). When True,
+                the caller lets normal resolution match that container instead
+                of routing discards to the fixed trash.
+        """
+        for label, lw in self.config.get("labware", {}).items():
+            if is_discard_description(label) or is_discard_description(lw.get("load_name", "")):
+                return True
+        return False
 
     def _collect_unique_descriptions(self, spec: ProtocolSpec) -> List[str]:
         """Gather every unique labware description from a spec — step

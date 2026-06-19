@@ -22,7 +22,10 @@ from nl2protocol.models import (
     SetTemperature, WaitForTemperature, DeactivateModule,
     EngageMagnets, DisengageMagnets,
 )
-from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
+from nl2protocol.constants import DEFAULT_MIX_REPS, TRASH_LABEL, is_discard_description
+from nl2protocol.models.spec import (
+    ProtocolSpec, CompleteProtocolSpec, Provenance, push_revision,
+)
 from nl2protocol.validation.constraints import WellStateTracker
 
 
@@ -235,11 +238,19 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
         """
         if not ref:
             return None
+        if ref.resolved_label == TRASH_LABEL:
+            return TRASH_LABEL
         if ref.resolved_label and ref.resolved_label in cfg.get("labware", {}):
             return ref.resolved_label
         # Fallback: description might already be a config label (legacy specs)
         if ref.description in cfg.get("labware", {}):
             return ref.description
+        # Discard sink: a destination naming waste/trash that resolved to no
+        # real container lowers to the OT-2 fixed trash. Belt-and-suspenders
+        # for the resolver's "discard" branch — the script is correct even if
+        # the assignments flow left resolved_label unset.
+        if is_discard_description(ref.description):
+            return TRASH_LABEL
         return None
 
     def pipette_for_volume(volume: float, cfg: dict) -> Optional[str]:
@@ -477,6 +488,33 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
         src_wells = wells_from_ref(step.source)
         dst_wells = wells_from_ref(step.destination)
 
+        # Derived volume: a volume marked "= the well's current contents"
+        # ("transfer the supernatant", "resuspend the beads") is resolved here
+        # from the live tracker, which already reflects steps 1..N-1. This is
+        # the user's "render expression to a value" — coupled volumes (add vs.
+        # mix vs. remove) stay consistent because they read the same well. The
+        # literal value is a fallback used only when the well is empty/unknown.
+        if step.volume is not None and step.volume.basis is not None:
+            basis = step.volume.basis
+            b_label = src_label if basis.location == "source" else dst_label
+            b_wells = src_wells if basis.location == "source" else dst_wells
+            b_well = b_wells[0] if b_wells else None
+            well_state = (well_tracker.state.get(b_label, {}).get(b_well)
+                          if b_label and b_well else None)
+            if well_state is not None:
+                derived = round(well_state.volume_ul * basis.fraction, 1)
+                if derived > 0:
+                    push_revision(step.volume, value=derived, provenance=Provenance(
+                        source="inferred",
+                        positive_reasoning=(
+                            f"Derived at build: {basis.fraction:g} × current "
+                            f"contents of {b_label} {b_well} "
+                            f"({well_state.volume_ul:g} µL) = {derived} µL."
+                        ),
+                        confidence=0.9,
+                    ))
+                    v = derived
+
         # Tip strategy is determined deterministically, not by LLM extraction.
         # The algorithm: reuse tips while the source well stays the same and
         # there's no post-dispense mixing (which contaminates the tip with
@@ -519,7 +557,23 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
 
         # ---- map action → commands ----
 
-        if step.action == "transfer":
+        if step.action == "transfer" and dst_label == TRASH_LABEL:
+            # Discard: aspirate the waste into the tip, then drop the tip into
+            # the OT-2 fixed trash (no dispense into a container). This is the
+            # standard supernatant/wash-removal idiom; the fixed trash is always
+            # present, so no labware is loaded for it. One tip per source well.
+            discard_wells = src_wells or (
+                [step.source.well] if step.source and step.source.well else ["A1"]
+            )
+            for sw in discard_wells:
+                commands.append(PickUpTip(pipette=mount))
+                if v and src_label:
+                    commands.append(Aspirate(
+                        pipette=mount, labware=src_label, well=sw, volume=v,
+                    ))
+                commands.append(DropTip(pipette=mount))
+
+        elif step.action == "transfer":
             # Collect all transfers for this step, then apply tip strategy
             step_transfers = []
 
@@ -687,11 +741,15 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
             target = dst_label or src_label
             if target is None:
                 raise ValueError(f"Step {step.order} (mix): no labware location resolved")
-            reps = 3
-            if step.post_actions:
-                for pa in step.post_actions:
-                    if pa.action == "mix" and pa.repetitions:
-                        reps = pa.repetitions
+            # Stated count wins; otherwise fall back to the named default and
+            # surface it (not a silent 3). post_actions is pruned for a mix
+            # action, so a standalone mix carries its count in step.repetitions.
+            if step.repetitions:
+                reps = step.repetitions
+            else:
+                reps = DEFAULT_MIX_REPS
+                print(f"  Note: step {step.order} (mix) has no stated cycle "
+                      f"count; using default {DEFAULT_MIX_REPS}")
             wells = dst_wells or src_wells or ["A1"]
             # New tip per well — mixing touches well contents,
             # reusing would cross-contaminate between wells

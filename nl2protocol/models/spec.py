@@ -13,6 +13,8 @@ from typing import Annotated, Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from nl2protocol.constants import TRASH_LABEL, is_discard_description
+
 
 WellName = Annotated[str, Field(pattern=r'^[A-P](1[0-9]|2[0-4]|[1-9])$')]
 
@@ -394,6 +396,32 @@ class CompositionProvenance(BaseModel):
 # PROVENANCED TYPES
 # ============================================================================
 
+class VolumeBasis(BaseModel):
+    """Marks a volume as DERIVED from a well's current contents, resolved to a
+    number at build time rather than guessed independently.
+
+    Set when the instruction defines the amount by the well, not by a figure —
+    "transfer the supernatant" (= all of the source well), "resuspend the beads"
+    (= stir most of the destination well). The literal `value` on the carrying
+    ProvenancedVolume is a fallback; `spec_to_schema` overwrites it with
+    `fraction × (current tracked contents of the step's <location> well)`, which
+    makes physically-coupled volumes consistent by construction.
+    """
+    kind: Literal["well_contents"] = Field("well_contents", description=(
+        "Basis kind. Only 'well_contents' today — a fraction of the well's "
+        "current volume."
+    ))
+    location: Literal["source", "destination"] = Field(..., description=(
+        "Which of the step's LocationRefs names the well to read: 'source' for "
+        "a removal (transfer the supernatant out of it), 'destination' for a "
+        "mix that stirs the well it acts on."
+    ))
+    fraction: float = Field(1.0, gt=0, le=1.0, description=(
+        "Scale on the well's current contents. 1.0 = all of it (removal); "
+        "~0.8 = a resuspend mix that stays below the meniscus."
+    ))
+
+
 class ProvenancedVolume(BaseModel):
     """A volume with provenance tracking."""
     value: float = Field(..., gt=0, description="Numeric volume. Copy the user's number exactly — never round or adjust.")
@@ -404,6 +432,11 @@ class ProvenancedVolume(BaseModel):
         "This is independent of provenance — a value can come from the instruction but still not be exact."
     ))
     provenance: Provenance
+    basis: Optional[VolumeBasis] = Field(None, description=(
+        "When set, this volume is derived at build time from a well's current "
+        "contents (see VolumeBasis); `value` is a fallback used only if the "
+        "well is empty/unknown at resolution time."
+    ))
     prior_revisions: List["ProvenancedVolume"] = Field(default_factory=list, description=(
         "Append-only history of prior states. Each entry is a snapshot of "
         "(value, unit, exact, provenance) taken just before a write replaced "
@@ -662,6 +695,7 @@ ActionType = Literal[
 _PRUNABLE_FIELDS: frozenset = frozenset({
     "substance", "volume", "temperature", "duration",
     "source", "destination", "post_actions", "replicates", "note",
+    "repetitions",
 })
 
 _ACTION_KEEPS: dict = {
@@ -673,7 +707,7 @@ _ACTION_KEEPS: dict = {
                               "post_actions", "replicates"},
     "serial_dilution":      {"volume", "substance", "source", "destination",
                               "post_actions", "replicates"},
-    "mix":                  {"volume", "substance", "destination"},
+    "mix":                  {"volume", "substance", "destination", "repetitions"},
     "aspirate":             {"volume", "substance", "source"},
     "dispense":             {"volume", "substance", "destination"},
     "blow_out":             {"destination"},
@@ -738,6 +772,14 @@ class ExtractedStep(BaseModel):
     source: Optional[LocationRef] = None
     destination: Optional[LocationRef] = None
     post_actions: Optional[List[PostAction]] = None
+    repetitions: Optional[int] = Field(None, description=(
+        "Number of mix cycles for a standalone 'mix' action (one up-and-down "
+        "pipetting pass per cycle). Set ONLY if the user stated a count, e.g. "
+        "'pipette up and down 10 times' → repetitions: 10. Leave null when no "
+        "count is given — do not infer a default. Only consumed by the 'mix' "
+        "action; for a mix attached to a transfer, use PostAction.repetitions "
+        "instead."
+    ))
     replicates: Optional[int] = Field(None, description=(
         "Number of replicate destination columns per source well. Must be >= 2 (1 is not replication). "
         "Set only when the user explicitly says 'in triplicate' (3), 'in duplicate' (2), etc. "
@@ -1043,7 +1085,16 @@ class CompleteProtocolSpec(ProtocolSpec):
                 # location and the user is never asked to fill it.
                 for role in ("source", "destination"):
                     ref = getattr(step, role, None)
-                    if (ref is not None and ref.well is None
+                    if ref is None:
+                        continue
+                    # A discard destination (waste/trash) needs no well — the
+                    # OT-2 fixed trash is a single-well sink resolved off-config.
+                    if role == "destination" and (
+                        ref.resolved_label == TRASH_LABEL
+                        or is_discard_description(ref.description)
+                    ):
+                        continue
+                    if (ref.well is None
                             and not ref.wells and ref.well_range is None):
                         errors.append(f"{prefix}: missing {role} well(s){substance_hint}")
 

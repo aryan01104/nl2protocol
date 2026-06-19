@@ -137,7 +137,7 @@ class ConfigLoader:
                   * the file contains invalid JSON.
                 The error's reason field carries the specific failure cause.
         """
-        from .validation.validate_config import validate_config_file
+        from .stage_1_pre_extraction.validate_config import validate_config_file
 
         if not os.path.exists(self.config_path):
             raise ConfigFileError(self.config_path, "File not found.")

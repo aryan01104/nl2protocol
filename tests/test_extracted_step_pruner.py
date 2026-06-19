@@ -86,6 +86,7 @@ def _build_max_step(action: str) -> ExtractedStep:
         destination=_loc("dest rack"),
         post_actions=[PostAction(action="mix", repetitions=2)],
         replicates=3,
+        repetitions=5,
         note="some note",
     )
 
