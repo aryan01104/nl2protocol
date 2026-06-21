@@ -1166,6 +1166,7 @@
     <div id="live-upload-group" style="display: none; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 10px; background: var(--modal-header-bg); border-radius: 4px;">
       <label style="font-size: 12px; color: var(--ink);">Instruction (.txt): <input type="file" id="live-instruction-file" accept=".txt,.md,text/plain" style="font-size: 12px;"></label>
       <label style="font-size: 12px; color: var(--ink);">Config (.json): <input type="file" id="live-config-file" accept=".json,application/json" style="font-size: 12px;"></label>
+      <label style="font-size: 12px; color: var(--ink);">Initial state (.xlsx, optional): <input type="file" id="live-initial-state-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="font-size: 12px;"></label>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       {% if not local_dev_mode %}
@@ -3935,6 +3936,15 @@
       return await input.files[0].text();
     }
 
+    // Read a file (e.g. the .xlsx initial-state map) as base64 for the JSON body.
+    async function readFileBase64(input) {
+      if (!input || !input.files || !input.files[0]) return null;
+      const bytes = new Uint8Array(await input.files[0].arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+
     const LOCAL_DEV_MODE = {{ local_dev_mode|tojson if local_dev_mode is defined else 'false' }};
 
     startBtn.addEventListener("click", async () => {
@@ -3945,7 +3955,7 @@
         return;
       }
 
-      let instruction, config;
+      let instruction, config, initialStateB64 = null;
       try {
         if (uploadMode) {
           const instText = await readFileText(document.getElementById("live-instruction-file"));
@@ -3955,6 +3965,8 @@
           instruction = instText;
           try { config = JSON.parse(configText); }
           catch (e) { setStatus("invalid config JSON", "error"); return; }
+          // Optional initial-state map (.xlsx) — the oracle for well contents.
+          initialStateB64 = await readFileBase64(document.getElementById("live-initial-state-file"));
         } else if (exampleSelect.value) {
           const [instResp, configResp] = await Promise.all([
             fetch("/examples/" + encodeURIComponent(exampleSelect.value) + "/instruction"),
@@ -3988,11 +4000,13 @@
         const r = await fetch("/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instruction, config, api_key: apiKey, case_name: caseName }),
+          body: JSON.stringify({ instruction, config, api_key: apiKey, case_name: caseName, initial_state_b64: initialStateB64 }),
         });
         const j = await r.json();
         if (j.status === "started") {
-          setStatus("running", "warn");
+          const warns = (j.initial_state_errors && j.initial_state_errors.length)
+            ? " (initial-state warnings: " + j.initial_state_errors.length + ")" : "";
+          setStatus("running" + warns, "warn");
         } else if (j.status === "already_running") {
           setStatus("another run in progress — try again in a few minutes", "warn");
           startBtn.disabled = false;

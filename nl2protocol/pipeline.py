@@ -625,6 +625,46 @@ class ProtocolAgent:
 
         return results
 
+    def _initial_state_provenance(self):
+        """Return the Provenance stamped on a value taken from the uploaded
+        initial-state map.
+
+        The map is operator-authored ground truth, not text cited from the
+        instruction, so source is 'inferred' (no instruction citation exists)
+        with review_status 'user_edited' and full confidence; the reasoning
+        names the map as the origin.
+        """
+        from .models.provenance_models import InferredProvenance
+        return InferredProvenance(
+            source="inferred",
+            positive_reasoning="Value taken from the operator's uploaded initial-state map.",
+            why_not_in_instruction="Provided in the initial-state spreadsheet, not the instruction text.",
+            confidence=1.0,
+            review_status="user_edited",
+        )
+
+    def _seed_initial_contents_from_oracle(self, spec, initial_state) -> None:
+        """Replace spec.initial_contents with the uploaded initial-state map.
+
+        Pre:    `initial_state` is an InitialStateSheet (caller checks non-None);
+                its `cells` map (config_label, well) -> (substance, volume).
+        Post:   `spec.initial_contents` is rebuilt as one WellContents per cell,
+                keyed on the config label straight from the sheet (contents need
+                no nickname mapping), volume set, stamped with map provenance,
+                sorted by (labware, well). Any instruction-extracted initial
+                contents are discarded — the oracle is authoritative.
+        Side effects: replaces spec.initial_contents in place.
+        """
+        from .extraction import WellContents
+        spec.initial_contents = [
+            WellContents(
+                labware=label, well=well,
+                substance=substance, volume_ul=volume,
+                volume_ul_provenance=self._initial_state_provenance(),
+            )
+            for (label, well), (substance, volume) in sorted(initial_state.cells.items())
+        ]
+
     def _confirm_initial_contents_via_handler(self, spec, suggesters,
                                                   context) -> Optional[bool]:
         """Browser-bridged variant of the orchestrator's per-Gap
@@ -1460,6 +1500,7 @@ class ProtocolAgent:
         )
 
     def run_pipeline(self, prompt: str, csv_path: str = None,
+                     initial_state=None,
                      full_confirmation: bool = False, confirmation_threshold: float = 0.7,
                      verbose: bool = False) -> Optional[PipelineResult]:
         """Run the protocol generation pipeline.
@@ -1581,6 +1622,11 @@ class ProtocolAgent:
                 _log("  Try: 'Transfer 100uL from source_plate A1 to dest_plate B1'")
                 _save_state_log("stage_2_extraction")
                 return None
+
+            # Oracle is authoritative: when an initial-state map was uploaded, it
+            # *is* the initial contents — replace whatever extraction produced.
+            if initial_state is not None:
+                self._seed_initial_contents_from_oracle(spec, initial_state)
 
             state_log["stage_2_extraction"] = spec.model_dump()
 
@@ -1767,7 +1813,9 @@ class ProtocolAgent:
             if self.binary_confirm_handler is not None or sys.stdin.isatty():
                 self._emit_progress("step 2 of 3 — source containers",
                                      stage_name="stage_4_sources")
-            source_only = self._infer_source_containers(spec)
+            # Oracle is authoritative — skip source-container inference when present.
+            source_only = (self._infer_source_containers(spec)
+                           if initial_state is None else [])
             if source_only:
                 items = []
                 for labware, well, substance in source_only:

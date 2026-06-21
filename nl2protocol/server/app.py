@@ -383,6 +383,9 @@ class LiveModeApp:
         self._instruction: str = ""
         self._config_path: Optional[str] = None
         self._api_key: str = ""
+        # Parsed initial-state map (oracle) for this run, or None. Set by
+        # POST /start when the request carries initial_state_b64.
+        self._initial_state = None
         # Eval-mode: which dropdown case the browser picked. None when
         # the user uploaded their own files (no case_name flows). Set by
         # POST /start, read by _run_pipeline + the post-finalize hook.
@@ -549,6 +552,7 @@ class LiveModeApp:
         self._gap_resolved_events = []
         self._inline_checks_by_step = {}
         self._live_spec = None
+        self._initial_state = None
         self._pending_requests.clear()
         self._pending_assignments.clear()
         self._pending_binary_confirms.clear()
@@ -778,6 +782,44 @@ class LiveModeApp:
                     status_code=400,
                 )
 
+            # Optional initial-state map (.xlsx). Parsed server-side into the
+            # oracle the pipeline treats as ground truth for well contents.
+            # Two sources: uploaded base64 (upload mode), or an
+            # initial_state.xlsx sitting in the picked example's folder
+            # (dropdown mode). Absent → the pipeline behaves exactly as before.
+            initial_state_sheet = None
+            initial_state_errors: list = []
+            xlsx_bytes = None
+            b64 = body.get("initial_state_b64")
+            if b64:
+                import base64
+                try:
+                    xlsx_bytes = base64.b64decode(b64)
+                except Exception:
+                    return JSONResponse(
+                        {"status": "error",
+                         "message": "initial_state_b64 is not valid base64"},
+                        status_code=400,
+                    )
+            elif case_name:
+                example_xlsx = self._example_path(case_name, "initial_state.xlsx")
+                if example_xlsx is not None:
+                    xlsx_bytes = example_xlsx.read_bytes()
+            if xlsx_bytes is not None:
+                from nl2protocol.stage_1_pre_extraction.initial_state import (
+                    parse_initial_state,
+                )
+                initial_state_sheet = parse_initial_state(xlsx_bytes, config)
+                initial_state_errors = initial_state_sheet.errors
+                # Unusable map (no cells, only errors) → reject so the user fixes it.
+                if not initial_state_sheet.cells and initial_state_errors:
+                    return JSONResponse(
+                        {"status": "error",
+                         "message": "initial-state map could not be read",
+                         "errors": initial_state_errors},
+                        status_code=400,
+                    )
+
             # Write config to a temp file so ConfigLoader (path-based) can read it.
             tmp = tempfile.NamedTemporaryFile(
                 mode="w", suffix=".json", delete=False, encoding="utf-8",
@@ -790,6 +832,7 @@ class LiveModeApp:
             self._api_key = api_key
             self._case_name = case_name
             self._reset_per_run_state()
+            self._initial_state = initial_state_sheet
 
             # Record the rate-limit attempt now that all checks have passed
             # and we're committed to actually kicking off a real run.
@@ -802,6 +845,7 @@ class LiveModeApp:
             return {
                 "status": "started",
                 "html_report_path": self._html_report_path,
+                "initial_state_errors": initial_state_errors,
             }
 
         @self.app.websocket("/events")
@@ -1201,7 +1245,7 @@ class LiveModeApp:
                 agent.config_loader.client, run_meter,
             )
             metrics_reporter.model_name = agent.config_loader.model_name
-            agent.run_pipeline(instruction)
+            agent.run_pipeline(instruction, initial_state=self._initial_state)
         except Exception as e:
             # Surface the error to the browser. The status indicator
             # in handleEvent now sticks once "error" is set, so the
