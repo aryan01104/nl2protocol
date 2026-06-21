@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Initial-state spreadsheet</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --ink: #1c1b19;
+    --muted: #6b675f;
+    --rule: #e6e2da;
+    --accent: #2f6f4f;
+    --accent-soft: #eef4f0;
+    --code-bg: #f4f1ec;
+    --warn-bg: #fbf3e6;
+    --warn-edge: #d99a3a;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 64px 28px 120px; }
+  header.doc { margin-bottom: 8px; }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: 34px;
+    line-height: 1.18;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  .sub { color: var(--muted); font-size: 16px; margin: 0 0 40px; }
+  h2 {
+    font-size: 22px;
+    margin: 52px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 17px; margin: 30px 0 8px; color: var(--accent); }
+  p { margin: 0 0 16px; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin: 0 0 8px; }
+  code {
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    background: var(--code-bg);
+    padding: 1.5px 6px;
+    border-radius: 5px;
+  }
+  strong { font-weight: 650; }
+  .lede {
+    font-size: 18px;
+    color: #322f2a;
+    border-left: 3px solid var(--accent);
+    padding-left: 18px;
+    margin: 0 0 24px;
+  }
+  .decisions {
+    background: var(--accent-soft);
+    border: 1px solid #d4e3d9;
+    border-radius: 12px;
+    padding: 22px 26px 8px;
+    margin: 8px 0 16px;
+  }
+  .decisions h2 { border: 0; margin-top: 0; padding: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0 22px;
+    font-size: 15px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  th {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+    background: var(--code-bg);
+  }
+  td code { background: transparent; padding: 0; }
+  .phase {
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 6px 24px 8px;
+    margin: 18px 0;
+    background: #fff;
+  }
+  .phase h3 { margin-top: 18px; }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 20px;
+    padding: 3px 11px;
+    margin: 16px 0 0;
+  }
+  .warn {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--warn-edge);
+    border-radius: 8px;
+    padding: 18px 22px 4px;
+    margin: 20px 0;
+  }
+  .warn h2 { border: 0; margin: 0 0 10px; padding: 0; font-size: 18px; }
+  .files dt {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 13.5px;
+    color: var(--accent);
+    margin-top: 14px;
+    font-weight: 600;
+  }
+  .files dd { margin: 2px 0 0; color: #3a372f; }
+  .files dd:first-of-type { }
+  .files { margin: 0; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 40px 0; }
+  .foot { color: var(--muted); font-size: 14px; margin-top: 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <p class="kicker">Implementation Plan</p>
+  <h1>Initial-state spreadsheet → well volumes + labware-mapping grounding</h1>
+  <p class="sub">nl2protocol · website-voice-rewrite branch</p>
+</header>
+
+<h2>Context</h2>
+<p class="lede">
+  Today the pipeline has no way to learn the <strong>actual starting volume</strong> of a well.
+</p>
+<p>
+  When an instruction says "well A1 contains lysis buffer" without a volume,
+  <code>WellCapacitySuggester</code> (<code>gap_resolution/suggesters.py:218</code>) guesses the
+  labware's <em>capacity</em> ("assume full") at confidence 0.7 and forces the user to confirm it
+  in a modal. That guess is the only number available for the downstream arithmetic checks
+  (overdispense / overflow), and it is usually wrong — the real starting volume is a setup fact
+  only the experimenter knows. Real labs record this by hand; the robot has no sensor for it.
+</p>
+<p>
+  This change lets the user upload a spreadsheet that records, per well, what it holds and how much.
+  The spreadsheet is an <strong>independent artifact</strong>: it is parsed on its own terms into an
+  initial-state object, never fused with the instruction. A separate reconciliation step then uses
+  that object to fill volumes, to ground which labware nickname maps to which config label, and to
+  validate that every container the instruction draws from is actually loaded.
+</p>
+<p>
+  A <code>csv_path</code> parameter already exists on <code>run_pipeline</code>
+  (<code>pipeline.py:1462</code>), wired from the CLI <code>-d/--data</code> flag, but is never read
+  in the function body — dead code we will repurpose or remove.
+</p>
+
+<div class="decisions">
+<h2>Decisions (locked with user)</h2>
+<ul>
+  <li><strong>Format: Excel only</strong> (<code>.xlsx</code>), parsed server-side with
+    <strong>openpyxl</strong> (new dependency).</li>
+  <li><strong>Sheet is keyed on config labels</strong>, not user nicknames. The deck-setup person
+    knows the real config labels; this is what makes the mapping crosscheck possible.</li>
+  <li><strong>Sheet is a standalone artifact.</strong> Parser: xlsx bytes → <code>InitialState</code>
+    object. No instruction involved in parsing.</li>
+  <li><strong>Browser-only input.</strong> No CLI. File bytes travel base64 in the
+    <code>/start</code> body, decoded and parsed server-side.</li>
+  <li><strong>Phased</strong>, held as one feature (no early merge): Phase 1 parse + fill volumes;
+    Phase 2 mapping hint + source validation. Both ship together end-to-end.</li>
+</ul>
+</div>
+
+<h2>The sheet template (the "writing rule")</h2>
+<p>One row per loaded well:</p>
+<table>
+  <thead>
+    <tr><th>labware_label</th><th>well</th><th>substance</th><th>volume_ul</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>source_plate</code></td><td><code>A1</code></td><td>lysis buffer</td><td>250</td></tr>
+    <tr><td><code>reagent_reservoir</code></td><td><code>A1</code></td><td>ethanol</td><td>12000</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><code>labware_label</code> must match a key in the lab config's <code>labware</code> map.</li>
+  <li><code>well</code> is a standard coordinate (A1…H12 etc.).</li>
+  <li><code>substance</code> is free text (matched loosely against the instruction's wording).</li>
+  <li><code>volume_ul</code> is a number, in microliters.</li>
+</ul>
+
+<h2>Artifact model</h2>
+<p>
+  New dataclass <code>InitialState</code> (new file
+  <code>nl2protocol/stage_1_pre_extraction/initial_state.py</code>):
+</p>
+<ul>
+  <li><code>rows</code> — list of <code>(labware_label, well, substance, volume_ul)</code>.</li>
+  <li><code>by_labware()</code> — groups rows per config label (the well-set used for the mapping
+    crosscheck).</li>
+  <li><code>lookup(labware_label, well)</code> — used to fill volumes after mapping resolves.</li>
+  <li><code>unmatched</code> accounting — populated during reconciliation so unused rows can be
+    surfaced.</li>
+</ul>
+<p>
+  Keep this object separate from <code>WellContents</code> (<code>models/spec.py:378</code>), which
+  is the instruction-derived shape (its <code>.labware</code> is <em>user wording</em>). The
+  reconciliation step is what writes sheet data into <code>spec.initial_contents</code>.
+</p>
+
+<h2>Implementation</h2>
+
+<div class="phase">
+<span class="tag">PHASE 1 — parse + fill volumes</span>
+
+<h3>1 · Add dependency</h3>
+<p>Add <code>openpyxl</code> to <code>[project] dependencies</code> in <code>pyproject.toml</code>.</p>
+
+<h3>2 · Parser</h3>
+<p>
+  <code>parse_initial_state(xlsx_bytes, config) → InitialState</code> in the new
+  <code>initial_state.py</code>:
+</p>
+<ul>
+  <li>Read the first worksheet with openpyxl (<code>read_only=True</code>).</li>
+  <li>Validate headers against the template; validate each <code>labware_label</code> exists in
+    <code>config["labware"]</code>; coerce <code>volume_ul</code> to float; collect row-level errors
+    into a structured result (do not raise on the first bad row — report all).</li>
+  <li>Pure function, no I/O beyond the in-memory workbook. Fully unit-testable.</li>
+</ul>
+
+<h3>3 · Plumb the file in (browser → pipeline)</h3>
+<ul>
+  <li><code>server/app.py</code> <code>/start</code> handler (~721–805): accept an optional
+    <code>initial_state_b64</code> field; base64-decode to bytes; call
+    <code>parse_initial_state(...)</code>; thread the <code>InitialState</code> into
+    <code>_run_pipeline</code> (app.py:1103) → <code>ProtocolAgent.run_pipeline</code>.</li>
+  <li>Browser page (the same form that posts instruction + config): add a file input for the
+    <code>.xlsx</code>, read it as base64, include <code>initial_state_b64</code> in the
+    <code>/start</code> body.</li>
+  <li><code>run_pipeline</code> (<code>pipeline.py:1462</code>): replace the dead
+    <code>csv_path</code> param with <code>initial_state: Optional[InitialState] = None</code>.
+    Remove the CLI <code>-d/--data</code> wiring (<code>for_cli/cli.py:685, 91–94</code>) or leave
+    the flag inert — out of scope and unused.</li>
+</ul>
+
+<h3>4 · Fill volumes (reconciliation, volume half)</h3>
+<p>
+  After labware assignments are applied (<code>_apply_labware_assignments</code>, ~pipeline.py:1838)
+  and before the IC confirmation modal <code>_confirm_initial_contents_via_handler</code>
+  (<code>pipeline.py:628</code>): for each <code>spec.initial_contents</code> entry whose resolved
+  config label + well hits <code>initial_state.lookup(...)</code>, set <code>volume_ul</code> from
+  the sheet and stamp <code>volume_ul_provenance</code> with a new <code>provenance_source</code>
+  value (e.g. <code>"initial_state_sheet"</code>; extend the <code>Literal</code> on
+  <code>Suggestion</code> / <code>Provenance</code>, <code>gap_resolution/types.py:127</code>).
+</p>
+<ul>
+  <li>Wells covered by the sheet now have a non-null volume → the
+    <code>InitialContentsVolumeDetector</code> creates no gap and <code>WellCapacitySuggester</code>
+    never fires for them.</li>
+  <li>Wells NOT in the sheet still flow into the IC modal with the capacity default (0.7) exactly as
+    today. Pre-filled sheet values appear in the modal as accepted values the user can still edit.</li>
+</ul>
+</div>
+
+<div class="phase">
+<span class="tag">PHASE 2 — mapping hint + source validation</span>
+
+<h3>5 · Mapping crosscheck → resolver hint</h3>
+<p>
+  Before labware resolution (the <code>_EarlyLabwareResolver(...).suggest(spec)</code> call,
+  ~pipeline.py:1604): build a hint map by matching each nickname's well-set + substances (from
+  <code>_collect_descriptions_with_wells()</code>, <code>resolver.py:497</code>) against each config
+  label's well-set in <code>initial_state.by_labware()</code>. A nickname whose well/substance set
+  best matches exactly one config label yields <code>nickname → label</code>.
+</p>
+<ul>
+  <li>Inject as an optional <code>external_hints</code> on the resolver, consumed in
+    <code>LabwareMatcher._resolve_one</code> (<code>resolver.py:569–605</code>)
+    <strong>after</strong> <code>_type_filter</code>, via a new
+    <code>_apply_external_hints(description, wells, survivors)</code> that narrows survivors to the
+    hinted label when present.</li>
+  <li>Tie-break order on conflict: <strong>sheet crosscheck &gt; shape/category &gt; substance</strong>.
+    On genuine conflict between a hint and the surviving candidates, do <strong>not</strong> silently
+    override — keep the candidates and let the existing llm/unresolvable branch surface it.</li>
+</ul>
+
+<h3>6 · Source-is-loaded validation</h3>
+<p>
+  After reconciliation, cross the instruction's draw-from set (transfer step sources) against known
+  initial contents (sheet + inline). Surface two mismatches as warnings (reuse the existing warning /
+  <code>StageEvent</code> channel, not a new mechanism):
+</p>
+<ul>
+  <li>a step draws from a container/well with no initial contents → <strong>"source not loaded"</strong>;</li>
+  <li>a sheet row matches no source or destination in the protocol → <strong>"row unused"</strong>.</li>
+</ul>
+<p>Do <strong>not</strong> drop unused rows silently.</p>
+</div>
+
+<div class="warn">
+<h2>⚠ Adjacent cleanup (recommended, same blast radius)</h2>
+<p>
+  There are <strong>two divergent well-capacity tables</strong> for one fact:
+  <code>_LABWARE_CAPACITY_HINTS</code> / <code>_capacity_for_labware</code>
+  (<code>suggesters.py:197–215</code>) and <code>_capacity_from_load_name</code>
+  (<code>validation/constraints.py:~1170</code>). They can disagree for the same plate — e.g.
+  <code>nest_96_wellplate_200ul</code> → the suggester proposes 300 µL while the overflow check
+  believes capacity is 200 µL, so the system flags its own default as overflowing. Consolidate to one
+  shared capacity function both call. Small and optional, but it removes a real self-contradiction in
+  the same volume logic this feature exercises.
+</p>
+</div>
+
+<h2>Critical files</h2>
+<dl class="files">
+  <dt>nl2protocol/stage_1_pre_extraction/initial_state.py</dt>
+  <dd>NEW — model + parser.</dd>
+  <dt>nl2protocol/pipeline.py</dt>
+  <dd><code>run_pipeline</code> param (1462); reconciliation calls around labware apply (~1838) and
+    IC modal (628); resolver hint build (~1604).</dd>
+  <dt>nl2protocol/extraction/resolver.py</dt>
+  <dd><code>_resolve_one</code> (569) + new <code>_apply_external_hints</code>; reuse
+    <code>_collect_descriptions_with_wells</code> (497).</dd>
+  <dt>nl2protocol/server/app.py</dt>
+  <dd><code>/start</code> handler (721–805), <code>_run_pipeline</code> (1103, 1183, 1204) to accept
+    and thread the file.</dd>
+  <dt>browser static asset / template posting to /start</dt>
+  <dd>Add file input + base64 encode.</dd>
+  <dt>nl2protocol/models/spec.py · nl2protocol/gap_resolution/types.py</dt>
+  <dd>Add the <code>initial_state_sheet</code> provenance source.</dd>
+  <dt>pyproject.toml</dt>
+  <dd>Add <code>openpyxl</code>.</dd>
+  <dt>nl2protocol/validation/constraints.py · suggesters.py</dt>
+  <dd>Optional capacity consolidation.</dd>
+</dl>
+
+<h2>Verification</h2>
+<ul>
+  <li><strong>Unit (parser):</strong> valid sheet → correct <code>InitialState</code>; bad label,
+    missing column, non-numeric volume → reported (not raised); multiple bad rows all reported.</li>
+  <li><strong>Unit (mapping crosscheck):</strong> nickname well/substance set matching exactly one
+    config label → hint produced; ambiguous set → no hint; conflicting hint vs candidates → no silent
+    override.</li>
+  <li><strong>Integration (run_pipeline):</strong> instruction with two unstated source volumes + a
+    sheet covering one → covered well takes the sheet value with <code>initial_state_sheet</code>
+    provenance and creates no IC gap; uncovered well still reaches the IC modal with the capacity
+    default. A sheet that names a labware → the resolver picks that config label.</li>
+  <li><strong>Validation:</strong> instruction drawing from an unloaded well → "source not loaded"
+    warning; sheet row used by nothing → "row unused" warning.</li>
+  <li><strong>Browser E2E:</strong> upload a real <code>.xlsx</code> alongside an instruction + config
+    in the live UI, run it, and watch the reported volumes / step columns reflect the sheet values —
+    not a code-level check only.</li>
+</ul>
+
+<p class="foot">Plan file: <code>docs/plans/initial-state-spreadsheet.html</code> · also at
+<code>~/.claude/plans/jaunty-cooking-sloth.md</code></p>
+
+</div>
+</body>
+</html>
