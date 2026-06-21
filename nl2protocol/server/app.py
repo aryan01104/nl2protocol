@@ -983,6 +983,26 @@ class LiveModeApp:
                     )
                 except Exception:
                     pass
+            elif event.kind == "labware_resolution_done":
+                # Re-render the step blocks the moment labware is confirmed so
+                # the description -> config-label chain appears right after the
+                # assignments modal, not after gap resolution. resolved_label
+                # and its revision snapshot are already on self._live_spec
+                # (mutated in place by _apply_labware_assignments before this
+                # event fired), so re-rendering now shows the resolved chain.
+                data = _safe_data(event.data) or {}
+                if not isinstance(data, dict):
+                    data = {"_raw": data}
+                try:
+                    if self._live_spec is not None:
+                        from nl2protocol.reporting import _step_to_render_dict
+                        steps = getattr(self._live_spec, "steps", None) or []
+                        data["steps"] = [
+                            _step_to_render_dict(s, idx, self._instruction_text)
+                            for idx, s in enumerate(steps)
+                        ]
+                except Exception:
+                    pass
             else:
                 data = _safe_data(event.data)
             payload = {

@@ -86,19 +86,23 @@
     --tip-cite-quote:    #fbbf24;   /* amber-400 (warm on dark)      */
     --tip-reasoning:     #e2e8f0;   /* slate-200                     */
 
-    /* ───────── Per-citation palette (8 hues, Tailwind 600 family) ─────────
-       Each unique cited_text in the instruction hashes to one slot;
-       both the cite span (instruction column) and the atomic value
-       span (spec column) share the hue. Uniform saturation level
-       across the family for visual coherence. */
-    --palette-0: #dc2626;   /* red-600     */
-    --palette-1: #ea580c;   /* orange-600  */
-    --palette-2: #d97706;   /* amber-600   */
-    --palette-3: #16a34a;   /* green-600   */
-    --palette-4: #0d9488;   /* teal-600    */
-    --palette-5: #2563eb;   /* blue-600    */
-    --palette-6: #7c3aed;   /* violet-600  */
-    --palette-7: #db2777;   /* pink-600    */
+    /* ───────── Parameter palette (8 hues) ─────────
+       Atomic value cites use a FIXED hue per parameter kind (volume,
+       substance, source, … — see _FIELD_PALETTE in reporting.py), so a
+       given parameter is always the same color and the instruction cite
+       span matches its spec value span. The step trigger's left bar still
+       hashes its phrase onto a slot. Hues follow the Okabe-Ito
+       colorblind-safe blueprint, darkened so every slot reads as TEXT
+       on the white panel (all ≥ 4.9:1 WCAG contrast) while staying
+       mutually distinct (min CIELAB ΔE ≈ 23 across the 8). */
+    --palette-0: #0072b2;   /* blue       */
+    --palette-1: #b45309;   /* orange     */
+    --palette-2: #117733;   /* green      */
+    --palette-3: #aa3377;   /* magenta    */
+    --palette-4: #6d28d9;   /* purple     */
+    --palette-5: #0e7490;   /* teal       */
+    --palette-6: #c81e1e;   /* red        */
+    --palette-7: #8c6d1f;   /* brown/gold */
   }
   * { box-sizing: border-box; }
   body {
@@ -205,6 +209,14 @@
     outline: 1px solid var(--dim);
     outline-offset: 1px;
     border-radius: 2px;
+  }
+  /* Values read from the operator's uploaded initial-state map get a dotted
+     underline instead of the outline box — a distinct "from initial contents"
+     marker, separate from the generic model-filled (config/domain/inferred). */
+  .prov-initial_state {
+    font-weight: 500;
+    cursor: help;
+    border-bottom: 1px dotted var(--dim);
   }
 
   /* ───────── Step detail grid ─────────
@@ -1300,9 +1312,13 @@
      atoms is communicated by SHAPE — an always-on outline rectangle —
      so the two visual axes don't overlap. #}
   <div class="legend">
-    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition · instruction-sourced atoms get per-citation hue on hover (cite ↔ value)</span>
+    <span><span class="swatch" style="background: var(--col-instruction)"></span>→ step decomposition (cite ↔ value on hover)</span>
+
+    <span>parameter color (instruction cite ↔ spec value):<span class="swatch" style="background: var(--palette-0); margin-left: 8px;"></span>volume ·<span class="swatch" style="background: var(--palette-2);"></span>substance ·<span class="swatch" style="background: var(--palette-1);"></span>source ·<span class="swatch" style="background: var(--palette-4);"></span>destination ·<span class="swatch" style="background: var(--palette-5);"></span>duration ·<span class="swatch" style="background: var(--palette-6);"></span>temperature</span>
 
     <span><span style="outline: 1px solid var(--dim); outline-offset: 1px; border-radius: 2px; padding: 0 3px;">value</span> = model-filled atom (config, domain default, or inferred — outlined box, no color)</span>
+
+    <span><span style="border-bottom: 1px dotted var(--dim); padding: 0 1px;">value</span> = read from your uploaded initial-state map (dotted underline)</span>
 
     <span><span style="color: var(--status-error-fg); font-weight: 700;">⚠</span> reviewer disagreed (hover for objection) · <span style="color: var(--res-user-edited);">✎</span> user-edited during gap resolution</span>
 
@@ -3799,6 +3815,14 @@
           // resolved_spec.
           if (e.data && e.data.step_dict) {
             updateStepBlock(e.data.step_dict);
+          }
+          break;
+        case "labware_resolution_done":
+          // Sync with the assignments modal: re-render each step block as soon
+          // as labware is confirmed, so the "plate" -> plate (config) chain
+          // animates in immediately rather than waiting for gap resolution.
+          if (e.data && Array.isArray(e.data.steps)) {
+            e.data.steps.forEach(updateStepBlock);
           }
           break;
         case "constraint_check_done":
