@@ -253,17 +253,11 @@ class WellCapacitySuggester:
         capacity = _capacity_for_labware(load_name)
 
         if resolved_label and load_name:
-            reasoning = (
-                f"'{ic.labware}' resolved to config '{resolved_label}' "
-                f"(load_name '{load_name}'); a well in this container holds "
-                f"~{capacity:.0f} \u00b5L. Using as default \u2014 edit if "
-                f"your actual fill volume is lower."
-            )
+            reasoning = f"Assumed full \u2014 well holds ~{capacity:.0f} \u00b5L."
         else:
             reasoning = (
-                f"Container '{ic.labware}' has no resolved config match; "
-                f"using conservative ~{capacity:.0f} \u00b5L default. Edit "
-                f"if your actual fill volume differs."
+                f"Assumed full \u2014 ~{capacity:.0f} \u00b5L "
+                f"(labware not in config)."
             )
 
         return Suggestion(
