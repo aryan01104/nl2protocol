@@ -45,9 +45,11 @@ from nl2protocol.server.handlers import (
     HTMLConfirmationHandler,
     HTMLInitialContentsHandler,
     HTMLNamespaceSplitHandler,
+    HTMLSourceWellHandler,
     InitialContentsConfirmation,
     NamespaceSplitConfirmation,
     PendingRequest,
+    SourceWellConfirmation,
 )
 from nl2protocol.server.reporter import (
     CompositeReporter,
@@ -444,6 +446,7 @@ class LiveModeApp:
         # to a browser modal asking the user to map each prefix to a
         # config labware. Same dict-by-rid pattern as the other handlers.
         self._pending_namespace_splits: Dict[str, NamespaceSplitConfirmation] = {}
+        self._pending_source_wells: Dict[str, SourceWellConfirmation] = {}
         # Per-IP rate limit. Defense in depth on top of BYO-key: even if a
         # visitor brings their own key, we don't want a bot to spam /start
         # 100x and exhaust our Fly machine's CPU. Dict grows with unique
@@ -558,6 +561,7 @@ class LiveModeApp:
         self._pending_binary_confirms.clear()
         self._pending_initial_contents.clear()
         self._pending_namespace_splits.clear()
+        self._pending_source_wells.clear()
 
     def _list_examples(self) -> list:
         if not self._examples_dir.exists():
@@ -1070,6 +1074,11 @@ class LiveModeApp:
                 if pending_ns is None:
                     continue
                 pending_ns.set_response(action, msg.get("mappings"))
+            elif kind == "source_well_response":
+                pending_sw = self._pending_source_wells.get(rid)
+                if pending_sw is None:
+                    continue
+                pending_sw.set_response(action, msg.get("wells"))
 
     def _replay_pending_requests(self) -> None:
         """When the browser reconnects mid-run, re-emit a panel_request
@@ -1114,6 +1123,18 @@ class LiveModeApp:
                 kind="namespace_split_request",
                 data=payload,
                 stage_name="stage_2_5_namespace_split",
+            ))
+        except queue.Full:
+            pass
+
+    def _send_source_well_request(self, payload: Dict[str, Any]) -> None:
+        """Push a source_well_request envelope onto the outbound queue."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="source_well_request",
+                data=payload,
+                stage_name="stage_2_5_source_wells",
             ))
         except queue.Full:
             pass
@@ -1241,6 +1262,11 @@ class LiveModeApp:
             pending_namespace_splits=self._pending_namespace_splits,
             timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         )
+        source_well_handler = HTMLSourceWellHandler(
+            send_request=self._send_source_well_request,
+            pending_source_wells=self._pending_source_wells,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
 
         run_error: Optional[Dict[str, Any]] = None
         try:
@@ -1254,6 +1280,7 @@ class LiveModeApp:
                 binary_confirm_handler=binary_confirm_handler,
                 initial_contents_handler=initial_contents_handler,
                 namespace_split_handler=namespace_split_handler,
+                source_well_handler=source_well_handler,
             )
             # Wrap the agent's Anthropic client with the metering proxy.
             # Downstream helpers (SemanticExtractor, LabwareMatcher,

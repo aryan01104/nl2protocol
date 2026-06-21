@@ -363,6 +363,94 @@ class HTMLNamespaceSplitHandler:
         return confirmation.confirmed
 
 
+class SourceWellConfirmation:
+    """Coordination primitive for one in-flight source-well chooser round-trip.
+
+    Analog of `NamespaceSplitConfirmation`; `confirmed` is a
+    {row_key: chosen_well} dict the pipeline applies back onto the matching
+    source LocationRefs (None on abort).
+    """
+
+    def __init__(self):
+        self.event = threading.Event()
+        self.confirmed: Optional[Dict[str, str]] = None
+        self.aborted: bool = False
+
+    def set_response(self, action: str,
+                     wells: Optional[Dict[str, str]]) -> None:
+        """Map browser response onto the slot and signal.
+
+        Pre:    `action` is "confirm" (then `wells` is {row_key: chosen_well})
+                or "abort".
+        Post:   On "abort": aborted=True, confirmed=None. On "confirm":
+                confirmed=wells (possibly empty). `event` set last.
+        """
+        if action == "abort":
+            self.aborted = True
+            self.confirmed = None
+        else:
+            self.aborted = False
+            self.confirmed = dict(wells or {})
+        self.event.set()
+
+
+class HTMLSourceWellHandler:
+    """Browser-bridged handler for the source-well chooser. Same blocking
+    pattern as `HTMLNamespaceSplitHandler`; the payload carries one row per
+    ambiguous source (a substance present in multiple wells of the source
+    labware), each with the candidate wells to pick from.
+
+    Pre:    `send_request` pushes a payload dict onto the outbound queue.
+            `pending_source_wells` is the shared request_id -> Confirmation
+            dict (one in-flight at a time per run). `timeout_seconds` bounds
+            the wait.
+    Post:   `confirm(rows)`: empty rows -> `{}`; otherwise sends a
+            `source_well_request`, blocks, and returns `{row_key: chosen_well}`
+            on confirm or `None` on abort/timeout.
+    """
+
+    def __init__(
+        self,
+        send_request: Callable[[Dict[str, Any]], None],
+        pending_source_wells: Dict[str, "SourceWellConfirmation"],
+        timeout_seconds: int = DEFAULT_REQUEST_TIMEOUT_SECONDS,
+    ):
+        self._send = send_request
+        self._pending = pending_source_wells
+        self._timeout = timeout_seconds
+        self._counter = 0
+        self._lock = threading.Lock()
+
+    def _next_request_id(self) -> str:
+        with self._lock:
+            self._counter += 1
+            return f"srcwell-{self._counter}"
+
+    def confirm(self, rows: list) -> Optional[Dict[str, str]]:
+        """Send the candidate source wells to the browser and block until the
+        user confirms or aborts.
+
+        Pre:    `rows` is a list of dicts, each
+                `{key, description, substance, candidates, suggested}`. Empty
+                list -> return `{}` immediately (nothing to choose).
+        Post:   Returns `{key: chosen_well}` on confirm, `None` on
+                abort/timeout, `{}` when input was empty.
+        """
+        if not rows:
+            return {}
+        rid = self._next_request_id()
+        confirmation = SourceWellConfirmation()
+        self._pending[rid] = confirmation
+        try:
+            self._send({"request_id": rid, "source_wells": rows})
+            signaled = confirmation.event.wait(timeout=self._timeout)
+        finally:
+            self._pending.pop(rid, None)
+        if not signaled or confirmation.aborted:
+            return None
+        return confirmation.confirmed
+
+
 class InitialContentsConfirmation:
     """Coordination primitive for one in-flight initial-contents
     batch confirmation. Same shape as AssignmentsConfirmation, but

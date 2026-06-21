@@ -1247,6 +1247,23 @@
       </div>
     </div>
   </div>
+  <!-- Source-well chooser modal. Hidden until a source_well_request arrives.
+       Fires when a step's substance is found in MORE THAN ONE well of the
+       source labware (per the initial-state map) — the user picks which well
+       to draw from. Same center-screen overlay shape as the assignments modal. -->
+  <div id="live-sourcewell-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1100; align-items: center; justify-content: center;">
+    <div style="background: var(--panel); border: 1px solid var(--grid); border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.25); width: min(720px, 92vw); max-height: 86vh; overflow-y: auto; font-size: 13px;">
+      <div style="padding: 12px 18px; border-bottom: 1px solid var(--grid); background: var(--modal-header-bg); font-weight: 600;">
+        Choose source well
+        <span style="float: right; font-size: 11px; color: var(--dim); font-weight: 500;">a substance was found in more than one well — pick which to draw from</span>
+      </div>
+      <div id="live-sourcewell-body" style="padding: 14px 18px;"></div>
+      <div style="padding: 10px 18px; border-top: 1px solid var(--grid); display: flex; gap: 8px; justify-content: flex-end;">
+        <button id="live-sourcewell-abort" style="padding: 6px 14px; border: 1px solid var(--btn-secondary-border); background: var(--panel); color: var(--ink); border-radius: 4px; cursor: pointer; font-size: 13px;">Quit</button>
+        <button id="live-sourcewell-confirm" style="padding: 6px 14px; border: 1px solid var(--btn-primary); background: var(--btn-primary); color: var(--btn-primary-fg); border-radius: 4px; cursor: pointer; font-size: 13px;">Confirm</button>
+      </div>
+    </div>
+  </div>
   <!-- ADR-0013 Phase 3c: gap-prompt modal. Hidden until a panel_request
        arrives over the WebSocket. Anchored bottom-right per ADR-0013.
        Visual hierarchy: header → Problem block (warning-tinted, the
@@ -3342,6 +3359,75 @@
       hideAssignmentsModal();
     }
 
+    let activeSourceWellRid = null;
+    let activeSourceWellSelects = null;
+    function showSourceWellModal(req) {
+      const overlay = document.getElementById("live-sourcewell-overlay");
+      const body = document.getElementById("live-sourcewell-body");
+      if (!overlay || !body) return;
+      activeSourceWellRid = req.request_id;
+      activeSourceWellSelects = {};
+      body.innerHTML = "";
+      const table = document.createElement("table");
+      table.style.cssText = "width: 100%; border-collapse: collapse;";
+      const thead = document.createElement("thead");
+      thead.innerHTML = '<tr style="text-align: left; border-bottom: 1px solid var(--grid);">'
+        + '<th style="padding: 6px 8px; font-weight: 600;">Source (substance)</th>'
+        + '<th style="padding: 6px 8px; font-weight: 600;">Well</th>'
+        + '</tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      (req.source_wells || []).forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.style.cssText = "border-bottom: 1px solid var(--grid);";
+        const descCell = document.createElement("td");
+        descCell.style.cssText = "padding: 8px 8px; vertical-align: top;";
+        descCell.textContent = (row.substance || "") + " (" + (row.description || "") + ")";
+        const wellCell = document.createElement("td");
+        wellCell.style.cssText = "padding: 6px 8px; vertical-align: top;";
+        const select = document.createElement("select");
+        select.style.cssText = "width: 100%; padding: 4px 6px; font-size: 13px; border: 1px solid var(--btn-secondary-border); border-radius: 4px;";
+        (row.candidates || []).forEach((well) => {
+          const opt = document.createElement("option");
+          opt.value = well;
+          opt.textContent = well;
+          if (well === row.suggested) opt.selected = true;
+          select.appendChild(opt);
+        });
+        wellCell.appendChild(select);
+        tr.appendChild(descCell);
+        tr.appendChild(wellCell);
+        tbody.appendChild(tr);
+        activeSourceWellSelects[row.key] = select;
+      });
+      table.appendChild(tbody);
+      body.appendChild(table);
+      overlay.style.display = "flex";
+    }
+    function hideSourceWellModal() {
+      const overlay = document.getElementById("live-sourcewell-overlay");
+      if (overlay) overlay.style.display = "none";
+      activeSourceWellRid = null;
+      activeSourceWellSelects = null;
+    }
+    function sendSourceWellResponse(action) {
+      if (!activeWS || activeWS.readyState !== WebSocket.OPEN) return;
+      if (!activeSourceWellRid) return;
+      const wells = {};
+      if (action === "confirm" && activeSourceWellSelects) {
+        for (const [key, sel] of Object.entries(activeSourceWellSelects)) {
+          wells[key] = sel.value;
+        }
+      }
+      activeWS.send(JSON.stringify({
+        kind: "source_well_response",
+        request_id: activeSourceWellRid,
+        action: action,
+        wells: wells,
+      }));
+      hideSourceWellModal();
+    }
+
     function updatePanelMeta(panel, rows, singularLabel, pluralLabel) {
       // Refresh the count badge + is-empty class. Per ADR-0011
       // animation-timing addendum (2026-05-06), panels stay collapsed
@@ -3857,6 +3943,9 @@
         case "labware_assignments_request":
           if (e.data) gateModal(() => showAssignmentsModal(e.data));
           break;
+        case "source_well_request":
+          if (e.data) gateModal(() => showSourceWellModal(e.data));
+          break;
         case "binary_confirm_request":
           if (e.data) gateModal(() => showBinaryModal(e.data));
           break;
@@ -3911,6 +4000,10 @@
     const assignAbort = document.getElementById("live-assignments-abort");
     if (assignConfirm) assignConfirm.addEventListener("click", () => sendAssignmentsResponse("confirm"));
     if (assignAbort) assignAbort.addEventListener("click", () => sendAssignmentsResponse("abort"));
+    const srcWellConfirm = document.getElementById("live-sourcewell-confirm");
+    const srcWellAbort = document.getElementById("live-sourcewell-abort");
+    if (srcWellConfirm) srcWellConfirm.addEventListener("click", () => sendSourceWellResponse("confirm"));
+    if (srcWellAbort) srcWellAbort.addEventListener("click", () => sendSourceWellResponse("abort"));
     // Binary-confirm button handlers (also set up once).
     const binYes = document.getElementById("live-binary-yes");
     const binNo = document.getElementById("live-binary-no");
