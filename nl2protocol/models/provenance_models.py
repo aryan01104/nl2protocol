@@ -151,11 +151,14 @@ class InferredProvenance(ProvenanceBase):
     it has no `cited_text` field, so a non-instruction value cannot ground in
     user-quoted text.
     """
-    source: Literal["domain_default", "inferred"] = Field(..., description=(
+    source: Literal["domain_default", "inferred", "initial_state"] = Field(..., description=(
         "Where this value came from. "
         "'domain_default' = standard practice for a named protocol. "
         "'inferred' = reasoning or guess with no direct support. "
-        "Both require positive_reasoning."
+        "'initial_state' = SYSTEM-ONLY: read from the operator's uploaded "
+        "initial-state map (e.g. a substance taken from the source well's "
+        "known contents). NEVER emit this during extraction — only the "
+        "pipeline sets it. All require positive_reasoning."
     ))
     positive_reasoning: str = Field(..., description=(
         "One sentence answering: 'why is THIS the right value?'. "

@@ -23,6 +23,40 @@ def _step_index(gap: Gap) -> Optional[int]:
 
 
 # ============================================================================
+# 0. MixCycleCountSuggester — standard cycle count for a missing mix count
+# ============================================================================
+
+class MixCycleCountSuggester:
+    """Suggest the standard mix cycle count for a step missing `repetitions`.
+
+    Pre:    `gap.kind == "missing"` and `gap.field_path` ends in
+            `.repetitions` (a standalone `mix`, or a `serial_dilution` whose
+            per-transfer mix count was never stated).
+    Post:   Returns a Suggestion of DEFAULT_MIX_REPS cycles with confidence
+            0.6 — below the auto-accept threshold, so the count always
+            surfaces for the user to accept or edit instead of being applied
+            silently in codegen. Returns None for any other gap.
+    """
+
+    def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
+        if gap.kind != "missing" or not gap.field_path.endswith(".repetitions"):
+            return None
+        from nl2protocol.constants import DEFAULT_MIX_REPS
+        return Suggestion(
+            value=DEFAULT_MIX_REPS,
+            provenance_source="domain_default",
+            positive_reasoning=(
+                f"Standard mixing is {DEFAULT_MIX_REPS} up-and-down cycles "
+                f"when the instruction states no count."
+            ),
+            why_not_in_instruction=(
+                "The instruction asks to mix but gives no cycle count."
+            ),
+            confidence=0.6,
+        )
+
+
+# ============================================================================
 # 1. ConfigLookupSuggester — substance → source location via config
 # ============================================================================
 

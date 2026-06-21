@@ -214,7 +214,7 @@ _ACTION_KEEPS: dict = {
     "consolidate":          {"volume", "substance", "source", "destination",
                               "post_actions", "replicates"},
     "serial_dilution":      {"volume", "substance", "source", "destination",
-                              "post_actions", "replicates"},
+                              "post_actions", "replicates", "repetitions"},
     "mix":                  {"volume", "substance", "destination", "repetitions"},
     "aspirate":             {"volume", "substance", "source"},
     "dispense":             {"volume", "substance", "destination"},
@@ -536,6 +536,8 @@ class CompleteProtocolSpec(ProtocolSpec):
                   * Liquid-handling actions {transfer, distribute, consolidate,
                     aspirate, dispense, mix, serial_dilution} require
                     `step.volume` to be non-None.
+                  * `mix` and `serial_dilution` additionally require
+                    `step.repetitions` (the mix cycle count) to be non-None.
                   * Transfer-like actions {transfer, distribute,
                     serial_dilution, consolidate} additionally require
                     BOTH `step.source` and `step.destination` to be non-None.
@@ -580,6 +582,13 @@ class CompleteProtocolSpec(ProtocolSpec):
 
             if step.action in liquid_actions and step.volume is None:
                 errors.append(f"{prefix}: missing volume{substance_hint}")
+
+            # Mix cycle count: standalone 'mix' and the per-transfer mixing in
+            # 'serial_dilution' both need a count. Left null by extraction (the
+            # model says "do not infer"); surfaced here so the user controls it
+            # via the gap modal instead of codegen silently using the default.
+            if step.action in {"mix", "serial_dilution"} and step.repetitions is None:
+                errors.append(f"{prefix}: missing mix cycle count")
 
             if step.action in transfer_actions:
                 if step.source is None:

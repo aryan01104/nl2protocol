@@ -665,6 +665,57 @@ class ProtocolAgent:
             for (label, well), (substance, volume) in sorted(initial_state.cells.items())
         ]
 
+    def _infer_substances_from_oracle(self, spec) -> None:
+        """Fill a step's null substance from its source well's initial contents.
+
+        Pre:    Called only when an initial-state map was uploaded. The oracle
+                has already seeded `spec.initial_contents` (config-label keyed)
+                and labware assignments have been applied, so each source ref
+                carries a config-label `resolved_label`.
+        Post:   For each step whose `substance` is None and whose source
+                resolves to a single (config-label, well) present in
+                `spec.initial_contents`, sets `step.substance` to a
+                ProvenancedString of that well's substance, stamped
+                source="initial_state" (renders with the dotted "from initial
+                contents" marker). Steps with a substance already set, with no
+                single source well, or with no matching initial-contents entry
+                are left untouched. Behaviour-only for legibility — codegen
+                does not consume substance.
+        Side effects: mutates `spec.steps[*].substance` in place.
+        """
+        from nl2protocol.models.provenance_models import (
+            InferredProvenance, ProvenancedString,
+        )
+        by_key = {(ic.labware, ic.well): ic for ic in spec.initial_contents}
+        for step in spec.steps:
+            if getattr(step, "substance", None) is not None:
+                continue
+            ref = getattr(step, "source", None)
+            if ref is None:
+                continue
+            label = getattr(ref, "resolved_label", None) or ref.description
+            well = getattr(ref, "well", None)
+            if not well:
+                continue
+            ic = by_key.get((label, well))
+            if ic is None or not ic.substance:
+                continue
+            step.substance = ProvenancedString(
+                value=ic.substance,
+                provenance=InferredProvenance(
+                    source="initial_state",
+                    positive_reasoning=(
+                        f"The source well {label} {well} starts with "
+                        f"'{ic.substance}' per the uploaded initial-state map."
+                    ),
+                    why_not_in_instruction=(
+                        "The instruction names no substance for this step; it "
+                        "was read from the initial-state map."
+                    ),
+                    confidence=0.9,
+                ),
+            )
+
     def _confirm_initial_contents_via_handler(self, spec, suggesters,
                                                   context) -> Optional[bool]:
         """Browser-bridged variant of the orchestrator's per-Gap
@@ -1679,6 +1730,7 @@ class ProtocolAgent:
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
                 WellRangeClipSuggester, WellContentsVolumeSuggester,
+                MixCycleCountSuggester,
                 LLMSpotSuggester, IndependentReviewSuggester,
             )
 
@@ -1694,6 +1746,7 @@ class ProtocolAgent:
                 RegexFromNoteSuggester(),
                 WellRangeClipSuggester(),
                 WellContentsVolumeSuggester(),
+                MixCycleCountSuggester(),
                 LLMSpotSuggester(client=extractor.client,
                                   model_name=extractor.model_name),
             ]
@@ -1884,6 +1937,13 @@ class ProtocolAgent:
                     if sug.suggested_label is not None
                 }
             self._apply_labware_assignments(spec, labware_suggestions, confirmed)
+
+            # Oracle reference resolution: now that source refs carry config
+            # labels and initial_contents is config-keyed, fill any null step
+            # substance from the source well's known contents (rendered with
+            # the dotted "from initial contents" marker).
+            if initial_state is not None:
+                self._infer_substances_from_oracle(spec)
 
             # ADR-0011 Phase 1: emit labware_resolution_done so column 4
             # (validated spec) can populate with the description→label

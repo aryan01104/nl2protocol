@@ -72,10 +72,53 @@ class TestStandaloneMixRepetitions:
         assert mix.repetitions == 10
         assert mix.volume == 100
 
-    def test_missing_count_falls_to_named_default(self, config):
-        """No stated count → DEFAULT_MIX_REPS (not a magic 3)."""
-        mix = _mix_command([_mix_step(repetitions=None)], config)
-        assert mix.repetitions == DEFAULT_MIX_REPS
+    def test_missing_count_is_surfaced_not_silently_defaulted(self, config):
+        """No stated count → completeness rejects the spec so the count is
+        surfaced as a gap (suggested DEFAULT_MIX_REPS, user-editable), instead
+        of codegen silently filling it."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError, match="missing mix cycle count"):
+            _mix_command([_mix_step(repetitions=None)], config)
+
+
+class TestMixCycleCountGapFlow:
+    """A missing mix cycle count surfaces as a reviewable gap with a suggested
+    default the user can accept or edit, instead of a silent codegen default."""
+
+    def _gap(self, field_path=".repetitions", kind="missing"):
+        from nl2protocol.gap_resolution.types import Gap
+        return Gap(id="g", step_order=1, field_path=f"steps[0]{field_path}",
+                   kind=kind, current_value=None,
+                   description="missing mix cycle count", severity="blocker")
+
+    def test_suggester_offers_default_below_auto_accept_threshold(self):
+        from nl2protocol.gap_resolution import MixCycleCountSuggester
+        from nl2protocol.gap_resolution.orchestrator import DEFAULT_AUTO_ACCEPT_THRESHOLD
+        s = MixCycleCountSuggester().suggest(self._gap(), spec=None, context={})
+        assert s is not None
+        assert s.value == DEFAULT_MIX_REPS
+        # Below the auto-accept threshold so the user always sees/edits it.
+        assert s.confidence < DEFAULT_AUTO_ACCEPT_THRESHOLD
+
+    def test_suggester_declines_unrelated_gaps(self):
+        from nl2protocol.gap_resolution import MixCycleCountSuggester
+        sug = MixCycleCountSuggester()
+        assert sug.suggest(self._gap(field_path=".volume"), None, {}) is None
+        assert sug.suggest(self._gap(kind="fabricated"), None, {}) is None
+
+    def test_serial_dilution_missing_count_is_surfaced(self, config):
+        """serial_dilution's per-transfer mix count is required too (was a
+        hardcoded 3 in codegen)."""
+        from pydantic import ValidationError
+        sd = ExtractedStep(
+            order=1, action="serial_dilution", volume=_vol(100), repetitions=None,
+            source=_loc(description="plate", well="A1", resolved_label="plate"),
+            destination=_loc(description="plate", well_range="A1-A12", resolved_label="plate"),
+            composition_provenance=_comp(),
+        )
+        with pytest.raises(ValidationError, match="missing mix cycle count"):
+            CompleteProtocolSpec(steps=[sd], protocol_type="t", summary="t",
+                                 reasoning="", initial_contents=[])
 
 
 class TestRepetitionsPruning:
