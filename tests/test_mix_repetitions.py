@@ -121,6 +121,69 @@ class TestMixCycleCountGapFlow:
                                  reasoning="", initial_contents=[])
 
 
+class TestNormalizeMixRepresentation:
+    """serial_dilution's redundant post-action mix is folded onto
+    step.repetitions and the post-action dropped, so there is one source for
+    the mix count."""
+
+    def _agent(self):
+        from nl2protocol.pipeline import ProtocolAgent
+        return ProtocolAgent.__new__(ProtocolAgent)
+
+    def _pa(self, action, repetitions=None):
+        from types import SimpleNamespace
+        return SimpleNamespace(action=action, repetitions=repetitions, volume=None)
+
+    def _sd(self, repetitions, post_actions):
+        from types import SimpleNamespace
+        return SimpleNamespace(action="serial_dilution", repetitions=repetitions,
+                               post_actions=post_actions)
+
+    def test_folds_post_action_count_into_step_repetitions(self):
+        from types import SimpleNamespace
+        step = self._sd(None, [self._pa("mix", 5)])
+        self._agent()._normalize_mix_representation(SimpleNamespace(steps=[step]))
+        assert step.repetitions == 5
+        assert step.post_actions is None
+
+    def test_drops_null_post_action_mix_count_stays_none_for_gap(self):
+        from types import SimpleNamespace
+        step = self._sd(None, [self._pa("mix", None)])
+        self._agent()._normalize_mix_representation(SimpleNamespace(steps=[step]))
+        assert step.repetitions is None  # the gap fills it later
+        assert step.post_actions is None  # empty mix dropped (no dangling row)
+
+    def test_keeps_non_mix_post_actions(self):
+        from types import SimpleNamespace
+        step = self._sd(None, [self._pa("mix", 3), self._pa("blow_out")])
+        self._agent()._normalize_mix_representation(SimpleNamespace(steps=[step]))
+        assert [pa.action for pa in step.post_actions] == ["blow_out"]
+
+    def test_non_serial_dilution_untouched(self):
+        from types import SimpleNamespace
+        step = SimpleNamespace(action="transfer", repetitions=None,
+                               post_actions=[self._pa("mix", None)])
+        self._agent()._normalize_mix_representation(SimpleNamespace(steps=[step]))
+        assert [pa.action for pa in step.post_actions] == ["mix"]  # left for that path
+
+
+class TestMixCountRenders:
+    """The resolved step-level mix count renders (was invisible as
+    'mix: (no parameters)')."""
+
+    def test_serial_dilution_mix_count_row(self):
+        from nl2protocol.reporting import _step_to_render_dict
+        sd = ExtractedStep(
+            order=1, action="serial_dilution", volume=_vol(100), repetitions=3,
+            source=_loc(description="plate", well="A1", resolved_label="plate"),
+            destination=_loc(description="plate", well_range="A1-A12", resolved_label="plate"),
+            composition_provenance=_comp(),
+        )
+        d = _step_to_render_dict(sd, 0)
+        mix_rows = [r for r in d["detail_lines"] if r.get("label") == "mix"]
+        assert mix_rows and any("×3" in r["value_html"] for r in mix_rows)
+
+
 class TestRepetitionsPruning:
     def test_repetitions_kept_on_mix_step(self):
         """A mix step retains its repetitions through the action-field pruner."""

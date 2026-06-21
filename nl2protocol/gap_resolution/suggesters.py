@@ -1217,6 +1217,14 @@ For each claim below, evaluate TWO things INDEPENDENTLY:
   1. Is the POSITIVE reasoning sound? (Domain-knowledge check: does this value match standard lab practice / the action's semantics?)
   2. Is the NEGATIVE reasoning correct? (Text-grounding check: does the instruction REALLY not supply this value? Re-read the instruction; the original model may have missed something.)
 
+ACTION SEMANTICS — do NOT raise these as objections:
+  - serial_dilution, distribute, and consolidate are SINGLE steps that expand
+    into multiple per-well operations at build time. A well RANGE or multi-well
+    destination (e.g. A2-A12) on these is correct and expected — do NOT object
+    that it "should be multiple transfer steps" or "is not sequential."
+  - A serial_dilution chains transfers across its destination range internally;
+    one step with a range is the right representation, not a bug.
+
 INSTRUCTION:
 {instruction}
 

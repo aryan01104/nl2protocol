@@ -200,6 +200,28 @@ class TestAutoAccept:
         assert outcome.iterations[0].records[0].auto_accepted is False
         assert handler.calls  # user was prompted
 
+    def test_skipped_persistent_gap_not_represented_or_looped(self):
+        # A detector that keeps emitting the SAME gap every iteration (e.g. a
+        # reviewer disagree from unchanged state). Skipping it must NOT re-ask
+        # it to the iteration cap — seen-id dedup handles it once and converges.
+        spec = make_spec()
+        g = gap("persistent", kind="low_confidence", severity="quality")
+        handler = FakeHandler([
+            Resolution(action="skip", new_value=None,
+                       user_action_provenance="user_skipped"),
+        ])
+        orch = Orchestrator(
+            detectors=[FakeDetector([[g]])],  # last batch repeats -> always [g]
+            suggesters=[],
+            reviewer=None,
+            handler=handler,
+            apply_resolution=fake_apply,
+        )
+        outcome = orch.run(spec, context={})
+        assert len(handler.calls) == 1   # asked exactly once
+        assert outcome.converged is True
+        assert outcome.aborted is False
+
     def test_fabricated_kind_always_confirms(self):
         spec = make_spec()
         gaps = [gap("g1", kind="fabricated")]
@@ -473,19 +495,15 @@ class TestLoopBehavior:
 
     def test_iteration_cap_terminates(self):
         spec = make_spec()
-        # Detector keeps returning the same gap forever (suggester
-        # returns None so user is prompted; user keeps skipping).
-        gaps = [gap("g1")]
-        handler = FakeHandler([
-            Resolution(action="skip", new_value=None,
-                       user_action_provenance="user_skipped"),
-            Resolution(action="skip", new_value=None,
-                       user_action_provenance="user_skipped"),
-            Resolution(action="skip", new_value=None,
-                       user_action_provenance="user_skipped"),
-        ])
+        # A genuinely non-converging run: each iteration surfaces a NEW gap
+        # (distinct id) that the user skips. Seen-id dedup retires each old
+        # gap, but new ones keep appearing, so the run hits the cap without
+        # converging. (A *repeated* same-id gap would instead be deduped and
+        # converge — see test_skipped_persistent_gap_not_represented_or_looped.)
+        handler = FakeHandler([])  # default: skip everything
         orch = Orchestrator(
-            detectors=[FakeDetector([gaps, gaps, gaps, gaps])],
+            detectors=[FakeDetector([[gap("g1")], [gap("g2")],
+                                     [gap("g3")], [gap("g4")]])],
             suggesters=[FakeSuggester({})],
             reviewer=None,
             handler=handler,

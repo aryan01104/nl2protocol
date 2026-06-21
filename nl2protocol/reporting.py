@@ -1656,6 +1656,15 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
     if step.replicates is not None:
         detail_lines.append(_row("replicates", f"{step.replicates}×"))
 
+    # Step-level mix cycle count (standalone `mix` and `serial_dilution`'s
+    # intrinsic per-transfer mixing). Lives on `step.repetitions`, not in a
+    # post-action, so without this row the resolved count is invisible (the
+    # step rendered "mix: (no parameters)").
+    if getattr(step, "repetitions", None) is not None and step.action in (
+        "mix", "serial_dilution",
+    ):
+        detail_lines.append(_row("mix", f"×{step.repetitions}"))
+
     # Post-actions (mix / blow_out / touch_tip applied AFTER the main
     # action). Each post-action emits one row; the value cell combines
     # the repetition count and the volume span.
