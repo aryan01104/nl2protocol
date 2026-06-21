@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>nl2protocol — natural-language lab protocols to Opentrons scripts</title>
-<meta name="description" content="Turn natural-language lab protocols into Opentrons Python scripts with auditable provenance for every extracted value. Open source.">
+<meta name="description" content="Turn natural-language lab protocols into Opentrons Python scripts. Every extracted value is cited back to your instruction or carries its reasoning. Open source.">
 
 <meta property="og:title" content="nl2protocol — lab protocols, with citations">
-<meta property="og:description" content="Natural-language to Opentrons. Every value the system extracts carries a citation back to your instruction or an explicit reasoning trace.">
+<meta property="og:description" content="Natural-language to Opentrons. Each extracted value is cited to your instruction, or shows the reasoning behind it when it was inferred.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://nl2protocol.com">
 
@@ -49,19 +49,20 @@
       into
       <span class="cite cite-instr" tabindex="0" data-prov="from instruction">Opentrons scripts</span>
       <span class="dash">&mdash;</span>
-      <span class="cite cite-infer" tabindex="0" data-prov="inferred: this is the differentiator and the whole point of the project">with citations for every extracted value</span>.
+      <span class="cite cite-infer" tabindex="0" data-prov="inferred: this is the project's differentiator over RAG-based codegen tools">with citations for every extracted value</span>.
     </h1>
 
     <p class="hero-deck">
       Writing OT-2 protocols by hand means translating an experiment
-      into Python, well by well. This makes it a review job instead
-      &mdash; every value the model picked comes with a citation back
-      to your words.
+      into Python, well by well. nl2protocol turns that into a review
+      job. Every value the model picked is cited back to the words you
+      wrote, so you check the citations instead of writing the code.
     </p>
 
     <p class="hero-aside">
-      Hover the marked phrases. Every value in the spec carries a citation
-      like that <span class="aside-note">&mdash; that&rsquo;s the point.</span>
+      Hover the marked phrases above to see where each one came from.
+      Every value in the generated spec carries a citation like
+      that.
     </p>
 
     <div class="hero-cta">
@@ -115,9 +116,9 @@
         </header>
         <p class="how-body">
           Sonnet reads your instruction and emits a structured spec.
-          Every extracted value carries a claim: <em>this came from the
-          instruction, here&rsquo;s the verbatim quote</em>, or <em>this was
-          inferred, here&rsquo;s the reasoning</em>.
+          Each extracted value records how it got there: either the
+          verbatim quote it came from in your instruction, or, if it
+          was inferred, the reasoning behind the inference.
         </p>
         <footer class="how-meta">
           <span class="how-meta-key">model</span>
@@ -131,10 +132,14 @@
           <h3 class="how-title">Resolve gaps</h3>
         </header>
         <p class="how-body">
-          Deterministic suggesters fill what they can (config lookups, well-capacity
-          defaults). Haiku audits non-deterministic suggestions against your
-          instruction. Anything the system can&rsquo;t decide goes to you, one
-          decision at a time.
+          Labware descriptions are first mapped to your config, then a
+          loop fills whatever the spec is missing. Cheap deterministic
+          suggesters run before any model call (a config lookup or a
+          well-capacity default covers most gaps). A Haiku reviewer audits
+          anything the model inferred against your instruction. A gap
+          fills on its own only at high confidence with the reviewer
+          agreeing. Everything else is handed to you, one decision at a
+          time.
         </p>
         <footer class="how-meta">
           <span class="how-meta-key">reviewer</span>
@@ -148,9 +153,12 @@
           <h3 class="how-title">Simulate</h3>
         </header>
         <p class="how-body">
-          The generated Python script runs through Opentrons&rsquo; own
-          simulator before output. If the simulator rejects the script,
-          we surface the failure loudly &mdash; no silent broken protocols.
+          A deterministic constraint check confirms the resolved spec
+          fits the hardware, then a builder turns it into Opentrons
+          Python and runs that script through Opentrons&rsquo; own
+          simulator. A simulator failure blocks the run; the script and
+          the failure log are saved for inspection instead of returned
+          as a usable protocol.
         </p>
         <footer class="how-meta">
           <span class="how-meta-key">verifier</span>
@@ -173,29 +181,32 @@
       <li class="diff-item">
         <h3 class="diff-title">Every value carries provenance.</h3>
         <p class="diff-body">
-          Other tools generate code and hope. Here, every extracted volume,
-          well, labware, and substance comes with either the verbatim quote
-          from your instruction or explicit reasoning if it was inferred.
-          You can audit any decision the system makes.
+          RAG-based converters emit Opentrons code with no link back to
+          what you asked for. Here, every extracted volume, well, labware,
+          and substance is tagged with its source: a verbatim quote from
+          your instruction, a standard domain default, or an inference
+          with the reasoning attached. Any value in the spec can be traced
+          to where it came from.
         </p>
       </li>
 
       <li class="diff-item">
         <h3 class="diff-title">A separate reviewer pass audits the LLM&rsquo;s guesses.</h3>
         <p class="diff-body">
-          A second Claude call checks the values the system inferred &mdash;
-          rather than quoted from your instruction &mdash; and can object
-          before you decide, not after the protocol fails on the robot.
-          (It runs in the same model family, so it&rsquo;s a check, not a
-          guarantee &mdash; see <a href="/limitations/">limitations</a>.)
+          Values the extractor inferred, rather than quoted from your
+          instruction, are checked by a second Claude call (Haiku) that
+          grades the reasoning before you ever see the gap. A weak or
+          unsupported inference gets flagged for your review instead of
+          passing through silently.
         </p>
       </li>
 
       <li class="diff-item">
         <h3 class="diff-title">The script is simulator-verified.</h3>
         <p class="diff-body">
-          Opentrons&rsquo; own simulator runs the generated Python before output.
-          Code that wouldn&rsquo;t actually load on the robot never reaches you.
+          The generated Python is run through Opentrons&rsquo; own simulator
+          before it is returned. Code that would fail to load on the robot
+          is caught here, not on the deck.
         </p>
       </li>
 
