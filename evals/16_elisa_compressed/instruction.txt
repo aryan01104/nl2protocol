@@ -1,1 +1,0 @@
-Run 5 PBS-T washes across the assay plate, 300 µL per well.

@@ -1,0 +1,119 @@
+```python
+metadata = {
+    'protocolName': 'KAPA Pure Beads Cleanup - Single Sample',
+    'author': 'control-baseline',
+    'apiLevel': '2.15'
+}
+
+def run(protocol):
+    # --- Load modules ---
+    mag_mod = protocol.load_module('magnetic module gen2', '4')
+
+    # --- Load labware ---
+    tiprack_300 = protocol.load_labware('opentrons_96_tiprack_300ul', '1')
+    reagent_rack = protocol.load_labware('opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap', '2')
+    ethanol_reservoir = protocol.load_labware('nest_12_reservoir_15ml', '3')
+    sample_plate = mag_mod.load_labware('nest_96_wellplate_2ml_deep')
+    elution_plate = protocol.load_labware('nest_96_wellplate_100ul_pcr_full_skirt', '5')
+
+    # --- Load pipette ---
+    p300 = protocol.load_instrument('p300_single_gen2', 'left', tip_racks=[tiprack_300])
+
+    # --- Define wells ---
+    beads_well = reagent_rack['A1']
+    elution_buffer_well = reagent_rack['A2']
+    ethanol_well = ethanol_reservoir['A1']
+    sample_well = sample_plate['A1']
+    eluate_well = elution_plate['A1']
+
+    # --- Step 1 & 2: Add 80 µL KAPA Pure Beads and mix 10x ---
+    p300.pick_up_tip()
+    p300.aspirate(80, beads_well)
+    p300.dispense(80, sample_well)
+    # Mix 10x at 100 µL
+    for _ in range(10):
+        p300.aspirate(100, sample_well)
+        p300.dispense(100, sample_well)
+    p300.drop_tip()
+
+    # --- Step 3: Incubate at RT for 10 min to bind DNA to beads ---
+    protocol.delay(minutes=10, msg='Incubating at room temperature for 10 min to bind DNA to beads')  # chose 10 min (midpoint of 5–15 min range)
+
+    # --- Step 4: Engage magnetic module; wait for liquid to clear ---
+    mag_mod.engage(height_from_base=5)  # 5 mm from base for deep well plate
+    protocol.delay(minutes=5, msg='Waiting for magnetic beads to pellet and liquid to clear')  # 5 min for clearing
+
+    # --- Step 5: Remove and discard supernatant (180 µL total: 100 µL sample + 80 µL beads) ---
+    # Use a single tip for all supernatant/ethanol removal steps (Steps 5, 8, 11)
+    p300.pick_up_tip()
+    # Aspirate carefully near the bottom but offset from bead pellet
+    # Remove ~180 µL in one shot (within p300 range)
+    p300.aspirate(180, sample_well.bottom(z=1))
+    p300.drop_tip()  # discard supernatant - drop tip to waste
+
+    # --- Step 6: Add 200 µL of 80% ethanol (first wash) ---
+    p300.pick_up_tip()
+    p300.aspirate(200, ethanol_well)
+    p300.dispense(200, sample_well.top(z=-2))  # dispense gently along the wall
+    p300.drop_tip()
+
+    # --- Step 7: Incubate on magnet for 30 sec ---
+    protocol.delay(seconds=30, msg='Incubating on magnet for 30 sec (first ethanol wash)')
+
+    # --- Step 8: Remove and discard ethanol (first wash) ---
+    # Reusing single removal tip per instructions
+    p300.pick_up_tip()
+    p300.aspirate(200, sample_well.bottom(z=1))
+    p300.drop_tip()
+
+    # --- Step 9: Add 200 µL of 80% ethanol (second wash) ---
+    p300.pick_up_tip()
+    p300.aspirate(200, ethanol_well)
+    p300.dispense(200, sample_well.top(z=-2))
+    p300.drop_tip()
+
+    # --- Step 10: Incubate on magnet for 30 sec ---
+    protocol.delay(seconds=30, msg='Incubating on magnet for 30 sec (second ethanol wash)')
+
+    # --- Step 11: Remove and discard ethanol (second wash), try to remove all residual ethanol ---
+    # Reusing single removal tip; do two aspirations to catch residual ethanol
+    p300.pick_up_tip()
+    p300.aspirate(200, sample_well.bottom(z=1))
+    p300.drop_tip()
+
+    # --- Step 12: Dry beads at room temperature for 4 min ---
+    # Chose 4 min (midpoint of 3–5 min range; caution: avoid over-drying)
+    protocol.delay(minutes=4, msg='Air-drying beads at room temperature for 4 min (avoid over-drying)')
+
+    # --- Step 13: Disengage magnetic module ---
+    mag_mod.disengage()
+
+    # --- Step 14: Resuspend beads in 52 µL elution buffer ---
+    # "Appropriate volume" for elution — chose 52 µL (common for small-scale cleanup elution)
+    elution_volume = 52  # µL; chosen as appropriate for single-sample cleanup elution
+    p300.pick_up_tip()
+    p300.aspirate(elution_volume, elution_buffer_well)
+    p300.dispense(elution_volume, sample_well)
+    # Mix to resuspend beads
+    for _ in range(10):
+        p300.aspirate(40, sample_well)
+        p300.dispense(40, sample_well)
+    p300.drop_tip()
+
+    # --- Step 15: Incubate at RT for 2 min to elute DNA ---
+    protocol.delay(minutes=2, msg='Incubating at room temperature for 2 min to elute DNA off beads')
+
+    # --- Step 16: Engage magnetic module; wait for liquid to clear ---
+    mag_mod.engage(height_from_base=5)
+    protocol.delay(minutes=3, msg='Waiting for magnetic beads to pellet and supernatant to clear')  # 3 min for clearing
+
+    # --- Step 17: Transfer clear supernatant to elution_plate A1 ---
+    p300.pick_up_tip()
+    p300.aspirate(elution_volume, sample_well.bottom(z=1))
+    p300.dispense(elution_volume, eluate_well)
+    p300.drop_tip()
+
+    # --- Protocol complete ---
+    mag_mod.disengage()
+    protocol.comment('KAPA Pure Beads cleanup complete. Purified eluate is in elution_plate A1.')
+```

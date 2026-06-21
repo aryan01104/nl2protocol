@@ -1,0 +1,18 @@
+{
+  "case": "01_lotterhos_magbead",
+  "mode": "regular",
+  "model": "claude-sonnet-4-6",
+  "thinking": false,
+  "started_utc": "2026-06-18T06:45:54.486071+00:00",
+  "finished_utc": "2026-06-18T06:46:57.994726+00:00",
+  "duration_s": 63.508655,
+  "git_sha": "b27c92c",
+  "out_dir": "evals/controls/01_lotterhos_magbead/regular__20260618T064554Z__b27c92c",
+  "error": null,
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 1033,
+    "output_tokens": 4354
+  },
+  "script_chars": 11709
+}

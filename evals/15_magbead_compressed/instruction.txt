@@ -1,1 +1,0 @@
-Do a 0.8X SPRI bead cleanup on the fragmented DNA sample — two 80% ethanol washes on the magnet, then elute in 30 µL Tris-HCl.

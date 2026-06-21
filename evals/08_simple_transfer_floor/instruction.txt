@@ -1,1 +1,0 @@
-Transfer 50 µL from well A1 of the source plate to well A1 of the destination plate.

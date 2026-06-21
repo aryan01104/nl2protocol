@@ -1,5 +1,0 @@
-Distribute 200 µL of lysis buffer from the reservoir to each of 12 sample tubes.
-
-Centrifuge the tubes at 5000 rpm for 3 minutes to pellet debris.
-
-Transfer 100 µL of the supernatant from each tube to the corresponding well of the destination 96-well plate.
