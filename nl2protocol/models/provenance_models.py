@@ -190,7 +190,7 @@ def validate_provenance(data) -> ProvenanceBase:
 
 
 # ============================================================================
-# PROVENANCE FOR STEP
+# PROVENANCE MODEL FOR STEP
 # ============================================================================
 
 class CompositionProvenance(BaseModel):
