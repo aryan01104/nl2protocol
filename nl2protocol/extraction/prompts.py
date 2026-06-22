@@ -298,9 +298,14 @@ MIX STEPS (standalone "mix" action):
   100uL") is its own step with action="mix". Put the cycle count in
   "repetitions" and the per-cycle volume in "volume".
   Example: "Mix thoroughly by pipetting up and down 10 times at 100uL" →
-    {{"action": "mix", "repetitions": 10, "volume": {{"value": 100, "provenance": {{...}}}}}}
+    {{"action": "mix", "repetitions": 10,
+      "repetitions_provenance": {{"source": "instruction", "cited_text": "10 times", "confidence": 1.0}},
+      "volume": {{"value": 100, "provenance": {{...}}}}}}
 - Set "repetitions" ONLY if the instruction states a count; leave it null
-  otherwise (do not invent a default).
+  otherwise (do not invent a default). When you DO set it, also set
+  "repetitions_provenance" (source="instruction", cited_text = the verbatim
+  count phrase, e.g. "10 times"). Same rule for a transfer's attached mix
+  count (PostAction.repetitions / repetitions_provenance).
 - For a mix that rides along with a transfer ("transfer X, then mix"), do NOT
   make a separate mix step — attach it to the transfer via post_actions.
 
@@ -348,8 +353,11 @@ COMPRESSION — KEEP STEPS COMPACT:
       "action": "transfer",
       "source": {{"description": "dilution strip", "wells": ["A1","B1","C1","D1","E1","F1","G1","H1"]}},
       "destination": {{"description": "plate", "well": "A1"}},
-      "replicates": 3
+      "replicates": 3,
+      "replicates_provenance": {{"source": "instruction", "cited_text": "in triplicate", "confidence": 1.0}}
     }}
+- When you set "replicates", also set "replicates_provenance" (source="instruction",
+  cited_text = the verbatim phrase, e.g. "in triplicate").
 - A protocol with 12 samples in triplicate should be 1 step, NOT 12 steps.
 - Aim for under 10 steps total. If your spec has more than 15 steps, you are probably not compressing enough.
 

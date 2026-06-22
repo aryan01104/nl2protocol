@@ -926,6 +926,33 @@ class TestDefaultApplyStampsUserAction:
         # Provenance stamped
         assert spec.steps[0].volume.provenance.review_status == "user_edited"
 
+    def test_accept_count_suggestion_stamps_repetitions_provenance(self):
+        # repetitions is a bare scalar with a sibling _provenance field: accept
+        # must record WHERE the count came from, not just set the int — else the
+        # report shows an unattributed count.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution import MixCycleCountSuggester
+        spec = _real_spec()
+        g = gap("g1", field_path="steps[0].repetitions")
+        sugg = MixCycleCountSuggester().suggest(g, spec, {})
+        res = Resolution(action="accept_suggestion", new_value=sugg.value,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sugg)
+        assert spec.steps[0].repetitions == sugg.value
+        assert spec.steps[0].repetitions_provenance is not None
+        assert spec.steps[0].repetitions_provenance.review_status == "user_accepted_suggestion"
+
+    def test_edit_count_stamps_repetitions_provenance_user_edited(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        g = gap("g1", field_path="steps[0].repetitions")
+        res = Resolution(action="edit", new_value=7,
+                         user_action_provenance="user_edited")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        assert spec.steps[0].repetitions == 7
+        assert spec.steps[0].repetitions_provenance is not None
+        assert spec.steps[0].repetitions_provenance.review_status == "user_edited"
+
     def test_user_action_supersedes_prior_reviewer_objection(self):
         # If the reviewer disagreed with a value, then the user accepts/edits
         # anyway, the resulting Provenance reflects the user's action and

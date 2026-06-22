@@ -754,6 +754,24 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
                 _stamp_user_action(new_value, user_action)
         else:
             setattr(spec.steps[idx], fname, new_value)
+        # Sibling-provenance fields (repetitions / replicates): the count is a
+        # bare scalar, so record how it was determined onto `{fname}_provenance`
+        # — accept_suggestion carries the suggestion's provenance, edit marks
+        # user_edited. Other bare fields have no such sibling and are skipped.
+        prov_attr = f"{fname}_provenance"
+        if hasattr(spec.steps[idx], prov_attr):
+            if resolution.action == "accept_suggestion" and suggestion is not None:
+                setattr(spec.steps[idx], prov_attr,
+                        _build_suggested_provenance(suggestion, review_status=user_action))
+            elif resolution.action == "edit":
+                from nl2protocol.models.spec import InferredProvenance
+                setattr(spec.steps[idx], prov_attr, InferredProvenance(
+                    source="inferred",
+                    positive_reasoning="User-typed count during gap resolution.",
+                    why_not_in_instruction="The instruction stated no count; the user provided one.",
+                    confidence=1.0,
+                    review_status="user_edited",
+                ))
         return
 
     m = re.match(r"steps\[(\d+)\]\.(\w+)\.(\w+)$", path)
