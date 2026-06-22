@@ -23,6 +23,40 @@ def _step_index(gap: Gap) -> Optional[int]:
 
 
 # ============================================================================
+# 0. MixCycleCountSuggester — standard cycle count for a missing mix count
+# ============================================================================
+
+class MixCycleCountSuggester:
+    """Suggest the standard mix cycle count for a step missing `repetitions`.
+
+    Pre:    `gap.kind == "missing"` and `gap.field_path` ends in
+            `.repetitions` (a standalone `mix`, or a `serial_dilution` whose
+            per-transfer mix count was never stated).
+    Post:   Returns a Suggestion of DEFAULT_MIX_REPS cycles with confidence
+            0.6 — below the auto-accept threshold, so the count always
+            surfaces for the user to accept or edit instead of being applied
+            silently in codegen. Returns None for any other gap.
+    """
+
+    def suggest(self, gap: Gap, spec, context: dict) -> Optional[Suggestion]:
+        if gap.kind != "missing" or not gap.field_path.endswith(".repetitions"):
+            return None
+        from nl2protocol.constants import DEFAULT_MIX_REPS
+        return Suggestion(
+            value=DEFAULT_MIX_REPS,
+            provenance_source="domain_default",
+            positive_reasoning=(
+                f"Standard mixing is {DEFAULT_MIX_REPS} up-and-down cycles "
+                f"when the instruction states no count."
+            ),
+            why_not_in_instruction=(
+                "The instruction asks to mix but gives no cycle count."
+            ),
+            confidence=0.6,
+        )
+
+
+# ============================================================================
 # 1. ConfigLookupSuggester — substance → source location via config
 # ============================================================================
 
@@ -1182,6 +1216,14 @@ class IndependentReviewSuggester:
 For each claim below, evaluate TWO things INDEPENDENTLY:
   1. Is the POSITIVE reasoning sound? (Domain-knowledge check: does this value match standard lab practice / the action's semantics?)
   2. Is the NEGATIVE reasoning correct? (Text-grounding check: does the instruction REALLY not supply this value? Re-read the instruction; the original model may have missed something.)
+
+ACTION SEMANTICS — do NOT raise these as objections:
+  - serial_dilution, distribute, and consolidate are SINGLE steps that expand
+    into multiple per-well operations at build time. A well RANGE or multi-well
+    destination (e.g. A2-A12) on these is correct and expected — do NOT object
+    that it "should be multiple transfer steps" or "is not sequential."
+  - A serial_dilution chains transfers across its destination range internally;
+    one step with a range is the right representation, not a bug.
 
 INSTRUCTION:
 {instruction}

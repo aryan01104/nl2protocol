@@ -28,9 +28,11 @@ from nl2protocol.server.handlers import (
     HTMLConfirmationHandler,
     HTMLInitialContentsHandler,
     HTMLNamespaceSplitHandler,
+    HTMLSourceWellHandler,
     InitialContentsConfirmation,
     NamespaceSplitConfirmation,
     PendingRequest,
+    SourceWellConfirmation,
 )
 
 
@@ -802,5 +804,82 @@ class TestHTMLNamespaceSplitHandlerConfirm:
         result = h.confirm([
             {"prefix": "A", "wells": ["A1"], "candidates": ["rack_a"],
              "suggested_label": "rack_a"},
+        ])
+        assert result is None
+
+
+# ============================================================================
+# SourceWellConfirmation + HTMLSourceWellHandler
+# ============================================================================
+# Same blocking pattern; payload carries one row per ambiguous source
+# (substance in >1 well of the labware) with the candidate wells to pick from.
+
+
+class TestSourceWellConfirmationActionMapping:
+    def test_confirm_stores_key_to_well_mapping(self):
+        sc = SourceWellConfirmation()
+        sc.set_response("confirm", {"s1-source": "A2", "s3-source": "B1"})
+        assert sc.aborted is False
+        assert sc.confirmed == {"s1-source": "A2", "s3-source": "B1"}
+        assert sc.event.is_set()
+
+    def test_abort_clears_confirmed_and_sets_aborted(self):
+        sc = SourceWellConfirmation()
+        sc.set_response("abort", None)
+        assert sc.aborted is True
+        assert sc.confirmed is None
+        assert sc.event.is_set()
+
+
+class TestHTMLSourceWellHandlerConfirm:
+    def test_empty_rows_returns_empty_dict_no_send(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, SourceWellConfirmation] = {}
+        h = HTMLSourceWellHandler(
+            send_request=sent.append, pending_source_wells=pending,
+            timeout_seconds=2,
+        )
+        assert h.confirm([]) == {}
+        assert sent == []
+
+    def test_confirm_returns_key_to_well_mapping(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, SourceWellConfirmation] = {}
+        h = HTMLSourceWellHandler(
+            send_request=sent.append, pending_source_wells=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("confirm", {"s1-source": "A2"})
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"key": "s1-source", "description": "reservoir", "substance": "diluent",
+             "candidates": ["A1", "A2"], "suggested": "A1"},
+        ])
+        assert result == {"s1-source": "A2"}
+        assert len(sent) == 1
+        assert sent[0]["source_wells"][0]["candidates"] == ["A1", "A2"]
+
+    def test_confirm_returns_none_on_abort(self):
+        sent: List[Dict[str, Any]] = []
+        pending: Dict[str, SourceWellConfirmation] = {}
+        h = HTMLSourceWellHandler(
+            send_request=sent.append, pending_source_wells=pending,
+            timeout_seconds=2,
+        )
+
+        def _respond():
+            time.sleep(0.05)
+            rid = next(iter(pending))
+            pending[rid].set_response("abort", None)
+
+        threading.Thread(target=_respond, daemon=True).start()
+        result = h.confirm([
+            {"key": "s1-source", "description": "reservoir", "substance": "diluent",
+             "candidates": ["A1", "A2"], "suggested": "A1"},
         ])
         assert result is None

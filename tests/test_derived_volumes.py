@@ -67,7 +67,7 @@ def _coupled_steps(mix_basis, out_basis):
             destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp()),
         ExtractedStep(  # mix the well — volume derived
-            order=2, action="mix", volume=_vol(1.0, basis=mix_basis),
+            order=2, action="mix", repetitions=3, volume=_vol(1.0, basis=mix_basis),
             destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp()),
         ExtractedStep(  # remove it back out — volume derived
@@ -124,7 +124,7 @@ class TestBuildTimeResolution:
     def test_basis_falls_back_to_literal_when_well_empty(self, config):
         """If the basis well was never filled, the literal value stands."""
         schema = _build([
-            ExtractedStep(order=1, action="mix", volume=_vol(25.0,
+            ExtractedStep(order=1, action="mix", repetitions=3, volume=_vol(25.0,
                 basis=VolumeBasis(location="destination", fraction=0.8)),
                 destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
                 composition_provenance=_comp()),
@@ -146,7 +146,7 @@ class TestWellContentsVolumeSuggester:
 
     def test_fires_on_resuspend_mix(self):
         sug = WellContentsVolumeSuggester()
-        step = ExtractedStep(order=1, action="mix", volume=_vol(1.0),
+        step = ExtractedStep(order=1, action="mix", repetitions=3, volume=_vol(1.0),
             destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp())
         out = sug.suggest(self._gap(0), self._spec([step]), {})
@@ -180,7 +180,7 @@ class TestWellContentsVolumeSuggester:
 
     def test_declines_non_volume_gap(self):
         sug = WellContentsVolumeSuggester()
-        step = ExtractedStep(order=1, action="mix", volume=_vol(1.0),
+        step = ExtractedStep(order=1, action="mix", repetitions=3, volume=_vol(1.0),
             destination=_loc(description="dest_plate", well="A1", resolved_label="dest_plate"),
             composition_provenance=_comp())
         g = Gap(id="g", kind="missing", field_path="steps[0].destination",

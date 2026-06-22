@@ -72,6 +72,8 @@ def _missing_field_to_path(action: str, description: str) -> str:
         return ".temperature"
     if "missing duration" in desc_lower:
         return ".duration"
+    if "mix cycle count" in desc_lower or "repetitions" in desc_lower:
+        return ".repetitions"
     if "missing note" in desc_lower:
         return ".note"
     if "duration" in desc_lower and "note" in desc_lower:

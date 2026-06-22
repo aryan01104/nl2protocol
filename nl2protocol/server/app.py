@@ -45,9 +45,11 @@ from nl2protocol.server.handlers import (
     HTMLConfirmationHandler,
     HTMLInitialContentsHandler,
     HTMLNamespaceSplitHandler,
+    HTMLSourceWellHandler,
     InitialContentsConfirmation,
     NamespaceSplitConfirmation,
     PendingRequest,
+    SourceWellConfirmation,
 )
 from nl2protocol.server.reporter import (
     CompositeReporter,
@@ -444,6 +446,7 @@ class LiveModeApp:
         # to a browser modal asking the user to map each prefix to a
         # config labware. Same dict-by-rid pattern as the other handlers.
         self._pending_namespace_splits: Dict[str, NamespaceSplitConfirmation] = {}
+        self._pending_source_wells: Dict[str, SourceWellConfirmation] = {}
         # Per-IP rate limit. Defense in depth on top of BYO-key: even if a
         # visitor brings their own key, we don't want a bot to spam /start
         # 100x and exhaust our Fly machine's CPU. Dict grows with unique
@@ -518,7 +521,15 @@ class LiveModeApp:
         )
         template = env.get_template("report.html.jinja")
 
+        # Vendored (self-hosted) Choices.js for the non-native Protocol
+        # dropdown, inlined into the live page so it stays self-contained.
+        vendor = template_dir / "vendor"
+        choices_css = (vendor / "choices.min.css").read_text()
+        choices_js = (vendor / "choices.min.js").read_text()
+
         return template.render(
+            choices_css=choices_css,
+            choices_js=choices_js,
             instruction="",
             instruction_html="<em style='color:#6b6b6b'>(loading — pipeline starts when you click ▶ Start)</em>",
             spec_steps=[],
@@ -558,6 +569,7 @@ class LiveModeApp:
         self._pending_binary_confirms.clear()
         self._pending_initial_contents.clear()
         self._pending_namespace_splits.clear()
+        self._pending_source_wells.clear()
 
     def _list_examples(self) -> list:
         if not self._examples_dir.exists():
@@ -701,7 +713,12 @@ class LiveModeApp:
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
-            return HTMLResponse(self._cached_live_page)
+            # Re-render per request (cheap) so template edits show on a plain
+            # refresh, and tell the browser not to cache the live page.
+            return HTMLResponse(
+                self._render_live_page(),
+                headers={"Cache-Control": "no-store"},
+            )
 
         @self.app.get("/examples")
         async def list_examples():
@@ -760,10 +777,11 @@ class LiveModeApp:
             if raw_case and "/" not in raw_case and "\\" not in raw_case and ".." not in raw_case:
                 case_name = raw_case
 
-            # Local-dev fallback: when the operator opted in via env flag AND
-            # the request didn't carry a key, use the server's env key. Never
-            # fires on a Fly deploy because the flag isn't set there.
-            if not api_key and self._local_dev_mode:
+            # Server-supplied key: the browser no longer sends one (the key
+            # field was removed). Fall back to the server's environment in
+            # both hosted and local-dev modes. On Fly this is the encrypted
+            # `ANTHROPIC_API_KEY` secret; locally it's the operator's shell/.env.
+            if not api_key:
                 api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
             if not instruction:
@@ -778,8 +796,8 @@ class LiveModeApp:
                 )
             if not api_key:
                 return JSONResponse(
-                    {"status": "error", "message": "api_key is required"},
-                    status_code=400,
+                    {"status": "error", "message": "server is missing ANTHROPIC_API_KEY"},
+                    status_code=500,
                 )
 
             # Optional initial-state map (.xlsx). Parsed server-side into the
@@ -983,6 +1001,26 @@ class LiveModeApp:
                     )
                 except Exception:
                     pass
+            elif event.kind == "labware_resolution_done":
+                # Re-render the step blocks the moment labware is confirmed so
+                # the description -> config-label chain appears right after the
+                # assignments modal, not after gap resolution. resolved_label
+                # and its revision snapshot are already on self._live_spec
+                # (mutated in place by _apply_labware_assignments before this
+                # event fired), so re-rendering now shows the resolved chain.
+                data = _safe_data(event.data) or {}
+                if not isinstance(data, dict):
+                    data = {"_raw": data}
+                try:
+                    if self._live_spec is not None:
+                        from nl2protocol.reporting import _step_to_render_dict
+                        steps = getattr(self._live_spec, "steps", None) or []
+                        data["steps"] = [
+                            _step_to_render_dict(s, idx, self._instruction_text)
+                            for idx, s in enumerate(steps)
+                        ]
+                except Exception:
+                    pass
             else:
                 data = _safe_data(event.data)
             payload = {
@@ -1050,6 +1088,11 @@ class LiveModeApp:
                 if pending_ns is None:
                     continue
                 pending_ns.set_response(action, msg.get("mappings"))
+            elif kind == "source_well_response":
+                pending_sw = self._pending_source_wells.get(rid)
+                if pending_sw is None:
+                    continue
+                pending_sw.set_response(action, msg.get("wells"))
 
     def _replay_pending_requests(self) -> None:
         """When the browser reconnects mid-run, re-emit a panel_request
@@ -1094,6 +1137,18 @@ class LiveModeApp:
                 kind="namespace_split_request",
                 data=payload,
                 stage_name="stage_2_5_namespace_split",
+            ))
+        except queue.Full:
+            pass
+
+    def _send_source_well_request(self, payload: Dict[str, Any]) -> None:
+        """Push a source_well_request envelope onto the outbound queue."""
+        from nl2protocol.reporting import StageEvent
+        try:
+            self._event_queue.put_nowait(StageEvent(
+                kind="source_well_request",
+                data=payload,
+                stage_name="stage_2_5_source_wells",
             ))
         except queue.Full:
             pass
@@ -1221,6 +1276,11 @@ class LiveModeApp:
             pending_namespace_splits=self._pending_namespace_splits,
             timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
         )
+        source_well_handler = HTMLSourceWellHandler(
+            send_request=self._send_source_well_request,
+            pending_source_wells=self._pending_source_wells,
+            timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS,
+        )
 
         run_error: Optional[Dict[str, Any]] = None
         try:
@@ -1234,6 +1294,7 @@ class LiveModeApp:
                 binary_confirm_handler=binary_confirm_handler,
                 initial_contents_handler=initial_contents_handler,
                 namespace_split_handler=namespace_split_handler,
+                source_well_handler=source_well_handler,
             )
             # Wrap the agent's Anthropic client with the metering proxy.
             # Downstream helpers (SemanticExtractor, LabwareMatcher,

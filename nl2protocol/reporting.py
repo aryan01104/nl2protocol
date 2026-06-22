@@ -373,14 +373,47 @@ _PROV_CLASS = {
     "config":         "prov-config",
     "domain_default": "prov-domain_default",
     "inferred":       "prov-inferred",
+    "initial_state":  "prov-initial_state",
 }
 
 # Per-citation palette size. 8 distinguishable hues defined in the template's
-# CSS as .palette-0 .. .palette-7. Each unique cited_text deterministically
-# hashes to one slot; both the cite span in the instruction column and the
-# atomic value span in the spec column carry the same .palette-N class so
-# readers can connect them by hue without any arrow.
+# CSS as .palette-0 .. .palette-7. The step trigger's left-bar hue still hashes
+# its cited_text onto a slot via _palette_class; atomic value cites use the
+# fixed-per-field mapping below instead.
 _PALETTE_SIZE = 8
+
+# Fixed hue per parameter type. Both the cite span in the instruction column and
+# the atomic value span in the spec column carry the same .palette-N class, so a
+# given parameter kind is always the same color across every step and protocol
+# (volume always blue, source always orange, …). The four fields of a transfer
+# (volume/substance/source/destination) get the most mutually distinct hues
+# (CIELAB ΔE ≈ 77); duration/temperature take two of the rest. Slots 3 (magenta)
+# and 7 (brown) are intentionally left free.
+_FIELD_PALETTE = {
+    "volume":      "palette-0",  # blue
+    "substance":   "palette-2",  # green
+    "source":      "palette-1",  # orange
+    "destination": "palette-4",  # purple
+    "duration":    "palette-5",  # teal
+    "temperature": "palette-6",  # red
+}
+
+
+def _field_palette_class(prov_id) -> Optional[str]:
+    """Return the fixed `palette-N` class for a value cell's `prov_id`, or None.
+
+    The parameter kind is the last `-`-segment of the prov_id, except a trailing
+    `-wells` segment (a LocationRef's wells row) which defers to the segment
+    before it so wells share their parent location's hue. Examples:
+    `s0-volume`→volume, `s0-source-wells`→source, `s0-mix-0-volume`→volume.
+    Returns None for prov_ids whose field is not a colored parameter (e.g. the
+    step trigger) or when `prov_id` is falsy (prior-revision spans).
+    """
+    if not prov_id:
+        return None
+    parts = prov_id.split("-")
+    field = parts[-2] if parts[-1] == "wells" and len(parts) >= 2 else parts[-1]
+    return _FIELD_PALETTE.get(field)
 
 
 # ============================================================================
@@ -513,8 +546,10 @@ def _render_provenanced_value(
     high-signal review states.
 
     Color rules:
-      - source="instruction" with a recoverable cited_text → adds `palette-N`
-        class so the value matches its cite span's hue in the instruction.
+      - source="instruction" with a recoverable cited_text → adds the fixed
+        per-field `palette-N` class (see `_field_palette_class`) so the value
+        matches both its cite span's hue in the instruction AND every other
+        value of the same parameter kind.
       - other sources → categorical class only (.prov-domain_default etc.)
         with dotted-underline styling driven from CSS.
 
@@ -568,7 +603,9 @@ def _render_provenanced_value(
             )
 
     if cite_recoverable and cite_list:
-        classes.append(_palette_class(cite_list))
+        field_palette = _field_palette_class(prov_id)
+        if field_palette:
+            classes.append(field_palette)
 
     # Review-lifecycle class. The CSS pseudo-element on this class draws
     # the inline ⚠ / ✎ badge for the two attention-worthy states; other
@@ -746,11 +783,14 @@ def _collect_arrow_targets(spec) -> list:
         sid = f"s{step_idx}"
         comp = step.composition_provenance
 
-        # Composite Q1 (step trigger) — arrow endpoint.
+        # Composite Q1 (step trigger) — arrow endpoint. Its cited_text is also
+        # this step's anchor phrase for the per-step windowing in
+        # _render_instruction_with_marks.
         targets.append({
             "prov_id": f"{sid}-step-trigger",
             "cited_text": comp.step_cited_text,
             "kind": "composite-step",
+            "step_idx": step_idx,
         })
 
         # Composite Q2 (parameter cohesion) — on-hover highlights, no arrow.
@@ -761,6 +801,7 @@ def _collect_arrow_targets(spec) -> list:
                 "step_id": sid,
                 "cited_text": cite,
                 "kind": "q2-cohesion",
+                "step_idx": step_idx,
             })
 
         # Atomic per-value cites — color-matched in instruction column.
@@ -792,13 +833,13 @@ def _collect_arrow_targets(spec) -> list:
                 # cited_text is List[str] post-normalizer. Emit one target
                 # per cite so each substring gets its own colored span in
                 # the instruction. All cites for the same field share the
-                # palette derived from the FULL list (the hash key is the
-                # joined list), so a wells-list with N cites colors all N
-                # spans the same hue — connecting them visually as one
+                # fixed per-field hue, so a wells-list with N cites colors all
+                # N spans the same hue — connecting them visually as one
                 # logical citation cluster while still highlighting each
-                # actual phrase the LLM quoted.
+                # actual phrase the LLM quoted, and matching the value span's
+                # hue in the spec column.
                 cite_iter = cited if isinstance(cited, list) else [cited]
-                palette = _palette_class(cited)
+                palette = _FIELD_PALETTE.get(field_name)
                 # Cites under wells_provenance target the indented wells
                 # row (its own prov_id) so the cite-span ↔ value hover
                 # pairs the right visual row. Description / atomic
@@ -816,6 +857,7 @@ def _collect_arrow_targets(spec) -> list:
                         "cited_text": single_cite,
                         "kind": "atomic-color",
                         "palette_class": palette,
+                        "step_idx": step_idx,
                     })
     return targets
 
@@ -840,10 +882,47 @@ def _render_instruction_with_marks(instruction: str, targets: list) -> str:
     """
     import html
 
-    # Resolve each target to a char range; drop unrecoverable ones.
+    # Pass 1: anchor each step to a forward-moving window. Steps cite the
+    # instruction in document order, so each step's region begins at or after
+    # the previous step's. The composite-step target carries the step trigger
+    # phrase, which we locate with a monotonic cursor; two steps with identical
+    # triggers thus resolve to consecutive occurrences. windows[step_idx] is the
+    # half-open (start, end) region that step "owns".
+    anchor_targets = sorted(
+        (t for t in targets
+         if t["kind"] == "composite-step" and t.get("step_idx") is not None),
+        key=lambda t: t["step_idx"],
+    )
+    anchors = []  # (step_idx, anchor_start)
+    cursor = 0
+    for t in anchor_targets:
+        pos = _find_cite_position(instruction, t["cited_text"], start=cursor)
+        if pos is None:
+            pos = _find_cite_position(instruction, t["cited_text"])  # global fallback
+        if pos is None:
+            a_start = cursor  # degenerate: no recoverable anchor
+        else:
+            a_start = pos[0]
+            cursor = max(cursor, pos[1])
+        anchors.append((t["step_idx"], a_start))
+
+    windows = {}  # step_idx -> (win_start, win_end)
+    for i, (step_idx, a_start) in enumerate(anchors):
+        win_end = anchors[i + 1][1] if i + 1 < len(anchors) else len(instruction)
+        windows[step_idx] = (a_start, win_end)
+
+    # Pass 2: resolve each target inside its step's window, then fall back to a
+    # global first-match (today's behavior) so nothing regresses.
     spans = []
     for t in targets:
-        pos = _find_cite_position(instruction, t["cited_text"])
+        win = windows.get(t.get("step_idx"))
+        pos = None
+        if win is not None:
+            pos = _find_cite_position(
+                instruction, t["cited_text"], start=win[0], end=win[1]
+            )
+        if pos is None:
+            pos = _find_cite_position(instruction, t["cited_text"])
         if pos is None:
             continue
         if pos[0] >= pos[1]:
@@ -967,25 +1046,25 @@ def _format_location(loc) -> str:
 
 
 def _format_labware_label(loc) -> str:
-    """Just the labware portion of a LocationRef: '"tube rack"' or
-    '"tube rack" → labware: [reagent_rack]' when resolved.
+    """Just the labware portion of a LocationRef: '"tube rack"' before the
+    resolver runs, or '<resolved_label> (config)' once resolved.
 
     Pre:    `loc` is a LocationRef with `description` (required) and
             an optional `resolved_label`.
-    Post:   Returns '"description"' alone if resolved_label is null;
-            '"description" → labware: [resolved_label]' otherwise.
-            The double quotes are P2-2: they make the user's verbatim
-            wording visually distinguishable from neighboring plain
-            text on the row (substance, action name). The arrow +
-            "labware:" prefix is CARRY-D1: makes the description →
-            config-key mapping direction visible at a glance, per
-            the user's PDF p.2 literal `tube_rack → labware: [reagent_rack]`.
-            No well info in this string — that's `_format_wells_only`'s job.
+    Post:   Returns '"description"' (quoted) when resolved_label is null;
+            returns '<resolved_label> (config)' once resolved. This text
+            sits at the head of the description's revision chain, so a
+            resolved ref reads as '"plate" -> plate (config)' (the struck
+            description, an arrow, then the config label). The arrow already
+            shows the description -> config-key direction, so the old
+            '-> labware: [...]' restatement is dropped as redundant. The
+            double quotes (P2-2) distinguish the user's verbatim wording from
+            neighboring plain text; the '(config)' tag marks the label as
+            config-sourced. No well info here — that's `_format_wells_only`.
     """
-    text = f'"{loc.description}"'
     if getattr(loc, "resolved_label", None):
-        text += f" \u2192 labware: [{loc.resolved_label}]"
-    return text
+        return f"{loc.resolved_label} (config)"
+    return f'"{loc.description}"'
 
 
 def _format_wells_only(loc) -> Optional[str]:
@@ -1576,6 +1655,15 @@ def _step_to_render_dict(step, step_idx: int = 0, instruction: Optional[str] = N
 
     if step.replicates is not None:
         detail_lines.append(_row("replicates", f"{step.replicates}×"))
+
+    # Step-level mix cycle count (standalone `mix` and `serial_dilution`'s
+    # intrinsic per-transfer mixing). Lives on `step.repetitions`, not in a
+    # post-action, so without this row the resolved count is invisible (the
+    # step rendered "mix: (no parameters)").
+    if getattr(step, "repetitions", None) is not None and step.action in (
+        "mix", "serial_dilution",
+    ):
+        detail_lines.append(_row("mix", f"×{step.repetitions}"))
 
     # Post-actions (mix / blow_out / touch_tip applied AFTER the main
     # action). Each post-action emits one row; the value cell combines

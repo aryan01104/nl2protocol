@@ -223,7 +223,7 @@ class TestValidateCompleteness:
     def test_liquid_action_with_volume_ok(self):
         self._complete([
             _step(
-                order=1, action="mix", volume=_vol(50.0),
+                order=1, action="mix", volume=_vol(50.0), repetitions=3,
                 destination=LocationRef(description="plate", well="A1", description_provenance=_prov(), wells_provenance=_prov()),
             ),
         ])

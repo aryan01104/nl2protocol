@@ -169,10 +169,17 @@ class Orchestrator:
         from nl2protocol.gap_resolution.registry import detect_all
 
         iterations: List[IterationResult] = []
+        # Gap ids already presented/resolved in a prior iteration. Re-detection
+        # runs every iteration; without this, a gap the user SKIPPED (or one a
+        # detector keeps re-emitting from unchanged state, e.g. a reviewer
+        # disagree) would be asked again forever until the iteration cap and
+        # fail the run. Once handled, a gap id is not surfaced again.
+        handled_ids: set = set()
         for i in range(1, self._max_iterations + 1):
             gaps = detect_all(spec, context, self._detectors)
             if gap_filter is not None:
                 gaps = [g for g in gaps if gap_filter(g)]
+            gaps = [g for g in gaps if g.id not in handled_ids]
             if not gaps:
                 if i == 1:
                     iterations.append(IterationResult(iteration=1))
@@ -241,6 +248,7 @@ class Orchestrator:
                     ))
                     self._apply(spec, gap, resolution, suggestion)
                     self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=True)
+                    handled_ids.add(gap.id)
                     resolved_in_iteration += 1
                     continue
 
@@ -269,9 +277,11 @@ class Orchestrator:
                                                 aborted=True, converged=False)
                 if resolution.action == "skip":
                     self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
+                    handled_ids.add(gap.id)
                     continue
                 self._apply(spec, gap, resolution, suggestion)
                 self._emit_gap_resolved(gap, resolution, suggestion, auto_accepted=False)
+                handled_ids.add(gap.id)
                 resolved_in_iteration += 1
 
             # End of iteration; loop top will re-detect.
@@ -287,6 +297,11 @@ class Orchestrator:
 
         from nl2protocol.gap_resolution.registry import detect_all as _detect
         final_gaps = _detect(spec, context, self._detectors)
+        if gap_filter is not None:
+            final_gaps = [g for g in final_gaps if gap_filter(g)]
+        # Gaps the user already handled (e.g. skipped, or kept despite a
+        # reviewer disagree) don't count against convergence.
+        final_gaps = [g for g in final_gaps if g.id not in handled_ids]
         return OrchestratorOutcome(
             spec=spec,
             iterations=iterations,

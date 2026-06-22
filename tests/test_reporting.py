@@ -304,10 +304,11 @@ from nl2protocol.reporting import (
 
 
 class TestFormatLabwareLabel:
-    """The labware-portion render of a LocationRef. P2-2 added the
-    surrounding double quotes around `description`; CARRY-D1 adds the
-    arrow + 'labware:' prefix between the description and the bracketed
-    resolved_label so the mapping direction reads at a glance."""
+    """The labware-portion render of a LocationRef. P2-2 keeps the double
+    quotes around the unresolved `description`; once resolved the head is the
+    bare config label tagged '(config)' — the description -> label direction
+    is carried by the revision-chain arrow, so the inline '-> labware: [...]'
+    restatement is dropped."""
 
     class _FakeLoc:
         def __init__(self, description, resolved_label=None):
@@ -318,12 +319,13 @@ class TestFormatLabwareLabel:
         out = _format_labware_label(self._FakeLoc("tube rack"))
         assert out == '"tube rack"'
 
-    def test_resolved_renders_arrow_labware_bracketed_label(self):
+    def test_resolved_returns_config_label_with_config_tag(self):
         out = _format_labware_label(
             self._FakeLoc("tube rack", resolved_label="reagent_rack")
         )
-        # CARRY-D1: PDF p.2 literal `tube_rack → labware: [reagent_rack]`.
-        assert out == '"tube rack" \u2192 labware: [reagent_rack]'
+        # Head of the chain: bare config label + '(config)' tag. The struck
+        # description and arrow come from the revision-chain renderer.
+        assert out == "reagent_rack (config)"
 
 
 class TestPaletteClass:
@@ -344,6 +346,52 @@ class TestPaletteClass:
 
     def test_empty_returns_palette_zero_safe_default(self):
         assert _palette_class("") == "palette-0"
+
+
+class TestFieldPalette:
+    """Atomic value cites are colored by a FIXED hue per parameter kind, so a
+    given parameter is always the same color across steps and protocols, and
+    the instruction cite span matches its spec value span."""
+
+    def test_maps_each_field_to_its_fixed_slot(self):
+        from nl2protocol.reporting import _field_palette_class, _FIELD_PALETTE
+        for field, cls in _FIELD_PALETTE.items():
+            assert _field_palette_class(f"s0-{field}") == cls
+
+    def test_wells_row_shares_parent_location_hue(self):
+        from nl2protocol.reporting import _field_palette_class, _FIELD_PALETTE
+        assert _field_palette_class("s0-source-wells") == _FIELD_PALETTE["source"]
+        assert (_field_palette_class("s0-destination-wells")
+                == _FIELD_PALETTE["destination"])
+
+    def test_post_action_volume_uses_volume_hue(self):
+        from nl2protocol.reporting import _field_palette_class, _FIELD_PALETTE
+        # Post-action prov_ids look like "s0-mix-0-volume"; field is the tail.
+        assert _field_palette_class("s0-mix-0-volume") == _FIELD_PALETTE["volume"]
+
+    def test_non_field_or_empty_prov_id_returns_none(self):
+        from nl2protocol.reporting import _field_palette_class
+        assert _field_palette_class("s0-step-trigger") is None
+        assert _field_palette_class(None) is None
+        assert _field_palette_class("") is None
+
+    def test_same_field_same_color_across_steps(self):
+        # The whole point of the switch: step 0's volume and step 7's volume
+        # render in the same hue.
+        from nl2protocol.reporting import _render_provenanced_value
+        from nl2protocol.models.spec import InstructionProvenance
+        prov = InstructionProvenance(source="instruction", cited_text="100uL", confidence=1.0)
+        instr = "Transfer 100uL from A1 to B1."
+        out0 = _render_provenanced_value("100 uL", prov, prov_id="s0-volume", instruction=instr)
+        out7 = _render_provenanced_value("100 uL", prov, prov_id="s7-volume", instruction=instr)
+        assert "palette-0" in out0 and "palette-0" in out7
+
+    def test_different_fields_get_different_colors(self):
+        from nl2protocol.reporting import _field_palette_class
+        slots = {_field_palette_class(f"s0-{f}")
+                 for f in ("volume", "substance", "source", "destination")}
+        # The four transfer fields are mutually distinct hues.
+        assert len(slots) == 4
 
 
 class TestGracefulDegradeNoDataProvId:
@@ -382,6 +430,23 @@ class TestGracefulDegradeNoDataProvId:
         assert 'data-prov-id="s0-volume"' in out
         # Recoverable instruction-sourced cites get a palette class.
         assert "palette-" in out
+
+    def test_initial_state_source_gets_dotted_class_not_box(self):
+        from nl2protocol.reporting import _render_provenanced_value
+        from nl2protocol.models.spec import InferredProvenance
+        prov = InferredProvenance(
+            source="initial_state",
+            positive_reasoning="source well plate A1 starts with 'sample' per the map",
+            confidence=0.9,
+        )
+        out = _render_provenanced_value(
+            "sample", prov, prov_id="s1-substance", instruction="anything",
+        )
+        # Dotted "from initial contents" marker, NOT the outlined box used by
+        # generic model-filled (inferred/domain/config) values, and no palette.
+        assert "prov-initial_state" in out
+        assert "prov-inferred" not in out
+        assert "palette-" not in out
 
     def test_non_instruction_source_emits_data_prov_id_drops_palette(self):
         from nl2protocol.reporting import _render_provenanced_value
@@ -1313,6 +1378,50 @@ class TestRenderInstructionWithMarks:
         assert "palette-" not in out
 
 
+class TestRenderInstructionWithMarks_PerStepWindow:
+    """A cited substring that recurs across steps must resolve to each step's
+    OWN occurrence, not always the first. Each step's composite-step target
+    anchors a forward-moving window; the step's other cites resolve inside it."""
+
+    # "100uL" recurs at two offsets; "Step one"/"Step two" anchor the windows.
+    INSTR = "Step one: add 100uL to A1. Step two: add 100uL to B1."
+
+    def _targets(self):
+        return [
+            {"prov_id": "s0-trigger", "cited_text": "Step one",
+             "kind": "composite-step", "step_idx": 0},
+            {"prov_id": "s0-volume", "cited_text": "100uL",
+             "kind": "atomic-color", "palette_class": "palette-1", "step_idx": 0},
+            {"prov_id": "s1-trigger", "cited_text": "Step two",
+             "kind": "composite-step", "step_idx": 1},
+            {"prov_id": "s1-volume", "cited_text": "100uL",
+             "kind": "atomic-color", "palette_class": "palette-2", "step_idx": 1},
+        ]
+
+    def test_recurring_cite_resolves_per_step_not_merged_on_first(self):
+        out = _render_instruction_with_marks(self.INSTR, self._targets())
+        # Each step's "100uL" gets its own span; they are NOT both collapsed
+        # onto the first occurrence (which would merge the two ids).
+        assert 'data-cite-id="s0-volume"' in out
+        assert 'data-cite-id="s1-volume"' in out
+        assert "s0-volume s1-volume" not in out
+        assert "s1-volume s0-volume" not in out
+
+    def test_second_step_cite_lands_after_its_anchor(self):
+        out = _render_instruction_with_marks(self.INSTR, self._targets())
+        # The step-1 volume span must sit in step 2's region (after "Step two"),
+        # i.e. on the SECOND "100uL", not the first.
+        assert out.index('data-cite-id="s1-volume"') > out.index("Step two")
+
+    def test_cite_with_no_window_falls_back_to_global(self):
+        # A target whose step_idx has no anchor window resolves via the global
+        # first-match fallback (today's behavior) — never dropped.
+        targets = [{"prov_id": "orphan", "cited_text": "Step one",
+                    "kind": "atomic-color", "step_idx": 99}]
+        out = _render_instruction_with_marks(self.INSTR, targets)
+        assert 'data-cite-id="orphan"' in out
+
+
 class TestCollectArrowTargets:
     """_collect_arrow_targets walks a spec and produces a list of
     (prov_id, cited_text, kind) records — one per instruction-sourced
@@ -1377,6 +1486,24 @@ class TestCollectArrowTargets:
             "s0-source", "s0-source-wells",
             "s0-volume",
         ]
+
+    def test_atomic_targets_carry_fixed_field_palette(self):
+        # The instruction-column cite span uses the same fixed per-field hue as
+        # the spec-column value span, so the two match by parameter kind.
+        from nl2protocol.reporting import _FIELD_PALETTE
+        spec = self._spec_with_one_step()
+        targets = _collect_arrow_targets(spec)
+        by_id = {t["prov_id"]: t for t in targets if t["kind"] == "atomic-color"}
+        assert by_id["s0-volume"]["palette_class"] == _FIELD_PALETTE["volume"]
+        assert by_id["s0-source"]["palette_class"] == _FIELD_PALETTE["source"]
+        assert by_id["s0-destination"]["palette_class"] == _FIELD_PALETTE["destination"]
+
+    def test_every_target_carries_its_step_idx(self):
+        # The per-step windowing in _render_instruction_with_marks keys off
+        # step_idx, so every emitted target must carry it.
+        spec = self._spec_with_one_step()
+        targets = _collect_arrow_targets(spec)
+        assert all(t.get("step_idx") == 0 for t in targets)
 
     def test_skips_non_instruction_provenance(self):
         from nl2protocol.models.spec import (

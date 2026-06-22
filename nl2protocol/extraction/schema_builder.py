@@ -722,7 +722,7 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
                                 pipette=mount, source_labware=from_label,
                                 source_well=chain[i], dest_labware=dst_label,
                                 dest_well=chain[i + 1], volume=v,
-                                new_tip="always", mix_after=mix_after or (3, v)
+                                new_tip="always", mix_after=mix_after or (step.repetitions or DEFAULT_MIX_REPS, v)
                             ))
                 else:
                     # Fallback: single chain from first source through all dests
@@ -734,7 +734,7 @@ def spec_to_schema(spec: 'CompleteProtocolSpec', config: dict):
                             pipette=mount, source_labware=from_label,
                             source_well=chain[i], dest_labware=dst_label,
                             dest_well=chain[i + 1], volume=v,
-                            new_tip="always", mix_after=mix_after or (3, v)
+                            new_tip="always", mix_after=mix_after or (step.repetitions or DEFAULT_MIX_REPS, v)
                         ))
 
         elif step.action == "mix":

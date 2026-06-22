@@ -20,6 +20,8 @@ warnings.filterwarnings("ignore", module="opentrons")
 
 LINE_WIDTH = 60  # Same as the ===== separator
 
+_SUBSTANCE_VECTOR_BUDGET = 48  # char budget for a disagreeing-wells substance vector
+
 from .for_cli import colors as C
 
 def _log(msg: str = ""):
@@ -464,7 +466,8 @@ class ProtocolAgent:
                  assignments_handler=None,
                  binary_confirm_handler=None,
                  initial_contents_handler=None,
-                 namespace_split_handler=None):
+                 namespace_split_handler=None,
+                 source_well_handler=None):
         """
         Args:
             config_path: path to lab_config.json
@@ -524,6 +527,7 @@ class ProtocolAgent:
         # style multi-rack descriptions. Fires before the labware-
         # assignments confirm so the partition is settled first.
         self.namespace_split_handler = namespace_split_handler
+        self.source_well_handler = source_well_handler
 
     def _emit_stage_started(self, number: int, name: str) -> None:
         """Emit a structured stage_started event for the live-mode indicator.
@@ -664,6 +668,247 @@ class ProtocolAgent:
             )
             for (label, well), (substance, volume) in sorted(initial_state.cells.items())
         ]
+
+    def _infer_substances_from_oracle(self, spec) -> None:
+        """Fill a step's null substance from its source well(s)' initial contents.
+
+        Pre:    Called only when an initial-state map was uploaded. The oracle
+                has already seeded `spec.initial_contents` (config-label keyed)
+                and labware assignments have been applied, so each source ref
+                carries a config-label `resolved_label`.
+        Post:   For each step whose `substance` is None, the source's wells are
+                gathered from whichever of `well` / `wells` / `well_range` is
+                populated and looked up in `spec.initial_contents`. Stamped
+                source="initial_state" (renders with the dotted "from initial
+                contents" marker):
+                  - all matched wells hold the same substance (compared case- and
+                    whitespace-insensitively) -> that single substance;
+                  - matched wells disagree -> the substances as a comma-joined
+                    vector in well order, truncated to the first wells that fit
+                    `_SUBSTANCE_VECTOR_BUDGET` chars with a ", …" suffix when more
+                    remain; the full untruncated list is kept in the provenance
+                    reasoning.
+                Steps with a substance already set, with no source wells, or
+                with no matching initial-contents entry (the genuine "unknown"
+                case, which keeps rendering "(not extracted)") are left
+                untouched. Behaviour-only for legibility — codegen does not
+                consume substance.
+        Side effects: mutates `spec.steps[*].substance` in place.
+        """
+        from nl2protocol.models.provenance_models import (
+            InferredProvenance, ProvenancedString,
+        )
+        from .extraction.schema_builder import expand_well_range
+        by_key = {(ic.labware, ic.well): ic for ic in spec.initial_contents}
+        for step in spec.steps:
+            if getattr(step, "substance", None) is not None:
+                continue
+            ref = getattr(step, "source", None)
+            if ref is None:
+                continue
+            label = getattr(ref, "resolved_label", None) or ref.description
+            wells = []
+            if getattr(ref, "well", None):
+                wells.append(ref.well)
+            if getattr(ref, "wells", None):
+                wells.extend(ref.wells)
+            if getattr(ref, "well_range", None):
+                wells.extend(expand_well_range(ref.well_range))
+            ordered = [(w, ic.substance) for w in wells
+                       if (ic := by_key.get((label, w))) is not None and ic.substance]
+            if not ordered:
+                continue
+            subs = [s for _, s in ordered]
+            if len({s.strip().lower() for s in subs}) == 1:
+                value = subs[0]
+                n = len(ordered)
+                noun, verb = ("well", "starts") if n == 1 else ("wells", "all start")
+                wells_phrase = ", ".join(w for w, _ in ordered)
+                reasoning = (f"The source {noun} {label} {wells_phrase} {verb} "
+                             f"with '{value}' per the uploaded initial-state map.")
+            else:
+                kept, used = [], 0
+                for s in subs:
+                    extra = len(s) + (2 if kept else 0)
+                    if kept and used + extra > _SUBSTANCE_VECTOR_BUDGET:
+                        break
+                    kept.append(s)
+                    used += extra
+                value = ", ".join(kept) + (", …" if len(kept) < len(subs) else "")
+                pairs = ", ".join(f"{w}={s}" for w, s in ordered)
+                reasoning = (f"The source wells of {label} hold differing "
+                             f"substances per the uploaded initial-state map: "
+                             f"{pairs}.")
+            step.substance = ProvenancedString(
+                value=value,
+                provenance=InferredProvenance(
+                    source="initial_state",
+                    positive_reasoning=reasoning,
+                    why_not_in_instruction=(
+                        "The instruction names no substance for this step; it "
+                        "was read from the initial-state map."
+                    ),
+                    confidence=0.9,
+                ),
+            )
+
+    def _normalize_mix_representation(self, spec) -> None:
+        """Fold a serial_dilution's redundant post-action mix into step.repetitions.
+
+        Pre:    `spec` is freshly extracted.
+        Post:   For each `serial_dilution` step carrying a `mix` PostAction:
+                  - if `step.repetitions` is None, it takes the first
+                    post-action mix's `repetitions` (may stay None -> the
+                    mix-count gap fills it later);
+                  - every `mix` PostAction is removed (serial_dilution mixes
+                    intrinsically, so the post-action is a duplicate whose null
+                    count silently defaults in codegen and renders empty).
+                Non-serial_dilution steps and non-mix post-actions are
+                untouched. After this, step.repetitions is the single source
+                for serial_dilution's mix count (gap-controlled, rendered, and
+                read by codegen's `mix_after or (step.repetitions or ...)`).
+        Side effects: mutates spec.steps[*].repetitions / .post_actions.
+        """
+        for step in spec.steps:
+            if step.action != "serial_dilution":
+                continue
+            pas = getattr(step, "post_actions", None) or []
+            mix_pas = [pa for pa in pas if pa.action == "mix"]
+            if not mix_pas:
+                continue
+            if step.repetitions is None:
+                for pa in mix_pas:
+                    if pa.repetitions is not None:
+                        step.repetitions = pa.repetitions
+                        break
+            remaining = [pa for pa in pas if pa.action != "mix"]
+            step.post_actions = remaining or None
+
+    def _resolve_source_wells_from_oracle(self, spec) -> None:
+        """Resolve an unspecified source well from the initial-state map.
+
+        Pre:    Called only when an initial-state map was uploaded. Labware
+                assignments have been applied (source refs carry config-label
+                `resolved_label`) and `spec.initial_contents` is config-keyed.
+        Post:   For each step whose source names a labware and a substance but
+                has NO well/wells/well_range, the source well is filled by
+                matching the substance against that labware's initial contents:
+                  - exactly one matching well -> that well, `wells_provenance`
+                    source="initial_state" (grounded in the map);
+                  - no match -> "A1" (the existing codegen convention),
+                    source="inferred" with a "defaulted, no map match" reason
+                    (renders as a model-filled default, not a grounded value);
+                  - two or more matches -> deferred to
+                    `_resolve_ambiguous_source_wells`.
+                Refs already carrying a well/wells/well_range, or whose step has
+                no resolved labware or substance, are left untouched.
+        Side effects: mutates spec.steps[*].source.{well, wells_provenance}.
+        """
+        from nl2protocol.models.provenance_models import InferredProvenance
+        by_label: dict = {}
+        for ic in spec.initial_contents:
+            by_label.setdefault(ic.labware, []).append(ic)
+
+        ambiguous = []  # (ref, substance, [wells]) -> chooser
+        for step in spec.steps:
+            ref = getattr(step, "source", None)
+            if ref is None or ref.well or ref.wells or ref.well_range:
+                continue
+            label = getattr(ref, "resolved_label", None)
+            sub = getattr(step, "substance", None)
+            sub_val = getattr(sub, "value", None) if sub is not None else None
+            if not label or not sub_val:
+                continue
+            matches = sorted({
+                ic.well for ic in by_label.get(label, [])
+                if ic.well and ic.substance
+                and ic.substance.strip().lower() == sub_val.strip().lower()
+            })
+            if len(matches) == 1:
+                ref.well = matches[0]
+                ref.wells_provenance = InferredProvenance(
+                    source="initial_state",
+                    positive_reasoning=(
+                        f"'{sub_val}' is in {label} {matches[0]} per the uploaded "
+                        f"initial-state map."),
+                    why_not_in_instruction=(
+                        "The instruction names the labware but not the well."),
+                    confidence=0.9,
+                )
+            elif not matches:
+                ref.well = "A1"
+                ref.wells_provenance = InferredProvenance(
+                    source="inferred",
+                    positive_reasoning=(
+                        f"No {label} well in the initial-state map contains "
+                        f"'{sub_val}'; defaulted to A1."),
+                    why_not_in_instruction=(
+                        "The instruction names the labware but not the well, and "
+                        "the map has no matching well."),
+                    confidence=0.4,
+                )
+            else:
+                ambiguous.append((step, ref, sub_val, matches))
+
+        if ambiguous:
+            self._resolve_ambiguous_source_wells(ambiguous)
+
+    def _resolve_ambiguous_source_wells(self, ambiguous) -> None:
+        """Pick a source well when the substance matches multiple oracle wells.
+
+        With a chooser handler present, surface all ambiguous rows in one
+        dropdown modal and apply the user's picks (grounded source=
+        "initial_state"). Without a handler (CLI / headless) or on abort, fall
+        back to the first match, marked source="inferred" pending confirmation.
+        Each row is keyed `s{order}-source` so the response maps back to the ref.
+        """
+        from nl2protocol.models.provenance_models import InferredProvenance
+
+        def _ground(ref, well, label, sub_val):
+            ref.well = well
+            ref.wells_provenance = InferredProvenance(
+                source="initial_state",
+                positive_reasoning=(
+                    f"'{sub_val}' is in {label} {well}; chosen from the wells the "
+                    f"initial-state map lists with this substance."),
+                why_not_in_instruction=(
+                    "The instruction names the labware but not the well."),
+                confidence=0.9,
+            )
+
+        def _default(ref, label, sub_val, matches):
+            ref.well = matches[0]
+            ref.wells_provenance = InferredProvenance(
+                source="inferred",
+                positive_reasoning=(
+                    f"'{sub_val}' is in multiple {label} wells "
+                    f"({', '.join(matches)}); used {matches[0]} — please confirm."),
+                why_not_in_instruction=(
+                    "The instruction names the labware but not the well; the map "
+                    "lists several wells with this substance."),
+                confidence=0.4,
+            )
+
+        handler = getattr(self, "source_well_handler", None)
+        if handler is None:
+            for _step, ref, sub_val, matches in ambiguous:
+                _default(ref, ref.resolved_label, sub_val, matches)
+            return
+
+        rows = [{
+            "key": f"s{step.order}-source",
+            "description": ref.description,
+            "substance": sub_val,
+            "candidates": matches,
+            "suggested": matches[0],
+        } for step, ref, sub_val, matches in ambiguous]
+        chosen = handler.confirm(rows) or {}
+        for step, ref, sub_val, matches in ambiguous:
+            well = chosen.get(f"s{step.order}-source")
+            if well in matches:
+                _ground(ref, well, ref.resolved_label, sub_val)
+            else:
+                _default(ref, ref.resolved_label, sub_val, matches)
 
     def _confirm_initial_contents_via_handler(self, spec, suggesters,
                                                   context) -> Optional[bool]:
@@ -1606,6 +1851,9 @@ class ProtocolAgent:
             spec = extractor.extract(prompt)
 
             if spec is not None:
+                # Fold a serial_dilution's redundant post-action mix onto
+                # step.repetitions before anything reads it.
+                self._normalize_mix_representation(spec)
                 # Emit extracted spec event for downstream reporters.
                 self.reporter.emit(StageEvent(
                     kind="extracted_spec",
@@ -1679,6 +1927,7 @@ class ProtocolAgent:
                 ConfigLookupSuggester, CarryoverSuggester,
                 WellCapacitySuggester, RegexFromNoteSuggester,
                 WellRangeClipSuggester, WellContentsVolumeSuggester,
+                MixCycleCountSuggester,
                 LLMSpotSuggester, IndependentReviewSuggester,
             )
 
@@ -1694,6 +1943,7 @@ class ProtocolAgent:
                 RegexFromNoteSuggester(),
                 WellRangeClipSuggester(),
                 WellContentsVolumeSuggester(),
+                MixCycleCountSuggester(),
                 LLMSpotSuggester(client=extractor.client,
                                   model_name=extractor.model_name),
             ]
@@ -1884,6 +2134,14 @@ class ProtocolAgent:
                     if sug.suggested_label is not None
                 }
             self._apply_labware_assignments(spec, labware_suggestions, confirmed)
+
+            # Oracle reference resolution: now that source refs carry config
+            # labels and initial_contents is config-keyed, fill any null step
+            # substance from the source well's known contents (rendered with
+            # the dotted "from initial contents" marker).
+            if initial_state is not None:
+                self._resolve_source_wells_from_oracle(spec)
+                self._infer_substances_from_oracle(spec)
 
             # ADR-0011 Phase 1: emit labware_resolution_done so column 4
             # (validated spec) can populate with the description→label

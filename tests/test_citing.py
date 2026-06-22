@@ -4,8 +4,49 @@ Covers `cite_covers_well`, the range-aware "is this well grounded by
 this cite" predicate consumed by the verifier in extractor.py.
 """
 
-from nl2protocol.citing import cite_covers_well
+from nl2protocol.citing import cite_covers_well, find_cite_position
 from nl2protocol.extraction.provenance_checking import value_in_quote
+
+
+# ============================================================================
+# find_cite_position: windowed search for occurrence disambiguation
+# ============================================================================
+
+
+class TestFindCitePosition_Window:
+    """The `start`/`end` window restricts the exact pass so a recurring cite
+    resolves to the occurrence inside the searched region, not always the first."""
+
+    # "mix" at offsets 0, 8, 16.
+    INSTR = "mix and mix and mix"
+
+    def test_default_call_returns_first_occurrence(self):
+        # Global call (no window) is unchanged: first-match-wins.
+        assert find_cite_position(self.INSTR, "mix") == (0, 3)
+
+    def test_window_returns_occurrence_inside_window(self):
+        # Searching from offset 4 skips the first "mix"; from 12 reaches the third.
+        assert find_cite_position(self.INSTR, "mix", start=4) == (8, 11)
+        assert find_cite_position(self.INSTR, "mix", start=12) == (16, 19)
+
+    def test_endpos_excludes_later_occurrences(self):
+        # end caps the search: window [4, 11) contains only the second "mix".
+        assert find_cite_position(self.INSTR, "mix", start=4, end=11) == (8, 11)
+
+    def test_windowed_miss_returns_none_no_global_fallback(self):
+        # A windowed call that finds nothing in-window returns None (the caller
+        # is responsible for falling back to a global search).
+        assert find_cite_position(self.INSTR, "mix", start=12, end=15) is None
+
+    def test_windowed_call_skips_whitespace_fallback(self):
+        # The whitespace-collapse fallback runs only on a global call. A windowed
+        # call with a spacing-only difference does NOT fall back -> None.
+        assert find_cite_position("add  100uL", "add 100uL", start=0, end=10) is None
+        # ...but the same cite resolves on a global call via the fallback.
+        assert find_cite_position("add  100uL", "add 100uL") is not None
+
+    def test_empty_cite_returns_none(self):
+        assert find_cite_position(self.INSTR, "", start=4) is None
 
 
 # ============================================================================

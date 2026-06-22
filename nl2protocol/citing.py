@@ -29,23 +29,40 @@ def normalize_for_match(s: str) -> str:
     return re.sub(r"\s+", " ", s.lower()).strip()
 
 
-def find_cite_position(instruction: str, cited_text: str) -> Optional[Tuple[int, int]]:
+def find_cite_position(
+    instruction: str,
+    cited_text: str,
+    start: int = 0,
+    end: Optional[int] = None,
+) -> Optional[Tuple[int, int]]:
     """Find (start, end) char offsets where `cited_text` appears in
     `instruction`. Case-insensitive. Falls back to whitespace-collapsed
     matching for innocuous spacing differences. Returns None when no
-    occurrence is found by either pass.
+    occurrence is found.
 
-    First-match-wins for substrings that appear multiple times.
-    Multi-cite disambiguation (e.g., carrying an LLM-emitted character
-    offset alongside the cite) is a future improvement.
+    `start`/`end` restrict the exact pass to the half-open window
+    `instruction[start:end)` (default: the whole string). A windowed search
+    returns the first occurrence *inside the window*, which is how callers
+    disambiguate a substring that recurs across the instruction: search each
+    step's own region rather than the whole text. The whitespace-collapse
+    fallback runs ONLY on a global call (`start == 0 and end is None`); a
+    windowed call that finds no exact match returns None so the caller can
+    fall back to a global search. This keeps existing global callers
+    byte-identical.
+
+    First-match-wins among occurrences within the searched window.
     """
     if not cited_text:
         return None
+    windowed = not (start == 0 and end is None)
+    endpos = end if end is not None else len(instruction)
     # Try exact case-insensitive match first.
     pattern = re.compile(re.escape(cited_text), re.IGNORECASE)
-    m = pattern.search(instruction)
+    m = pattern.search(instruction, start, endpos)
     if m:
         return m.start(), m.end()
+    if windowed:
+        return None
     # Fallback: collapse whitespace on both sides and try again. The
     # returned offsets are approximate (they reference the normalized
     # instruction, then clamped to the original instruction's length) —
