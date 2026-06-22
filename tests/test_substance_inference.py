@@ -75,13 +75,28 @@ def test_fills_from_multi_well_source_when_all_wells_agree():
     assert step.substance.provenance.source == "initial_state"
 
 
-def test_skips_multi_well_source_when_wells_disagree():
-    step = _step(substance=None, resolved_label="plate", wells=["A1", "A2"])
+def test_renders_substance_vector_when_wells_disagree():
+    step = _step(substance=None, resolved_label="plate", wells=["A1", "A2", "A3"])
     spec = SimpleNamespace(steps=[step], initial_contents=[
-        _ic("plate", "A1", "sample"), _ic("plate", "A2", "buffer"),
+        _ic("plate", "A1", "b"), _ic("plate", "A2", "a"), _ic("plate", "A3", "c"),
     ])
     _agent()._infer_substances_from_oracle(spec)
-    assert step.substance is None
+    assert step.substance is not None
+    assert step.substance.value == "b, a, c"  # well order, not deduped/sorted
+    assert step.substance.provenance.source == "initial_state"
+
+
+def test_truncates_substance_vector_with_ellipsis():
+    wells = [f"A{i}" for i in range(1, 9)]
+    step = _step(substance=None, resolved_label="plate", wells=wells)
+    spec = SimpleNamespace(steps=[step], initial_contents=[
+        _ic("plate", w, f"reagent_{i}") for i, w in enumerate(wells)
+    ])
+    _agent()._infer_substances_from_oracle(spec)
+    assert step.substance.value.endswith(", …")
+    assert step.substance.value.count(",") < len(wells)  # not every item shown
+    # full list survives in the provenance reasoning
+    assert "reagent_7" in step.substance.provenance.positive_reasoning
 
 
 def test_fills_from_well_range_source():

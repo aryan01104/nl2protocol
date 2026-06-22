@@ -20,6 +20,8 @@ warnings.filterwarnings("ignore", module="opentrons")
 
 LINE_WIDTH = 60  # Same as the ===== separator
 
+_SUBSTANCE_VECTOR_BUDGET = 48  # char budget for a disagreeing-wells substance vector
+
 from .for_cli import colors as C
 
 def _log(msg: str = ""):
@@ -676,15 +678,21 @@ class ProtocolAgent:
                 carries a config-label `resolved_label`.
         Post:   For each step whose `substance` is None, the source's wells are
                 gathered from whichever of `well` / `wells` / `well_range` is
-                populated and looked up in `spec.initial_contents`. When every
-                matched well holds the same substance (compared case- and
-                whitespace-insensitively), `step.substance` is set to a
-                ProvenancedString of it, stamped source="initial_state" (renders
-                with the dotted "from initial contents" marker). Steps with a
-                substance already set, with no source wells, with no matching
-                initial-contents entry, or whose matched wells disagree on the
-                substance are left untouched. Behaviour-only for legibility —
-                codegen does not consume substance.
+                populated and looked up in `spec.initial_contents`. Stamped
+                source="initial_state" (renders with the dotted "from initial
+                contents" marker):
+                  - all matched wells hold the same substance (compared case- and
+                    whitespace-insensitively) -> that single substance;
+                  - matched wells disagree -> the substances as a comma-joined
+                    vector in well order, truncated to the first wells that fit
+                    `_SUBSTANCE_VECTOR_BUDGET` chars with a ", …" suffix when more
+                    remain; the full untruncated list is kept in the provenance
+                    reasoning.
+                Steps with a substance already set, with no source wells, or
+                with no matching initial-contents entry (the genuine "unknown"
+                case, which keeps rendering "(not extracted)") are left
+                untouched. Behaviour-only for legibility — codegen does not
+                consume substance.
         Side effects: mutates `spec.steps[*].substance` in place.
         """
         from nl2protocol.models.provenance_models import (
@@ -706,26 +714,36 @@ class ProtocolAgent:
                 wells.extend(ref.wells)
             if getattr(ref, "well_range", None):
                 wells.extend(expand_well_range(ref.well_range))
-            if not wells:
+            ordered = [(w, ic.substance) for w in wells
+                       if (ic := by_key.get((label, w))) is not None and ic.substance]
+            if not ordered:
                 continue
-            matched = [
-                ic.substance for w in wells
-                if (ic := by_key.get((label, w))) is not None and ic.substance
-            ]
-            if len({s.strip().lower() for s in matched}) != 1:
-                continue
-            substance = matched[0]
-            n = len(wells)
-            noun, verb = ("well", "starts") if n == 1 else ("wells", "all start")
-            wells_phrase = wells[0] if n == 1 else ", ".join(wells)
+            subs = [s for _, s in ordered]
+            if len({s.strip().lower() for s in subs}) == 1:
+                value = subs[0]
+                n = len(ordered)
+                noun, verb = ("well", "starts") if n == 1 else ("wells", "all start")
+                wells_phrase = ", ".join(w for w, _ in ordered)
+                reasoning = (f"The source {noun} {label} {wells_phrase} {verb} "
+                             f"with '{value}' per the uploaded initial-state map.")
+            else:
+                kept, used = [], 0
+                for s in subs:
+                    extra = len(s) + (2 if kept else 0)
+                    if kept and used + extra > _SUBSTANCE_VECTOR_BUDGET:
+                        break
+                    kept.append(s)
+                    used += extra
+                value = ", ".join(kept) + (", …" if len(kept) < len(subs) else "")
+                pairs = ", ".join(f"{w}={s}" for w, s in ordered)
+                reasoning = (f"The source wells of {label} hold differing "
+                             f"substances per the uploaded initial-state map: "
+                             f"{pairs}.")
             step.substance = ProvenancedString(
-                value=substance,
+                value=value,
                 provenance=InferredProvenance(
                     source="initial_state",
-                    positive_reasoning=(
-                        f"The source {noun} {label} {wells_phrase} {verb} with "
-                        f"'{substance}' per the uploaded initial-state map."
-                    ),
+                    positive_reasoning=reasoning,
                     why_not_in_instruction=(
                         "The instruction names no substance for this step; it "
                         "was read from the initial-state map."
