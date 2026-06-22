@@ -521,7 +521,15 @@ class LiveModeApp:
         )
         template = env.get_template("report.html.jinja")
 
+        # Vendored (self-hosted) Choices.js for the non-native Protocol
+        # dropdown, inlined into the live page so it stays self-contained.
+        vendor = template_dir / "vendor"
+        choices_css = (vendor / "choices.min.css").read_text()
+        choices_js = (vendor / "choices.min.js").read_text()
+
         return template.render(
+            choices_css=choices_css,
+            choices_js=choices_js,
             instruction="",
             instruction_html="<em style='color:#6b6b6b'>(loading — pipeline starts when you click ▶ Start)</em>",
             spec_steps=[],
@@ -705,7 +713,12 @@ class LiveModeApp:
     def _setup_routes(self):
         @self.app.get("/")
         async def serve_index():
-            return HTMLResponse(self._cached_live_page)
+            # Re-render per request (cheap) so template edits show on a plain
+            # refresh, and tell the browser not to cache the live page.
+            return HTMLResponse(
+                self._render_live_page(),
+                headers={"Cache-Control": "no-store"},
+            )
 
         @self.app.get("/examples")
         async def list_examples():
@@ -764,10 +777,11 @@ class LiveModeApp:
             if raw_case and "/" not in raw_case and "\\" not in raw_case and ".." not in raw_case:
                 case_name = raw_case
 
-            # Local-dev fallback: when the operator opted in via env flag AND
-            # the request didn't carry a key, use the server's env key. Never
-            # fires on a Fly deploy because the flag isn't set there.
-            if not api_key and self._local_dev_mode:
+            # Server-supplied key: the browser no longer sends one (the key
+            # field was removed). Fall back to the server's environment in
+            # both hosted and local-dev modes. On Fly this is the encrypted
+            # `ANTHROPIC_API_KEY` secret; locally it's the operator's shell/.env.
+            if not api_key:
                 api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
             if not instruction:
@@ -782,8 +796,8 @@ class LiveModeApp:
                 )
             if not api_key:
                 return JSONResponse(
-                    {"status": "error", "message": "api_key is required"},
-                    status_code=400,
+                    {"status": "error", "message": "server is missing ANTHROPIC_API_KEY"},
+                    status_code=500,
                 )
 
             # Optional initial-state map (.xlsx). Parsed server-side into the
