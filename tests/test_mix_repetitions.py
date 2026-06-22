@@ -80,6 +80,16 @@ class TestStandaloneMixRepetitions:
         with pytest.raises(ValidationError, match="missing mix cycle count"):
             _mix_command([_mix_step(repetitions=None)], config)
 
+    def test_non_positive_count_is_rejected(self, config):
+        """A stated count of 0 or negative is invalid: codegen does
+        `step.repetitions or DEFAULT_MIX_REPS`, so 0 is silently swapped for the
+        default and a negative emits an invalid repetition count. Completeness
+        rejects both instead of letting them through."""
+        from pydantic import ValidationError
+        for bad in (0, -1):
+            with pytest.raises(ValidationError, match="mix cycle count must be at least 1"):
+                _mix_command([_mix_step(repetitions=bad)], config)
+
 
 class TestMixCycleCountGapFlow:
     """A missing mix cycle count surfaces as a reviewable gap with a suggested

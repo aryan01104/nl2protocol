@@ -587,8 +587,11 @@ class CompleteProtocolSpec(ProtocolSpec):
             # 'serial_dilution' both need a count. Left null by extraction (the
             # model says "do not infer"); surfaced here so the user controls it
             # via the gap modal instead of codegen silently using the default.
-            if step.action in {"mix", "serial_dilution"} and step.repetitions is None:
-                errors.append(f"{prefix}: missing mix cycle count")
+            if step.action in {"mix", "serial_dilution"}:
+                if step.repetitions is None:
+                    errors.append(f"{prefix}: missing mix cycle count")
+                elif step.repetitions <= 0:
+                    errors.append(f"{prefix}: mix cycle count must be at least 1")
 
             if step.action in transfer_actions:
                 if step.source is None:
