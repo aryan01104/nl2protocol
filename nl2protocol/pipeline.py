@@ -668,26 +668,29 @@ class ProtocolAgent:
         ]
 
     def _infer_substances_from_oracle(self, spec) -> None:
-        """Fill a step's null substance from its source well's initial contents.
+        """Fill a step's null substance from its source well(s)' initial contents.
 
         Pre:    Called only when an initial-state map was uploaded. The oracle
                 has already seeded `spec.initial_contents` (config-label keyed)
                 and labware assignments have been applied, so each source ref
                 carries a config-label `resolved_label`.
-        Post:   For each step whose `substance` is None and whose source
-                resolves to a single (config-label, well) present in
-                `spec.initial_contents`, sets `step.substance` to a
-                ProvenancedString of that well's substance, stamped
-                source="initial_state" (renders with the dotted "from initial
-                contents" marker). Steps with a substance already set, with no
-                single source well, or with no matching initial-contents entry
-                are left untouched. Behaviour-only for legibility — codegen
-                does not consume substance.
+        Post:   For each step whose `substance` is None, the source's wells are
+                gathered from whichever of `well` / `wells` / `well_range` is
+                populated and looked up in `spec.initial_contents`. When every
+                matched well holds the same substance (compared case- and
+                whitespace-insensitively), `step.substance` is set to a
+                ProvenancedString of it, stamped source="initial_state" (renders
+                with the dotted "from initial contents" marker). Steps with a
+                substance already set, with no source wells, with no matching
+                initial-contents entry, or whose matched wells disagree on the
+                substance are left untouched. Behaviour-only for legibility —
+                codegen does not consume substance.
         Side effects: mutates `spec.steps[*].substance` in place.
         """
         from nl2protocol.models.provenance_models import (
             InferredProvenance, ProvenancedString,
         )
+        from .extraction.schema_builder import expand_well_range
         by_key = {(ic.labware, ic.well): ic for ic in spec.initial_contents}
         for step in spec.steps:
             if getattr(step, "substance", None) is not None:
@@ -696,19 +699,32 @@ class ProtocolAgent:
             if ref is None:
                 continue
             label = getattr(ref, "resolved_label", None) or ref.description
-            well = getattr(ref, "well", None)
-            if not well:
+            wells = []
+            if getattr(ref, "well", None):
+                wells.append(ref.well)
+            if getattr(ref, "wells", None):
+                wells.extend(ref.wells)
+            if getattr(ref, "well_range", None):
+                wells.extend(expand_well_range(ref.well_range))
+            if not wells:
                 continue
-            ic = by_key.get((label, well))
-            if ic is None or not ic.substance:
+            matched = [
+                ic.substance for w in wells
+                if (ic := by_key.get((label, w))) is not None and ic.substance
+            ]
+            if len({s.strip().lower() for s in matched}) != 1:
                 continue
+            substance = matched[0]
+            n = len(wells)
+            noun, verb = ("well", "starts") if n == 1 else ("wells", "all start")
+            wells_phrase = wells[0] if n == 1 else ", ".join(wells)
             step.substance = ProvenancedString(
-                value=ic.substance,
+                value=substance,
                 provenance=InferredProvenance(
                     source="initial_state",
                     positive_reasoning=(
-                        f"The source well {label} {well} starts with "
-                        f"'{ic.substance}' per the uploaded initial-state map."
+                        f"The source {noun} {label} {wells_phrase} {verb} with "
+                        f"'{substance}' per the uploaded initial-state map."
                     ),
                     why_not_in_instruction=(
                         "The instruction names no substance for this step; it "
