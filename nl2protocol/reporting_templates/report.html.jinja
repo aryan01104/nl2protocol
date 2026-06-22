@@ -218,7 +218,12 @@
   /* right column: legend (stretch, top-aligned) + status strip beneath, equal 16px gaps */
   .hb-left { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   .hb-topbar { display: flex; align-items: center; gap: 16px; }
-  .hb-left .legend { margin: 0; }
+  /* Live mode only: stretch the legend to fill hb-left (matching the
+     full-width status strip above it) and let the three groups grow to
+     fill, so no empty gap opens to the right. The static report keeps the
+     base rule's fit-content hug. */
+  .hb-left .legend { margin: 0; width: auto; }
+  .hb-left .legend-group { flex: 1 1 auto; }
   /* Theme Choices.js to the report's tokens (non-native Protocol dropdown) */
   .choices { margin-bottom: 0; }
   .choices__inner { background: var(--panel); border: 1px solid var(--btn-secondary-border); border-radius: 7px;
@@ -262,12 +267,12 @@
     padding: 24px 32px;
     min-height: calc(100vh - 200px);
   }
-  /* Live-mode column gating. Static reports always show all 3 columns;
-     live mode starts with only column 1 (Instruction) and reveals each
-     subsequent column as its stage's first event arrives. */
-  .grid.cols-1 { grid-template-columns: minmax(420px, 640px); }
-  .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Live-mode column gating. The grid keeps a fixed 3-track layout at every
+     stage, so each column is always one page-third wide — Instruction included,
+     even while it's the only one shown. Reveal doesn't resize the visible
+     columns; pending columns are display:none (below), leaving their third
+     empty until their stage's first event reveals them in place. */
+  .grid.cols-1, .grid.cols-2, .grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .col.is-pending { display: none; }
   .col {
     background: var(--panel);
@@ -1273,7 +1278,6 @@
         <div class="up-row"><span class="up-num">2</span><div class="up-main"><span class="up-name">Config <span class="up-tag req">required</span></span><span class="up-hint" data-default=".json">.json</span></div><label class="up-choose">Choose file<input type="file" id="live-config-file" accept=".json,application/json"></label></div>
         <div class="up-row"><span class="up-num">3</span><div class="up-main"><span class="up-name">Initial state <span class="up-tag opt">optional</span></span><span class="up-hint" data-default=".xlsx">.xlsx</span></div><label class="up-choose">Choose file<input type="file" id="live-initial-state-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label></div>
       </div>
-      <span id="live-status" style="display: none; align-self: flex-start; padding: 2px 10px; border-radius: 3px; font-size: 12px;"></span>
       <div class="lc-note">Events stream as the pipeline runs.</div>
     </div>
   </div>
@@ -2514,8 +2518,7 @@
   // simply find no button and the WebSocket never opens.
   function initLiveMode() {
     const startBtn = document.getElementById("live-start-btn");
-    const status = document.getElementById("live-status");
-    if (!startBtn || !status) return;   // not in live mode
+    if (!startBtn) return;   // not in live mode
 
     let activeWS = null;   // populated by connectWS so panel button clicks can reach it
 
@@ -2524,28 +2527,12 @@
     const cssVar = (name) =>
       getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-    // Status changes are sticky in the failure direction: once we've set
-    // "error", `pipeline_done` (which fires unconditionally in the server's
-    // finally block) must NOT downgrade the status back to a success-looking
-    // "done". Without this, an uncaught exception sequence — error event
-    // first, then pipeline_done sentinel — paints the indicator green and
-    // makes a real crash look like a clean run.
-    //
-    // Signature: setStatus(text, tier) where tier ∈
-    // {"success", "error", "warn", "neutral"}. The tier resolves to a
-    // (--status-{tier}-bg, --status-{tier}-fg) pair on :root so every
-    // pill color tracks the central palette tokens.
+    // Status pill removed; #live-stage-indicator carries run status. setStatus
+    // no longer renders, but still latches the sticky terminal-error flag that
+    // gates markIndicatorDone() so a crash never flips the indicator to a ✓.
     let statusIsTerminalError = false;
-    function setStatus(text, tier) {
-      if (text === "error") {
-        statusIsTerminalError = true;
-      } else if (statusIsTerminalError && text === "done") {
-        return;
-      }
-      status.textContent = text;
-      status.style.display = "inline-block";
-      status.style.background = cssVar(`--status-${tier}-bg`);
-      status.style.color = cssVar(`--status-${tier}-fg`);
+    function setStatus(text) {
+      if (text === "error") statusIsTerminalError = true;
     }
 
     // ADR-0013 Phase 3c: gap-prompt modal helpers.
@@ -3989,8 +3976,8 @@
           // its green ✓ even after a crash.
           startBtn.disabled = false;
           hidePanel();
-          // The status strip's "Run complete" covers success; the #live-status
-          // pill is reserved for errors, so don't surface a redundant "done".
+          // Only flip the indicator to its green ✓ on a clean run; a terminal
+          // error must leave the crash state visible.
           if (!statusIsTerminalError) {
             markIndicatorDone();
           }
