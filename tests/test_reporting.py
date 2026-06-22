@@ -692,11 +692,10 @@ class TestUnifiedProtocolStepsColumn:
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # Three columns: instruction (narrow cap), protocol steps (mid),
-        # generated python (widest cap).
-        assert (
-            "minmax(420px, 640px)\n      minmax(340px, 600px)\n      minmax(380px, 720px)"
-        ) in rendered
+        # Three equal columns (instruction / protocol steps / generated python).
+        # The header-band redesign replaced the old per-column width caps with
+        # equal thirds.
+        assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in rendered
 
 
 class TestADR0011Phase2bResolutionArrows:
