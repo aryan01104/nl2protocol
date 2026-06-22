@@ -1162,14 +1162,16 @@
     user-select: none;
   }
   #live-stage-indicator.is-active, #live-stage-indicator.is-done { color: var(--indicator-tan); }
+  #live-stage-indicator.is-error { color: var(--status-error-fg); }
   #live-stage-indicator .indicator-dot {
     width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none;
   }
   #live-stage-indicator.is-active .indicator-dot { background: var(--indicator-tan); animation: indicator-pulse 1.1s ease-in-out infinite; }
   #live-stage-indicator.is-done .indicator-dot { background: var(--indicator-done); }
+  #live-stage-indicator.is-error .indicator-dot { background: var(--status-error-fg); animation: none; }
   #live-stage-indicator .ss-stage { font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; flex: none; }
   #live-stage-indicator .ss-div { width: 1px; align-self: stretch; background: var(--grid); flex: none; margin: 2px 2px; display: none; }
-  #live-stage-indicator.is-active .ss-div { display: block; }
+  #live-stage-indicator.is-active .ss-div, #live-stage-indicator.is-error .ss-div { display: block; }
   #live-stage-indicator .ss-sub {
     font-size: 12.5px; font-style: italic; opacity: 0.82;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -2527,12 +2529,23 @@
     const cssVar = (name) =>
       getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-    // Status pill removed; #live-stage-indicator carries run status. setStatus
-    // no longer renders, but still latches the sticky terminal-error flag that
-    // gates markIndicatorDone() so a crash never flips the indicator to a ✓.
+    // The status pill was removed; surface messages in the #live-stage-indicator
+    // bar instead. Error-tier messages latch a red state and persist in the
+    // substep (the run is stopping or never started); other statuses show until
+    // stage events take over. statusIsTerminalError gates markIndicatorDone().
     let statusIsTerminalError = false;
-    function setStatus(text) {
-      if (text === "error") statusIsTerminalError = true;
+    function setStatus(text, tier) {
+      const indicator = document.getElementById("live-stage-indicator");
+      if (!indicator) return;
+      if (tier === "error") {
+        statusIsTerminalError = true;
+        stopCatalogCycle();
+        indicator.classList.add("is-error");
+        indicator.classList.remove("is-active", "is-done");
+      } else {
+        indicator.classList.remove("is-error");
+      }
+      setIndicatorSub(text);
     }
 
     // ADR-0013 Phase 3c: gap-prompt modal helpers.
@@ -3689,7 +3702,8 @@
     function handleStageStarted(data) {
       if (!data) return;
       const indicator = document.getElementById("live-stage-indicator");
-      if (indicator) { indicator.classList.add("is-active"); indicator.classList.remove("is-done"); }
+      if (indicator) { indicator.classList.add("is-active"); indicator.classList.remove("is-done", "is-error"); }
+      statusIsTerminalError = false;   // a fresh run clears any prior terminal-error latch
       activeStageNumber = data.number;
       const total = data.total || 7;
       const name = data.name || "";
@@ -3967,13 +3981,10 @@
           if (e.data) gateModal(() => showIcModal(e.data));
           break;
         case "pipeline_done":
-          // pipeline_done fires from the server's finally block too,
-          // so reaching this case does NOT mean success. Honor the
-          // sticky failure flag: setStatus already short-circuits the
-          // "done" pill text when we're in terminal-error mode (and
-          // the user-visible pill stays "error"); markIndicatorDone()
-          // needs the same guard or the top-right indicator flips to
-          // its green ✓ even after a crash.
+          // pipeline_done fires from the server's finally block too, so
+          // reaching this case does NOT mean success. Honor the sticky failure
+          // flag: a terminal error left the indicator bar red, and
+          // markIndicatorDone() must not flip it to its green ✓ after a crash.
           startBtn.disabled = false;
           hidePanel();
           // Only flip the indicator to its green ✓ on a clean run; a terminal
@@ -3983,7 +3994,7 @@
           }
           break;
         case "error":
-          setStatus("error", "error");
+          setStatus(e.data && e.data.message ? "error: " + e.data.message : "error", "error");
           break;
       }
       // After any DOM mutation, re-render arrows so existing red
