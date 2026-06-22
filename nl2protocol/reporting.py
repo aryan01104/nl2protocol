@@ -1072,16 +1072,19 @@ def _format_wells_only(loc) -> Optional[str]:
 
     Pre:    `loc` is a LocationRef with at most one of well, wells,
             well_range populated (per the LocationRef contract).
-    Post:   Returns 'well A1' / 'wells A1, A2, A3, A4' (with '...'
-            suffix when >6 wells) / 'A1-A12'. Returns None when no
-            well field is populated — caller skips the row.
+    Post:   Returns 'well A1' / 'wells A1, A2, A3' / 'A1-A12'. For a long
+            wells list (>6) returns the first 5, an ellipsis, and the LAST
+            well — 'wells A1, A2, A3, A4, A5 … A8' — so the range endpoint
+            stays visible. Returns None when no well field is populated —
+            caller skips the row.
     """
     if loc.well:
         return f"well {loc.well}"
     if loc.wells:
-        head = ", ".join(loc.wells[:6])
-        suffix = "..." if len(loc.wells) > 6 else ""
-        return f"wells {head}{suffix}"
+        if len(loc.wells) > 6:
+            head = ", ".join(loc.wells[:5])
+            return f"wells {head} … {loc.wells[-1]}"
+        return f"wells {', '.join(loc.wells)}"
     if loc.well_range:
         return loc.well_range
     return None

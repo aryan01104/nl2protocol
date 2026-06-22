@@ -697,6 +697,19 @@ class TestUnifiedProtocolStepsColumn:
         # equal thirds.
         assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in rendered
 
+    def test_long_well_vector_keeps_last_well_visible(self):
+        # A truncated wells list must still show the range endpoint, not hide
+        # it behind a trailing ellipsis (A1..A5 … A8, not A1..A6...).
+        from nl2protocol.reporting import _format_wells_only
+        from nl2protocol.models.spec import LocationRef, InstructionProvenance
+        prov = InstructionProvenance(source="instruction", cited_text=["w"], confidence=1.0)
+        lr = LocationRef(description="p", wells=[f"A{i}" for i in range(1, 9)],
+                         resolved_label="p", description_provenance=prov,
+                         wells_provenance=prov)
+        out = _format_wells_only(lr)
+        assert out.endswith("… A8")
+        assert out.startswith("wells A1,")
+
 
 class TestADR0011Phase2bResolutionArrows:
     """Phase 2b draws one cross-column arrow per drawable gap_resolved
