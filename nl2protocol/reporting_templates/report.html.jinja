@@ -280,6 +280,7 @@
     border-radius: 6px;
     padding: 16px;
     overflow-y: auto;
+    overflow-x: auto;   /* Over-wide step values scroll the column sideways, not per-cell. */
     max-height: 80vh;
   }
   .col h2 {
@@ -354,8 +355,11 @@
   }
   .cell-value {
     /* Default text styling; provenance + chain spans handle their own colors. */
-    min-width: 0;       /* Allow long values to wrap rather than overflow. */
-    word-break: break-word;
+    min-width: 0;       /* Track may shrink below content; over-wide tokens overflow. */
+    /* Wrap at spaces/commas only. A single over-wide token (e.g. reagent_reservoir)
+       is not chopped mid-word — it overflows and the column scrolls to reveal it. */
+    overflow-wrap: normal;
+    word-break: normal;
   }
   .cell-check {
     /* Right-aligned check column. The inline-check span inside carries
