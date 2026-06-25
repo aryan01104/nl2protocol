@@ -708,7 +708,7 @@ class TestUnifiedProtocolStepsColumn:
                          wells_provenance=prov)
         out = _format_wells_only(lr)
         assert out.endswith("… A8")
-        assert out.startswith("wells A1,")
+        assert out.startswith("A1,")
 
 
 class TestADR0011Phase2bResolutionArrows:
