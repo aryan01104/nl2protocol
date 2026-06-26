@@ -168,6 +168,15 @@
   }
   .legend-pv { flex: none; width: 56px; }
   .legend-sub { color: var(--dim); }
+  .tip-toggle {
+    flex: none;
+    font: 12.5px var(--font-body); padding: 9px 14px;
+    border: 1px solid var(--grid); background: var(--panel);
+    border-radius: 8px; cursor: pointer; color: var(--dim); white-space: nowrap;
+  }
+  .tip-toggle.on { border-color: var(--col-instruction); color: var(--col-instruction);
+    background: color-mix(in srgb, var(--col-instruction) 7%, transparent); }
+  .legend-group .tip-toggle { align-self: flex-start; }   /* static legend column */
 
   /* ───────── Live-mode header band (logo + controls + legend + status) ───────── */
   .brand { display: inline-block; margin: 0; line-height: 0; flex: none; }
@@ -1229,6 +1238,15 @@
         <div class="legend-item"><span class="legend-glyph" style="color: var(--check-pill-glyph);">✓</span><span>validation passed</span></div>
         <div class="legend-item"><span class="legend-glyph" style="color: var(--warning-accent);">⚠</span><span>warning <span class="legend-sub">(flagged for review)</span></span></div>
       </div>
+      {# Static report has no status bar, so the hover-pop-up toggle lives in
+         the legend here. In live mode it's pinned to the status bar instead. #}
+      {% if not live_mode %}
+      <div class="legend-group">
+        <div class="legend-title">display</div>
+        <button type="button" id="tip-toggle" class="tip-toggle on" aria-pressed="true">ⓘ hover details: On</button>
+        <div class="legend-item"><span class="legend-sub">show the provenance pop-up on hover</span></div>
+      </div>
+      {% endif %}
     </div>
   {% endset %}
   {% if not live_mode %}
@@ -1268,6 +1286,7 @@
           <span class="ss-div"></span>
           <span id="indicator-substep" class="ss-sub"></span>
         </div>
+        <button type="button" id="tip-toggle" class="tip-toggle on" aria-pressed="true" title="Show the provenance pop-up when hovering a parameter or step">ⓘ hover details: On</button>
       </div>
       {{ legend_html }}
     </div>
@@ -1670,6 +1689,26 @@
 
   const overlay = document.getElementById("arrow-overlay");
   const tip = document.getElementById("hover-tip");
+
+  // Hover pop-up on/off (default on, persisted). showTip() gates on this flag.
+  let tipsEnabled = true;
+  try { tipsEnabled = localStorage.getItem("nl2-hover-tips") !== "off"; } catch (e) {}
+  const tipToggle = document.getElementById("tip-toggle");
+  function syncTipToggle() {
+    if (!tipToggle) return;
+    tipToggle.classList.toggle("on", tipsEnabled);
+    tipToggle.textContent = "ⓘ hover details: " + (tipsEnabled ? "On" : "Off");
+    tipToggle.setAttribute("aria-pressed", tipsEnabled ? "true" : "false");
+  }
+  if (tipToggle) {
+    syncTipToggle();
+    tipToggle.addEventListener("click", () => {
+      tipsEnabled = !tipsEnabled;
+      try { localStorage.setItem("nl2-hover-tips", tipsEnabled ? "on" : "off"); } catch (e) {}
+      syncTipToggle();
+      if (!tipsEnabled) hideTip();
+    });
+  }
   // Per ADR-0011 animation-timing addendum (2026-05-06): path maps for
   // the two arrow renderers. Each maps id → SVGPathElement. Path elements
   // SURVIVE across renders — their continued presence in the DOM is the
@@ -1934,7 +1973,7 @@
   }
 
   function showTip(html, evt) {
-    if (!tip) return;
+    if (!tip || !tipsEnabled) return;
     tip.innerHTML = html;
     tip.classList.add("visible");
     moveTip(evt);

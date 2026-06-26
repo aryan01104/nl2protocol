@@ -697,6 +697,17 @@ class TestUnifiedProtocolStepsColumn:
         # equal thirds.
         assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in rendered
 
+    def test_hover_pop_up_toggle_renders(self, tmp_path):
+        # The legend exposes an on/off control for the provenance hover pop-up,
+        # and showTip() gates on the flag that control flips.
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        HTMLReporter(str(out_path)).finalize()
+        rendered = out_path.read_text()
+        assert 'id="tip-toggle"' in rendered
+        assert "hover details" in rendered
+        assert "if (!tip || !tipsEnabled) return;" in rendered
+
     def test_long_well_vector_keeps_last_well_visible(self):
         # A truncated wells list must still show the range endpoint, not hide
         # it behind a trailing ellipsis (A1..A5 … A8, not A1..A6...).
