@@ -60,6 +60,11 @@ from nl2protocol.models.spec import (
 from nl2protocol.extraction.prompts import REASONING_SYSTEM_PROMPT, REASONING_USER_PROMPT
 
 MAX_SPEC_REPAIR_ATTEMPTS = 3
+# Retry the streamed extraction on transient API failures (read timeout fired
+# mid-stream, connection drop, overload); the SDK's max_retries skips those.
+MAX_EXTRACTION_ATTEMPTS = 3
+EXTRACTION_RETRY_BACKOFF_S = 4
+EXTRACTION_READ_TIMEOUT_S = 180.0
 _REPAIRABLE_CONTAINERS = ("steps", "initial_contents", "prefilled_labware")
 
 
@@ -117,72 +122,90 @@ class SemanticExtractor:
             instruction=instruction,
         )
 
-        try:
-            from nl2protocol.for_cli.spinner import Spinner
-            # Stream the call so the user sees the model reasoning live (the model
-            # emits <reasoning> before <spec>) and so we can safely raise max_tokens
-            # — streaming is the supported path above ~16K (it sidesteps the SDK's
-            # HTTP-timeout guard). 32000 is well within Sonnet 4.6's 64K ceiling.
-            full_response = ""
-            spec_seen = False
-            last_emit_len = 0   # accumulated length at the last reasoning_delta emit
-            with Spinner("Reasoning through protocol...") as spinner:
-                with self.client.messages.stream(
-                    model=self.model_name,
-                    max_tokens=32000,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_prompt}]
-                ) as stream:
-                    for delta in stream.text_stream:
-                        full_response += delta
-                        if not spec_seen and "<spec>" in full_response:
-                            # JSON isn't useful to show — switch to an assembling state.
-                            spec_seen = True
-                            spinner.update("Assembling spec…")
-                            self._emit_reasoning("Assembling spec…")
-                        elif not spec_seen:
-                            compact = self._compact_reasoning(full_response)
-                            spinner.update(compact)
-                            # Throttle browser events by accumulated length so we
-                            # don't flood the WebSocket queue (CLI uses the spinner
-                            # above, which is fine to update every token).
-                            if len(full_response) - last_emit_len >= 60:
-                                last_emit_len = len(full_response)
-                                self._emit_reasoning(compact)
-                    final = stream.get_final_message()
+        import anthropic
+        import httpx
+        import time
+        from nl2protocol.errors import format_api_error
+        from nl2protocol.for_cli.spinner import Spinner
+        # Transient failures worth retrying — chiefly a read timeout fired
+        # mid-stream, which the SDK's own max_retries does not cover.
+        transient = (anthropic.APITimeoutError, anthropic.APIConnectionError,
+                     anthropic.RateLimitError, anthropic.InternalServerError,
+                     httpx.TimeoutException, httpx.TransportError, TimeoutError)
 
-            full_response = full_response.strip()
+        full_response = None
+        spec_json = None
+        for attempt in range(MAX_EXTRACTION_ATTEMPTS):
+            try:
+                # Stream so reasoning shows live and max_tokens can stay high
+                # (streaming sidesteps the SDK's >16K HTTP-timeout guard). The
+                # per-request timeout caps a stalled stream so the loop can retry.
+                full_response = ""
+                spec_seen = False
+                last_emit_len = 0   # accumulated length at the last reasoning_delta emit
+                with Spinner("Reasoning through protocol...") as spinner:
+                    with self.client.messages.stream(
+                        model=self.model_name,
+                        max_tokens=32000,
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": user_prompt}],
+                        timeout=httpx.Timeout(EXTRACTION_READ_TIMEOUT_S, connect=15.0),
+                    ) as stream:
+                        for delta in stream.text_stream:
+                            full_response += delta
+                            if not spec_seen and "<spec>" in full_response:
+                                # JSON isn't useful to show — switch to an assembling state.
+                                spec_seen = True
+                                spinner.update("Assembling spec…")
+                                self._emit_reasoning("Assembling spec…")
+                            elif not spec_seen:
+                                compact = self._compact_reasoning(full_response)
+                                spinner.update(compact)
+                                # Throttle browser events by accumulated length so we
+                                # don't flood the WebSocket queue (CLI uses the spinner
+                                # above, which is fine to update every token).
+                                if len(full_response) - last_emit_len >= 60:
+                                    last_emit_len = len(full_response)
+                                    self._emit_reasoning(compact)
+                        final = stream.get_final_message()
 
-            # Streaming lets us raise max_tokens, but a truncation can still happen
-            # on very large protocols. Make it an explicit, legible error instead of
-            # an opaque downstream JSON parse failure.
-            if final.stop_reason == "max_tokens":
-                raise ValueError(
-                    "extraction truncated at max_tokens — "
-                    "raise max_tokens or simplify the instruction"
-                )
+                full_response = full_response.strip()
 
-            # Parse reasoning and spec from tagged response
-            reasoning, spec_json = self._parse_response(full_response)
+                # Truncation is terminal (not transient) — surface it clearly.
+                if final.stop_reason == "max_tokens":
+                    raise ValueError(
+                        "extraction truncated at max_tokens — "
+                        "raise max_tokens or simplify the instruction"
+                    )
 
-            # Parse and validate the structured spec
-            data = json.loads(spec_json)
-            spec = self._validate_with_repair(data, instruction)
+                reasoning, spec_json = self._parse_response(full_response)
+                data = json.loads(spec_json)
+                spec = self._validate_with_repair(data, instruction)
+                spec.reasoning = reasoning
+                return spec
 
-            # Store the reasoning chain-of-thought
-            spec.reasoning = reasoning
+            except transient as e:
+                if attempt < MAX_EXTRACTION_ATTEMPTS - 1:
+                    wait = EXTRACTION_RETRY_BACKOFF_S * (2 ** attempt)
+                    print(f"  Reasoning attempt {attempt + 1}/{MAX_EXTRACTION_ATTEMPTS} hit a "
+                          f"transient API error ({format_api_error(e)}); retrying in {wait}s…",
+                          file=sys.stderr)
+                    time.sleep(wait)
+                    continue
+                print(f"  Reasoning failed after {MAX_EXTRACTION_ATTEMPTS} attempts: "
+                      f"{format_api_error(e)}", file=sys.stderr)
+                self._save_debug_output(full_response, spec_json, e)
+                return None
 
-            return spec
+            except Exception as e:
+                if isinstance(e, anthropic.APIError):
+                    print(f"  Reasoning failed: {format_api_error(e)}", file=sys.stderr)
+                else:
+                    print(f"  Reasoning failed: {e}", file=sys.stderr)
+                self._save_debug_output(full_response, spec_json, e)
+                return None
 
-        except Exception as e:
-            from nl2protocol.errors import format_api_error
-            import anthropic
-            if isinstance(e, (anthropic.APIError, anthropic.APIConnectionError, anthropic.APITimeoutError)):
-                print(f"  Reasoning failed: {format_api_error(e)}", file=sys.stderr)
-            else:
-                print(f"  Reasoning failed: {e}", file=sys.stderr)
-            self._save_debug_output(locals().get('full_response'), locals().get('spec_json'), e)
-            return None
+        return None
 
     def _validate_with_repair(self, data: dict, instruction: str) -> ProtocolSpec:
         """Validate the extracted spec, repairing model self-consistency slips in place.
