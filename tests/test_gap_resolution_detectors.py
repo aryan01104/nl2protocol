@@ -129,6 +129,25 @@ class TestMissingFieldsDetector:
         ids_2 = sorted(g.id for g in gaps_2)
         assert ids_1 == ids_2
 
+    def test_mix_missing_location_routes_to_destination_not_unknown(self):
+        # A single-location action (mix) with no source/destination routes its
+        # "missing location" gap to a real field (destination) — not the old
+        # unmappable ".unknown" placeholder that crashed the apply layer.
+        spec = _spec([
+            ExtractedStep(
+                order=1, action="mix",
+                volume=ProvenancedVolume(value=100.0, unit="uL", exact=True,
+                                         provenance=_instr_prov()),
+                repetitions=3,
+                composition_provenance=_comp(),
+            ),
+        ])
+        gaps = MissingFieldsDetector().detect(spec, context={})
+        loc = next((g for g in gaps if "location" in g.description), None)
+        assert loc is not None
+        assert loc.field_path == "steps[0].destination"
+        assert not any(".unknown" in g.field_path or g.field_path == "unknown" for g in gaps)
+
 
 # ============================================================================
 # ProvenanceWarningDetector

@@ -1,8 +1,6 @@
 from typing import List
 
-from pydantic import ValidationError
-
-from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
+from nl2protocol.models.spec import ProtocolSpec, missing_fields
 
 
 # ========================================================================
@@ -10,23 +8,9 @@ from nl2protocol.models.spec import ProtocolSpec, CompleteProtocolSpec
 # ========================================================================
 
 def verify_no_missing_field(spec: ProtocolSpec) -> List[str]:
-    """Check if the spec has enough information to generate a protocol.
+    """Return the completeness errors for `spec` (empty list = sufficient).
 
-    Attempts promotion to CompleteProtocolSpec. If validation fails,
-    returns the error messages as a list. Empty list = sufficient.
+    Thin human-readable view over `missing_fields` — the structured walk that
+    is the single source of truth for action-specific required fields.
     """
-    try:
-        CompleteProtocolSpec.model_validate(spec.model_dump())
-        return []
-    except ValidationError as e:
-        gaps = []
-        for err in e.errors():
-            msg = err["msg"].removeprefix("Value error, ")
-            # The validator joins multiple issues with "; " — split them
-            prefix_end = msg.find(": ")
-            if prefix_end != -1:
-                body = msg[prefix_end + 2:]
-                gaps.extend(issue.strip() for issue in body.split("; "))
-            else:
-                gaps.append(msg)
-        return gaps
+    return [mf.message() for mf in missing_fields(spec)]
