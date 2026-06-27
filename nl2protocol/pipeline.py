@@ -1850,6 +1850,13 @@ class ProtocolAgent:
             )
             spec = extractor.extract(prompt)
 
+            # Record retry telemetry whether extraction succeeded or failed, so
+            # the state log always shows attempt count + any transient errors.
+            state_log["stage_2_extraction_meta"] = {
+                "attempts": getattr(extractor, "extraction_attempts", 1),
+                "retries": getattr(extractor, "extraction_retries", []),
+            }
+
             if spec is not None:
                 # Fold a serial_dilution's redundant post-action mix onto
                 # step.repetitions before anything reads it.

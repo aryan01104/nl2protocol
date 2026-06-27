@@ -135,7 +135,13 @@ class SemanticExtractor:
 
         full_response = None
         spec_json = None
+        # Surfaced to the pipeline state log so a run records whether (and why)
+        # extraction retried — `extraction_attempts == 1` with no retries means
+        # a clean single pass.
+        self.extraction_attempts = 0
+        self.extraction_retries = []
         for attempt in range(MAX_EXTRACTION_ATTEMPTS):
+            self.extraction_attempts = attempt + 1
             try:
                 # Stream so reasoning shows live and max_tokens can stay high
                 # (streaming sidesteps the SDK's >16K HTTP-timeout guard). The
@@ -185,8 +191,15 @@ class SemanticExtractor:
                 return spec
 
             except transient as e:
-                if attempt < MAX_EXTRACTION_ATTEMPTS - 1:
-                    wait = EXTRACTION_RETRY_BACKOFF_S * (2 ** attempt)
+                retrying = attempt < MAX_EXTRACTION_ATTEMPTS - 1
+                wait = EXTRACTION_RETRY_BACKOFF_S * (2 ** attempt) if retrying else None
+                self.extraction_retries.append({
+                    "attempt": attempt + 1,
+                    "error_type": type(e).__name__,
+                    "error": format_api_error(e),
+                    "waited_s": wait,
+                })
+                if retrying:
                     print(f"  Reasoning attempt {attempt + 1}/{MAX_EXTRACTION_ATTEMPTS} hit a "
                           f"transient API error ({format_api_error(e)}); retrying in {wait}s…",
                           file=sys.stderr)

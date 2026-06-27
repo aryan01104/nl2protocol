@@ -269,6 +269,10 @@ class TestPipelineMalformedLLMOutput:
             spec = extractor.extract("Transfer 100uL from A1 to B1")
         assert spec is not None
         assert mock_client.messages.stream.call_count == 2
+        # Retry telemetry the pipeline writes into the state log.
+        assert extractor.extraction_attempts == 2
+        assert len(extractor.extraction_retries) == 1
+        assert extractor.extraction_retries[0]["error_type"] == "ReadTimeout"
 
     def test_extraction_does_not_retry_terminal_error(self, simple_config):
         # A max_tokens truncation is terminal, not transient — fail fast, no retry.
@@ -282,6 +286,9 @@ class TestPipelineMalformedLLMOutput:
             spec = extractor.extract("Transfer 100uL from A1 to B1")
         assert spec is None
         assert mock_client.messages.stream.call_count == 1
+        # Terminal error → one attempt, no transient retries recorded.
+        assert extractor.extraction_attempts == 1
+        assert extractor.extraction_retries == []
 
 
 class TestPipelineMultiStep:
