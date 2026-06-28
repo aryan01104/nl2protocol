@@ -88,6 +88,8 @@ def _build_max_step(action: str) -> ExtractedStep:
         post_actions=[PostAction(action="mix", repetitions=2)],
         replicates=3,
         repetitions=5,
+        repetitions_provenance=_instr_prov(),
+        replicates_provenance=_instr_prov(),
         note="some note",
     )
 
@@ -131,6 +133,18 @@ def test_pruned_values_recorded_in_pruned_fields(action):
         f"action={action!r}: expected scrubs {expected_scrubbed}, "
         f"got {recorded}"
     )
+
+
+def test_count_provenance_pruned_with_its_count():
+    # Sibling provenance is scrubbed alongside its count: a transfer drops
+    # repetitions (+ its provenance); a mix drops replicates (+ its provenance).
+    # Neither provenance can survive orphaned on a now-None count.
+    transfer = _build_max_step("transfer")
+    assert transfer.repetitions is None and transfer.repetitions_provenance is None
+    assert transfer.replicates == 3 and transfer.replicates_provenance is not None
+    mix = _build_max_step("mix")
+    assert mix.replicates is None and mix.replicates_provenance is None
+    assert mix.repetitions == 5 and mix.repetitions_provenance is not None
 
 
 @pytest.mark.parametrize("action", sorted(_ACTION_KEEPS.keys()))

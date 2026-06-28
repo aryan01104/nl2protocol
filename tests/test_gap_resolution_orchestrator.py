@@ -120,6 +120,22 @@ def good_suggestion(value="filled", confidence=0.9):
     )
 
 
+def test_build_suggested_provenance_preserves_domain_default():
+    # A domain_default suggestion (e.g. MixCycleCountSuggester's standard cycle
+    # count) must stamp source="domain_default", not collapse to "inferred".
+    from nl2protocol.gap_resolution.orchestrator import _build_suggested_provenance
+    dd = Suggestion(value=3, provenance_source="domain_default",
+                    positive_reasoning="standard mix count",
+                    why_not_in_instruction="instruction omitted the count",
+                    confidence=0.9)
+    assert _build_suggested_provenance(
+        dd, review_status="user_accepted_suggestion").source == "domain_default"
+    inf = Suggestion(value=3, provenance_source="inferred",
+                     positive_reasoning="r", why_not_in_instruction="w", confidence=0.9)
+    assert _build_suggested_provenance(
+        inf, review_status="user_edited").source == "inferred"
+
+
 # ============================================================================
 # Topological sort
 # ============================================================================

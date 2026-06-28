@@ -573,7 +573,10 @@ def _build_suggested_provenance(suggestion: Suggestion, review_status: str):
             confidence=suggestion.confidence,
         )
     return InferredProvenance(
-        source="inferred",
+        # Preserve a domain_default suggestion's source (e.g. MixCycleCountSuggester's
+        # standard cycle count) instead of collapsing every non-cited fill to inferred.
+        source=("domain_default"
+                if suggestion.provenance_source == "domain_default" else "inferred"),
         positive_reasoning=suggestion.positive_reasoning,
         why_not_in_instruction=suggestion.why_not_in_instruction,
         review_status=review_status,
