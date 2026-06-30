@@ -1315,13 +1315,77 @@ def _render_script_with_step_tags(script: str, step_line_map: dict) -> str:
                 continue
     out = []
     for li, line in enumerate(script.split("\n")):
-        escaped = _html.escape(line)
         if li in line_to_step:
-            tag = f' data-script-step="s{line_to_step[li]}"'
-            out.append(f'<span class="code-line"{tag}>{escaped}</span>')
+            si = line_to_step[li]
+            tag = f' data-script-step="s{si}"'
+            inner = _wrap_code_value_tokens(line, si)
+            out.append(f'<span class="code-line"{tag}>{inner}</span>')
         else:
-            out.append(f'<span class="code-line">{escaped}</span>')
+            out.append(f'<span class="code-line">{_html.escape(line)}</span>')
     return "\n".join(out)
+
+
+def _wrap_code_value_tokens(raw_line: str, step_idx: int) -> str:
+    """Wrap the value tokens inside one generated-code line (volume number,
+    source well, destination well) in palette+prov-id spans, so the column-3
+    token carries the SAME `data-prov-id` and `palette-N` hue as its spec
+    value and instruction cite. That makes the existing cite ↔ value pair
+    machinery (setPairActive) light all three columns together, drives the
+    per-token hue wash, and gives the per-parameter arrow (renderParamArrows
+    in the template) a column-3 anchor.
+
+    Tokens are located by parsing the Opentrons call shape rather than by
+    matching spec display strings (which format differently, e.g. "10.0 uL"
+    vs the bare `10.0` literal). For a transfer/aspirate/dispense/mix call:
+      - volume positional arg          -> volume        (s{idx}-volume)
+        (first numeric for transfer/aspirate/dispense; second for mix,
+         whose signature is .mix(repetitions, volume, well))
+      - 1st  ['<well>'] subscript      -> source wells  (s{idx}-source-wells)
+      - 2nd  ['<well>'] subscript      -> dest   wells  (s{idx}-destination-wells)
+    Lines with no recognizable value tokens fall back to a plain escape, so
+    non-transfer actions degrade gracefully (no token highlight, line-level
+    step linkage still applies). HTML is built segment-by-segment so only
+    the wrapped tokens become spans and everything else stays escaped text.
+    """
+    import re
+    import html as _html
+    sid = f"s{step_idx}"
+    spans = []  # (start, end, prov_id)
+    # Mirror pipeline.generate_python_script's emit shapes exactly:
+    #   transfer/aspirate/dispense -> volume is the FIRST positional arg
+    #   mix                        -> .mix(repetitions, volume, lw['well'])
+    #                                 so volume is the SECOND numeric
+    vol = re.search(r"\.(?:transfer|aspirate|dispense)\(\s*([0-9]+(?:\.[0-9]+)?)", raw_line)
+    if vol is None:
+        vol = re.search(r"\.mix\(\s*[0-9]+\s*,\s*([0-9]+(?:\.[0-9]+)?)", raw_line)
+    if vol:
+        spans.append((vol.start(1), vol.end(1), f"{sid}-volume"))
+    # Wells are always emitted as LABWARE['WELL'] (single-quoted) by the
+    # codegen, for any plate size. First subscript -> source, second ->
+    # destination (transfer); single-well commands only fill source.
+    roles = ("source", "destination")
+    for i, wm in enumerate(re.finditer(r"\['([^']+)'\]", raw_line)):
+        if i >= len(roles):
+            break
+        spans.append((wm.start(1), wm.end(1), f"{sid}-{roles[i]}-wells"))
+    if not spans:
+        return _html.escape(raw_line)
+    spans.sort()
+    pieces = []
+    cursor = 0
+    for start, end, pid in spans:
+        if start < cursor:  # overlap guard — keep the earlier token
+            continue
+        pieces.append(_html.escape(raw_line[cursor:start]))
+        palette = _field_palette_class(pid)
+        cls = "code-tok" + (f" {palette}" if palette else "")
+        pieces.append(
+            f'<span class="{cls}" data-prov-id="{_html.escape(pid, quote=True)}">'
+            f'{_html.escape(raw_line[start:end])}</span>'
+        )
+        cursor = end
+    pieces.append(_html.escape(raw_line[cursor:]))
+    return "".join(pieces)
 
 
 def _collect_lab_state_rows(spec) -> list:

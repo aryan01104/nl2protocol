@@ -1,0 +1,54 @@
+name: Deploy app to Fly.io
+
+# Test-gated deploy of the hosted demo. On a push to main that touches the
+# app (Python package, Dockerfile, or fly.toml), run the suite, then — only
+# if it passes — `flyctl deploy` the nl2protocol-aryan app. The container
+# runs `nl2protocol --serve` (report.html.jinja + reporting.py), so this is
+# what makes report changes show up live. Needs the FLY_API_TOKEN repo
+# secret (mint with `fly tokens create deploy`, set via `gh secret set`).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'nl2protocol/**'
+      - 'Dockerfile'
+      - 'fly.toml'
+      - 'pyproject.toml'
+      - '.github/workflows/deploy-fly.yml'
+  workflow_dispatch:
+
+# One deploy at a time; a newer push cancels an in-flight run.
+concurrency:
+  group: deploy-fly
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'   # match Dockerfile (python:3.12-slim)
+      - name: Install package + test deps
+        run: pip install -e .[dev]
+      - name: Run tests
+        # No ANTHROPIC_API_KEY in CI → the real-API tests skip via their
+        # skipif guard; the rendering / unit suite still runs as the gate.
+        run: pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
