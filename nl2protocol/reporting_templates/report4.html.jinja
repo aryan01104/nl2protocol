@@ -161,7 +161,9 @@
     gap: 9px;
     color: var(--ink);
     line-height: 1.45;
-    font-family: var(--font-mono);   /* technical: legend labels */
+    font-family: var(--font-body);   /* prose: legend descriptions (IBM Plex Sans) */
+    font-size: 13px;
+    font-weight: 400;
   }
   .legend-glyph {
     flex: none;
@@ -169,7 +171,7 @@
     text-align: center;
     font-weight: 700;
   }
-  .legend-pv { flex: none; width: 56px; }
+  .legend-pv { flex: none; width: 56px; font-family: var(--font-mono); }   /* technical: the example value chip */
   .legend-sub { color: var(--dim); }
   .tip-toggle {
     flex: none;
@@ -322,11 +324,11 @@
      source kind is communicated by SHAPE instead — non-instruction
      values carry an always-on outline rectangle. Two visual axes
      carrying one signal each, no overlap. */
-  .prov-instruction    { font-weight: 500; cursor: help; /* hue comes from .palette-N when cite is recoverable */ }
+  .prov-instruction    { font-weight: 400; cursor: help; /* hue comes from .palette-N when cite is recoverable */ }
   .prov-config,
   .prov-domain_default,
   .prov-inferred {
-    font-weight: 500;
+    font-weight: 400;
     cursor: help;
     outline: 1px solid var(--dim);
     outline-offset: 1px;
@@ -336,7 +338,7 @@
      underline instead of the outline box — a distinct "from initial contents"
      marker, separate from the generic model-filled (config/domain/inferred). */
   .prov-initial_state {
-    font-weight: 500;
+    font-weight: 400;
     cursor: help;
     border-bottom: 1px dotted var(--dim);
   }
@@ -371,6 +373,7 @@
     min-width: 0;       /* Allow long values to wrap rather than overflow. */
     word-break: break-word;
     font-family: var(--font-mono);   /* technical: parameter values */
+    font-size: 11.5px;  /* smaller than the 13px labels so long args wrap less */
   }
   .cell-check {
     /* Right-aligned check column. The inline-check span inside carries
@@ -480,15 +483,16 @@
   .step {
     margin-bottom: 14px;
     padding: 10px 12px;
-    border-left: 3px solid transparent;
-    background: rgba(0, 0, 0, 0.015);
-    border-radius: 0 4px 4px 0;
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   }
-  .step.step-orphan { border-left-color: var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
+  .step.step-orphan { border-left: 3px solid var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
   /* Instruction-grounded is the common case (most steps), so the blue
      left-bar dominates the column without conveying useful signal.
      Leave it transparent; the rarer orphan / mixed cases still show. */
-  .step.step-grounded-mixed { border-left-color: var(--col-domain); }
+  .step.step-grounded-mixed { border-left: 3px solid var(--col-domain); }
   .step-header {
     font-size: 12px;
     color: var(--dim);
@@ -676,7 +680,7 @@
   }
   .cite-atomic-color {
     /* color comes from the .palette-N class on the same span */
-    font-weight: 500;
+    font-weight: 400;
   }
   /* Param-hue wash on hover/active, referencing var(--palette-N) directly so
      the cite lights in its parameter color while the cited text stays ink. */
@@ -690,6 +694,12 @@
   .cite-atomic-color.palette-7:hover, .cite-atomic-color.palette-7.cite-active { background: color-mix(in srgb, var(--palette-7) 16%, transparent); }
   .cite-atomic-color:hover,
   .cite-atomic-color.cite-active { border-radius: 2px; }
+  /* Step hover: every cite in the step's instruction phrase gets ONE uniform
+     blue wash (matching .step.step-active), not each param's palette hue. */
+  .cite-marker.step-cite-active {
+    background: color-mix(in srgb, var(--col-instruction) 12%, transparent);
+    border-radius: 2px;
+  }
   .cite-q2-cohesion {
     /* deliberately unstyled at rest — reads as plain prose */
     transition: background 0.15s;
@@ -715,6 +725,11 @@
     border-left-color: transparent;
   }
   body.param-active pre.code .code-line.is-script-linked { background: transparent; }
+  /* Hovering a value/token nested inside a step also fires the step hover; while
+     a single param is active, suppress the step's uniform instruction wash on the
+     OTHER cites — but never on the focused cite itself (it carries .cite-active and
+     must keep its own param hue). The :not() keeps this off the active cite. */
+  body.param-active .cite-marker.step-cite-active:not(.cite-active) { background: transparent; }
 
   /* ───────── Phase 3h (#68) + 2026-05-06 polish: fade-in for live-mode blocks ─────────
      Live-mode appendStepBlocks adds .fade-in (opacity 0) to each new
@@ -988,7 +1003,7 @@
     padding: 10px 12px;
     background: var(--tip-bg);
     color: var(--tip-fg);
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.45;
     border-radius: 4px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
@@ -996,7 +1011,8 @@
     opacity: 0;
     transition: opacity 0.18s ease;
     white-space: normal;
-    font-family: var(--font-mono);   /* technical: tooltips */
+    font-family: var(--font-body);   /* prose: tooltip explanation (IBM Plex Sans) */
+    font-weight: 400;
   }
   #hover-tip.visible { opacity: 1; }
   #hover-tip .tip-meta {
@@ -1005,6 +1021,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 4px;
+    font-family: var(--font-mono);   /* technical: the uppercase label line */
   }
   #hover-tip .tip-cite {
     font-style: italic;
@@ -2117,17 +2134,17 @@
   }
 
   function setPairActive(id, active) {
-    // Toggle highlight on every cite-segment, prov-target, and arrow
-    // sharing one id. An atomic-color cite segment that lies inside
-    // a composite step cite carries both ids; on step hover, the
-    // atomic segment activates too so its palette text color shows.
-    // (Earlier the palette class flipped to a solid background which
-    // read as noisy under a step hover, so this branch used to skip
-    // atomic segments — that background-flip rule is gone, so the
-    // skip is gone with it.)
+    // Toggle highlight on every cite-segment, prov-target, and arrow sharing
+    // one id. A step hover (id ends "-step-trigger") matches EVERY atomic cite
+    // of the step (they all carry the shared step-trigger id), so it uses a
+    // single UNIFORM wash class (step-cite-active) instead of cite-active —
+    // otherwise each atom's palette rule paints its own hue and the step's
+    // instruction phrase reads as a rainbow. A param hover keeps cite-active,
+    // which the per-palette rules light in that one parameter's hue.
     const isStepTrigger = id.endsWith("-step-trigger");
+    const citeClass = isStepTrigger ? "step-cite-active" : "cite-active";
     document.querySelectorAll(sel("data-cite-id", id)).forEach((e) => {
-      e.classList.toggle("cite-active", active);
+      e.classList.toggle(citeClass, active);
     });
     document.querySelectorAll(sel("data-prov-id", id)).forEach((e) => {
       if (e.classList.contains("step")) {
@@ -2273,8 +2290,16 @@
     // tooltip wiring lives on prov-id targets and step blocks below).
     document.querySelectorAll("[data-cite-id]").forEach((el) => {
       const ids = (el.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
-      el.addEventListener("mouseenter", () => { ids.forEach((id) => setPairActive(id, true)); startDwell(ids[0]); showParamArrows(ids); });
-      el.addEventListener("mouseleave", () => { ids.forEach((id) => setPairActive(id, false)); cancelDwell(); clearParamArrows(); });
+      // A cited phrase can triple as the step trigger, a Q2-cohesion fragment,
+      // and an atomic param cite (e.g. "s0-step-trigger s0-q2-0 s0-volume"). For
+      // the per-parameter wash + arrow, use ONLY the atomic param ids — otherwise
+      // the shared s{n}-step-trigger lights every sibling param's cite at once
+      // (blue + green + purple together). A bare step-trigger span (no param id)
+      // keeps the step-level behavior via the fallback to `ids`.
+      const paramIds = ids.filter((id) => !/-step-trigger$/.test(id) && !/-q2-\d+$/.test(id));
+      const useIds = paramIds.length ? paramIds : ids;
+      el.addEventListener("mouseenter", () => { useIds.forEach((id) => setPairActive(id, true)); startDwell(useIds[0]); showParamArrows(paramIds); });
+      el.addEventListener("mouseleave", () => { useIds.forEach((id) => setPairActive(id, false)); cancelDwell(); clearParamArrows(); });
     });
 
     // Atomic value spans (carry data-prov-source) — pair highlight + tooltip.

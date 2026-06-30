@@ -26,12 +26,30 @@ def _get_template(self, name, *args, **kwargs):
 jinja2.Environment.get_template = _get_template
 
 
+def _patch_code_token_wrapping():
+    """Route the live server's generated-code column through reporting2's
+    token-wrapping renderer so col-3 emits `.code-tok[data-prov-id]` spans.
+
+    The live server builds the code column at app.py:996 via a local
+    `from nl2protocol.reporting import _render_script_with_step_tags`, which
+    reads the module attribute at call time. Overriding that attribute with
+    reporting2's version (which wraps the volume/well tokens) makes the
+    per-parameter grounding arrows have a col-3 anchor in LIVE mode. Only this
+    one helper is swapped — the spec column still uses reporting.py, so the
+    fork's _format_wells_only / count-provenance regressions are NOT pulled in.
+    """
+    import nl2protocol.reporting as _rep
+    import nl2protocol.reporting2 as _rep2
+    _rep._render_script_with_step_tags = _rep2._render_script_with_step_tags
+
+
 def main():
     try:
         from dotenv import load_dotenv, find_dotenv
         load_dotenv(find_dotenv(usecwd=True))
     except Exception:
         pass
+    _patch_code_token_wrapping()
     from nl2protocol.server import run_serve
     run_serve(host="127.0.0.1", port=8000, open_browser=False,
               examples_dir="test_cases/examples")
