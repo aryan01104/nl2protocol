@@ -156,6 +156,14 @@ class TestCoerceReplicates:
         step = _step(replicates=-3)
         assert step.replicates is None
 
+    # Post: coercing replicates to None also clears its sibling provenance, so a
+    # now-None count can't carry orphaned provenance. action="transfer" keeps
+    # replicates through the pruner, isolating coerce_replicates.
+    def test_coerce_clears_replicates_provenance(self):
+        step = _step(action="transfer", replicates=1, replicates_provenance=_prov())
+        assert step.replicates is None
+        assert step.replicates_provenance is None
+
 
 # ============================================================================
 # ProtocolSpec.validate_step_ordering — contract tests

@@ -171,6 +171,13 @@ class PostAction(BaseModel):
     repetitions: Optional[int] = Field(None, description=(
         "Number of mix cycles. Set only if the user specified a count. Do not infer a default — leave null."
     ))
+    repetitions_provenance: Optional[Provenance] = Field(None, description=(
+        "How the mix-cycle count was determined. Required when repetitions is "
+        "non-null AND came from the instruction: source='instruction' with "
+        "cited_text the verbatim count phrase (e.g. 'mix 5 times'). Leave null "
+        "when repetitions is null; the gap-resolver stamps inferred/"
+        "domain_default when a suggester fills it."
+    ))
     volume: Optional[ProvenancedVolume] = Field(None, description=(
         "Volume per mix cycle. Set only if the user specified a mix volume. Do not infer a default — leave null."
     ))
@@ -204,18 +211,22 @@ _PRUNABLE_FIELDS: frozenset = frozenset({
     "substance", "volume", "temperature", "duration",
     "source", "destination", "post_actions", "replicates", "note",
     "repetitions",
+    # Sibling provenance is pruned with its count so it can't survive orphaned.
+    "repetitions_provenance", "replicates_provenance",
 })
 
 _ACTION_KEEPS: dict = {
     "transfer":             {"volume", "substance", "source", "destination",
-                              "post_actions", "replicates"},
+                              "post_actions", "replicates", "replicates_provenance"},
     "distribute":           {"volume", "substance", "source", "destination",
-                              "post_actions", "replicates"},
+                              "post_actions", "replicates", "replicates_provenance"},
     "consolidate":          {"volume", "substance", "source", "destination",
-                              "post_actions", "replicates"},
+                              "post_actions", "replicates", "replicates_provenance"},
     "serial_dilution":      {"volume", "substance", "source", "destination",
-                              "post_actions", "replicates", "repetitions"},
-    "mix":                  {"volume", "substance", "destination", "repetitions"},
+                              "post_actions", "replicates", "replicates_provenance",
+                              "repetitions", "repetitions_provenance"},
+    "mix":                  {"volume", "substance", "destination",
+                              "repetitions", "repetitions_provenance"},
     "aspirate":             {"volume", "substance", "source"},
     "dispense":             {"volume", "substance", "destination"},
     "blow_out":             {"destination"},
@@ -288,12 +299,25 @@ class ExtractedStep(BaseModel):
         "action; for a mix attached to a transfer, use PostAction.repetitions "
         "instead."
     ))
+    repetitions_provenance: Optional[Provenance] = Field(None, description=(
+        "How the mix-cycle count was determined. Required when repetitions is "
+        "non-null AND came from the instruction: source='instruction' with "
+        "cited_text the verbatim phrase (e.g. 'up and down 10 times'). Leave "
+        "null when repetitions is null; the gap-resolver stamps inferred/"
+        "domain_default when a suggester fills the count."
+    ))
     replicates: Optional[int] = Field(None, description=(
         "Number of replicate destination columns per source well. Must be >= 2 (1 is not replication). "
         "Set only when the user explicitly says 'in triplicate' (3), 'in duplicate' (2), etc. "
         "Leave null if no replication is mentioned. "
         "Example: 'test each sample in triplicate' → replicates: 3. "
         "Example: 'transfer to column 11 and 12' → replicates: null (this is just two destinations, not replication)."
+    ))
+    replicates_provenance: Optional[Provenance] = Field(None, description=(
+        "How the replicate count was determined. Required when replicates is "
+        "non-null AND came from the instruction: source='instruction' with "
+        "cited_text the verbatim phrase (e.g. 'in triplicate'). Leave null when "
+        "replicates is null."
     ))
 
     @model_validator(mode='after')
@@ -311,12 +335,15 @@ class ExtractedStep(BaseModel):
                 are silently normalized rather than rejected (lenient
                 normalization for hallucinated LLM output). Returns self.
 
-        Side effects: May mutate `self.replicates` (sets to None when < 2).
+        Side effects: May mutate `self.replicates` (sets to None when < 2) and
+                clears `self.replicates_provenance` alongside it, so a count and
+                its provenance never disagree.
 
         Raises: Never.
         """
         if self.replicates is not None and self.replicates < 2:
             self.replicates = None
+            self.replicates_provenance = None
         return self
     tip_strategy: Optional[Literal["new_tip_each", "same_tip", "unspecified"]] = None
     pipette_hint: Optional[Literal["p20", "p300", "p1000"]] = Field(None, description=(

@@ -487,8 +487,8 @@ class TestRendererChain:
             lambda l: l.wells_provenance,
             prov_id="dst-wells", instruction="tube C7",
         )
-        assert ">well C7<" in html
-        assert ">wells D1<" in html
+        assert ">C7<" in html
+        assert ">D1<" in html
         assert "prior-rev" in html
         assert "rev-arrow" in html
 
@@ -530,11 +530,11 @@ class TestRendererChain:
             lr, _format_wells_only, lambda l: l.wells_provenance,
             prov_id="dst-wells", instruction="tube C7",
         )
-        # Chain renders: well C7 → well A1 (the two C7 priors collapse).
+        # Chain renders: C7 → A1 (the two C7 priors collapse).
         # We assert exactly ONE prior-rev wrapper, not two.
         assert html.count('class="prior-rev"') == 1
-        assert ">well C7<" in html
-        assert ">well A1<" in html
+        assert ">C7<" in html
+        assert ">A1<" in html
 
     def test_prior_with_identical_projection_is_filtered(self):
         # push_revision always snapshots the WHOLE tracked object. When a
@@ -633,4 +633,4 @@ class TestRendererChain:
         # No chain (skipped the only prior). Single span output.
         assert "prior-rev" not in html
         assert "rev-arrow" not in html
-        assert ">well A1<" in html
+        assert ">A1<" in html

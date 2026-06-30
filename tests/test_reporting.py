@@ -692,11 +692,34 @@ class TestUnifiedProtocolStepsColumn:
         rep = HTMLReporter(str(out_path))
         rep.finalize()
         rendered = out_path.read_text()
-        # Three columns: instruction (narrow cap), protocol steps (mid),
-        # generated python (widest cap).
-        assert (
-            "minmax(420px, 640px)\n      minmax(340px, 600px)\n      minmax(380px, 720px)"
-        ) in rendered
+        # Three equal columns (instruction / protocol steps / generated python).
+        # The header-band redesign replaced the old per-column width caps with
+        # equal thirds.
+        assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in rendered
+
+    def test_hover_pop_up_toggle_renders(self, tmp_path):
+        # The legend exposes an on/off control for the provenance hover pop-up,
+        # and showTip() gates on the flag that control flips.
+        from nl2protocol.reporting import HTMLReporter
+        out_path = tmp_path / "report.html"
+        HTMLReporter(str(out_path)).finalize()
+        rendered = out_path.read_text()
+        assert 'id="tip-toggle"' in rendered
+        assert "hover details" in rendered
+        assert "if (!tip || !tipsEnabled) return;" in rendered
+
+    def test_long_well_vector_keeps_last_well_visible(self):
+        # A truncated wells list must still show the range endpoint, not hide
+        # it behind a trailing ellipsis (A1..A5 … A8, not A1..A6...).
+        from nl2protocol.reporting import _format_wells_only
+        from nl2protocol.models.spec import LocationRef, InstructionProvenance
+        prov = InstructionProvenance(source="instruction", cited_text=["w"], confidence=1.0)
+        lr = LocationRef(description="p", wells=[f"A{i}" for i in range(1, 9)],
+                         resolved_label="p", description_provenance=prov,
+                         wells_provenance=prov)
+        out = _format_wells_only(lr)
+        assert out.endswith("… A8")
+        assert out.startswith("A1,")
 
 
 class TestADR0011Phase2bResolutionArrows:

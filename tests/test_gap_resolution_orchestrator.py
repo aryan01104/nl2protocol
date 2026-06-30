@@ -120,6 +120,22 @@ def good_suggestion(value="filled", confidence=0.9):
     )
 
 
+def test_build_suggested_provenance_preserves_domain_default():
+    # A domain_default suggestion (e.g. MixCycleCountSuggester's standard cycle
+    # count) must stamp source="domain_default", not collapse to "inferred".
+    from nl2protocol.gap_resolution.orchestrator import _build_suggested_provenance
+    dd = Suggestion(value=3, provenance_source="domain_default",
+                    positive_reasoning="standard mix count",
+                    why_not_in_instruction="instruction omitted the count",
+                    confidence=0.9)
+    assert _build_suggested_provenance(
+        dd, review_status="user_accepted_suggestion").source == "domain_default"
+    inf = Suggestion(value=3, provenance_source="inferred",
+                     positive_reasoning="r", why_not_in_instruction="w", confidence=0.9)
+    assert _build_suggested_provenance(
+        inf, review_status="user_edited").source == "inferred"
+
+
 # ============================================================================
 # Topological sort
 # ============================================================================
@@ -925,6 +941,33 @@ class TestDefaultApplyStampsUserAction:
         assert spec.steps[0].volume.value == 42.0
         # Provenance stamped
         assert spec.steps[0].volume.provenance.review_status == "user_edited"
+
+    def test_accept_count_suggestion_stamps_repetitions_provenance(self):
+        # repetitions is a bare scalar with a sibling _provenance field: accept
+        # must record WHERE the count came from, not just set the int — else the
+        # report shows an unattributed count.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        from nl2protocol.gap_resolution import MixCycleCountSuggester
+        spec = _real_spec()
+        g = gap("g1", field_path="steps[0].repetitions")
+        sugg = MixCycleCountSuggester().suggest(g, spec, {})
+        res = Resolution(action="accept_suggestion", new_value=sugg.value,
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=sugg)
+        assert spec.steps[0].repetitions == sugg.value
+        assert spec.steps[0].repetitions_provenance is not None
+        assert spec.steps[0].repetitions_provenance.review_status == "user_accepted_suggestion"
+
+    def test_edit_count_stamps_repetitions_provenance_user_edited(self):
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        g = gap("g1", field_path="steps[0].repetitions")
+        res = Resolution(action="edit", new_value=7,
+                         user_action_provenance="user_edited")
+        default_apply_resolution(spec, g, res, suggestion=None)
+        assert spec.steps[0].repetitions == 7
+        assert spec.steps[0].repetitions_provenance is not None
+        assert spec.steps[0].repetitions_provenance.review_status == "user_edited"
 
     def test_user_action_supersedes_prior_reviewer_objection(self):
         # If the reviewer disagreed with a value, then the user accepts/edits
