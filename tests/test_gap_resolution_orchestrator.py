@@ -926,6 +926,19 @@ class TestDefaultApplyStampsUserAction:
         # Reviewer state cleared
         assert spec.steps[0].volume.provenance.reviewer_objection is None
 
+    def test_unmappable_field_path_is_noop_not_crash(self):
+        # Defense in depth: a field_path that doesn't address a real step field
+        # (a future unmapped detector path) must no-op, not crash with a
+        # Pydantic "object has no field" ValueError.
+        from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
+        spec = _real_spec()
+        before = spec.steps[0].model_dump()
+        g = gap("g1", field_path="steps[0].bogus_field")
+        res = Resolution(action="accept_suggestion", new_value="x",
+                         user_action_provenance="user_accepted_suggestion")
+        default_apply_resolution(spec, g, res, suggestion=None)  # must not raise
+        assert spec.steps[0].model_dump() == before
+
     def test_edit_mutates_value_preserves_provenance_shape(self):
         from nl2protocol.gap_resolution.orchestrator import default_apply_resolution
         spec = _real_spec()

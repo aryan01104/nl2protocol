@@ -724,6 +724,11 @@ def _apply_at_path(spec, path: str, resolution: Resolution,
     m = re.match(r"steps\[(\d+)\]\.(\w+)$", path)
     if m:
         idx, fname = int(m.group(1)), m.group(2)
+        # Defense in depth: a path that doesn't address a real step field is a
+        # no-op, not a crash. The completeness walk now emits concrete paths,
+        # so this shouldn't fire — but a future unmapped path degrades safely.
+        if idx >= len(spec.steps) or fname not in type(spec.steps[idx]).model_fields:
+            return
         if resolution.action == "accept_suggestion":
             expected = _expected_field_type_for_step(spec.steps[idx], fname)
             if (expected is not None

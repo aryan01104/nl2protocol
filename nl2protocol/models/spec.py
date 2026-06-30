@@ -9,6 +9,7 @@ Every extracted value carries a Provenance tag saying where it came from
 can verify claims and route uncertain values for user confirmation.
 """
 
+from dataclasses import dataclass
 from typing import Annotated, Any, List, Optional, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -596,82 +597,137 @@ class CompleteProtocolSpec(ProtocolSpec):
         Raises: ValueError listing every incomplete-field issue across all
                 steps (single raise; never multiple).
         """
-        errors = []
-        liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
-                          "dispense", "mix", "serial_dilution"}
-        transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
-        single_location_actions = {"mix", "aspirate", "dispense", "touch_tip"}
-        temperature_actions = {"set_temperature", "wait_for_temperature"}
-
-        for step in self.steps:
-            prefix = f"Step {step.order} ({step.action})"
-            substance_hint = f" for '{step.substance.value}'" if step.substance else ""
-
-            if step.action in liquid_actions and step.volume is None:
-                errors.append(f"{prefix}: missing volume{substance_hint}")
-
-            # Mix cycle count: standalone 'mix' and the per-transfer mixing in
-            # 'serial_dilution' both need a count. Left null by extraction (the
-            # model says "do not infer"); surfaced here so the user controls it
-            # via the gap modal instead of codegen silently using the default.
-            if step.action in {"mix", "serial_dilution"}:
-                if step.repetitions is None:
-                    errors.append(f"{prefix}: missing mix cycle count")
-                elif step.repetitions <= 0:
-                    errors.append(f"{prefix}: mix cycle count must be at least 1")
-
-            if step.action in transfer_actions:
-                if step.source is None:
-                    errors.append(f"{prefix}: no source for '{step.substance.value}' — add it to your config" if step.substance else f"{prefix}: missing source location")
-                if step.destination is None:
-                    errors.append(f"{prefix}: missing destination location{substance_hint}")
-                # A populated LocationRef with no well/wells/well_range is
-                # half-specified — the constraint checker can't validate
-                # absent wells (only out-of-range ones), so without this
-                # check the spec passes completeness with an unusable
-                # location and the user is never asked to fill it.
-                for role in ("source", "destination"):
-                    ref = getattr(step, role, None)
-                    if ref is None:
-                        continue
-                    # A discard destination (waste/trash) needs no well — the
-                    # OT-2 fixed trash is a single-well sink resolved off-config.
-                    if role == "destination" and (
-                        ref.resolved_label == TRASH_LABEL
-                        or is_discard_description(ref.description)
-                    ):
-                        continue
-                    if (ref.well is None
-                            and not ref.wells and ref.well_range is None):
-                        errors.append(f"{prefix}: missing {role} well(s){substance_hint}")
-
-            if step.action in single_location_actions:
-                if step.source is None and step.destination is None:
-                    errors.append(f"{prefix}: missing location{substance_hint}")
-                elif not any(
-                    ref is not None and (ref.well is not None or ref.wells or ref.well_range is not None)
-                    for ref in (step.source, step.destination)
-                ):
-                    errors.append(f"{prefix}: missing well(s){substance_hint}")
-
-            if step.action in temperature_actions and step.temperature is None:
-                errors.append(f"{prefix}: missing temperature target")
-
-            if step.action == "delay" and step.duration is None:
-                errors.append(f"{prefix}: missing duration")
-
-            if step.action == "pause" and step.duration is None and not step.note:
-                errors.append(f"{prefix}: pause requires either duration (timed) or note (user-driven)")
-
-            if step.action == "comment" and not step.note:
-                errors.append(f"{prefix}: missing note")
-
+        errors = missing_fields(self)
         if errors:
             raise ValueError(
-                f"Spec is incomplete ({len(errors)} issue(s)): " + "; ".join(errors)
+                f"Spec is incomplete ({len(errors)} issue(s)): "
+                + "; ".join(mf.message() for mf in errors)
             )
 
         return self
+
+
+# ============================================================================
+# COMPLETENESS WALK (structured)
+# ============================================================================
+
+@dataclass(frozen=True)
+class MissingField:
+    """A structured completeness deficiency: which spec field is missing, and why.
+
+    `field_path` is the dotted spec address the gap-resolution apply layer
+    writes to (e.g. "steps[12].destination"); `detail` is the human phrase
+    rendered after the "Step N (action): " prefix. The gap detector reads
+    `field_path` directly — no message re-parsing — so the producer (this
+    walk, which knows the field) is the single source of truth for the
+    address, not a downstream keyword table.
+    """
+
+    step_order: Optional[int]
+    action: Optional[str]
+    field_path: str
+    detail: str
+    kind: str = "missing"
+    severity: str = "blocker"
+
+    def message(self) -> str:
+        """Render the human-readable error string for display / the raise."""
+        return f"Step {self.step_order} ({self.action}): {self.detail}"
+
+
+def missing_fields(spec) -> List[MissingField]:
+    """Return one MissingField per action-specific completeness deficiency.
+
+    Pure walk over `spec.steps`; the single source of truth for both the
+    `CompleteProtocolSpec` construction guard (rendered to a ValueError) and
+    the gap detector (which reads `field_path` directly). Every issue carries
+    a concrete `field_path` — single-location actions ("mix" et al.) route
+    their location to `destination` by convention rather than an unmappable
+    placeholder.
+    """
+    out: List[MissingField] = []
+
+    def add(step, suffix: str, detail: str) -> None:
+        out.append(MissingField(
+            step_order=step.order,
+            action=step.action,
+            field_path=f"steps[{step.order - 1}]{suffix}",
+            detail=detail,
+        ))
+
+    liquid_actions = {"transfer", "distribute", "consolidate", "aspirate",
+                      "dispense", "mix", "serial_dilution"}
+    transfer_actions = {"transfer", "distribute", "serial_dilution", "consolidate"}
+    single_location_actions = {"mix", "aspirate", "dispense", "touch_tip"}
+    temperature_actions = {"set_temperature", "wait_for_temperature"}
+
+    for step in spec.steps:
+        substance_hint = f" for '{step.substance.value}'" if step.substance else ""
+
+        if step.action in liquid_actions and step.volume is None:
+            add(step, ".volume", f"missing volume{substance_hint}")
+
+        # Mix cycle count: standalone 'mix' and the per-transfer mixing in
+        # 'serial_dilution' both need a count. Left null by extraction (the
+        # model says "do not infer"); surfaced here so the user controls it
+        # via the gap modal instead of codegen silently using the default.
+        if step.action in {"mix", "serial_dilution"}:
+            if step.repetitions is None:
+                add(step, ".repetitions", "missing mix cycle count")
+            elif step.repetitions <= 0:
+                add(step, ".repetitions", "mix cycle count must be at least 1")
+
+        if step.action in transfer_actions:
+            if step.source is None:
+                add(step, ".source",
+                    f"no source for '{step.substance.value}' — add it to your config"
+                    if step.substance else "missing source location")
+            if step.destination is None:
+                add(step, ".destination", f"missing destination location{substance_hint}")
+            # A populated LocationRef with no well/wells/well_range is
+            # half-specified — the constraint checker can't validate absent
+            # wells (only out-of-range ones), so without this check the spec
+            # passes completeness with an unusable location.
+            for role in ("source", "destination"):
+                ref = getattr(step, role, None)
+                if ref is None:
+                    continue
+                # A discard destination (waste/trash) needs no well — the
+                # OT-2 fixed trash is a single-well sink resolved off-config.
+                if role == "destination" and (
+                    ref.resolved_label == TRASH_LABEL
+                    or is_discard_description(ref.description)
+                ):
+                    continue
+                if ref.well is None and not ref.wells and ref.well_range is None:
+                    add(step, f".{role}.wells", f"missing {role} well(s){substance_hint}")
+
+        if step.action in single_location_actions:
+            if step.source is None and step.destination is None:
+                # Single-location actions act in place; by convention the
+                # location lives in `destination`.
+                add(step, ".destination", f"missing location{substance_hint}")
+            elif not any(
+                ref is not None and (ref.well is not None or ref.wells or ref.well_range is not None)
+                for ref in (step.source, step.destination)
+            ):
+                role = "source" if step.source is not None else "destination"
+                add(step, f".{role}.wells", f"missing well(s){substance_hint}")
+
+        if step.action in temperature_actions and step.temperature is None:
+            add(step, ".temperature", "missing temperature target")
+
+        if step.action == "delay" and step.duration is None:
+            add(step, ".duration", "missing duration")
+
+        if step.action == "pause" and step.duration is None and not step.note:
+            add(step, ".duration|.note",
+                "pause requires either duration (timed) or note (user-driven)")
+
+        if step.action == "comment" and not step.note:
+            add(step, ".note", "missing note")
+
+    return out
 
 
 # ============================================================================

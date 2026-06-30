@@ -23,7 +23,6 @@ Design notes:
 
 from __future__ import annotations
 
-import re
 from typing import List, Optional
 
 from nl2protocol.gap_resolution.types import Gap, GapKind, GapSeverity
@@ -33,111 +32,38 @@ from nl2protocol.gap_resolution.types import Gap, GapKind, GapSeverity
 # MissingFieldsDetector — wraps SemanticExtractor.missing_fields
 # ============================================================================
 
-# Format produced by CompleteProtocolSpec.validate_completeness:
-#   "Step N (action): description"
-# e.g. "Step 3 (transfer): no source for 'water' — add it to your config"
-#      "Step 13 (mix): missing volume"
-_MISSING_FIELD_PATTERN = re.compile(r"^Step\s+(\d+)\s+\(([^)]+)\):\s*(.+)$")
-
-
-def _missing_field_to_path(action: str, description: str) -> str:
-    """Best-effort mapping from validate_completeness's free-text description
-    to a dotted field path. Falls back to including the description verbatim
-    when the field isn't recognizable.
-
-    Examples:
-      "missing volume"                                   → ".volume"
-      "missing destination location"                     → ".destination"
-      "no source for 'X' — add it to your config"        → ".source"
-      "missing temperature target"                       → ".temperature"
-      "missing duration"                                 → ".duration"
-      "missing note"                                     → ".note"
-      "pause requires either duration (timed) or ..."    → ".duration|.note"
-    """
-    desc_lower = description.lower()
-    if "missing volume" in desc_lower:
-        return ".volume"
-    # Well-specific clauses come before the broader source/destination
-    # checks so "missing source well(s)" routes to the LocationRef subfield
-    # apply branch instead of the top-level source one.
-    if "source well" in desc_lower:
-        return ".source.wells"
-    if "destination well" in desc_lower:
-        return ".destination.wells"
-    if "missing destination" in desc_lower or "destination location" in desc_lower:
-        return ".destination"
-    if "no source for" in desc_lower or "missing source" in desc_lower:
-        return ".source"
-    if "missing temperature" in desc_lower:
-        return ".temperature"
-    if "missing duration" in desc_lower:
-        return ".duration"
-    if "mix cycle count" in desc_lower or "repetitions" in desc_lower:
-        return ".repetitions"
-    if "missing note" in desc_lower:
-        return ".note"
-    if "duration" in desc_lower and "note" in desc_lower:
-        # pause polymorphic case
-        return ".duration|.note"
-    return ".unknown"
-
-
-def _missing_field_kind_and_severity(description: str) -> tuple:
-    """All validate_completeness errors are 'missing' kind + 'blocker'
-    severity by definition (the validator only fires when a required
-    field is absent)."""
-    return "missing", "blocker"
-
-
 class MissingFieldsDetector:
-    """Wraps `extraction.sufficient.verify_no_missing_field`.
+    """Translate structured completeness deficiencies into Gaps.
 
-    Calls `verify_no_missing_field(spec)` (which attempts CompleteProtocolSpec
-    promotion and collects validation errors), then translates each
-    error string into a `Gap`.
+    Calls `models.spec.missing_fields(spec)` — the single source of truth for
+    action-specific required fields — and reads each record's `field_path`
+    directly. No message re-parsing: the producer (which knows the field)
+    states the address, so a new validator rule can never silently fall to an
+    unmappable path the way the old keyword table did.
 
     Pre:    `spec` is a parsed ProtocolSpec.
-    Post:   Returns one Gap per error string from the underlying function.
-            Each Gap has stable id `"step{N}.{field}"` derivable from the
-            error message; `kind="missing"`, `severity="blocker"`.
+    Post:   Returns one Gap per MissingField. Stable id `"step{N}{suffix}"`
+            (suffix = the field_path tail after `steps[i]`, e.g.
+            "steps[0].volume" → "step1.volume"); `kind="missing"`,
+            `severity="blocker"`.
     Side effects: None.
     """
 
     def detect(self, spec, context: dict) -> List[Gap]:
-        from nl2protocol.extraction.sufficient import verify_no_missing_field
+        from nl2protocol.models.spec import missing_fields
 
         gaps: List[Gap] = []
-        for msg in verify_no_missing_field(spec):
-            m = _MISSING_FIELD_PATTERN.match(msg)
-            if m:
-                step_order = int(m.group(1))
-                action = m.group(2)
-                description = m.group(3)
-                field_path_suffix = _missing_field_to_path(action, description)
-                kind, severity = _missing_field_kind_and_severity(description)
-                gap_id = f"step{step_order}{field_path_suffix}"
-                gaps.append(Gap(
-                    id=gap_id,
-                    step_order=step_order,
-                    field_path=f"steps[{step_order - 1}]{field_path_suffix}",
-                    kind=kind,
-                    current_value=None,
-                    description=msg,
-                    severity=severity,
-                ))
-            else:
-                # Unparseable error — emit as a spec-level gap so it isn't
-                # silently dropped. id needs to be unique-enough that
-                # iteration matching works.
-                gaps.append(Gap(
-                    id=f"unparseable:{hash(msg) & 0xffffffff:08x}",
-                    step_order=None,
-                    field_path="unknown",
-                    kind="missing",
-                    current_value=None,
-                    description=msg,
-                    severity="blocker",
-                ))
+        for mf in missing_fields(spec):
+            suffix = mf.field_path.split("]", 1)[1] if "]" in mf.field_path else f".{mf.field_path}"
+            gaps.append(Gap(
+                id=f"step{mf.step_order}{suffix}",
+                step_order=mf.step_order,
+                field_path=mf.field_path,
+                kind=mf.kind,
+                current_value=None,
+                description=mf.message(),
+                severity=mf.severity,
+            ))
         return gaps
 
 
