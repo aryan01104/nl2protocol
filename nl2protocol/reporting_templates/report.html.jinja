@@ -121,6 +121,7 @@
     margin: 0 0 4px;
     font-size: 20px;
     font-weight: 600;
+    font-family: var(--font-mono);   /* technical: brand wordmark */
   }
   header .meta {
     color: var(--dim);
@@ -152,6 +153,7 @@
     text-transform: uppercase;
     color: var(--dim);
     margin-bottom: 3px;
+    font-family: var(--font-mono);   /* technical: legend labels */
   }
   .legend-item {
     display: flex;
@@ -159,6 +161,9 @@
     gap: 9px;
     color: var(--ink);
     line-height: 1.45;
+    font-family: var(--font-body);   /* prose: legend descriptions (IBM Plex Sans) */
+    font-size: 13px;
+    font-weight: 400;
   }
   .legend-glyph {
     flex: none;
@@ -166,7 +171,7 @@
     text-align: center;
     font-weight: 700;
   }
-  .legend-pv { flex: none; width: 56px; }
+  .legend-pv { flex: none; width: 56px; font-family: var(--font-mono); }   /* technical: the example value chip */
   .legend-sub { color: var(--dim); }
   .tip-toggle {
     flex: none;
@@ -176,7 +181,7 @@
   }
   .tip-toggle.on { border-color: var(--col-instruction); color: var(--col-instruction);
     background: color-mix(in srgb, var(--col-instruction) 7%, transparent); }
-  .legend-group .tip-toggle { align-self: flex-start; }   /* static legend column */
+  .legend-group .tip-toggle { align-self: flex-start; }
 
   /* ───────── Live-mode header band (logo + controls + legend + status) ───────── */
   .brand { display: inline-block; margin: 0; line-height: 0; flex: none; }
@@ -289,7 +294,6 @@
     border-radius: 6px;
     padding: 16px;
     overflow-y: auto;
-    overflow-x: auto;   /* Over-wide step values scroll the column sideways, not per-cell. */
     max-height: 80vh;
   }
   .col h2 {
@@ -301,6 +305,7 @@
     color: var(--dim);
     border-bottom: 1px solid var(--grid);
     padding-bottom: 8px;
+    font-family: var(--font-mono);   /* technical: column headers */
   }
 
   /* ───────── Provenance color spans ─────────
@@ -319,11 +324,11 @@
      source kind is communicated by SHAPE instead — non-instruction
      values carry an always-on outline rectangle. Two visual axes
      carrying one signal each, no overlap. */
-  .prov-instruction    { font-weight: 500; cursor: help; /* hue comes from .palette-N when cite is recoverable */ }
+  .prov-instruction    { font-weight: 400; cursor: help; /* hue comes from .palette-N when cite is recoverable */ }
   .prov-config,
   .prov-domain_default,
   .prov-inferred {
-    font-weight: 500;
+    font-weight: 400;
     cursor: help;
     outline: 1px solid var(--dim);
     outline-offset: 1px;
@@ -333,7 +338,7 @@
      underline instead of the outline box — a distinct "from initial contents"
      marker, separate from the generic model-filled (config/domain/inferred). */
   .prov-initial_state {
-    font-weight: 500;
+    font-weight: 400;
     cursor: help;
     border-bottom: 1px dotted var(--dim);
   }
@@ -360,17 +365,17 @@
     white-space: nowrap;
     justify-self: end;   /* right-align so all colons form one vertical line */
     text-align: right;
+    font-family: var(--font-body);   /* prose: param labels (sibling cell-value is mono) */
   }
   .cell-label.is-indented {
     padding-left: 1.4em;
   }
   .cell-value {
     /* Default text styling; provenance + chain spans handle their own colors. */
-    min-width: 0;       /* Track may shrink below content; over-wide tokens overflow. */
-    /* Wrap at spaces/commas only. A single over-wide token (e.g. reagent_reservoir)
-       is not chopped mid-word — it overflows and the column scrolls to reveal it. */
-    overflow-wrap: normal;
-    word-break: normal;
+    min-width: 0;       /* Allow long values to wrap rather than overflow. */
+    word-break: break-word;
+    font-family: var(--font-mono);   /* technical: parameter values */
+    font-size: 11.5px;  /* smaller than the 13px labels so long args wrap less */
   }
   .cell-check {
     /* Right-aligned check column. The inline-check span inside carries
@@ -434,21 +439,39 @@
   }
 
   /* ───────── Per-citation palette ─────────
-     `.palette-N` paints text in palette hue ONLY when the parent step
-     is being hovered (via .prov-active on the value-span side, or
-     .cite-active on the cite-marker side), or when the element itself
-     is being directly hovered. Resting state is plain ink — keeps the
-     three columns calm and forces palette-driven attention into the
-     parent-step hover model. Backgrounds are intentionally NOT used
-     here; the visual language is text-color-only. */
-  .palette-0.prov-active, .palette-0.cite-active, span.palette-0[data-prov-id]:hover { color: var(--palette-0); }
-  .palette-1.prov-active, .palette-1.cite-active, span.palette-1[data-prov-id]:hover { color: var(--palette-1); }
-  .palette-2.prov-active, .palette-2.cite-active, span.palette-2[data-prov-id]:hover { color: var(--palette-2); }
-  .palette-3.prov-active, .palette-3.cite-active, span.palette-3[data-prov-id]:hover { color: var(--palette-3); }
-  .palette-4.prov-active, .palette-4.cite-active, span.palette-4[data-prov-id]:hover { color: var(--palette-4); }
-  .palette-5.prov-active, .palette-5.cite-active, span.palette-5[data-prov-id]:hover { color: var(--palette-5); }
-  .palette-6.prov-active, .palette-6.cite-active, span.palette-6[data-prov-id]:hover { color: var(--palette-6); }
-  .palette-7.prov-active, .palette-7.cite-active, span.palette-7[data-prov-id]:hover { color: var(--palette-7); }
+     The active state (parent step hovered → .prov-active on the value
+     side; or the element directly hovered) carries the parameter hue as a
+     ~16% background WASH only — the glyph text always stays ink. A hue on
+     small mono text is invisible in peripheral vision (area + luminance
+     carry, hue-on-text does not), and coloring the text fights the calm
+     three-column reading. The wash references var(--palette-N) directly
+     (not currentColor) so it stays hued while the text is plain. */
+  .palette-0.prov-active, span.palette-0[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-0) 16%, transparent); }
+  .palette-1.prov-active, span.palette-1[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-1) 16%, transparent); }
+  .palette-2.prov-active, span.palette-2[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-2) 16%, transparent); }
+  .palette-3.prov-active, span.palette-3[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-3) 16%, transparent); }
+  .palette-4.prov-active, span.palette-4[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-4) 16%, transparent); }
+  .palette-5.prov-active, span.palette-5[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-5) 16%, transparent); }
+  .palette-6.prov-active, span.palette-6[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-6) 16%, transparent); }
+  .palette-7.prov-active, span.palette-7[data-prov-id]:hover { background: color-mix(in srgb, var(--palette-7) 16%, transparent); }
+  [class*="palette-"].prov-active,
+  span[class*="palette-"][data-prov-id]:hover { border-radius: 2px; }
+
+  /* Prototype-parity (2026): atomic param cites in the instruction carry a
+     RESTING colored underline in their palette hue (so the cited phrase
+     reads as a grounded value before any hover), matching the spec value
+     and code token color. NOTE: this intentionally overrides the design
+     system's "atomic cites are plain ink at rest" choice — delete this
+     block to restore the quiet resting state. Text stays ink; only the
+     underline is colored. */
+  .cite-atomic-color.palette-0 { border-bottom: 2px solid color-mix(in srgb, var(--palette-0) 45%, transparent); }
+  .cite-atomic-color.palette-1 { border-bottom: 2px solid color-mix(in srgb, var(--palette-1) 45%, transparent); }
+  .cite-atomic-color.palette-2 { border-bottom: 2px solid color-mix(in srgb, var(--palette-2) 45%, transparent); }
+  .cite-atomic-color.palette-3 { border-bottom: 2px solid color-mix(in srgb, var(--palette-3) 45%, transparent); }
+  .cite-atomic-color.palette-4 { border-bottom: 2px solid color-mix(in srgb, var(--palette-4) 45%, transparent); }
+  .cite-atomic-color.palette-5 { border-bottom: 2px solid color-mix(in srgb, var(--palette-5) 45%, transparent); }
+  .cite-atomic-color.palette-6 { border-bottom: 2px solid color-mix(in srgb, var(--palette-6) 45%, transparent); }
+  .cite-atomic-color.palette-7 { border-bottom: 2px solid color-mix(in srgb, var(--palette-7) 45%, transparent); }
 
   /* ───────── Instruction column ───────── */
   .instruction-text {
@@ -462,15 +485,16 @@
   .step {
     margin-bottom: 14px;
     padding: 10px 12px;
-    border-left: 3px solid transparent;
-    background: rgba(0, 0, 0, 0.015);
-    border-radius: 0 4px 4px 0;
+    background: var(--panel);
+    border: 1px solid var(--grid);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   }
-  .step.step-orphan { border-left-color: var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
+  .step.step-orphan { border-left: 3px solid var(--col-inferred); background: rgba(251, 133, 0, 0.05); }
   /* Instruction-grounded is the common case (most steps), so the blue
      left-bar dominates the column without conveying useful signal.
      Leave it transparent; the rarer orphan / mixed cases still show. */
-  .step.step-grounded-mixed { border-left-color: var(--col-domain); }
+  .step.step-grounded-mixed { border-left: 3px solid var(--col-domain); }
   .step-header {
     font-size: 12px;
     color: var(--dim);
@@ -601,6 +625,23 @@
   pre.code .code-line.is-script-linked {
     background: color-mix(in srgb, var(--col-instruction) 10%, transparent);
   }
+  /* Per-parameter value tokens inside a code line (volume number, source /
+     destination well). Carry the same data-prov-id + palette-N as their
+     spec value + instruction cite, so setPairActive lights all three
+     columns together and the hue wash + per-param arrow have a col-3
+     anchor. The .palette-N color/wash rules higher up do the coloring;
+     this only adds the affordance. */
+  pre.code .code-tok {
+    cursor: help;
+    border-radius: 2px;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  #arrow-overlay path.param-arrow {
+    fill: none;
+    stroke-width: 2.2;
+    stroke-opacity: 0.9;
+    stroke-linecap: round;
+  }
   /* Validated-spec block highlight when matching code lines are hovered.
      Same blue mix as .step.step-active below — the script-linked and
      step-trigger hover paths share one visual language. */
@@ -641,11 +682,24 @@
   }
   .cite-atomic-color {
     /* color comes from the .palette-N class on the same span */
-    font-weight: 500;
+    font-weight: 400;
   }
+  /* Param-hue wash on hover/active, referencing var(--palette-N) directly so
+     the cite lights in its parameter color while the cited text stays ink. */
+  .cite-atomic-color.palette-0:hover, .cite-atomic-color.palette-0.cite-active { background: color-mix(in srgb, var(--palette-0) 16%, transparent); }
+  .cite-atomic-color.palette-1:hover, .cite-atomic-color.palette-1.cite-active { background: color-mix(in srgb, var(--palette-1) 16%, transparent); }
+  .cite-atomic-color.palette-2:hover, .cite-atomic-color.palette-2.cite-active { background: color-mix(in srgb, var(--palette-2) 16%, transparent); }
+  .cite-atomic-color.palette-3:hover, .cite-atomic-color.palette-3.cite-active { background: color-mix(in srgb, var(--palette-3) 16%, transparent); }
+  .cite-atomic-color.palette-4:hover, .cite-atomic-color.palette-4.cite-active { background: color-mix(in srgb, var(--palette-4) 16%, transparent); }
+  .cite-atomic-color.palette-5:hover, .cite-atomic-color.palette-5.cite-active { background: color-mix(in srgb, var(--palette-5) 16%, transparent); }
+  .cite-atomic-color.palette-6:hover, .cite-atomic-color.palette-6.cite-active { background: color-mix(in srgb, var(--palette-6) 16%, transparent); }
+  .cite-atomic-color.palette-7:hover, .cite-atomic-color.palette-7.cite-active { background: color-mix(in srgb, var(--palette-7) 16%, transparent); }
   .cite-atomic-color:hover,
-  .cite-atomic-color.cite-active {
-    background: rgba(0, 0, 0, 0.06);
+  .cite-atomic-color.cite-active { border-radius: 2px; }
+  /* Step hover: every cite in the step's instruction phrase gets ONE uniform
+     blue wash (matching .step.step-active), not each param's palette hue. */
+  .cite-marker.step-cite-active {
+    background: color-mix(in srgb, var(--col-instruction) 12%, transparent);
     border-radius: 2px;
   }
   .cite-q2-cohesion {
@@ -660,6 +714,24 @@
     background: color-mix(in srgb, var(--col-instruction) 6%, transparent);
     border-left-color: var(--col-instruction);
   }
+
+  /* When a single-param cross-column line is active (body.param-active, set
+     by showParamArrows), hide the step-level arrows and neutralize the step
+     blue highlight + code-line linkage so only the focused param's grounding
+     line shows. Each selector out-specifies its base rule, so no !important. */
+  body.param-active #arrow-paths,
+  body.param-active #step-code-arrow-paths { opacity: 0; }
+  body.param-active .step.step-active,
+  body.param-active .col-validated-spec .step.is-script-linked {
+    background: transparent;
+    border-left-color: transparent;
+  }
+  body.param-active pre.code .code-line.is-script-linked { background: transparent; }
+  /* Hovering a value/token nested inside a step also fires the step hover; while
+     a single param is active, suppress the step's uniform instruction wash on the
+     OTHER cites — but never on the focused cite itself (it carries .cite-active and
+     must keep its own param hue). The :not() keeps this off the active cite. */
+  body.param-active .cite-marker.step-cite-active:not(.cite-active) { background: transparent; }
 
   /* ───────── Phase 3h (#68) + 2026-05-06 polish: fade-in for live-mode blocks ─────────
      Live-mode appendStepBlocks adds .fade-in (opacity 0) to each new
@@ -933,7 +1005,7 @@
     padding: 10px 12px;
     background: var(--tip-bg);
     color: var(--tip-fg);
-    font-size: 12px;
+    font-size: 13px;
     line-height: 1.45;
     border-radius: 4px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
@@ -941,6 +1013,8 @@
     opacity: 0;
     transition: opacity 0.18s ease;
     white-space: normal;
+    font-family: var(--font-body);   /* prose: tooltip explanation (IBM Plex Sans) */
+    font-weight: 400;
   }
   #hover-tip.visible { opacity: 1; }
   #hover-tip .tip-meta {
@@ -949,6 +1023,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 4px;
+    font-family: var(--font-mono);   /* technical: the uppercase label line */
   }
   #hover-tip .tip-cite {
     font-style: italic;
@@ -1015,6 +1090,11 @@
     stroke-width: 2.5;
     transition: stroke 0.12s, stroke-opacity 0.12s, stroke-width 0.12s;
   }
+  /* Reveal arrows: optional sequential appear-then-disappear (gated by
+     REVEAL_ARROWS_FADE_OUT, OFF by default). The faded class hides the
+     persisted path; a hover (.arrow-active) still brings it back. */
+  #arrow-overlay path.reveal-faded { opacity: 0; transition: opacity 0.3s ease; }
+  #arrow-overlay path.reveal-faded.arrow-active { opacity: 1; }
   #arrow-overlay path.arrow-active {
     stroke: var(--col-instruction);
     stroke-opacity: 0.9;
@@ -1661,6 +1741,11 @@
        midpoint of the step's vertical bracket bar in col 3. Animation
        (trace timing, stagger, hover-active) mirrors #arrow-paths. -->
   <g clip-path="url(#step-code-arrow-clip)" id="step-code-arrow-paths"></g>
+  <!-- Per-parameter grounding arrows (instruction cite → spec value → code
+       token), drawn on hover by renderParamArrows(). Unclipped — endpoints
+       are clamped to their columns' visible bands instead. One bezier per
+       segment, stroked in the parameter's palette hue. -->
+  <g id="param-arrow-paths"></g>
 </svg>
 
 <!-- ADR-0011 Phase 2b: resolution-arrow data embedded as JSON.
@@ -1744,6 +1829,23 @@
     return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
   }
 
+  // Clamp a rect's vertical center into its column's visible band and
+  // report whether it is currently scrolled out. Arrows anchored to a
+  // clamped rect terminate at the band edge instead of sweeping across
+  // the layout toward an off-screen point (the out-of-bounds symptom).
+  // The existing vertical clip then hides the stub cleanly.
+  function clampRectToCol(rect, col) {
+    if (!col) return { rect, off: false };
+    const c = col.getBoundingClientRect();
+    const yc = rect.top + rect.height / 2;
+    const off = yc < c.top + 4 || yc > c.bottom - 4;
+    const y = Math.max(c.top + 8, Math.min(c.bottom - 8, yc));
+    return {
+      rect: { left: rect.left, right: rect.right, top: y - 0.5, height: 1, width: rect.width },
+      off,
+    };
+  }
+
   // Auto-scroll helper. Given a step index and one or two columns,
   // ensure the step's `.step` block is fully visible in EACH column.
   // For a single column (red-arrow case) this just scrolls that column.
@@ -1788,6 +1890,99 @@
     });
   }
 
+  // ── Dwell-to-scroll (2026) ────────────────────────────────────────
+  // After the pointer rests on a step/value/cite for DWELL_SCROLL_MS,
+  // bring any out-of-view member of its provenance set (instruction cite,
+  // spec value, code line) into view in its own column. The delay means a
+  // quick skim never yanks the columns around. Honors DWELL_SCROLL_ENABLED.
+  let dwellTimer = null;
+  function scrollElIntoCol(el) {
+    if (!el) return;
+    const col = el.closest(".col");
+    if (!col) return;
+    const cr = col.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top >= cr.top + 16 && r.bottom <= cr.bottom - 16) return;  // already visible
+    const target = col.scrollTop + (r.top - cr.top) - col.clientHeight / 2 + r.height / 2;
+    try { col.scrollTo({ top: Math.max(0, target), behavior: "smooth" }); }
+    catch (e) { col.scrollTop = Math.max(0, target); }
+  }
+  function dwellScrollForId(id) {
+    if (!id) return;
+    document.querySelectorAll(sel("data-cite-id", id)).forEach(scrollElIntoCol);
+    document.querySelectorAll(sel("data-prov-id", id)).forEach(scrollElIntoCol);
+    if (id.endsWith("-step-trigger")) {
+      const prefix = id.split("-")[0];
+      document.querySelectorAll(`[data-prov-id^="${prefix}-"]`).forEach(scrollElIntoCol);
+      document.querySelectorAll(`.code-line[data-script-step="${prefix}"]`).forEach(scrollElIntoCol);
+    }
+  }
+  function startDwell(id) {
+    clearTimeout(dwellTimer);
+    if (!DWELL_SCROLL_ENABLED || !id) return;
+    dwellTimer = setTimeout(() => { try { dwellScrollForId(id); } catch (e) { /* defensive */ } }, DWELL_SCROLL_MS);
+  }
+  function cancelDwell() { clearTimeout(dwellTimer); }
+
+  // ── Per-parameter grounding arrows (2026) ────────────────────────
+  // instruction cite → spec value → code token, in the parameter's hue,
+  // scoped to exactly the id(s) on the hovered element. Endpoints are
+  // clamped to their columns so nothing sweeps off-screen; activeParamIds
+  // lets scheduleRender keep them tracking through scroll / dwell-scroll.
+  let activeParamIds = null;
+  const FIELD_HUE_IDX = { volume: 0, substance: 2, source: 1, destination: 4, duration: 5, temperature: 6 };
+  function paletteVarForId(id) {
+    const parts = String(id).split("-");
+    const field = (parts[parts.length - 1] === "wells" && parts.length >= 2)
+      ? parts[parts.length - 2] : parts[parts.length - 1];
+    const n = FIELD_HUE_IDX[field];
+    return (n == null) ? "var(--col-instruction)" : `var(--palette-${n})`;
+  }
+  function renderParamArrows(ids) {
+    const group = document.getElementById("param-arrow-paths");
+    if (!group) return;
+    group.innerHTML = "";
+    if (!ids || !ids.length) return;
+    const instrCol = document.querySelector(".instruction-text")
+      ? document.querySelector(".instruction-text").closest(".col") : null;
+    const specCol = document.querySelector(".col-protocol-steps");
+    const codeCol = document.querySelector(".col-generated-code");
+    const seg = (a, colA, b, colB, hue) => {
+      if (!a || !b) return;
+      const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      if (!ra.width || !rb.width) return;
+      const ca = clampRectToCol(ra, colA), cb = clampRectToCol(rb, colB);
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("class", "param-arrow");
+      p.setAttribute("d", bezierPath(ca.rect, cb.rect));
+      p.style.stroke = hue;   // style (not attr) so the CSS var resolves
+      group.appendChild(p);
+    };
+    ids.forEach((id) => {
+      const esc = (window.CSS && CSS.escape) ? CSS.escape(id) : id;
+      const hue = paletteVarForId(id);
+      const cite = document.querySelector(`[data-cite-id~="${esc}"]`);
+      const value = specCol ? specCol.querySelector(`[data-prov-id="${esc}"]`) : null;
+      const token = codeCol ? codeCol.querySelector(`.code-tok[data-prov-id="${esc}"]`) : null;
+      seg(cite, instrCol, value, specCol, hue);
+      seg(value, specCol, token, codeCol, hue);
+    });
+  }
+  function showParamArrows(ids) {
+    activeParamIds = (ids && ids.length) ? ids.slice() : null;
+    // While a single-param cross-column line is showing, suppress the
+    // step-level arrows + step blue highlight (CSS keys off body.param-active)
+    // so only the focused param's grounding line is visible.
+    document.body.classList.toggle("param-active", !!activeParamIds);
+    renderParamArrows(activeParamIds || []);
+  }
+  function clearParamArrows() {
+    activeParamIds = null;
+    document.body.classList.remove("param-active");
+    const g = document.getElementById("param-arrow-paths");
+    if (g) g.innerHTML = "";
+  }
+
   // Per ADR-0011 animation-timing addendum (strict-serial revision):
   // each per-step slot is TRACE + FADE = 1375ms. Arrow takes the first
   // 770ms of the slot; block takes the next 605ms. The next slot begins
@@ -1804,6 +1999,23 @@
   // can't pop while arrows are still drawing — that race produces
   // the "Initial contents popped before arrows finished" symptom.
   let arrowsTracingDoneAt = 0;
+
+  // ── Tunable behavior flags (2026 review) ──────────────────────────
+  // Reveal arrows: when true, each composite-step arrow fades out after
+  // its block lands (sequential appear-then-disappear) instead of
+  // persisting as the live provenance record. OFF for now — flip to true
+  // to declutter the reveal; a hover still brings any arrow back.
+  const REVEAL_ARROWS_FADE_OUT = false;
+  const REVEAL_ARROWS_HOLD_MS = 450;   // hold after trace before fade-out
+  // Dwell-to-scroll: hovering a step/value/cite this long brings any
+  // out-of-view counterpart in the other columns into view.
+  const DWELL_SCROLL_ENABLED = true;
+  const DWELL_SCROLL_MS = 700;
+  // Shared reveal origin: block-fade (appendStepBlocks) and arrow-trace
+  // (renderArrows) both schedule relative to this one timestamp, so a
+  // step's arrow and its block are phase-locked instead of drifting on
+  // two independent setTimeout baselines.
+  let revealBaseline = 0;
 
   function renderArrows() {
     const arrowGroup = document.getElementById("arrow-paths");
@@ -1846,12 +2058,20 @@
     // entries whose ids no longer exist (rare — only on re-runs that
     // shrink the spec).
     const resolvedThisRender = new Set();
+    const instrCol = document.querySelector(".instruction-text")
+      ? document.querySelector(".instruction-text").closest(".col")
+      : null;
     anchorByStepId.forEach(({ rect: srcRect }, id) => {
       const target = document.querySelector(`.step${sel("data-prov-id", id)}`);
       if (!target) return;
       const dstRect = target.getBoundingClientRect();
       if (!dstRect.width) return;
-      const d = bezierPath(srcRect, dstRect);
+      // Clamp both endpoints into their columns' visible bands so an arrow
+      // whose target has scrolled away terminates at the band edge rather
+      // than sweeping across the instruction column (the out-of-bounds bug).
+      const srcC = clampRectToCol(srcRect, instrCol);
+      const dstC = clampRectToCol(dstRect, specCol);
+      const d = bezierPath(srcC.rect, dstC.rect);
       let path = arrowPathMap.get(id);
       if (path && path.parentNode === arrowGroup) {
         // Existing path — mutate `d` to follow scrolled / repositioned
@@ -1873,7 +2093,11 @@
             path.style.strokeDashoffset = String(len);
             const m = id.match(/^s(\d+)/);
             const stepIdx = m ? parseInt(m[1], 10) : 0;
-            const delay = stepIdx * ARROW_STAGGER_MS;
+            // Align the trace to the shared reveal origin set by
+            // appendStepBlocks so arrow + block fire off one clock. In
+            // static mode (no appendStepBlocks) seed the origin on first sight.
+            if (!revealBaseline) revealBaseline = performance.now();
+            const delay = Math.max(0, revealBaseline + stepIdx * ARROW_STAGGER_MS - performance.now());
             arrowsTracingDoneAt = Math.max(
               arrowsTracingDoneAt,
               performance.now() + delay + ARROW_TRACE_MS,
@@ -1900,6 +2124,10 @@
               setTimeout(() => {
                 path.style.strokeDasharray = "none";
                 path.style.strokeDashoffset = "0";
+                // Optional sequential disappear (off by default).
+                if (REVEAL_ARROWS_FADE_OUT) {
+                  setTimeout(() => path.classList.add("reveal-faded"), REVEAL_ARROWS_HOLD_MS);
+                }
               }, ARROW_TRACE_MS + 50);
             }, delay);
           }
@@ -1917,17 +2145,17 @@
   }
 
   function setPairActive(id, active) {
-    // Toggle highlight on every cite-segment, prov-target, and arrow
-    // sharing one id. An atomic-color cite segment that lies inside
-    // a composite step cite carries both ids; on step hover, the
-    // atomic segment activates too so its palette text color shows.
-    // (Earlier the palette class flipped to a solid background which
-    // read as noisy under a step hover, so this branch used to skip
-    // atomic segments — that background-flip rule is gone, so the
-    // skip is gone with it.)
+    // Toggle highlight on every cite-segment, prov-target, and arrow sharing
+    // one id. A step hover (id ends "-step-trigger") matches EVERY atomic cite
+    // of the step (they all carry the shared step-trigger id), so it uses a
+    // single UNIFORM wash class (step-cite-active) instead of cite-active —
+    // otherwise each atom's palette rule paints its own hue and the step's
+    // instruction phrase reads as a rainbow. A param hover keeps cite-active,
+    // which the per-palette rules light in that one parameter's hue.
     const isStepTrigger = id.endsWith("-step-trigger");
+    const citeClass = isStepTrigger ? "step-cite-active" : "cite-active";
     document.querySelectorAll(sel("data-cite-id", id)).forEach((e) => {
-      e.classList.toggle("cite-active", active);
+      e.classList.toggle(citeClass, active);
     });
     document.querySelectorAll(sel("data-prov-id", id)).forEach((e) => {
       if (e.classList.contains("step")) {
@@ -1936,22 +2164,23 @@
         e.classList.toggle("prov-active", active);
       }
     });
-    // Parent-step hover: also light up every atomic value cell whose
-    // data-prov-id starts with the step prefix (e.g. "s2-volume",
-    // "s2-source", "s2-substance" for step s2). This is what makes
-    // col 3 atoms colorize together when the user hovers a step in
-    // col 2, mirroring the col 1 ↔ col 2 hover pair model. The step
-    // block itself carries data-prov-id="s{idx}-step-trigger" which
-    // also matches the prefix; the .step guard above already gave it
-    // .step-active, so skip it here to avoid double-toggling.
+    // Parent-step hover lights the step BLOCK (the .step-active above) and
+    // its generated code lines, but intentionally NOT each param's own wash —
+    // washing every atom across all three columns on a step hover is too
+    // noisy. Per-param cross-column highlight is reserved for hovering the
+    // individual param (cite / value / code token). See showParamArrows.
     if (isStepTrigger) {
       const stepPrefix = id.split("-")[0];  // "s2"
       if (stepPrefix) {
-        document.querySelectorAll(`[data-prov-id^="${stepPrefix}-"]`).forEach((e) => {
-          if (e.classList.contains("step")) return;
-          if (e.getAttribute("data-prov-id") === id) return;
-          e.classList.toggle("prov-active", active);
-        });
+        // Extend the flow to col 3: light this step's generated code lines
+        // and validated-spec block with the same wash wireScriptLinkage
+        // uses on code hover, so a step hover reads instruction → spec → code.
+        document.querySelectorAll(`.code-line[data-script-step="${stepPrefix}"]`).forEach((e) =>
+          e.classList.toggle("is-script-linked", active)
+        );
+        document.querySelectorAll(`.col-validated-spec .step[data-script-step="${stepPrefix}"]`).forEach((e) =>
+          e.classList.toggle("is-script-linked", active)
+        );
       }
     }
     overlay.querySelectorAll(`path[data-cite-id="${CSS.escape(id)}"]`).forEach((p) =>
@@ -2072,8 +2301,16 @@
     // tooltip wiring lives on prov-id targets and step blocks below).
     document.querySelectorAll("[data-cite-id]").forEach((el) => {
       const ids = (el.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
-      el.addEventListener("mouseenter", () => ids.forEach((id) => setPairActive(id, true)));
-      el.addEventListener("mouseleave", () => ids.forEach((id) => setPairActive(id, false)));
+      // A cited phrase can triple as the step trigger, a Q2-cohesion fragment,
+      // and an atomic param cite (e.g. "s0-step-trigger s0-q2-0 s0-volume"). For
+      // the per-parameter wash + arrow, use ONLY the atomic param ids — otherwise
+      // the shared s{n}-step-trigger lights every sibling param's cite at once
+      // (blue + green + purple together). A bare step-trigger span (no param id)
+      // keeps the step-level behavior via the fallback to `ids`.
+      const paramIds = ids.filter((id) => !/-step-trigger$/.test(id) && !/-q2-\d+$/.test(id));
+      const useIds = paramIds.length ? paramIds : ids;
+      el.addEventListener("mouseenter", () => { useIds.forEach((id) => setPairActive(id, true)); startDwell(useIds[0]); showParamArrows(paramIds); });
+      el.addEventListener("mouseleave", () => { useIds.forEach((id) => setPairActive(id, false)); cancelDwell(); clearParamArrows(); });
     });
 
     // Atomic value spans (carry data-prov-source) — pair highlight + tooltip.
@@ -2081,11 +2318,37 @@
       const id = el.getAttribute("data-prov-id");
       el.addEventListener("mouseenter", (e) => {
         if (id) setPairActive(id, true);
+        startDwell(id);
+        if (id) showParamArrows([id]);
         showTip(tooltipHtmlForValueSpan(el), e);
       });
       el.addEventListener("mousemove", moveTip);
       el.addEventListener("mouseleave", () => {
         if (id) setPairActive(id, false);
+        cancelDwell();
+        clearParamArrows();
+        hideTip();
+      });
+    });
+
+    // Code value tokens (volume / wells) carry the same data-prov-id as
+    // their spec value, so they reuse setPairActive + the per-param arrow,
+    // and borrow the spec value's tooltip metadata for the hover card.
+    document.querySelectorAll("pre.code .code-tok[data-prov-id]").forEach((el) => {
+      const id = el.getAttribute("data-prov-id");
+      const esc = (window.CSS && CSS.escape) ? CSS.escape(id) : id;
+      el.addEventListener("mouseenter", (e) => {
+        if (id) setPairActive(id, true);
+        startDwell(id);
+        showParamArrows([id]);
+        const specVal = document.querySelector(`.col-protocol-steps [data-prov-source][data-prov-id="${esc}"]`);
+        if (specVal) showTip(tooltipHtmlForValueSpan(specVal), e);
+      });
+      el.addEventListener("mousemove", moveTip);
+      el.addEventListener("mouseleave", () => {
+        if (id) setPairActive(id, false);
+        cancelDwell();
+        clearParamArrows();
         hideTip();
       });
     });
@@ -2095,11 +2358,13 @@
       const provId = stepEl.getAttribute("data-prov-id");
       stepEl.addEventListener("mouseenter", (e) => {
         setPairActive(provId, true);
+        startDwell(provId);
         showTip(tooltipHtmlForStepBlock(stepEl), e);
       });
       stepEl.addEventListener("mousemove", moveTip);
       stepEl.addEventListener("mouseleave", () => {
         setPairActive(provId, false);
+        cancelDwell();
         hideTip();
       });
     });
@@ -2448,6 +2713,7 @@
       renderResolutionArrows();
       renderStepCodeBrackets();
       renderStepCodeArrows();
+      if (activeParamIds) renderParamArrows(activeParamIds);
     });
   }
 
@@ -3067,6 +3333,11 @@
       const fadeOffset = (opts.fadeOffset != null) ? opts.fadeOffset : ARROW_TRACE_MS;
       const col = document.querySelector(colSelector);
       if (!col || !stepDicts) return;
+      // Phase-lock: the protocol-steps reveal (col 1→2) shares its origin
+      // with renderArrows so each step's arrow trace and block fade fire
+      // off one clock instead of two independent setTimeout baselines.
+      const usesSharedClock = colSelector.indexOf("protocol-steps") !== -1;
+      if (usesSharedClock) revealBaseline = performance.now();
       // Drop any "(...) not reached" placeholder paragraph.
       col.querySelectorAll("p").forEach((p) => p.remove());
       // Drop any existing step blocks (so re-runs don't duplicate).
@@ -3110,7 +3381,9 @@
         if (step.note_line) html += step.note_line;
         div.innerHTML = html;
         col.appendChild(div);
-        const blockDelay = idx * stagger + fadeOffset;
+        const blockDelay = usesSharedClock
+          ? Math.max(0, revealBaseline + idx * stagger + fadeOffset - performance.now())
+          : idx * stagger + fadeOffset;
         setTimeout(() => div.classList.add("is-visible"), blockDelay);
       });
       // Re-wire hover handlers so newly-added cells get listeners.
