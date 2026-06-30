@@ -253,6 +253,43 @@ class TestPipelineMalformedLLMOutput:
         # Per extractor's docstring: "Returns ProtocolSpec on success, None on failure (fail-fast)."
         assert spec is None
 
+    def test_extraction_retries_transient_timeout(self, simple_config):
+        # A read timeout fired mid-stream is transient: extract() retries the
+        # whole streamed call and recovers instead of failing the run.
+        import httpx
+        from unittest.mock import patch
+        response = _make_mock_response(_spec_simple_transfer(volume_uL=100.0))
+        mock_client = MagicMock()
+        mock_client.messages.stream.side_effect = [
+            httpx.ReadTimeout("stalled mid-stream"),
+            _make_mock_stream(response),
+        ]
+        extractor = SemanticExtractor(client=mock_client)
+        with patch("time.sleep"):   # skip the backoff
+            spec = extractor.extract("Transfer 100uL from A1 to B1")
+        assert spec is not None
+        assert mock_client.messages.stream.call_count == 2
+        # Retry telemetry the pipeline writes into the state log.
+        assert extractor.extraction_attempts == 2
+        assert len(extractor.extraction_retries) == 1
+        assert extractor.extraction_retries[0]["error_type"] == "ReadTimeout"
+
+    def test_extraction_does_not_retry_terminal_error(self, simple_config):
+        # A max_tokens truncation is terminal, not transient — fail fast, no retry.
+        from unittest.mock import patch
+        response = _make_mock_response(_spec_simple_transfer(volume_uL=100.0))
+        response.stop_reason = "max_tokens"
+        mock_client = MagicMock()
+        mock_client.messages.stream.return_value = _make_mock_stream(response)
+        extractor = SemanticExtractor(client=mock_client)
+        with patch("time.sleep"):
+            spec = extractor.extract("Transfer 100uL from A1 to B1")
+        assert spec is None
+        assert mock_client.messages.stream.call_count == 1
+        # Terminal error → one attempt, no transient retries recorded.
+        assert extractor.extraction_attempts == 1
+        assert extractor.extraction_retries == []
+
 
 class TestPipelineMultiStep:
     """Multi-step specs propagate step count through the chain."""
