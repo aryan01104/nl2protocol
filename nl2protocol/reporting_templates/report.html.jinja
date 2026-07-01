@@ -2300,6 +2300,8 @@
     // any prov metadata via the value side, which it doesn't directly —
     // tooltip wiring lives on prov-id targets and step blocks below).
     document.querySelectorAll("[data-cite-id]").forEach((el) => {
+      if (el.dataset.hoverBound === "1") return;
+      el.dataset.hoverBound = "1";
       const ids = (el.getAttribute("data-cite-id") || "").split(/\s+/).filter(Boolean);
       // A cited phrase can triple as the step trigger, a Q2-cohesion fragment,
       // and an atomic param cite (e.g. "s0-step-trigger s0-q2-0 s0-volume"). For
@@ -2315,6 +2317,8 @@
 
     // Atomic value spans (carry data-prov-source) — pair highlight + tooltip.
     document.querySelectorAll("[data-prov-source]").forEach((el) => {
+      if (el.dataset.hoverBound === "1") return;
+      el.dataset.hoverBound = "1";
       const id = el.getAttribute("data-prov-id");
       el.addEventListener("mouseenter", (e) => {
         if (id) setPairActive(id, true);
@@ -2335,6 +2339,8 @@
     // their spec value, so they reuse setPairActive + the per-param arrow,
     // and borrow the spec value's tooltip metadata for the hover card.
     document.querySelectorAll("pre.code .code-tok[data-prov-id]").forEach((el) => {
+      if (el.dataset.hoverBound === "1") return;
+      el.dataset.hoverBound = "1";
       const id = el.getAttribute("data-prov-id");
       const esc = (window.CSS && CSS.escape) ? CSS.escape(id) : id;
       el.addEventListener("mouseenter", (e) => {
@@ -2355,6 +2361,8 @@
 
     // Step blocks — step-trigger pair highlight + tooltip.
     document.querySelectorAll(".step[data-prov-id]").forEach((stepEl) => {
+      if (stepEl.dataset.hoverBound === "1") return;
+      stepEl.dataset.hoverBound = "1";
       const provId = stepEl.getAttribute("data-prov-id");
       stepEl.addEventListener("mouseenter", (e) => {
         setPairActive(provId, true);
@@ -2371,6 +2379,8 @@
 
     // Complete-spec column step blocks (no data-prov-id but still hover tooltip).
     document.querySelectorAll(".step:not([data-prov-id])[data-step-cited]").forEach((stepEl) => {
+      if (stepEl.dataset.hoverBound === "1") return;
+      stepEl.dataset.hoverBound = "1";
       stepEl.addEventListener("mouseenter", (e) => showTip(tooltipHtmlForStepBlock(stepEl), e));
       stepEl.addEventListener("mousemove", moveTip);
       stepEl.addEventListener("mouseleave", hideTip);
@@ -2382,6 +2392,8 @@
     // the spec columns. Reuses the existing setPairActive helper that
     // already drives the cite ↔ value pair highlight.
     document.querySelectorAll(".panel tbody tr[data-target-cells]").forEach((rowEl) => {
+      if (rowEl.dataset.hoverBound === "1") return;
+      rowEl.dataset.hoverBound = "1";
       const ids = (rowEl.getAttribute("data-target-cells") || "").split(/\s+/).filter(Boolean);
       if (ids.length === 0) return;
       rowEl.addEventListener("mouseenter", () => ids.forEach((id) => setPairActive(id, true)));
@@ -4278,6 +4290,13 @@
               }
               codeCol.appendChild(pre);
               try { wireScriptLinkage(); } catch (err) { /* defensive */ }
+              // Bind the token-level hover (cross-column param wash + per-param
+              // arrow) onto the just-injected code tokens. wireScriptLinkage
+              // above only wires code-LINE ↔ step-block; the .code-tok
+              // handlers live in wireHover, which no later event re-runs since
+              // codegen is the final stage. The dataset.hoverBound guard makes
+              // this idempotent against already-wired col-1/2/4 elements.
+              try { wireHover(); } catch (err) { /* defensive */ }
             }
             try { scheduleRender(); } catch (err) { /* defensive */ }
           }, COLUMN_FADE_MS + 200);
